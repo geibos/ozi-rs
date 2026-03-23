@@ -1,0 +1,31 @@
+{
+  "id": "command-stack-foundation-01",
+  "seq": "01",
+  "title": "Implement reversible layer creation commands",
+  "status": "completed",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "coder-agent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/.config/opencode/context/development/principles/clean-code.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/domain/project.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs"
+  ],
+  "acceptance_criteria": [
+    "A project edit command can add a map, track, or waypoint layer",
+    "Undo restores the prior project snapshot",
+    "Redo reapplies the reverted command"
+  ],
+  "deliverables": [
+    "src/application/mod.rs",
+    "src/application/commands.rs",
+    "application tests"
+  ],
+  "started_at": "2026-03-23T17:31:51Z",
+  "completed_at": "2026-03-23T17:34:32Z",
+  "completion_summary": "Added explicit application commands for layer creation plus snapshot-based undo/redo coverage in the Rust test suite."
+}

@@ -1,0 +1,37 @@
+{
+  "id": "map-layer-registration-01",
+  "seq": "01",
+  "title": "Register opened maps as project map layers",
+  "status": "in_progress",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "coder-agent",
+  "context_files": [
+    "/Users/sobieg/Projects/ozi-rs/AGENTS.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/.config/opencode/context/development/principles/clean-code.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/domain/project.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/commands.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/ui/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/lizaalert.rs"
+  ],
+  "acceptance_criteria": [
+    "Map registration stores a local source path on the domain map layer",
+    "Downloaded maps are registered into the project through AppState",
+    "Reopening the same map path does not duplicate a layer"
+  ],
+  "deliverables": [
+    "src/domain/project.rs",
+    "src/application/mod.rs",
+    "src/application/commands.rs",
+    "README.md",
+    "domain and application tests"
+  ],
+  "started_at": "2026-03-23T17:35:46Z",
+  "completed_at": null,
+  "completion_summary": null
+}
