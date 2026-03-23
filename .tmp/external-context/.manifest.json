@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-22T20:17:19Z",
+  "libraries": {
+    "walkers": {
+      "files": [
+        {
+          "filename": "egui-eframe-osm-embedding.md",
+          "topic": "egui eframe osm embedding with pan support",
+          "tech_stack": "eframe / egui desktop",
+          "fetched": "2026-03-22T20:17:19Z",
+          "source": "Official docs, docs.rs, and source README"
+        },
+        {
+          "filename": "custom-sqlite-tile-backend.md",
+          "topic": "custom tile source and custom local sqlite tile backend for eframe",
+          "tech_stack": "eframe / egui desktop + local sqlite tiles",
+          "fetched": "2026-03-23T17:30:26Z",
+          "source": "docs.rs and source code"
+        },
+        {
+          "filename": "attribution-api-migration.md",
+          "topic": "sources::Attribution API migration",
+          "tech_stack": "Rust + eframe / egui + walkers",
+          "fetched": "2026-03-23T17:40:01Z",
+          "source": "docs.rs and source code"
+        }
+      ]
+    },
+    "eframe-egui": {
+      "files": [
+        {
+          "filename": "rust-desktop-map-editor-evaluation.md",
+          "topic": "Rust desktop map editor evaluation",
+          "tech_stack": "Rust desktop",
+          "fetched": "2026-03-22T12:08:31Z",
+          "source": "Official docs and docs.rs"
+        },
+        {
+          "filename": "osm-map-hosting.md",
+          "topic": "native egui app hosting for map widget",
+          "tech_stack": "eframe / egui desktop",
+          "fetched": "2026-03-22T20:17:19Z",
+          "source": "Official docs and docs.rs"
+        }
+      ]
+    },
+    "iced": {
+      "files": [
+        {
+          "filename": "rust-desktop-map-editor-evaluation.md",
+          "topic": "Rust desktop map editor evaluation",
+          "tech_stack": "Rust desktop",
+          "fetched": "2026-03-22T12:08:31Z",
+          "source": "Official docs, docs.rs, and iced book"
+        }
+      ]
+    },
+    "tauri": {
+      "files": [
+        {
+          "filename": "rust-desktop-map-editor-evaluation.md",
+          "topic": "Rust desktop map editor evaluation",
+          "tech_stack": "Rust desktop",
+          "fetched": "2026-03-22T12:08:31Z",
+          "source": "Official Tauri docs"
+        }
+      ]
+    }
+  }
+}
