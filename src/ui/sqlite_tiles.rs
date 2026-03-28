@@ -1,9 +1,9 @@
 use eframe::egui::{self, Rect};
 use lru::LruCache;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::num::NonZeroUsize;
 use std::path::Path;
-use walkers::{sources::Attribution, Tile, TileId, TilePiece, Tiles};
+use walkers::{Tile, TileId, TilePiece, Tiles, sources::Attribution};
 
 const SQLITE_TILES_ATTRIBUTION_TEXT: &str = "LizaAlert";
 const SQLITE_TILES_ATTRIBUTION_URL: &str = "";
