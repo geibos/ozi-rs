@@ -1,6 +1,6 @@
 mod sqlite_tiles;
 
-use crate::application::AppState;
+use crate::application::{AppState, DiagnosticEntry, DiagnosticLevel};
 use eframe::egui;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -88,7 +88,8 @@ impl OziApp {
             Err(error) => {
                 self.loaded_map_path = None;
                 self.offline_tiles = None;
-                eprintln!("Failed to open downloaded map: {error}");
+                self.state
+                    .report_runtime_error(format!("Failed to open downloaded map: {error}"));
             }
         }
     }
@@ -110,6 +111,7 @@ impl OziApp {
                 }
 
                 ui.label(self.state.lizaalert_status());
+                self.show_diagnostics_console(ui);
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label("Projects");
@@ -169,6 +171,21 @@ impl OziApp {
                 if let Some(map_name) = selected_map_name {
                     self.state.open_selected_map(&map_name);
                 }
+            });
+    }
+
+    fn show_diagnostics_console(&self, ui: &mut egui::Ui) {
+        egui::CollapsingHeader::new("Diagnostics")
+            .default_open(true)
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("diagnostics_console")
+                    .max_height(160.0)
+                    .show(ui, |ui| {
+                        for entry in self.state.recent_diagnostics().rev() {
+                            render_diagnostic_entry(ui, entry);
+                        }
+                    });
             });
     }
 }
@@ -236,6 +253,15 @@ fn project_matches_query(project: &crate::application::LizaProjectSummary, query
     let query = query.to_ascii_lowercase();
     project.name.to_ascii_lowercase().contains(&query)
         || project.slug.to_ascii_lowercase().contains(&query)
+}
+
+fn render_diagnostic_entry(ui: &mut egui::Ui, entry: &DiagnosticEntry) {
+    let (prefix, color) = match entry.level() {
+        DiagnosticLevel::Info => ("INFO", egui::Color32::LIGHT_GRAY),
+        DiagnosticLevel::Error => ("ERROR", egui::Color32::LIGHT_RED),
+    };
+
+    ui.colored_label(color, format!("[{prefix}] {}", entry.message()));
 }
 
 #[cfg(test)]
