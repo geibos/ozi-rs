@@ -1607,6 +1607,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpx"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfabaf0e8a17a6fb7977fac3bd5846488462edb9f8b246605835483a5501e698"
+dependencies = [
+ "geo-types",
+ "thiserror 1.0.69",
+ "time",
+ "xml-rs",
+]
+
+[[package]]
 name = "half"
 version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2778,6 +2790,7 @@ name = "ozi-rs"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "gpx",
  "lru",
  "regex",
  "reqwest",

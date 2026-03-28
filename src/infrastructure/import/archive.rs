@@ -107,7 +107,7 @@ where
 
         let path = entry.name().to_owned();
         let file_name = archive_file_name(&path);
-        let kind = classify_archive_entry(&path);
+        let kind = classify_archive_path(&path);
 
         entries.push(ArchiveEntry::new(
             path,
@@ -125,7 +125,7 @@ fn archive_file_name(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_owned()
 }
 
-fn classify_archive_entry(path: &str) -> ArchiveEntryKind {
+pub fn classify_archive_path(path: &str) -> ArchiveEntryKind {
     match extension(path).as_deref() {
         Some("gpx") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::Gpx),
         Some("kml") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::Kml),
@@ -151,7 +151,7 @@ fn extension(path: &str) -> Option<String> {
 mod tests {
     use super::{
         ArchiveEntryKind, SupportedArchiveEntryKind, UnsupportedArchiveEntryKind,
-        archive_file_name, classify_archive_entry,
+        archive_file_name, classify_archive_path,
     };
 
     #[test]
@@ -160,29 +160,29 @@ mod tests {
     }
 
     #[test]
-    fn classify_archive_entry_matches_supported_extensions_case_insensitively() {
+    fn classify_archive_path_matches_supported_extensions_case_insensitively() {
         assert_eq!(
-            classify_archive_entry("nested/FIELD.GPX"),
+            classify_archive_path("nested/FIELD.GPX"),
             ArchiveEntryKind::Supported(SupportedArchiveEntryKind::Gpx)
         );
         assert_eq!(
-            classify_archive_entry("maps/calibration.MAP"),
+            classify_archive_path("maps/calibration.MAP"),
             ArchiveEntryKind::Supported(SupportedArchiveEntryKind::OziMap)
         );
     }
 
     #[test]
-    fn classify_archive_entry_marks_raster_and_unknown_payloads_as_unsupported() {
+    fn classify_archive_path_marks_raster_and_unknown_payloads_as_unsupported() {
         assert_eq!(
-            classify_archive_entry("maps/base.ozf2"),
+            classify_archive_path("maps/base.ozf2"),
             ArchiveEntryKind::Unsupported(UnsupportedArchiveEntryKind::RasterPayload)
         );
         assert_eq!(
-            classify_archive_entry("mobile/cache.sqlitedb"),
+            classify_archive_path("mobile/cache.sqlitedb"),
             ArchiveEntryKind::Unsupported(UnsupportedArchiveEntryKind::SqliteTiles)
         );
         assert_eq!(
-            classify_archive_entry("notes/readme.txt"),
+            classify_archive_path("notes/readme.txt"),
             ArchiveEntryKind::Unsupported(UnsupportedArchiveEntryKind::Unknown)
         );
     }
