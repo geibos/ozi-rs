@@ -3,11 +3,18 @@ use crate::application::{
 };
 use regex::Regex;
 use reqwest::blocking::Client;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
 const MOBILE_MAPS_DIR: &str = "8-Android%26iOS/";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DownloadProgress {
+    pub downloaded_bytes: u64,
+    pub total_bytes: Option<u64>,
+}
 
 pub fn fetch_project_summaries() -> Result<Vec<LizaProjectSummary>, String> {
     let html = fetch_text(ROOT_URL)?;
@@ -48,19 +55,43 @@ pub fn fetch_project(summary: LizaProjectSummary) -> Result<LizaProject, String>
     })
 }
 
-pub fn download_map(selection: ActiveMapSelection) -> Result<ActiveMapSelection, String> {
+pub fn download_map<F>(
+    selection: ActiveMapSelection,
+    mut on_progress: F,
+) -> Result<ActiveMapSelection, String>
+where
+    F: FnMut(DownloadProgress),
+{
     let client = client()?;
-    let response = client
+    let mut response = client
         .get(&selection.remote_url)
         .send()
         .and_then(|response| response.error_for_status())
         .map_err(|err| err.to_string())?;
 
-    let bytes = response.bytes().map_err(|err| err.to_string())?;
     if let Some(parent) = selection.local_path.parent() {
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
-    fs::write(&selection.local_path, &bytes).map_err(|err| err.to_string())?;
+
+    let mut file = File::create(&selection.local_path).map_err(|err| err.to_string())?;
+    let total_bytes = response.content_length();
+    let mut downloaded_bytes = 0u64;
+    let mut buffer = [0u8; 16 * 1024];
+
+    loop {
+        let read_bytes = response.read(&mut buffer).map_err(|err| err.to_string())?;
+        if read_bytes == 0 {
+            break;
+        }
+
+        file.write_all(&buffer[..read_bytes])
+            .map_err(|err| err.to_string())?;
+        downloaded_bytes += read_bytes as u64;
+        on_progress(DownloadProgress {
+            downloaded_bytes,
+            total_bytes,
+        });
+    }
 
     Ok(selection)
 }
