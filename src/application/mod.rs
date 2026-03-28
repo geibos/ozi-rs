@@ -1,6 +1,8 @@
 mod commands;
+mod import;
 
 pub use commands::{CommandError, CommandStack, ProjectCommand};
+pub use import::{ArchiveImportError, ArchiveImportReport, import_gpx_archive_into_project};
 
 use crate::domain::{LayerId, Project};
 use crate::infrastructure::lizaalert;
@@ -287,6 +289,24 @@ impl AppState {
 
     pub fn window_title(&self) -> String {
         format!("ozi-rs - {}", self.project_name())
+    }
+
+    pub fn import_gpx_archive<R>(
+        &mut self,
+        reader: R,
+    ) -> Result<ArchiveImportReport, ArchiveImportError>
+    where
+        R: std::io::Read + std::io::Seek,
+    {
+        import::import_gpx_archive_into_project(&mut self.project, &mut self.history, reader)
+    }
+
+    pub fn track_layer_count(&self) -> usize {
+        self.project.track_layers().len()
+    }
+
+    pub fn waypoint_layer_count(&self) -> usize {
+        self.project.waypoint_layers().len()
     }
 
     fn register_active_map_layer(
