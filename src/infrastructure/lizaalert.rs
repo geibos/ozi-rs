@@ -12,7 +12,7 @@ const MOBILE_MAPS_DIR: &str = "8-Android%26iOS/";
 pub fn fetch_project_summaries() -> Result<Vec<LizaProjectSummary>, String> {
     let html = fetch_text(ROOT_URL)?;
     let link_regex =
-        Regex::new(r#"href=\"([^\"]+)\"[^>]*>([^<]+)</a>"#).map_err(|err| err.to_string())?;
+        Regex::new(r#"href="([^"]+)"[^>]*>([^<]+)</a>"#).map_err(|err| err.to_string())?;
     let project_regex = Regex::new(r"^\d{4}-\d{2}-\d{2}_.+/$").map_err(|err| err.to_string())?;
 
     let mut projects = link_regex
@@ -100,7 +100,7 @@ fn parse_center(text: &str) -> Result<MapCenter, String> {
 }
 
 fn parse_map_packages(html: &str, base_url: &str) -> Result<Vec<LizaMapPackage>, String> {
-    let link_regex = Regex::new(r#"href=\"([^\"]+\.sqlitedb)\"[^>]*>([^<]+)</a>"#)
+    let link_regex = Regex::new(r#"href="([^"]+\.sqlitedb)"[^>]*>([^<]+)</a>"#)
         .map_err(|err| err.to_string())?;
     let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
 
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn parse_map_packages_reads_sqlite_entries() {
         let html =
-            r#"<a href=\"foo_z16.sqlitedb\">foo_z16.sqlitedb</a><a href=\"bar.txt\">bar.txt</a>"#;
+            r#"<a href="foo_z16.sqlitedb">foo_z16.sqlitedb</a><a href="bar.txt">bar.txt</a>"#;
         let maps = parse_map_packages(html, "https://example.com/").expect("maps");
 
         assert_eq!(maps.len(), 1);
