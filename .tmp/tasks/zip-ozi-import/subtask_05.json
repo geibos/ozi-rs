@@ -1,0 +1,35 @@
+{
+  "id": "zip-ozi-import-05",
+  "seq": "05",
+  "title": "Add application workflow for ZIP plus GPX import",
+  "status": "pending",
+  "depends_on": [
+    "04"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/commands.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/project.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/track.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/waypoint.rs"
+  ],
+  "acceptance_criteria": [
+    "Application services can import GPX archive content into independent track and waypoint layers",
+    "Import failures are surfaced as explicit application-level errors without UI coupling",
+    "The workflow does not regress existing map layer registration behavior"
+  ],
+  "deliverables": [
+    "src/application/import.rs",
+    "src/application/mod.rs",
+    "src/application/commands.rs",
+    "tests/application_zip_gpx_import.rs"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "zip-ozi-import-10",
+  "seq": "10",
+  "title": "Investigate ozf2 raster feasibility as a separate slice",
+  "status": "pending",
+  "depends_on": [
+    "01"
+  ],
+  "parallel": true,
+  "suggested_agent": "architect",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/documentation.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/roadmap.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/adr/adr-0001-initial-architecture.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/ui/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/ui/sqlite_tiles.rs",
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml"
+  ],
+  "acceptance_criteria": [
+    "The team decides whether ozf2 support is feasible in-repo, via a crate, or must remain deferred",
+    "Required decoder, rendering, and licensing risks are explicitly documented",
+    "The output recommends either a separate implementation feature or a documented deferral"
+  ],
+  "deliverables": [
+    "docs/roadmap.md",
+    "docs/adr/"
+  ]
+}

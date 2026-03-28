@@ -1,0 +1,34 @@
+{
+  "id": "zip-ozi-import-02",
+  "seq": "02",
+  "title": "Define staged archive import architecture",
+  "status": "pending",
+  "depends_on": [
+    "01"
+  ],
+  "parallel": false,
+  "suggested_agent": "architect",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/roadmap.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/adr/adr-0001-initial-architecture.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/commands.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/project.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/lizaalert.rs"
+  ],
+  "acceptance_criteria": [
+    "The design keeps archive reading and format parsing in infrastructure",
+    "The first slice is explicitly scoped to archive ingestion plus GPX import without ozf2 decode",
+    "Planned module boundaries and application entry points are documented before implementation starts"
+  ],
+  "deliverables": [
+    "docs/architecture.md",
+    "docs/roadmap.md"
+  ]
+}

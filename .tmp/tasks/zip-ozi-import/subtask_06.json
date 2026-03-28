@@ -1,0 +1,32 @@
+{
+  "id": "zip-ozi-import-06",
+  "seq": "06",
+  "title": "Validate and harden the first GPX archive slice",
+  "status": "pending",
+  "depends_on": [
+    "05"
+  ],
+  "parallel": false,
+  "suggested_agent": "TestEngineer",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/commands.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/import/archive.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/import/gpx.rs"
+  ],
+  "acceptance_criteria": [
+    "Regression tests cover unsupported entries, malformed GPX, and duplicate-import edge cases for the first slice",
+    "The first slice has an explicit verification path documented with cargo fmt --check, cargo clippy --all-targets --all-features -- -D warnings, and cargo test --all",
+    "The first slice is ready to land independently of KML, Ozi text, and ozf2 work"
+  ],
+  "deliverables": [
+    "tests/import_gpx_archive.rs",
+    "tests/application_zip_gpx_import.rs",
+    "docs/testing-strategy.md"
+  ]
+}

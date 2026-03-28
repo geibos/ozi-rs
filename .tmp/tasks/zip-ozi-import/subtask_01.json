@@ -1,0 +1,28 @@
+{
+  "id": "zip-ozi-import-01",
+  "seq": "01",
+  "title": "Capture format matrix and dependency options",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "ExternalScout",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/documentation.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/roadmap.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/lizaalert.rs"
+  ],
+  "acceptance_criteria": [
+    "External docs/crates needed for zip, gpx, kml, map, plt, wpt, and ozf2 are identified",
+    "A support matrix distinguishes text-based formats from raster payload formats",
+    "Known blockers, especially ozf2 decode risk, are written down for later tasks"
+  ],
+  "deliverables": [
+    ".tmp/sessions/2026-03-28-zip-ozi-import/context.md"
+  ]
+}

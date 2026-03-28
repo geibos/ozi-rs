@@ -1,0 +1,35 @@
+{
+  "id": "zip-ozi-import-11",
+  "seq": "11",
+  "title": "Wire supported archive imports into UI entry points",
+  "status": "pending",
+  "depends_on": [
+    "06",
+    "07",
+    "08",
+    "09"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/ui/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/project.rs"
+  ],
+  "acceptance_criteria": [
+    "The UI can trigger supported ZIP import flows without embedding parser logic",
+    "User-facing status and error reporting distinguish supported archive contents from deferred ozf2 behavior",
+    "Smoke-level tests or focused UI-adjacent tests cover the import entry path"
+  ],
+  "deliverables": [
+    "src/ui/mod.rs",
+    "src/application/mod.rs",
+    "tests/ui_archive_import_flow.rs"
+  ]
+}

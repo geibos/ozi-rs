@@ -1,0 +1,34 @@
+{
+  "id": "zip-ozi-import-09",
+  "seq": "09",
+  "title": "Add Ozi MAP metadata import without raster decode",
+  "status": "pending",
+  "depends_on": [
+    "03"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/application/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/application/commands.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/project.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/import/archive.rs"
+  ],
+  "acceptance_criteria": [
+    "Archived .map files can be parsed into map-layer metadata without binding the app to ozf2 decoding",
+    "Application-level registration can store map metadata and source provenance separately from tracks and waypoints",
+    "Tests cover metadata-only success and missing-raster-reference failure cases"
+  ],
+  "deliverables": [
+    "src/infrastructure/import/ozi_map.rs",
+    "src/application/import.rs",
+    "src/domain/project.rs",
+    "tests/import_ozi_map_archive.rs"
+  ]
+}

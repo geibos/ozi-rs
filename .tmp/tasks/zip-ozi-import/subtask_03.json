@@ -1,0 +1,33 @@
+{
+  "id": "zip-ozi-import-03",
+  "seq": "03",
+  "title": "Add ZIP archive inventory and format detection foundation",
+  "status": "pending",
+  "depends_on": [
+    "02"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/lizaalert.rs",
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml"
+  ],
+  "acceptance_criteria": [
+    "ZIP archives can be enumerated into typed entries without touching UI code",
+    "Detection distinguishes supported text/map metadata files from unsupported raster/binary payloads",
+    "Deterministic tests cover archive enumeration and unsupported entry classification"
+  ],
+  "deliverables": [
+    "src/infrastructure/import/mod.rs",
+    "src/infrastructure/import/archive.rs",
+    "src/infrastructure/mod.rs",
+    "tests/archive_inventory.rs"
+  ]
+}

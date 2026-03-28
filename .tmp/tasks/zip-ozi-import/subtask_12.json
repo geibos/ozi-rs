@@ -1,0 +1,41 @@
+{
+  "id": "zip-ozi-import-12",
+  "seq": "12",
+  "title": "Sync docs and run full validation gates",
+  "status": "pending",
+  "depends_on": [
+    "10",
+    "11"
+  ],
+  "parallel": false,
+  "suggested_agent": "writer",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/documentation.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/roadmap.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/README.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/architecture.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/roadmap.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md",
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml"
+  ],
+  "acceptance_criteria": [
+    "README and docs describe the supported ZIP import formats, staged scope, and ozf2 status",
+    "Validation steps are recorded and executed with cargo fmt --check, cargo clippy --all-targets --all-features -- -D warnings, and cargo test --all",
+    "Any architectural change needed for archive import is reflected in docs or ADR updates"
+  ],
+  "deliverables": [
+    "README.md",
+    "docs/requirements.md",
+    "docs/architecture.md",
+    "docs/roadmap.md",
+    "docs/testing-strategy.md",
+    "docs/adr/"
+  ]
+}
