@@ -351,8 +351,8 @@ fn format_bytes(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        format_map_download_status, ActiveMapSelection, AppState, BackgroundMessage, MapCenter,
-        MapDownloadProgress,
+        ActiveMapSelection, AppState, BackgroundMessage, MapCenter, MapDownloadProgress,
+        format_map_download_status,
     };
     use std::path::Path;
     use std::path::PathBuf;
@@ -405,12 +405,16 @@ mod tests {
             base_zoom: 16,
         };
 
-        assert!(state
-            .register_active_map_layer(&selection)
-            .expect("first registration should succeed"));
-        assert!(!state
-            .register_active_map_layer(&selection)
-            .expect("duplicate registration should be ignored"));
+        assert!(
+            state
+                .register_active_map_layer(&selection)
+                .expect("first registration should succeed")
+        );
+        assert!(
+            !state
+                .register_active_map_layer(&selection)
+                .expect("duplicate registration should be ignored")
+        );
         assert_eq!(state.map_layer_count(), 1);
     }
 

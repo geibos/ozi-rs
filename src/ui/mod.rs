@@ -4,7 +4,7 @@ use crate::application::AppState;
 use eframe::egui;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use walkers::{lon_lat, sources::OpenStreetMap, HttpTiles, Map, MapMemory, Position};
+use walkers::{HttpTiles, Map, MapMemory, Position, lon_lat, sources::OpenStreetMap};
 
 use self::sqlite_tiles::SqliteTiles;
 
