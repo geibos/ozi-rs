@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-28-zip-ozi-import
 Created: 2026-03-28T08:05:00Z
-Status: planned_architecture_defined
+Status: foundation_inventory_validated
 
 ## Current Request
 Карта должна открываться не только sqlite (мобильная), а также из `.zip` архивов с Ozi/геоданными форматами: `ozf2`, `map`, `wpt`, `plt`, `kml`, `gpx`.
@@ -24,8 +24,11 @@ Status: planned_architecture_defined
 - /Users/sobieg/Projects/ozi-rs/src/domain/project.rs
 - /Users/sobieg/Projects/ozi-rs/src/domain/track.rs
 - /Users/sobieg/Projects/ozi-rs/src/domain/waypoint.rs
+- /Users/sobieg/Projects/ozi-rs/src/infrastructure/import/mod.rs
+- /Users/sobieg/Projects/ozi-rs/src/infrastructure/import/archive.rs
 - /Users/sobieg/Projects/ozi-rs/src/infrastructure/lizaalert.rs
 - /Users/sobieg/Projects/ozi-rs/Cargo.toml
+- /Users/sobieg/Projects/ozi-rs/tests/archive_inventory.rs
 
 ## External Docs Fetched
 - `.tmp/external-context/rust-geodata-import/zip-geodata-import-support-matrix.md`
@@ -50,6 +53,9 @@ Status: planned_architecture_defined
 - External support matrix now confirms the first-slice dependency choice: `zip` + `gpx`.
 - Staged architecture is now defined as: infrastructure archive reader -> infrastructure format detectors/adapters -> application import workflow -> UI trigger/reporting.
 - The first implementation slice remains intentionally limited to archive inventory and supported-entry classification before GPX parsing is wired in.
+- Implemented `infrastructure::import::archive::inventory_zip_entries` plus `ArchiveEntry` / `ArchiveEntryKind` classification for GPX, KML, Ozi text files, sqlite tiles, raster payloads, and unknown entries.
+- Added deterministic archive inventory tests in `tests/archive_inventory.rs` plus focused unit tests for case-insensitive extension classification.
+- Validation completed for this slice with `cargo fmt --check`, `cargo test --test archive_inventory`, and `cargo test classify_archive_entry --lib`.
 
 ## Constraints
 - Preserve `domain` / `application` / `infrastructure` / `ui` boundaries.
@@ -64,3 +70,6 @@ Status: planned_architecture_defined
 - [x] Feature is broken down into staged subtasks with dependencies.
 - [x] First recommended implementation slice is identified and scoped tightly.
 - [x] External format/library docs needed for implementation are identified.
+- [x] ZIP archives can be enumerated into typed entries without touching UI code.
+- [x] Supported-entry detection distinguishes text/map metadata files from unsupported raster/binary payloads.
+- [x] Deterministic tests cover archive enumeration and unsupported entry classification.
