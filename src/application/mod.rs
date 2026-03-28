@@ -6,9 +6,12 @@ pub use import::{ArchiveImportError, ArchiveImportReport, import_gpx_archive_int
 
 use crate::domain::{LayerId, Project};
 use crate::infrastructure::lizaalert;
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
+
+const MAX_DIAGNOSTIC_ENTRIES: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapCenter {
@@ -54,6 +57,32 @@ struct MapDownloadProgress {
     total_bytes: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticLevel {
+    Info,
+    Error,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticEntry {
+    level: DiagnosticLevel,
+    message: String,
+}
+
+impl DiagnosticEntry {
+    fn new(level: DiagnosticLevel, message: String) -> Self {
+        Self { level, message }
+    }
+
+    pub const fn level(&self) -> DiagnosticLevel {
+        self.level
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 #[derive(Debug)]
 pub struct AppState {
     history: CommandStack,
@@ -67,6 +96,7 @@ struct LizaAlertState {
     selected_project_slug: Option<String>,
     selected_project: Option<LizaProject>,
     active_map: Option<ActiveMapSelection>,
+    diagnostics: VecDeque<DiagnosticEntry>,
     status: String,
     busy: bool,
     sender: Sender<BackgroundMessage>,
@@ -99,6 +129,10 @@ impl AppState {
                 selected_project_slug: None,
                 selected_project: None,
                 active_map: None,
+                diagnostics: VecDeque::from([DiagnosticEntry::new(
+                    DiagnosticLevel::Info,
+                    "Load projects from maps.lizaalert.ru".to_owned(),
+                )]),
                 status: "Load projects from maps.lizaalert.ru".to_owned(),
                 busy: false,
                 sender,
@@ -122,10 +156,13 @@ impl AppState {
                     Ok(projects) => {
                         let count = projects.len();
                         self.lizaalert.projects = projects;
-                        self.lizaalert.status = format!("Loaded {count} projects");
+                        self.update_status(
+                            DiagnosticLevel::Info,
+                            format!("Loaded {count} projects"),
+                        );
                     }
                     Err(error) => {
-                        self.lizaalert.status = error;
+                        self.update_status(DiagnosticLevel::Error, error);
                     }
                 }
             }
@@ -137,15 +174,18 @@ impl AppState {
                         let name = project.summary.name.clone();
                         self.lizaalert.selected_project_slug = Some(project.summary.slug.clone());
                         self.lizaalert.selected_project = Some(project);
-                        self.lizaalert.status = format!("Loaded project: {name}");
+                        self.update_status(
+                            DiagnosticLevel::Info,
+                            format!("Loaded project: {name}"),
+                        );
                     }
                     Err(error) => {
-                        self.lizaalert.status = error;
+                        self.update_status(DiagnosticLevel::Error, error);
                     }
                 }
             }
             BackgroundMessage::MapDownloadProgress(progress) => {
-                self.lizaalert.status = format_map_download_status(progress);
+                self.update_status(DiagnosticLevel::Info, format_map_download_status(progress));
             }
             BackgroundMessage::MapDownloaded(result) => {
                 self.lizaalert.busy = false;
@@ -167,11 +207,11 @@ impl AppState {
                             ),
                         };
 
-                        self.lizaalert.status = status;
+                        self.update_status(DiagnosticLevel::Info, status);
                         self.lizaalert.active_map = Some(selection);
                     }
                     Err(error) => {
-                        self.lizaalert.status = error;
+                        self.update_status(DiagnosticLevel::Error, error);
                     }
                 }
             }
@@ -184,7 +224,7 @@ impl AppState {
         }
 
         self.lizaalert.busy = true;
-        self.lizaalert.status = "Loading project list...".to_owned();
+        self.update_status(DiagnosticLevel::Info, "Loading project list...");
         let sender = self.lizaalert.sender.clone();
 
         thread::spawn(move || {
@@ -206,12 +246,15 @@ impl AppState {
             .find(|project| project.slug == project_slug)
             .cloned()
         else {
-            self.lizaalert.status = "Project not found".to_owned();
+            self.update_status(DiagnosticLevel::Error, "Project not found");
             return;
         };
 
         self.lizaalert.busy = true;
-        self.lizaalert.status = format!("Loading project {}...", summary.name);
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!("Loading project {}...", summary.name),
+        );
         let sender = self.lizaalert.sender.clone();
 
         thread::spawn(move || {
@@ -227,7 +270,7 @@ impl AppState {
         }
 
         let Some(project) = self.lizaalert.selected_project.clone() else {
-            self.lizaalert.status = "Select a project first".to_owned();
+            self.update_status(DiagnosticLevel::Error, "Select a project first");
             return;
         };
 
@@ -237,13 +280,16 @@ impl AppState {
             .find(|map| map.name == map_name)
             .cloned()
         else {
-            self.lizaalert.status = "Map package not found".to_owned();
+            self.update_status(DiagnosticLevel::Error, "Map package not found");
             return;
         };
 
         let selection = lizaalert::build_active_map_selection(&project, &map);
         self.lizaalert.busy = true;
-        self.lizaalert.status = format!("Downloading {}...", selection.package_name);
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!("Downloading {}...", selection.package_name),
+        );
         let sender = self.lizaalert.sender.clone();
 
         thread::spawn(move || {
@@ -279,6 +325,10 @@ impl AppState {
         &self.lizaalert.status
     }
 
+    pub fn recent_diagnostics(&self) -> impl DoubleEndedIterator<Item = &DiagnosticEntry> {
+        self.lizaalert.diagnostics.iter()
+    }
+
     pub fn lizaalert_busy(&self) -> bool {
         self.lizaalert.busy
     }
@@ -309,6 +359,10 @@ impl AppState {
         self.project.waypoint_layers().len()
     }
 
+    pub fn report_runtime_error(&mut self, message: impl Into<String>) {
+        self.push_diagnostic(DiagnosticLevel::Error, message.into());
+    }
+
     fn register_active_map_layer(
         &mut self,
         selection: &ActiveMapSelection,
@@ -334,6 +388,22 @@ impl AppState {
         )?;
 
         Ok(true)
+    }
+
+    fn update_status(&mut self, level: DiagnosticLevel, message: impl Into<String>) {
+        let message = message.into();
+        self.lizaalert.status = message.clone();
+        self.push_diagnostic(level, message);
+    }
+
+    fn push_diagnostic(&mut self, level: DiagnosticLevel, message: String) {
+        self.lizaalert
+            .diagnostics
+            .push_back(DiagnosticEntry::new(level, message));
+
+        while self.lizaalert.diagnostics.len() > MAX_DIAGNOSTIC_ENTRIES {
+            self.lizaalert.diagnostics.pop_front();
+        }
     }
 }
 
@@ -371,8 +441,8 @@ fn format_bytes(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ActiveMapSelection, AppState, BackgroundMessage, MapCenter, MapDownloadProgress,
-        format_map_download_status,
+        ActiveMapSelection, AppState, BackgroundMessage, DiagnosticLevel, MapCenter,
+        MapDownloadProgress, format_map_download_status,
     };
     use std::path::Path;
     use std::path::PathBuf;
@@ -465,5 +535,40 @@ mod tests {
             state.lizaalert.status,
             "Downloading map... 50% (2.0 KiB/4.0 KiB)"
         );
+    }
+
+    #[test]
+    fn missing_project_error_is_recorded_in_diagnostics() {
+        let mut state = AppState::default();
+
+        state.load_project("missing-project");
+
+        let latest = state
+            .recent_diagnostics()
+            .next_back()
+            .expect("latest diagnostic entry");
+        assert_eq!(latest.level(), DiagnosticLevel::Error);
+        assert_eq!(latest.message(), "Project not found");
+    }
+
+    #[test]
+    fn diagnostics_history_keeps_recent_entries_bounded() {
+        let mut state = AppState::default();
+
+        for index in 0..120 {
+            state.report_runtime_error(format!("diagnostic {index}"));
+        }
+
+        assert_eq!(state.recent_diagnostics().count(), 100);
+        let oldest = state
+            .recent_diagnostics()
+            .next()
+            .expect("oldest diagnostic entry");
+        let latest = state
+            .recent_diagnostics()
+            .next_back()
+            .expect("latest diagnostic entry");
+        assert_eq!(oldest.message(), "diagnostic 20");
+        assert_eq!(latest.message(), "diagnostic 119");
     }
 }
