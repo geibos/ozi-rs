@@ -1,0 +1,33 @@
+{
+  "id": "zip-ozi-import-04",
+  "seq": "04",
+  "title": "Add GPX adapter for archived entries",
+  "status": "pending",
+  "depends_on": [
+    "03"
+  ],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/domain/track.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/waypoint.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/mod.rs",
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml"
+  ],
+  "acceptance_criteria": [
+    "A GPX entry from a ZIP archive can be parsed into project-facing track and waypoint data structures",
+    "Parser behavior for malformed GPX remains deterministic and returns explicit errors",
+    "Adapter tests cover tracks, waypoints, and mixed-content archives"
+  ],
+  "deliverables": [
+    "src/infrastructure/import/gpx.rs",
+    "src/infrastructure/import/mod.rs",
+    "tests/import_gpx_archive.rs"
+  ]
+}

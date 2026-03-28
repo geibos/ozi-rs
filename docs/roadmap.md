@@ -44,12 +44,14 @@ Target outcomes:
 - regression tests for parser edge cases.
 
 Priority backlog:
-1. choose first supported external formats, with GPX as the leading candidate for tracks and waypoints;
-2. implement import adapters;
+1. add ZIP archive inventory and supported-entry detection in the infrastructure layer;
+2. implement GPX import as the first archive-backed track/waypoint path;
 3. support imported-data triage workflows so users can inspect results and remove irrelevant tracks or point sets;
-4. implement export adapters;
-5. add parser and round-trip tests;
-6. add clear error reporting for common file-open and import failures.
+4. add later adapters for KML and Ozi text formats (`.plt`, `.wpt`, `.map`) once the archive boundary is stable;
+5. investigate `ozf2` feasibility separately before committing to native raster support;
+6. implement export adapters;
+7. add parser and round-trip tests;
+8. add clear error reporting for common file-open and import failures.
 
 ## Phase 4 - Initial UI Workflow
 
@@ -75,6 +77,7 @@ Candidate areas after the core is stable:
 
 Adopt soon:
 - GPX-oriented import workflows;
+- ZIP-backed GPX import so field data can arrive bundled with other artifacts;
 - imported-track review and cleanup;
 - project semantics where field data survives map changes;
 - clearer file-open diagnostics.
@@ -82,6 +85,7 @@ Adopt soon:
 Defer pending stronger product evidence or architecture maturity:
 - multi-map helper workflows inspired by OziManyMaps;
 - overlay/reference layers such as wiki, hybrid, OSM, or archive views;
+- KML and Ozi text import after the first archive-backed GPX slice is stable;
 - style and naming templates for tracks;
 - explicit normalization helpers for tracks and waypoints.
 
@@ -94,6 +98,7 @@ Reject or heavily reformulate:
 ## Deferred Until Better Evidence
 
 - any feature that depends heavily on screenshot-only Yonote material not yet fully extracted;
+- native `ozf2` decoding until feasibility and licensing are clearer;
 - advanced GIS/projection behavior;
 - GPS-device workflows;
 - legacy workflow quirks that conflict with explicit commands or clean data boundaries.

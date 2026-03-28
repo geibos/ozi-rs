@@ -112,6 +112,23 @@ This gives the application layer a natural seam for:
 - import/export adapters should translate external formats into the internal model;
 - UI-only state should remain transient unless there is a strong documented reason to persist it.
 
+## Staged Archive Import Boundary
+
+Archive-backed imports should stay layered so that adding formats does not couple parsing to the UI shell.
+
+Recommended flow:
+- `infrastructure::import::archive` reads ZIP containers and exposes deterministic entry metadata plus byte access;
+- `infrastructure::import` format adapters classify entries by supported type and parse them into project-facing data;
+- `application` orchestrates import workflows and decides how imported maps, tracks, and waypoint layers are registered;
+- `ui` only triggers the workflow and renders status or follow-up selection state.
+
+The first archive-import slice should stay explicitly limited to ZIP inventory, supported-entry detection, and archived GPX ingestion.
+
+Deferred behind later slices:
+- KML support once the GPX-backed workflow is stable;
+- Ozi `.plt` / `.wpt` / `.map` text parsers after the archive boundary is proven;
+- `ozf2` raster payloads only after a separate feasibility and licensing review.
+
 ## Suggested Initial Module Layout
 
 ```text
@@ -148,4 +165,5 @@ src/
 - choose the first persistence boundary for project save/load;
 - define command abstractions for reversible edits;
 - define minimal geometry primitives required for track and waypoint editing;
-- decide the first external formats to support.
+- decide the first external formats to support;
+- keep ZIP archive ingestion in infrastructure and stage new formats behind small import adapters.

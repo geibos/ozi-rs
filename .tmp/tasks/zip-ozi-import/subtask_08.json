@@ -1,0 +1,33 @@
+{
+  "id": "zip-ozi-import-08",
+  "seq": "08",
+  "title": "Add KML archive import adapter",
+  "status": "pending",
+  "depends_on": [
+    "03"
+  ],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/domain/track.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/waypoint.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/import/archive.rs",
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml"
+  ],
+  "acceptance_criteria": [
+    "Archived .kml files can be parsed into track and waypoint import data through infrastructure-only adapters",
+    "Unsupported or partially supported KML structures fail with clear errors instead of silent drops",
+    "Deterministic tests cover successful import and malformed KML handling"
+  ],
+  "deliverables": [
+    "src/infrastructure/import/kml.rs",
+    "src/infrastructure/import/mod.rs",
+    "tests/import_kml_archive.rs"
+  ]
+}

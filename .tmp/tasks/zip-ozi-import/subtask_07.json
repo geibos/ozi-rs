@@ -1,0 +1,33 @@
+{
+  "id": "zip-ozi-import-07",
+  "seq": "07",
+  "title": "Add Ozi text adapters for PLT and WPT",
+  "status": "pending",
+  "depends_on": [
+    "03"
+  ],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [
+    "/Users/sobieg/.config/opencode/context/core/standards/code-quality.md",
+    "/Users/sobieg/.config/opencode/context/core/standards/test-coverage.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/requirements.md",
+    "/Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md"
+  ],
+  "reference_files": [
+    "/Users/sobieg/Projects/ozi-rs/src/domain/track.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/domain/waypoint.rs",
+    "/Users/sobieg/Projects/ozi-rs/src/infrastructure/import/archive.rs",
+    "/Users/sobieg/Projects/ozi-rs/Cargo.toml"
+  ],
+  "acceptance_criteria": [
+    "Archived .plt files can populate track-layer import data without leaking parser logic into application or UI layers",
+    "Archived .wpt files can populate waypoint-layer import data with explicit parse errors for unsupported records",
+    "Focused tests cover at least one successful PLT case, one successful WPT case, and malformed input failures"
+  ],
+  "deliverables": [
+    "src/infrastructure/import/ozi_text.rs",
+    "src/infrastructure/import/mod.rs",
+    "tests/import_ozi_text_archive.rs"
+  ]
+}
