@@ -9,6 +9,7 @@ use walkers::{lon_lat, sources::OpenStreetMap, HttpTiles, Map, MapMemory, Positi
 use self::sqlite_tiles::SqliteTiles;
 
 pub struct OziApp {
+    project_search: String,
     state: AppState,
     fps_counter: FpsCounter,
     loaded_map_path: Option<PathBuf>,
@@ -52,6 +53,7 @@ impl FpsCounter {
 impl OziApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         Self {
+            project_search: String::new(),
             state: AppState::new(),
             fps_counter: FpsCounter::new(),
             loaded_map_path: None,
@@ -109,20 +111,45 @@ impl OziApp {
 
                 ui.label(self.state.lizaalert_status());
                 ui.separator();
-                ui.label("Projects");
+                ui.horizontal(|ui| {
+                    ui.label("Projects");
+                    ui.label(format!("({})", self.state.lizaalert_projects().len()));
+                });
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.project_search)
+                        .hint_text("Search projects"),
+                );
+
+                let project_query = self.project_search.trim();
+                let mut visible_projects = 0usize;
+                let mut selected_project_slug = None;
 
                 egui::ScrollArea::vertical()
                     .max_height(240.0)
                     .show(ui, |ui| {
-                        let projects = self.state.lizaalert_projects().to_vec();
-                        for project in projects {
+                        for project in self.state.lizaalert_projects() {
+                            if !project_matches_query(project, project_query) {
+                                continue;
+                            }
+
+                            visible_projects += 1;
                             if ui.button(&project.name).clicked() {
-                                self.state.load_project(&project.slug);
+                                selected_project_slug = Some(project.slug.clone());
                             }
                         }
                     });
 
-                if let Some(project) = self.state.current_project().cloned() {
+                if let Some(project_slug) = selected_project_slug {
+                    self.state.load_project(&project_slug);
+                }
+
+                if visible_projects == 0 {
+                    ui.label("No projects match the current search.");
+                }
+
+                let mut selected_map_name = None;
+
+                if let Some(project) = self.state.current_project() {
                     ui.separator();
                     ui.label(format!("Selected project: {}", project.summary.name));
                     ui.label(format!(
@@ -132,11 +159,15 @@ impl OziApp {
                     ui.separator();
                     ui.label("Available mobile map packages");
 
-                    for map in project.maps {
+                    for map in &project.maps {
                         if ui.button(&map.name).clicked() {
-                            self.state.open_selected_map(&map.name);
+                            selected_map_name = Some(map.name.clone());
                         }
                     }
+                }
+
+                if let Some(map_name) = selected_map_name {
+                    self.state.open_selected_map(&map_name);
                 }
             });
     }
@@ -148,7 +179,10 @@ impl eframe::App for OziApp {
         self.sync_active_map(ctx);
         self.fps_counter.tick();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(self.state.window_title()));
-        ctx.request_repaint();
+
+        if self.state.lizaalert_busy() {
+            ctx.request_repaint_after(Duration::from_millis(100));
+        }
 
         self.show_project_sidebar(ctx);
 
@@ -189,5 +223,49 @@ impl eframe::App for OziApp {
 
             ui.add(map);
         });
+    }
+}
+
+fn project_matches_query(project: &crate::application::LizaProjectSummary, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+
+    let query = query.to_ascii_lowercase();
+    project.name.to_ascii_lowercase().contains(&query)
+        || project.slug.to_ascii_lowercase().contains(&query)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::project_matches_query;
+    use crate::application::LizaProjectSummary;
+
+    fn sample_project() -> LizaProjectSummary {
+        LizaProjectSummary {
+            slug: "2026-03-28_demo-project".to_owned(),
+            name: "2026-03-28 demo project".to_owned(),
+            url: "https://example.test/project".to_owned(),
+        }
+    }
+
+    #[test]
+    fn project_search_matches_empty_query() {
+        assert!(project_matches_query(&sample_project(), ""));
+    }
+
+    #[test]
+    fn project_search_matches_name_case_insensitively() {
+        assert!(project_matches_query(&sample_project(), "DEMO"));
+    }
+
+    #[test]
+    fn project_search_matches_slug_case_insensitively() {
+        assert!(project_matches_query(&sample_project(), "PROJECT"));
+    }
+
+    #[test]
+    fn project_search_rejects_non_matching_query() {
+        assert!(!project_matches_query(&sample_project(), "missing"));
     }
 }
