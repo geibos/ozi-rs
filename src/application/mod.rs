@@ -46,6 +46,12 @@ pub struct ActiveMapSelection {
     pub base_zoom: u8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MapDownloadProgress {
+    downloaded_bytes: u64,
+    total_bytes: Option<u64>,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     history: CommandStack,
@@ -69,6 +75,7 @@ struct LizaAlertState {
 enum BackgroundMessage {
     ProjectsLoaded(Result<Vec<LizaProjectSummary>, String>),
     ProjectLoaded(Result<LizaProject, String>),
+    MapDownloadProgress(MapDownloadProgress),
     MapDownloaded(Result<ActiveMapSelection, String>),
 }
 
@@ -100,10 +107,16 @@ impl AppState {
 
     pub fn poll_background_tasks(&mut self) {
         while let Ok(message) = self.lizaalert.receiver.try_recv() {
-            self.lizaalert.busy = false;
+            self.handle_background_message(message);
+        }
+    }
 
-            match message {
-                BackgroundMessage::ProjectsLoaded(result) => match result {
+    fn handle_background_message(&mut self, message: BackgroundMessage) {
+        match message {
+            BackgroundMessage::ProjectsLoaded(result) => {
+                self.lizaalert.busy = false;
+
+                match result {
                     Ok(projects) => {
                         let count = projects.len();
                         self.lizaalert.projects = projects;
@@ -112,8 +125,12 @@ impl AppState {
                     Err(error) => {
                         self.lizaalert.status = error;
                     }
-                },
-                BackgroundMessage::ProjectLoaded(result) => match result {
+                }
+            }
+            BackgroundMessage::ProjectLoaded(result) => {
+                self.lizaalert.busy = false;
+
+                match result {
                     Ok(project) => {
                         let name = project.summary.name.clone();
                         self.lizaalert.selected_project_slug = Some(project.summary.slug.clone());
@@ -123,8 +140,15 @@ impl AppState {
                     Err(error) => {
                         self.lizaalert.status = error;
                     }
-                },
-                BackgroundMessage::MapDownloaded(result) => match result {
+                }
+            }
+            BackgroundMessage::MapDownloadProgress(progress) => {
+                self.lizaalert.status = format_map_download_status(progress);
+            }
+            BackgroundMessage::MapDownloaded(result) => {
+                self.lizaalert.busy = false;
+
+                match result {
                     Ok(selection) => {
                         let status = match self.register_active_map_layer(&selection) {
                             Ok(true) => format!(
@@ -147,7 +171,7 @@ impl AppState {
                     Err(error) => {
                         self.lizaalert.status = error;
                     }
-                },
+                }
             }
         }
     }
@@ -221,9 +245,15 @@ impl AppState {
         let sender = self.lizaalert.sender.clone();
 
         thread::spawn(move || {
-            let _ = sender.send(BackgroundMessage::MapDownloaded(lizaalert::download_map(
-                selection,
-            )));
+            let download_result = lizaalert::download_map(selection, |progress| {
+                let _ = sender.send(BackgroundMessage::MapDownloadProgress(
+                    MapDownloadProgress {
+                        downloaded_bytes: progress.downloaded_bytes,
+                        total_bytes: progress.total_bytes,
+                    },
+                ));
+            });
+            let _ = sender.send(BackgroundMessage::MapDownloaded(download_result));
         });
     }
 
@@ -287,9 +317,43 @@ impl AppState {
     }
 }
 
+fn format_map_download_status(progress: MapDownloadProgress) -> String {
+    match progress.total_bytes {
+        Some(total_bytes) if total_bytes > 0 => {
+            let percent = progress.downloaded_bytes as f64 / total_bytes as f64 * 100.0;
+            format!(
+                "Downloading map... {:.0}% ({}/{})",
+                percent,
+                format_bytes(progress.downloaded_bytes),
+                format_bytes(total_bytes)
+            )
+        }
+        _ => format!(
+            "Downloading map... {}",
+            format_bytes(progress.downloaded_bytes)
+        ),
+    }
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = KIB * 1024;
+
+    if bytes >= MIB {
+        format!("{:.1} MiB", bytes as f64 / MIB as f64)
+    } else if bytes >= KIB {
+        format!("{:.1} KiB", bytes as f64 / KIB as f64)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ActiveMapSelection, AppState, MapCenter};
+    use super::{
+        format_map_download_status, ActiveMapSelection, AppState, BackgroundMessage, MapCenter,
+        MapDownloadProgress,
+    };
     use std::path::Path;
     use std::path::PathBuf;
 
@@ -348,5 +412,34 @@ mod tests {
             .register_active_map_layer(&selection)
             .expect("duplicate registration should be ignored"));
         assert_eq!(state.map_layer_count(), 1);
+    }
+
+    #[test]
+    fn download_progress_status_reports_percentage_when_total_is_known() {
+        let status = format_map_download_status(MapDownloadProgress {
+            downloaded_bytes: 512,
+            total_bytes: Some(1024),
+        });
+
+        assert_eq!(status, "Downloading map... 50% (512 B/1.0 KiB)");
+    }
+
+    #[test]
+    fn progress_message_keeps_background_work_marked_busy() {
+        let mut state = AppState::default();
+        state.lizaalert.busy = true;
+
+        state.handle_background_message(BackgroundMessage::MapDownloadProgress(
+            MapDownloadProgress {
+                downloaded_bytes: 2048,
+                total_bytes: Some(4096),
+            },
+        ));
+
+        assert!(state.lizaalert.busy);
+        assert_eq!(
+            state.lizaalert.status,
+            "Downloading map... 50% (2.0 KiB/4.0 KiB)"
+        );
     }
 }
