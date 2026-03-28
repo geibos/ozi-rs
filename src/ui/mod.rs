@@ -75,12 +75,7 @@ impl OziApp {
             return;
         }
 
-        match SqliteTiles::open(
-            &active_map.local_path,
-            ctx.clone(),
-            format!("LizaAlert {}", active_map.package_name),
-            active_map.base_zoom,
-        ) {
+        match SqliteTiles::open(&active_map.local_path, ctx.clone(), active_map.base_zoom) {
             Ok(offline_tiles) => {
                 self.map_center = lon_lat(active_map.center.lon, active_map.center.lat);
                 self.map_memory.center_at(self.map_center);

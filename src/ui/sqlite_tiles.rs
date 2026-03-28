@@ -3,10 +3,10 @@ use lru::LruCache;
 use rusqlite::{params, Connection};
 use std::num::NonZeroUsize;
 use std::path::Path;
-use walkers::{
-    sources::{Attribution, AttributionType},
-    Tile, TileId, TilePiece, Tiles,
-};
+use walkers::{sources::Attribution, Tile, TileId, TilePiece, Tiles};
+
+const SQLITE_TILES_ATTRIBUTION_TEXT: &str = "LizaAlert";
+const SQLITE_TILES_ATTRIBUTION_URL: &str = "";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct TileKey {
@@ -22,7 +22,6 @@ enum CachedTile {
 }
 
 pub struct SqliteTiles {
-    attribution: String,
     cache: LruCache<TileKey, CachedTile>,
     connection: Connection,
     db_min_zoom: u8,
@@ -32,17 +31,11 @@ pub struct SqliteTiles {
 }
 
 impl SqliteTiles {
-    pub fn open(
-        path: &Path,
-        egui_ctx: egui::Context,
-        attribution: String,
-        web_max_zoom: u8,
-    ) -> Result<Self, String> {
+    pub fn open(path: &Path, egui_ctx: egui::Context, web_max_zoom: u8) -> Result<Self, String> {
         let connection = Connection::open(path).map_err(|err| err.to_string())?;
         let (db_min_zoom, db_max_zoom) = read_db_zoom_range(&connection)?;
 
         Ok(Self {
-            attribution,
             cache: LruCache::new(NonZeroUsize::new(512).expect("cache size")),
             connection,
             db_min_zoom,
@@ -114,12 +107,10 @@ impl Tiles for SqliteTiles {
 
     fn attribution(&self) -> Attribution {
         Attribution {
-            text: self.attribution.clone(),
-            url: String::new(),
+            text: SQLITE_TILES_ATTRIBUTION_TEXT,
+            url: SQLITE_TILES_ATTRIBUTION_URL,
             logo_light: None,
             logo_dark: None,
-            logo_link: None,
-            attribution_type: AttributionType::Text,
         }
     }
 
