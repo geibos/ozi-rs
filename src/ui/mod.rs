@@ -93,11 +93,11 @@ impl OziApp {
         }
     }
 
-    fn show_project_sidebar(&mut self, ctx: &egui::Context) {
+    fn show_project_sidebar(&mut self, ui: &mut egui::Ui) {
         egui::SidePanel::left("lizaalert_projects")
             .resizable(true)
-            .default_width(280.0)
-            .show(ctx, |ui| {
+            .default_size(280.0)
+            .show_inside(ui, |ui| {
                 ui.heading("Map Picker");
                 ui.label("Source: maps.lizaalert.ru");
 
@@ -174,7 +174,7 @@ impl OziApp {
 }
 
 impl eframe::App for OziApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.state.poll_background_tasks();
         self.sync_active_map(ctx);
         self.fps_counter.tick();
@@ -183,10 +183,12 @@ impl eframe::App for OziApp {
         if self.state.lizaalert_busy() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
+    }
 
-        self.show_project_sidebar(ctx);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.show_project_sidebar(ui);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("ozi-rs");
                 ui.label(format!("Project: {}", self.state.project_name()));
