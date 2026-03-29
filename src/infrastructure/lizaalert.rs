@@ -1,17 +1,21 @@
 use crate::application::{
     ActiveMapKind, ActiveMapSelection, LizaMapPackage, LizaProject, LizaProjectSummary, MapCenter,
 };
-use crate::infrastructure::import::{parse_ozi_map_metadata, read_ozi_map_text};
+use crate::infrastructure::import::{
+    ArchiveEntryKind, SupportedArchiveEntryKind, extract_zip_entries_to_directory,
+    inventory_zip_entries, parse_ozi_map_metadata, read_ozi_map_text,
+};
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
 const MOBILE_MAPS_DIR_URL: &str = "8-Android%26iOS/";
 const MOBILE_MAPS_DIR_NAME: &str = "8-Android&iOS";
 const PROJECT_CACHE_DIR: &str = "lizaalert-projects";
+const PROJECT_EXTRACTED_DIR: &str = "extracted";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DownloadProgress {
@@ -79,6 +83,11 @@ where
             message: format!("Opening cached project bundle: {}", summary.name),
         });
     }
+
+    on_progress(ProjectOpenProgress {
+        message: format!("Extracting cached OZI bundles: {}", summary.name),
+    });
+    materialize_cached_ozi_archives(&project_cache_root(), &summary.slug, &mut on_progress)?;
 
     on_progress(ProjectOpenProgress {
         message: format!("Indexing cached project maps: {}", summary.name),
@@ -382,6 +391,10 @@ fn read_cached_map_packages(
     let source_root = project_source_root(root, project_slug);
     let mut maps = read_cached_sqlite_map_packages(root, project_slug, &zoom_regex)?;
     maps.extend(read_cached_ozi_map_packages(&source_root)?);
+    maps.extend(read_cached_ozi_map_packages(&project_extracted_root(
+        root,
+        project_slug,
+    ))?);
 
     maps.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(maps)
@@ -491,6 +504,13 @@ fn is_ozi_map_path(path: &Path) -> bool {
     )
 }
 
+fn is_zip_path(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some(ext) if ext.eq_ignore_ascii_case("zip")
+    )
+}
+
 fn map_kind_from_local_path(path: &Path) -> ActiveMapKind {
     if is_ozi_map_path(path) {
         ActiveMapKind::OziRaster
@@ -511,6 +531,10 @@ fn project_source_root(root: &Path, project_slug: &str) -> PathBuf {
     root.join(project_slug).join("source")
 }
 
+fn project_extracted_root(root: &Path, project_slug: &str) -> PathBuf {
+    root.join(project_slug).join(PROJECT_EXTRACTED_DIR)
+}
+
 fn project_cache_root() -> PathBuf {
     Path::new(".tmp").join(PROJECT_CACHE_DIR)
 }
@@ -529,15 +553,108 @@ struct DirectoryEntry {
     is_dir: bool,
 }
 
+fn materialize_cached_ozi_archives<F>(
+    root: &Path,
+    project_slug: &str,
+    on_progress: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(ProjectOpenProgress),
+{
+    let source_root = project_source_root(root, project_slug);
+    let extracted_root = project_extracted_root(root, project_slug);
+    let mut zip_files = Vec::new();
+    collect_cached_zip_files(&source_root, &mut zip_files)?;
+
+    for zip_path in zip_files {
+        if !is_ozi_archive_file(&zip_path)? {
+            continue;
+        }
+
+        let destination = extraction_destination_for_archive(&extracted_root, &zip_path);
+        if destination.exists() {
+            continue;
+        }
+
+        on_progress(ProjectOpenProgress {
+            message: format!("Extracting {}", zip_path.display()),
+        });
+        extract_cached_archive(&zip_path, &destination)?;
+    }
+
+    Ok(())
+}
+
+fn collect_cached_zip_files(dir: &Path, output: &mut Vec<PathBuf>) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir).map_err(|err| err.to_string())? {
+        let entry = entry.map_err(|err| err.to_string())?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            collect_cached_zip_files(&path, output)?;
+            continue;
+        }
+
+        if is_zip_path(&path) {
+            output.push(path);
+        }
+    }
+
+    Ok(())
+}
+
+fn is_ozi_archive_file(path: &Path) -> Result<bool, String> {
+    let bytes = fs::read(path).map_err(|err| err.to_string())?;
+    let entries = inventory_zip_entries(Cursor::new(bytes)).map_err(|err| err.to_string())?;
+
+    Ok(entries.iter().any(|entry| {
+        matches!(
+            entry.kind(),
+            ArchiveEntryKind::Supported(SupportedArchiveEntryKind::OziMap)
+                | ArchiveEntryKind::Unsupported(_)
+        ) && !matches!(
+            entry.kind(),
+            ArchiveEntryKind::Unsupported(
+                crate::infrastructure::import::UnsupportedArchiveEntryKind::SqliteTiles
+            ) | ArchiveEntryKind::Unsupported(
+                crate::infrastructure::import::UnsupportedArchiveEntryKind::Unknown
+            )
+        )
+    }))
+}
+
+fn extract_cached_archive(archive_path: &Path, destination: &Path) -> Result<(), String> {
+    let bytes = fs::read(archive_path).map_err(|err| err.to_string())?;
+    extract_zip_entries_to_directory(Cursor::new(bytes), destination)
+        .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+fn extraction_destination_for_archive(extracted_root: &Path, archive_path: &Path) -> PathBuf {
+    let stem = archive_path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or("archive");
+
+    extracted_root.join(stem)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_text_bytes, load_cached_project_from_root, parse_center, parse_directory_entries,
-        parse_map_packages, read_text_file_lossy,
+        decode_text_bytes, load_cached_project_from_root, materialize_cached_ozi_archives,
+        parse_center, parse_directory_entries, parse_map_packages, read_text_file_lossy,
     };
     use crate::application::LizaProjectSummary;
     use std::fs;
+    use std::io::{Cursor, Write};
     use std::time::{SystemTime, UNIX_EPOCH};
+    use zip::write::SimpleFileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     #[test]
     fn parse_center_reads_decimal_coordinates() {
@@ -608,6 +725,32 @@ mod tests {
     }
 
     #[test]
+    fn materialize_cached_ozi_archives_extracts_zip_for_cached_project_indexing() {
+        let root = write_cached_project_zip_fixture();
+
+        materialize_cached_ozi_archives(&root, "2026-03-29_demo", &mut |_| {})
+            .expect("extract ozi archives");
+
+        let summary = LizaProjectSummary {
+            slug: "2026-03-29_demo".to_owned(),
+            name: "2026-03-29 demo".to_owned(),
+            url: "https://example.test/project/".to_owned(),
+        };
+        let project = load_cached_project_from_root(summary, &root).expect("project");
+
+        assert_eq!(project.maps.len(), 2);
+        assert_eq!(project.maps[0].name, "OZI: Demo topo");
+        assert!(
+            project.maps[0]
+                .local_path
+                .as_ref()
+                .expect("ozi path")
+                .to_string_lossy()
+                .contains("extracted/5-Ozi(Win&Android)_Topo/Maps/demo.map")
+        );
+    }
+
+    #[test]
     fn decode_text_bytes_falls_back_lossy_for_non_utf8() {
         let text = decode_text_bytes(b"demo \xFF bundle");
 
@@ -652,6 +795,51 @@ mod tests {
         fs::write(mobile_dir.join("demo_z16.sqlitedb"), []).expect("write sqlite placeholder");
         fs::write(ozi_dir.join("demo.map"), sample_ozi_map()).expect("write ozi map");
         root
+    }
+
+    fn write_cached_project_zip_fixture() -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("ozi-rs-lizaalert-cache-zip-{unique}"));
+        let source_dir = root.join("2026-03-29_demo/source");
+        let mobile_dir = source_dir.join("8-Android&iOS");
+        fs::create_dir_all(&mobile_dir).expect("create mobile dir");
+        fs::write(
+            source_dir.join("2-Coordinates.txt"),
+            "N 54.32821 E 048.40917",
+        )
+        .expect("write coordinates");
+        fs::write(mobile_dir.join("demo_z16.sqlitedb"), []).expect("write sqlite placeholder");
+        fs::write(
+            source_dir.join("5-Ozi(Win&Android)_Topo.zip"),
+            build_archive(&[
+                ("Maps/demo.map", sample_ozi_map().as_bytes(), false),
+                ("Maps/demo.ozf2", b"ozf-placeholder".as_slice(), false),
+            ]),
+        )
+        .expect("write ozi zip");
+        root
+    }
+
+    fn build_archive(entries: &[(&str, &[u8], bool)]) -> Vec<u8> {
+        let mut buffer = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(&mut buffer);
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+
+        for (path, contents, is_directory) in entries {
+            if *is_directory {
+                writer.add_directory(*path, options).expect("directory");
+                continue;
+            }
+
+            writer.start_file(*path, options).expect("file");
+            writer.write_all(contents).expect("contents");
+        }
+
+        writer.finish().expect("finish");
+        buffer.into_inner()
     }
 
     fn sample_ozi_map() -> &'static str {
