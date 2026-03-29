@@ -14,7 +14,6 @@ use std::path::{Path, PathBuf};
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
 const MOBILE_MAPS_DIR_URL: &str = "8-Android%26iOS/";
 const MOBILE_MAPS_DIR_NAME: &str = "8-Android&iOS";
-const PROJECT_CACHE_DIR: &str = "lizaalert-projects";
 const PROJECT_EXTRACTED_DIR: &str = "extracted";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,16 +67,17 @@ pub fn fetch_project(summary: LizaProjectSummary) -> Result<LizaProject, String>
 
 pub fn open_project<F>(
     summary: LizaProjectSummary,
+    root: &Path,
     mut on_progress: F,
 ) -> Result<LizaProject, String>
 where
     F: FnMut(ProjectOpenProgress),
 {
-    if !is_project_cached(&summary.slug) {
+    if !is_project_cached(&summary.slug, root) {
         on_progress(ProjectOpenProgress {
             message: format!("Downloading project bundle: {}", summary.name),
         });
-        cache_project(&summary, &mut on_progress)?;
+        cache_project_at_root(&summary, root, &mut on_progress)?;
     } else {
         on_progress(ProjectOpenProgress {
             message: format!("Opening cached project bundle: {}", summary.name),
@@ -87,16 +87,53 @@ where
     on_progress(ProjectOpenProgress {
         message: format!("Extracting cached OZI bundles: {}", summary.name),
     });
-    materialize_cached_ozi_archives(&project_cache_root(), &summary.slug, &mut on_progress)?;
+    materialize_cached_ozi_archives(root, &summary.slug, &mut on_progress)?;
 
     on_progress(ProjectOpenProgress {
         message: format!("Indexing cached project maps: {}", summary.name),
     });
-    load_cached_project(summary)
+    load_cached_project_from_root(summary, root)
 }
 
-pub fn is_project_cached(project_slug: &str) -> bool {
-    project_coordinates_path(&project_cache_root(), project_slug).exists()
+pub fn is_project_cached(project_slug: &str, root: &Path) -> bool {
+    project_coordinates_path(root, project_slug).exists()
+}
+
+/// Open an arbitrary local bundle directory that follows the LizaAlert structure.
+///
+/// The directory is expected to be the `{slug}/` folder that contains a `source/` subdirectory
+/// with `2-Coordinates.txt`, OZI archives/maps, and `8-Android&iOS/` SQLite tiles.
+pub fn open_bundle_directory<F>(dir: &Path, mut on_progress: F) -> Result<LizaProject, String>
+where
+    F: FnMut(ProjectOpenProgress),
+{
+    let slug = dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("bundle")
+        .to_owned();
+    let root = dir.parent().unwrap_or(dir);
+    let name = slug.replace('_', " ");
+    let summary = LizaProjectSummary {
+        slug: slug.clone(),
+        name: name.clone(),
+        url: String::new(),
+    };
+
+    on_progress(ProjectOpenProgress {
+        message: format!("Extracting OZI archives in: {name}"),
+    });
+    materialize_cached_ozi_archives(root, &slug, &mut on_progress)?;
+
+    on_progress(ProjectOpenProgress {
+        message: format!("Indexing maps in: {name}"),
+    });
+    load_cached_project_from_root(summary, root)
+}
+
+/// Return the root directory of the bundle for the given slug.
+pub fn bundle_directory(bundles_root: &Path, project_slug: &str) -> PathBuf {
+    bundles_root.join(project_slug)
 }
 
 pub fn download_map<F>(
@@ -143,11 +180,11 @@ where
 pub fn build_active_map_selection(
     project: &LizaProject,
     map: &LizaMapPackage,
+    bundles_root: &Path,
 ) -> ActiveMapSelection {
-    let local_path = map
-        .local_path
-        .clone()
-        .unwrap_or_else(|| legacy_map_cache_path(&project.summary.slug, &map.file_name));
+    let local_path = map.local_path.clone().unwrap_or_else(|| {
+        project_mobile_maps_dir(bundles_root, &project.summary.slug).join(&map.file_name)
+    });
 
     ActiveMapSelection {
         kind: map_kind_from_local_path(&local_path),
@@ -224,11 +261,15 @@ fn client() -> Result<Client, String> {
     Client::builder().build().map_err(|err| err.to_string())
 }
 
-fn cache_project<F>(summary: &LizaProjectSummary, on_progress: &mut F) -> Result<(), String>
+fn cache_project_at_root<F>(
+    summary: &LizaProjectSummary,
+    root: &Path,
+    on_progress: &mut F,
+) -> Result<(), String>
 where
     F: FnMut(ProjectOpenProgress),
 {
-    let source_root = project_source_root(&project_cache_root(), &summary.slug);
+    let source_root = project_source_root(root, &summary.slug);
     fs::create_dir_all(&source_root).map_err(|err| err.to_string())?;
     mirror_remote_directory(&summary.url, &source_root, on_progress)
 }
@@ -361,10 +402,6 @@ fn decode_text_bytes(bytes: &[u8]) -> String {
         Ok(text) => text,
         Err(error) => String::from_utf8_lossy(&error.into_bytes()).into_owned(),
     }
-}
-
-fn load_cached_project(summary: LizaProjectSummary) -> Result<LizaProject, String> {
-    load_cached_project_from_root(summary, &project_cache_root())
 }
 
 fn load_cached_project_from_root(
@@ -533,17 +570,6 @@ fn project_source_root(root: &Path, project_slug: &str) -> PathBuf {
 
 fn project_extracted_root(root: &Path, project_slug: &str) -> PathBuf {
     root.join(project_slug).join(PROJECT_EXTRACTED_DIR)
-}
-
-fn project_cache_root() -> PathBuf {
-    Path::new(".tmp").join(PROJECT_CACHE_DIR)
-}
-
-fn legacy_map_cache_path(project_slug: &str, file_name: &str) -> PathBuf {
-    Path::new(".tmp")
-        .join("lizaalert-maps")
-        .join(project_slug)
-        .join(file_name)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
