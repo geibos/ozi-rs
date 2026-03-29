@@ -437,8 +437,11 @@ impl OziRasterRenderer {
 
         for tile_y in visible_tiles.start_y..=visible_tiles.end_y {
             for tile_x in visible_tiles.start_x..=visible_tiles.end_x {
-                let (texture, tile_size_level_pixels) =
-                    self.load_tile_texture(ui.ctx(), level_selection.level_index, tile_x, tile_y)?;
+                let Ok((texture, tile_size_level_pixels)) =
+                    self.load_tile_texture(ui.ctx(), level_selection.level_index, tile_x, tile_y)
+                else {
+                    continue;
+                };
                 let tile_rect = ozi_tile_screen_rect(
                     rect,
                     image_rect.min,
@@ -557,8 +560,15 @@ impl OziViewportState {
         }
 
         if response.hovered() {
-            let scroll_delta_y = ui.input(|input| input.smooth_scroll_delta.y);
-            if scroll_delta_y.abs() > f32::EPSILON {
+            // Two-finger scroll pan (matches walkers panning behavior)
+            let scroll_delta = ui.input(|input| input.smooth_scroll_delta);
+            if scroll_delta != egui::Vec2::ZERO {
+                self.top_left_base_pixels -= scroll_delta / self.zoom;
+            }
+
+            // Pinch or Ctrl+scroll zoom (matches walkers zoom_delta behavior)
+            let zoom_delta = ui.input(|input| input.zoom_delta());
+            if (zoom_delta - 1.0).abs() > f32::EPSILON {
                 let min_zoom =
                     fit_ozi_zoom(image_size, rect.size()).max(0.01) * OZI_MIN_ZOOM_FACTOR;
                 let max_zoom = OZI_MAX_OVERZOOM_FACTOR;
@@ -567,8 +577,7 @@ impl OziViewportState {
                     .unwrap_or(rect.center());
                 let pointer_offset = pointer_position - rect.min;
                 let anchor = self.top_left_base_pixels + pointer_offset / self.zoom;
-                let zoom_factor = (scroll_delta_y * 0.0015).exp();
-                let new_zoom = (self.zoom * zoom_factor).clamp(min_zoom, max_zoom);
+                let new_zoom = (self.zoom * zoom_delta).clamp(min_zoom, max_zoom);
 
                 self.top_left_base_pixels = anchor - pointer_offset / new_zoom;
                 self.zoom = new_zoom;
