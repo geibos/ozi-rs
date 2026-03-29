@@ -9,6 +9,7 @@ use crate::infrastructure::import::{
     OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
 use crate::infrastructure::lizaalert;
+use crate::infrastructure::persistence;
 use std::collections::VecDeque;
 use std::fmt;
 use std::path::PathBuf;
@@ -131,6 +132,7 @@ impl DiagnosticEntry {
 pub struct AppState {
     history: CommandStack,
     project: Project,
+    project_path: Option<PathBuf>,
     lizaalert: LizaAlertState,
 }
 
@@ -169,6 +171,7 @@ impl AppState {
         Self {
             history: CommandStack::default(),
             project: Project::default(),
+            project_path: None,
             lizaalert: LizaAlertState {
                 projects: Vec::new(),
                 selected_project_slug: None,
@@ -489,7 +492,45 @@ impl AppState {
     }
 
     pub fn window_title(&self) -> String {
-        format!("ozi-rs - {}", self.project_name())
+        let modified = if self.project_path.is_none() {
+            " *"
+        } else {
+            ""
+        };
+        format!("ozi-rs - {}{modified}", self.project_name())
+    }
+
+    pub fn project_file_path(&self) -> Option<&std::path::Path> {
+        self.project_path.as_deref()
+    }
+
+    pub fn save_project_to(&mut self, path: PathBuf) {
+        match persistence::save_project(&self.project, &path) {
+            Ok(()) => {
+                let display = path.display().to_string();
+                self.project_path = Some(path);
+                self.update_status(DiagnosticLevel::Info, format!("Saved: {display}"));
+            }
+            Err(error) => {
+                self.update_status(DiagnosticLevel::Error, format!("Save failed: {error}"));
+            }
+        }
+    }
+
+    pub fn load_project_from(&mut self, path: PathBuf) {
+        match persistence::load_project(&path) {
+            Ok(project) => {
+                let display = path.display().to_string();
+                self.project = project;
+                self.project_path = Some(path);
+                self.history = CommandStack::default();
+                self.lizaalert.active_map = None;
+                self.update_status(DiagnosticLevel::Info, format!("Opened: {display}"));
+            }
+            Err(error) => {
+                self.update_status(DiagnosticLevel::Error, format!("Open failed: {error}"));
+            }
+        }
     }
 
     pub fn import_gpx_archive<R>(
@@ -605,7 +646,7 @@ mod tests {
     fn default_window_title_uses_untitled_project() {
         let state = AppState::default();
 
-        assert_eq!(state.window_title(), "ozi-rs - Untitled Project");
+        assert_eq!(state.window_title(), "ozi-rs - Untitled Project *");
     }
 
     #[test]

@@ -8,7 +8,8 @@ pub enum ProjectLayerError {
     MissingWaypoint(LayerId, WaypointId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct ProjectId(u64);
 
 impl ProjectId {
@@ -17,7 +18,8 @@ impl ProjectId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct LayerId(u64);
 
 impl LayerId {
@@ -30,7 +32,7 @@ impl LayerId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct MapLayer {
     id: LayerId,
     name: String,
@@ -67,7 +69,7 @@ impl MapLayer {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TrackLayer {
     id: LayerId,
     name: String,
@@ -100,7 +102,7 @@ impl TrackLayer {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WaypointLayer {
     id: LayerId,
     name: String,
@@ -151,7 +153,7 @@ impl WaypointLayer {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Project {
     id: ProjectId,
     name: String,

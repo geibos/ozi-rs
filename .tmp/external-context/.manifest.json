@@ -1,7 +1,54 @@
 {
   "version": "1.0",
-  "last_updated": "2026-03-22T20:17:19Z",
+  "last_updated": "2026-03-28T09:43:06Z",
   "libraries": {
+    "eframe-egui": {
+      "files": [
+        {
+          "filename": "app-trait-0-34-ui-migration.md",
+          "topic": "eframe 0.34.x App trait shape and ui migration",
+          "tech_stack": "Rust desktop + eframe / egui 0.34.x",
+          "fetched": "2026-03-28T08:25:00Z",
+          "source": "docs.rs and official GitHub releases"
+        },
+        {
+          "filename": "rust-desktop-map-editor-evaluation.md",
+          "topic": "Rust desktop map editor evaluation",
+          "tech_stack": "Rust desktop",
+          "fetched": "2026-03-22T12:08:31Z",
+          "source": "Official docs and docs.rs"
+        },
+        {
+          "filename": "osm-map-hosting.md",
+          "topic": "native egui app hosting for map widget",
+          "tech_stack": "eframe / egui desktop",
+          "fetched": "2026-03-22T20:17:19Z",
+          "source": "Official docs and docs.rs"
+        }
+      ]
+    },
+    "gpx": {
+      "files": [
+        {
+          "filename": "rust-gpx-import-adapter-api.md",
+          "topic": "small Rust GPX import adapter API details",
+          "tech_stack": "Rust stable + gpx crate + deterministic importer",
+          "fetched": "2026-03-28T08:20:00Z",
+          "source": "docs.rs and crate source"
+        }
+      ]
+    },
+    "rust-geodata-import": {
+      "files": [
+        {
+          "filename": "zip-geodata-import-support-matrix.md",
+          "topic": "ZIP-based geodata import support matrix for GPX, KML, Ozi text, and ozf2",
+          "tech_stack": "Rust stable + desktop geodata import",
+          "fetched": "2026-03-28T08:10:00Z",
+          "source": "docs.rs, crates.io API, official specs, and reference implementation docs"
+        }
+      ]
+    },
     "walkers": {
       "files": [
         {
@@ -24,24 +71,24 @@
           "tech_stack": "Rust + eframe / egui + walkers",
           "fetched": "2026-03-23T17:40:01Z",
           "source": "docs.rs and source code"
+        },
+        {
+          "filename": "walkers-0.53-eframe-0.34-compatibility.md",
+          "topic": "walkers 0.53.x compatibility with eframe 0.34.x",
+          "tech_stack": "Rust + eframe 0.34.x + egui 0.34.x + walkers 0.53.x",
+          "fetched": "2026-03-28T08:20:03Z",
+          "source": "docs.rs and GitHub tag/commit pages"
         }
       ]
     },
-    "eframe-egui": {
+    "reqwest": {
       "files": [
         {
-          "filename": "rust-desktop-map-editor-evaluation.md",
-          "topic": "Rust desktop map editor evaluation",
-          "tech_stack": "Rust desktop",
-          "fetched": "2026-03-22T12:08:31Z",
-          "source": "Official docs and docs.rs"
-        },
-        {
-          "filename": "osm-map-hosting.md",
-          "topic": "native egui app hosting for map widget",
-          "tech_stack": "eframe / egui desktop",
-          "fetched": "2026-03-22T20:17:19Z",
-          "source": "Official docs and docs.rs"
+          "filename": "default-features-false-https-blocking-tls.md",
+          "topic": "HTTPS support with default-features = false for blocking client requests",
+          "tech_stack": "Rust + reqwest 0.13.x blocking client",
+          "fetched": "2026-03-28T09:33:19Z",
+          "source": "docs.rs and upstream source"
         }
       ]
     },
@@ -64,6 +111,17 @@
           "tech_stack": "Rust desktop",
           "fetched": "2026-03-22T12:08:31Z",
           "source": "Official Tauri docs"
+        }
+      ]
+    },
+    "ozi-map": {
+      "files": [
+        {
+          "filename": "minimal-metadata-parser.md",
+          "topic": "OziExplorer .map file structure, calibration fields, raster filename handling, minimal metadata parser requirements, and pitfalls",
+          "tech_stack": "Rust stable + geodata import + raster reference resolution",
+          "fetched": "2026-03-28T09:43:06Z",
+          "source": "Official OziExplorer docs + GDAL docs/source + GPSBabel docs"
         }
       ]
     }
