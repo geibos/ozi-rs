@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-ozf2-rs-integration
 Created: 2026-03-29T06:35:00Z
-Status: application_ui_slice_validated
+Status: cached_project_ozi_open_validated
 
 ## Current Request
 Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that reference `.ozf2` payloads can start moving from deferred metadata-only handling toward actual in-app display.
@@ -64,6 +64,9 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - Added a minimal UI path input and `Open OZI map` action in the sidebar, keeping the existing LizaAlert picker intact.
 - Added a dedicated OZI render path in `src/ui/mod.rs` that parses the selected `.map`, decodes the `ozf2` raster through the infrastructure adapter, uploads it as an egui texture, and displays it in the central panel while preserving the sqlite/OSM fallback path.
 - Added focused application tests covering successful local OZI opening and explicit rejection of unsupported `ozfx3` payloads.
+- Extended cached LizaAlert project loading so mirrored `.map` files are discovered from the local project tree, surfaced as project map entries, and opened through the same project map selection flow as cached sqlite packages.
+- Updated `lizaalert::build_active_map_selection(...)` to infer `ActiveMapKind` from the cached local path, allowing `.map` selections to route into the existing OZI renderer without introducing a second project-opening mode.
+- Added focused coverage for cached OZI project entries in both infrastructure and application tests.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -71,4 +74,5 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - [x] `.map` metadata distinguishes supported `ozf2` from still-unsupported `ozfx3`.
 - [x] A decoded OZF raster can be opened through `ozi-rs` infrastructure with focused tests.
 - [x] Application/UI wiring for OZI-backed maps is implemented for local `.map` + `ozf2` opening.
+- [x] Cached mirrored project `.map` entries reuse the same application/UI OZI opening path.
 - [x] Validation passes for the touched slice.

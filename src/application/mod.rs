@@ -331,6 +331,18 @@ impl AppState {
         let selection = lizaalert::build_active_map_selection(&project, &map);
 
         if map.local_path.is_some() {
+            if selection.kind == ActiveMapKind::OziRaster {
+                match self.open_ozi_map_selection(
+                    selection.project_name.clone(),
+                    selection.package_name.clone(),
+                    selection.local_path.clone(),
+                ) {
+                    Ok(()) => {}
+                    Err(error) => self.update_status(DiagnosticLevel::Error, error.to_string()),
+                }
+                return;
+            }
+
             let status = match self.register_active_map_layer(&selection) {
                 Ok(true) => format!(
                     "Opened cached map: {} / {}",
@@ -376,6 +388,21 @@ impl AppState {
         map_path: impl Into<PathBuf>,
     ) -> Result<(), OpenLocalMapError> {
         let map_path = map_path.into();
+        let file_name = map_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("local-ozi.map")
+            .to_owned();
+
+        self.open_ozi_map_selection("Local OZI".to_owned(), file_name, map_path)
+    }
+
+    fn open_ozi_map_selection(
+        &mut self,
+        project_name: String,
+        package_name: String,
+        map_path: PathBuf,
+    ) -> Result<(), OpenLocalMapError> {
         let contents = std::fs::read_to_string(&map_path).map_err(OpenLocalMapError::Read)?;
         let metadata =
             parse_ozi_map_metadata(&map_path, &contents).map_err(OpenLocalMapError::Parse)?;
@@ -385,15 +412,10 @@ impl AppState {
             kind => return Err(OpenLocalMapError::UnsupportedRasterKind(kind.clone())),
         }
 
-        let file_name = map_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("local-ozi.map")
-            .to_owned();
         let selection = ActiveMapSelection {
             kind: ActiveMapKind::OziRaster,
-            project_name: "Local OZI".to_owned(),
-            package_name: file_name,
+            project_name,
+            package_name,
             remote_url: String::new(),
             local_path: map_path,
             center: MapCenter { lat: 0.0, lon: 0.0 },
@@ -405,7 +427,10 @@ impl AppState {
                 self.lizaalert.active_map = Some(selection.clone());
                 self.update_status(
                     DiagnosticLevel::Info,
-                    format!("Opened local OZI map: {}", selection.package_name),
+                    format!(
+                        "Opened OZI map: {} / {}",
+                        selection.project_name, selection.package_name
+                    ),
                 );
                 Ok(())
             }
@@ -414,8 +439,8 @@ impl AppState {
                 self.update_status(
                     DiagnosticLevel::Info,
                     format!(
-                        "Opened local OZI map: {} (already registered)",
-                        selection.package_name
+                        "Opened OZI map: {} / {} (already registered)",
+                        selection.project_name, selection.package_name
                     ),
                 );
                 Ok(())
@@ -754,6 +779,38 @@ mod tests {
 
         let active_map = state.active_map().expect("active map");
         assert_eq!(active_map.kind, ActiveMapKind::SqliteTiles);
+        assert_eq!(active_map.local_path, local_map_path);
+        assert!(!state.lizaalert_busy());
+    }
+
+    #[test]
+    fn open_selected_map_prefers_cached_ozi_map_without_downloading() {
+        let mut state = AppState::default();
+        let local_map_path = write_temp_ozi_map(sample_ozi_map("bundle/sample.ozf2"));
+
+        state.lizaalert.selected_project = Some(super::LizaProject {
+            summary: super::LizaProjectSummary {
+                slug: "2026-03-29_demo".to_owned(),
+                name: "2026-03-29 demo".to_owned(),
+                url: "https://example.test/project/".to_owned(),
+            },
+            center: MapCenter {
+                lat: 54.0,
+                lon: 48.0,
+            },
+            maps: vec![super::LizaMapPackage {
+                name: "OZI: Forest map".to_owned(),
+                file_name: "5-Ozi/Maps/demo.map".to_owned(),
+                url: String::new(),
+                base_zoom: 0,
+                local_path: Some(local_map_path.clone()),
+            }],
+        });
+
+        state.open_selected_map("OZI: Forest map");
+
+        let active_map = state.active_map().expect("active map");
+        assert_eq!(active_map.kind, ActiveMapKind::OziRaster);
         assert_eq!(active_map.local_path, local_map_path);
         assert!(!state.lizaalert_busy());
     }
