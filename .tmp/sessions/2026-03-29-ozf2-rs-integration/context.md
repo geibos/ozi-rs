@@ -1,0 +1,66 @@
+# Task Context: ozf2-rs integration into ozi-rs
+
+Session ID: 2026-03-29-ozf2-rs-integration
+Created: 2026-03-29T06:35:00Z
+Status: infrastructure_slice_validated
+
+## Current Request
+Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that reference `.ozf2` payloads can start moving from deferred metadata-only handling toward actual in-app display.
+
+## Context Files (Standards to Follow)
+- /Users/sobieg/.config/opencode/context/core/standards/code-quality.md
+- /Users/sobieg/.config/opencode/context/core/standards/test-coverage.md
+- /Users/sobieg/.config/opencode/context/core/standards/documentation.md
+- /Users/sobieg/Projects/ozi-rs/AGENTS.md
+- /Users/sobieg/Projects/ozi-rs/docs/architecture.md
+- /Users/sobieg/Projects/ozi-rs/docs/requirements.md
+- /Users/sobieg/Projects/ozi-rs/docs/testing-strategy.md
+
+## Reference Files (Source Material to Look At)
+- /Users/sobieg/Projects/ozi-rs/.tmp/sessions/2026-03-28-zip-ozi-import/context.md
+- /Users/sobieg/Projects/ozi-rs/.tmp/sessions/2026-03-28-ozi-map-display-first-slice/context.md
+- /Users/sobieg/Projects/ozi-rs/src/infrastructure/import/mod.rs
+- /Users/sobieg/Projects/ozi-rs/src/infrastructure/import/ozi_map.rs
+- /Users/sobieg/Projects/ozi-rs/src/application/mod.rs
+- /Users/sobieg/Projects/ozi-rs/src/application/import.rs
+- /Users/sobieg/Projects/ozi-rs/src/domain/project.rs
+- /Users/sobieg/Projects/ozi-rs/src/ui/mod.rs
+- /Users/sobieg/Projects/ozi-rs/Cargo.toml
+- /Users/sobieg/Projects/ozf2-rs/Cargo.toml
+- /Users/sobieg/Projects/ozf2-rs/src/lib.rs
+- /Users/sobieg/Projects/ozf2-rs/src/raster.rs
+- /Users/sobieg/Projects/ozi-rs/example_data/2021-07-30_Murino/5-Ozi(Win&Android)_Topo_EEKO/Maps/2021-07-30_Murino_Topo_EEKO_z16.ozf2
+
+## External Docs Fetched
+- /Users/sobieg/Projects/ozi-rs/.tmp/external-context/ozf2/ozf2-ozfx3-raster-decoding-feasibility.md
+  - Historical feasibility note said `ozf2/ozfx3` should stay gated and isolated.
+  - Current integration changes that assumption only for `ozf2`, via the separate sibling crate boundary.
+
+## Components
+- infrastructure adapter over `ozf2-rs`
+- OZI metadata classification updated for `ozf2` vs `ozfx3`
+- application-level OZI/OZF opening flow
+- UI display path for decoded OZF rasters
+
+## Constraints
+- Keep decoding isolated to the infrastructure layer.
+- Treat `ozfx3` as unsupported until the sibling crate supports it.
+- Preserve existing sqlite map flow and diagnostics behavior.
+- Prefer small validated slices over a big-bang UI rewrite.
+
+## Progress Notes
+- Added `ozf2-rs = { path = "../ozf2-rs" }` as a sibling path dependency to keep the decoder isolated outside the main repo while making it available through a narrow adapter boundary.
+- Added `src/infrastructure/import/ozi_raster.rs` with `decode_ozi_raster_image`, `DecodedOziRasterImage`, and explicit `OziRasterDecodeError` so `ozi-rs` can decode `.ozf2` through infrastructure without leaking sibling-crate types upward.
+- Updated `OziRasterKind` to distinguish `Ozf2` from still-unsupported `Ozfx3`.
+- Strengthened `.map` parsing to work with real LizaAlert fixtures instead of only simplified synthetic samples by scanning for projection and datum records rather than assuming fixed line numbers.
+- Fixed raster-path resolution for Windows absolute paths embedded inside `.map` files so a path like `C:\LA\map\OZF\foo.ozf2` resolves to the local basename next to the `.map` on macOS/Linux.
+- Added integration coverage for the real example bundle under `example_data/2021-07-30_Murino/...`, including `.map` parsing and `.ozf2` decode.
+- Kept the binary `.ozf2` decode test as an ignored manual integration test because `example_data/` is local/untracked; the repo-safe suite still validates the adapter shape without requiring that local fixture.
+- Validation passed with `cargo fmt --check`, `cargo test --test import_ozi_map_metadata`, `cargo test --test import_ozi_raster`, `cargo test --test import_ozi_raster -- --ignored`, and `cargo test parse_ozi_map_metadata --lib`.
+
+## Exit Criteria
+- [x] `ozi-rs` depends on `../ozf2-rs` through a narrow adapter boundary.
+- [x] `.map` metadata distinguishes supported `ozf2` from still-unsupported `ozfx3`.
+- [x] A decoded OZF raster can be opened through `ozi-rs` infrastructure with focused tests.
+- [x] Application/UI wiring for OZI-backed maps is explicitly split into the next slice.
+- [x] Validation passes for the touched slice.
