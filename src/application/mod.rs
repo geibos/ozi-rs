@@ -1,10 +1,14 @@
 mod commands;
 mod import;
 
+pub use crate::infrastructure::import::PltImportError;
 pub use commands::{CommandError, CommandStack, ProjectCommand};
-pub use import::{ArchiveImportError, ArchiveImportReport, import_gpx_archive_into_project};
+pub use import::{
+    ArchiveImportError, ArchiveImportReport, import_gpx_archive_into_project,
+    import_gpx_file_into_project, import_plt_file_into_project,
+};
 
-use crate::domain::{LayerId, Project};
+use crate::domain::{LayerId, Project, TrackId};
 use crate::infrastructure::import::{
     OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
@@ -133,6 +137,7 @@ pub struct AppState {
     history: CommandStack,
     project: Project,
     project_path: Option<PathBuf>,
+    bundles_root: PathBuf,
     lizaalert: LizaAlertState,
 }
 
@@ -172,6 +177,7 @@ impl AppState {
             history: CommandStack::default(),
             project: Project::default(),
             project_path: None,
+            bundles_root: default_bundles_root(),
             lizaalert: LizaAlertState {
                 projects: Vec::new(),
                 selected_project_slug: None,
@@ -302,16 +308,17 @@ impl AppState {
         };
 
         self.lizaalert.busy = true;
-        let status = if lizaalert::is_project_cached(&summary.slug) {
+        let status = if lizaalert::is_project_cached(&summary.slug, &self.bundles_root) {
             format!("Opening cached project {}...", summary.name)
         } else {
             format!("Downloading project {}...", summary.name)
         };
         self.update_status(DiagnosticLevel::Info, status);
         let sender = self.lizaalert.sender.clone();
+        let bundles_root = self.bundles_root.clone();
 
         thread::spawn(move || {
-            let result = lizaalert::open_project(summary, |progress| {
+            let result = lizaalert::open_project(summary, &bundles_root, |progress| {
                 let _ = sender.send(BackgroundMessage::ProjectLoadProgress(progress.message));
             });
             let _ = sender.send(BackgroundMessage::ProjectLoaded(result));
@@ -338,7 +345,7 @@ impl AppState {
             return;
         };
 
-        let selection = lizaalert::build_active_map_selection(&project, &map);
+        let selection = lizaalert::build_active_map_selection(&project, &map, &self.bundles_root);
 
         if map.local_path.is_some() {
             if selection.kind == ActiveMapKind::OziRaster {
@@ -523,6 +530,60 @@ impl AppState {
         }
     }
 
+    pub fn bundles_root(&self) -> &std::path::Path {
+        &self.bundles_root
+    }
+
+    pub fn set_bundles_root(&mut self, path: PathBuf) {
+        self.bundles_root = path;
+    }
+
+    pub fn open_local_bundle(&mut self, dir: PathBuf) {
+        if self.lizaalert.busy {
+            return;
+        }
+
+        self.lizaalert.busy = true;
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!("Opening local bundle: {}", dir.display()),
+        );
+        let sender = self.lizaalert.sender.clone();
+
+        thread::spawn(move || {
+            let result = lizaalert::open_bundle_directory(&dir, |progress| {
+                let _ = sender.send(BackgroundMessage::ProjectLoadProgress(progress.message));
+            });
+            let _ = sender.send(BackgroundMessage::ProjectLoaded(result));
+        });
+    }
+
+    /// Returns the root directory of the currently active bundle (the `{slug}/` folder).
+    pub fn active_bundle_dir(&self) -> Option<PathBuf> {
+        let map = self.lizaalert.active_map.as_ref()?;
+        let slug = self
+            .lizaalert
+            .selected_project
+            .as_ref()
+            .map(|p| p.summary.slug.as_str())
+            .or_else(|| {
+                // Fall back: the map file is inside the bundle dir somewhere
+                map.local_path.ancestors().nth(2).map(|_| "")
+            })?;
+
+        if slug.is_empty() {
+            return None;
+        }
+        Some(lizaalert::bundle_directory(&self.bundles_root, slug))
+    }
+
+    pub fn reveal_active_bundle(&self) {
+        let Some(dir) = self.active_bundle_dir() else {
+            return;
+        };
+        reveal_in_file_manager(&dir);
+    }
+
     pub fn load_project_from(&mut self, path: PathBuf) {
         match persistence::load_project(&path) {
             Ok(project) => {
@@ -549,6 +610,93 @@ impl AppState {
         import::import_gpx_archive_into_project(&mut self.project, &mut self.history, reader)
     }
 
+    pub fn import_gpx_file(
+        &mut self,
+        path: std::path::PathBuf,
+    ) -> Result<ArchiveImportReport, ArchiveImportError> {
+        import::import_gpx_file_into_project(&mut self.project, &mut self.history, &path)
+    }
+
+    pub fn import_plt_file(
+        &mut self,
+        path: std::path::PathBuf,
+    ) -> Result<ArchiveImportReport, PltImportError> {
+        import::import_plt_file_into_project(&mut self.project, &mut self.history, &path)
+    }
+
+    pub fn set_track_color(
+        &mut self,
+        layer_id: crate::domain::LayerId,
+        track_id: crate::domain::TrackId,
+        color: [u8; 4],
+    ) {
+        if let Some(track) = self.project.track_mut(layer_id, track_id) {
+            track.style_mut().color = color;
+        }
+    }
+
+    pub fn export_layer_to_gpx(
+        &mut self,
+        layer_id: crate::domain::LayerId,
+        path: std::path::PathBuf,
+    ) {
+        let Some(layer) = self
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+        else {
+            self.update_status(DiagnosticLevel::Error, "Layer not found for export");
+            return;
+        };
+        match crate::infrastructure::export::export_layer_to_gpx_file(layer, &path) {
+            Ok(()) => self.update_status(
+                DiagnosticLevel::Info,
+                format!("Exported to {}", path.display()),
+            ),
+            Err(e) => {
+                self.update_status(DiagnosticLevel::Error, format!("Export failed: {e}"));
+            }
+        }
+    }
+
+    pub fn toggle_track_visible(
+        &mut self,
+        layer_id: crate::domain::LayerId,
+        track_id: crate::domain::TrackId,
+    ) {
+        let visible = self
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+            .map(|t| t.style().visible)
+            .unwrap_or(true);
+        self.project
+            .set_track_visible_in_layer(layer_id, track_id, !visible);
+    }
+
+    pub fn track_layers(&self) -> &[crate::domain::TrackLayer] {
+        self.project.track_layers()
+    }
+
+    pub fn rename_track(&mut self, layer_id: LayerId, track_id: TrackId, new_name: String) {
+        let old_name = self
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+            .map(|t| t.name().to_owned())
+            .unwrap_or_default();
+
+        let _ = self.history.apply(
+            &mut self.project,
+            &commands::ProjectCommand::rename_track(layer_id, track_id, old_name, new_name),
+        );
+    }
+
     pub fn track_layer_count(&self) -> usize {
         self.project.track_layers().len()
     }
@@ -559,6 +707,10 @@ impl AppState {
 
     pub fn report_runtime_error(&mut self, message: impl Into<String>) {
         self.push_diagnostic(DiagnosticLevel::Error, message.into());
+    }
+
+    pub fn report_runtime_info(&mut self, message: impl Into<String>) {
+        self.push_diagnostic(DiagnosticLevel::Info, message.into());
     }
 
     fn register_active_map_layer(
@@ -602,6 +754,28 @@ impl AppState {
         while self.lizaalert.diagnostics.len() > MAX_DIAGNOSTIC_ENTRIES {
             self.lizaalert.diagnostics.pop_front();
         }
+    }
+}
+
+fn default_bundles_root() -> PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home).join("Documents").join("LizaAlert Maps");
+    }
+    PathBuf::from("bundles")
+}
+
+fn reveal_in_file_manager(path: &std::path::Path) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(path).spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(path).spawn();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer").arg(path).spawn();
     }
 }
 
