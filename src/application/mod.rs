@@ -18,7 +18,7 @@ use std::thread;
 
 const MAX_DIAGNOSTIC_ENTRIES: usize = 100;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MapCenter {
     pub lat: f64,
     pub lon: f64,
@@ -47,13 +47,13 @@ pub struct LizaProject {
     pub maps: Vec<LizaMapPackage>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ActiveMapKind {
     SqliteTiles,
     OziRaster,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ActiveMapSelection {
     pub kind: ActiveMapKind,
     pub project_name: String,
@@ -514,6 +514,12 @@ impl AppState {
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, format!("Save failed: {error}"));
             }
+        }
+    }
+
+    pub fn restore_active_map(&mut self, selection: ActiveMapSelection) {
+        if selection.local_path.exists() {
+            self.lizaalert.active_map = Some(selection);
         }
     }
 
