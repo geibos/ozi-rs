@@ -1,6 +1,7 @@
 use crate::application::{
     ActiveMapKind, ActiveMapSelection, LizaMapPackage, LizaProject, LizaProjectSummary, MapCenter,
 };
+use crate::infrastructure::import::parse_ozi_map_metadata;
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::fs::{self, File};
@@ -120,7 +121,7 @@ pub fn build_active_map_selection(
         .unwrap_or_else(|| legacy_map_cache_path(&project.summary.slug, &map.file_name));
 
     ActiveMapSelection {
-        kind: ActiveMapKind::SqliteTiles,
+        kind: map_kind_from_local_path(&local_path),
         project_name: project.summary.name.clone(),
         package_name: map.name.clone(),
         remote_url: map.url.clone(),
@@ -327,13 +328,26 @@ fn read_cached_map_packages(
     root: &Path,
     project_slug: &str,
 ) -> Result<Vec<LizaMapPackage>, String> {
+    let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
+    let source_root = project_source_root(root, project_slug);
+    let mut maps = read_cached_sqlite_map_packages(root, project_slug, &zoom_regex)?;
+    maps.extend(read_cached_ozi_map_packages(&source_root)?);
+
+    maps.sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(maps)
+}
+
+fn read_cached_sqlite_map_packages(
+    root: &Path,
+    project_slug: &str,
+    zoom_regex: &Regex,
+) -> Result<Vec<LizaMapPackage>, String> {
     let maps_dir = project_mobile_maps_dir(root, project_slug);
     if !maps_dir.exists() {
         return Ok(Vec::new());
     }
 
-    let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
-    let mut maps = fs::read_dir(&maps_dir)
+    let maps = fs::read_dir(&maps_dir)
         .map_err(|err| err.to_string())?
         .filter_map(|entry| entry.ok())
         .filter_map(|entry| {
@@ -358,10 +372,81 @@ fn read_cached_map_packages(
                 local_path: Some(path),
             })
         })
-        .collect::<Vec<_>>();
+        .collect();
 
-    maps.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(maps)
+}
+
+fn read_cached_ozi_map_packages(source_root: &Path) -> Result<Vec<LizaMapPackage>, String> {
+    let mut map_files = Vec::new();
+    collect_cached_ozi_map_files(source_root, &mut map_files)?;
+
+    let mut packages = Vec::new();
+
+    for map_path in map_files {
+        let contents = fs::read_to_string(&map_path).map_err(|err| err.to_string())?;
+        let metadata =
+            parse_ozi_map_metadata(&map_path, &contents).map_err(|err| err.to_string())?;
+        let relative_name = map_path
+            .strip_prefix(source_root)
+            .ok()
+            .and_then(|path| path.to_str())
+            .map(|path| path.replace(std::path::MAIN_SEPARATOR, "/"))
+            .unwrap_or_else(|| {
+                map_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("unknown.map")
+                    .to_owned()
+            });
+
+        packages.push(LizaMapPackage {
+            name: format!("OZI: {}", metadata.title()),
+            file_name: relative_name,
+            url: String::new(),
+            base_zoom: 0,
+            local_path: Some(map_path),
+        });
+    }
+
+    Ok(packages)
+}
+
+fn collect_cached_ozi_map_files(dir: &Path, output: &mut Vec<PathBuf>) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir).map_err(|err| err.to_string())? {
+        let entry = entry.map_err(|err| err.to_string())?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            collect_cached_ozi_map_files(&path, output)?;
+            continue;
+        }
+
+        if is_ozi_map_path(&path) {
+            output.push(path);
+        }
+    }
+
+    Ok(())
+}
+
+fn is_ozi_map_path(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some(ext) if ext.eq_ignore_ascii_case("map")
+    )
+}
+
+fn map_kind_from_local_path(path: &Path) -> ActiveMapKind {
+    if is_ozi_map_path(path) {
+        ActiveMapKind::OziRaster
+    } else {
+        ActiveMapKind::SqliteTiles
+    }
 }
 
 fn project_coordinates_path(root: &Path, project_slug: &str) -> PathBuf {
@@ -441,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn load_cached_project_from_root_reads_local_coordinates_and_sqlite_maps() {
+    fn load_cached_project_from_root_reads_local_coordinates_and_ozi_maps() {
         let root = write_cached_project_fixture();
         let summary = LizaProjectSummary {
             slug: "2026-03-29_demo".to_owned(),
@@ -454,12 +539,20 @@ mod tests {
         assert_eq!(project.summary, summary);
         assert_eq!(project.center.lat, 54.32821);
         assert_eq!(project.center.lon, 48.40917);
-        assert_eq!(project.maps.len(), 1);
-        assert_eq!(project.maps[0].base_zoom, 16);
-        let expected_path = root.join("2026-03-29_demo/source/8-Android&iOS/demo_z16.sqlitedb");
+        assert_eq!(project.maps.len(), 2);
+        assert_eq!(project.maps[0].base_zoom, 0);
+        assert_eq!(project.maps[0].name, "OZI: Demo topo");
+        let expected_ozi_path = root.join("2026-03-29_demo/source/5-Ozi/Maps/demo.map");
         assert_eq!(
             project.maps[0].local_path.as_deref(),
-            Some(expected_path.as_path())
+            Some(expected_ozi_path.as_path())
+        );
+        assert_eq!(project.maps[1].base_zoom, 16);
+        let expected_sqlite_path =
+            root.join("2026-03-29_demo/source/8-Android&iOS/demo_z16.sqlitedb");
+        assert_eq!(
+            project.maps[1].local_path.as_deref(),
+            Some(expected_sqlite_path.as_path())
         );
     }
 
@@ -471,13 +564,20 @@ mod tests {
         let root = std::env::temp_dir().join(format!("ozi-rs-lizaalert-cache-{unique}"));
         let source_dir = root.join("2026-03-29_demo/source");
         let mobile_dir = source_dir.join("8-Android&iOS");
+        let ozi_dir = source_dir.join("5-Ozi/Maps");
         fs::create_dir_all(&mobile_dir).expect("create mobile dir");
+        fs::create_dir_all(&ozi_dir).expect("create ozi dir");
         fs::write(
             source_dir.join("2-Coordinates.txt"),
             "N 54.32821 E 048.40917",
         )
         .expect("write coordinates");
         fs::write(mobile_dir.join("demo_z16.sqlitedb"), []).expect("write sqlite placeholder");
+        fs::write(ozi_dir.join("demo.map"), sample_ozi_map()).expect("write ozi map");
         root
+    }
+
+    fn sample_ozi_map() -> &'static str {
+        "OziExplorer Map Data File Version 2.2\nDemo topo\ndemo.ozf2\n1 ,Map Code,\nWGS 84\nReserved 1\nReserved 2\nMagnetic Variation,,,E\nMap Projection,Latitude/Longitude,PolyCal,No,AutoCalOnly,No,BSBUseWPX,No\nPoint01,xy,10,20,in, deg,54,30.000,N,48,24.000,E, grid, , , ,N\nProjection Setup,,,,,,,,,,\n"
     }
 }

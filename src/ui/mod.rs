@@ -202,7 +202,7 @@ impl OziApp {
                         project.center.lat, project.center.lon
                     ));
                     ui.separator();
-                    ui.label("Available mobile map packages");
+                    ui.label("Available cached project maps");
 
                     for map in &project.maps {
                         if ui.button(&map.name).clicked() {

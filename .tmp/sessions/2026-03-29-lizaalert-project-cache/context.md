@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-lizaalert-project-cache
 Created: 2026-03-29T07:25:00Z
-Status: foundation_slice_validated
+Status: cached_ozi_slice_validated
 
 ## Current Request
 Opening an online LizaAlert project should always use a unified UI flow: if the project is already cached locally, open it from the local copy; otherwise download the whole project structure once, store it locally, and then open it from that local cache without extra buttons.
@@ -35,6 +35,7 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - infrastructure cached-or-download project materialization
 - application unified project open orchestration
 - diagnostics/progress updates that keep UI unchanged
+- cached local OZI map discovery and opening through the same project UI
 
 ## Constraints
 - Opening online vs local projects must not diverge in UI behavior.
@@ -51,7 +52,11 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - Extended `LizaMapPackage` with `local_path` so the application can distinguish cached local map files from remote-only entries.
 - Updated `load_project(...)` status text to distinguish `Downloading project ...` from `Opening cached project ...` without changing the UI entrypoint.
 - Updated `open_selected_map(...)` to prefer cached local sqlite maps immediately instead of redownloading them.
+- Extended cached project discovery so mirrored `.map` files are found recursively under the local project source tree, parsed through the existing OZI metadata parser, and exposed as project map entries alongside cached sqlite packages.
+- Updated cached map selection so local `.map` entries open through the existing OZI flow while cached sqlite maps continue to use the sqlite-tile path.
+- Updated the project sidebar wording from mobile-only packages to generic cached project maps because the same project list can now include mirrored OZI entries.
 - Added focused tests for local cached project parsing, directory-entry parsing, remote package parsing, and cached map opening behavior.
+- Added focused tests covering cached project loading with both sqlite and OZI maps plus cached OZI opening without a download thread.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -60,3 +65,4 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - [x] First open downloads and stores the project locally without extra UI actions.
 - [x] Subsequent opens use the local cache path.
 - [x] Focused tests cover the first cached-project slice.
+- [x] Cached mirrored OZI `.map` files can be opened from the same project UI path as cached sqlite maps.
