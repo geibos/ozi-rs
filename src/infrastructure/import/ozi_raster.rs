@@ -103,10 +103,14 @@ impl OziRasterLevelMetadata {
             return None;
         }
 
-        Some((
-            visible_tile_extent(self.width, self.tile_width, tile_x),
-            visible_tile_extent(self.height, self.tile_height, tile_y),
-        ))
+        let w = visible_tile_extent(self.width, self.tile_width, tile_x);
+        let h = visible_tile_extent(self.height, self.tile_height, tile_y);
+
+        if w == 0 || h == 0 {
+            return None;
+        }
+
+        Some((w, h))
     }
 }
 
