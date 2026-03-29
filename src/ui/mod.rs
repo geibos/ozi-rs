@@ -103,6 +103,7 @@ impl FpsCounter {
 }
 
 const STORAGE_KEY_LAST_PROJECT: &str = "last_project_path";
+const STORAGE_KEY_ACTIVE_MAP: &str = "active_map";
 
 impl OziApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -110,12 +111,19 @@ impl OziApp {
 
         state.load_projects();
 
-        let last_project_path: Option<PathBuf> = cc
-            .storage
-            .and_then(|s| eframe::get_value(s, STORAGE_KEY_LAST_PROJECT));
-        if let Some(path) = last_project_path {
-            if path.exists() {
-                state.load_project_from(path);
+        if let Some(storage) = cc.storage {
+            let last_project_path: Option<PathBuf> =
+                eframe::get_value(storage, STORAGE_KEY_LAST_PROJECT);
+            if let Some(path) = last_project_path {
+                if path.exists() {
+                    state.load_project_from(path);
+                }
+            }
+
+            let active_map: Option<crate::application::ActiveMapSelection> =
+                eframe::get_value(storage, STORAGE_KEY_ACTIVE_MAP);
+            if let Some(selection) = active_map {
+                state.restore_active_map(selection);
             }
         }
 
@@ -288,6 +296,9 @@ impl eframe::App for OziApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         if let Some(path) = self.state.project_file_path() {
             eframe::set_value(storage, STORAGE_KEY_LAST_PROJECT, &path);
+        }
+        if let Some(map) = self.state.active_map() {
+            eframe::set_value(storage, STORAGE_KEY_ACTIVE_MAP, map);
         }
     }
 
