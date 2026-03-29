@@ -119,6 +119,11 @@ impl OziApp {
 
     fn sync_active_map(&mut self, ctx: &egui::Context) {
         let Some(active_map) = self.state.active_map() else {
+            if self.loaded_map_path.is_some() {
+                self.loaded_map_path = None;
+                self.offline_tiles = None;
+                self.ozi_renderer = None;
+            }
             return;
         };
 
@@ -284,6 +289,27 @@ impl eframe::App for OziApp {
                 ui.heading("ozi-rs");
                 ui.label(format!("Project: {}", self.state.project_name()));
                 ui.separator();
+                if ui.button("Open…").clicked() {
+                    if let Some(path) = pick_project_file() {
+                        self.state.load_project_from(path);
+                    }
+                }
+                let save_label = if self.state.project_file_path().is_some() {
+                    "Save"
+                } else {
+                    "Save As…"
+                };
+                if ui.button(save_label).clicked() {
+                    let path = self
+                        .state
+                        .project_file_path()
+                        .map(PathBuf::from)
+                        .or_else(save_project_file_dialog);
+                    if let Some(path) = path {
+                        self.state.save_project_to(path);
+                    }
+                }
+                ui.separator();
                 ui.monospace(self.fps_counter.label());
             });
 
@@ -326,6 +352,19 @@ impl eframe::App for OziApp {
             }
         });
     }
+}
+
+fn pick_project_file() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("ozi-rs project", &["ozp"])
+        .pick_file()
+}
+
+fn save_project_file_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("ozi-rs project", &["ozp"])
+        .set_file_name("project.ozp")
+        .save_file()
 }
 
 fn project_matches_query(project: &crate::application::LizaProjectSummary, query: &str) -> bool {

@@ -1,4 +1,5 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct TrackId(u64);
 
 impl TrackId {
@@ -7,7 +8,8 @@ impl TrackId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct TrackSegmentId(u64);
 
 impl TrackSegmentId {
@@ -16,7 +18,8 @@ impl TrackSegmentId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct TrackPointId(u64);
 
 impl TrackPointId {
@@ -25,7 +28,7 @@ impl TrackPointId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TrackPoint {
     id: TrackPointId,
     latitude: f64,
@@ -54,7 +57,7 @@ impl TrackPoint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TrackSegment {
     id: TrackSegmentId,
     points: Vec<TrackPoint>,
@@ -81,7 +84,7 @@ impl TrackSegment {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Track {
     id: TrackId,
     name: String,
