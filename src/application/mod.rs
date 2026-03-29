@@ -5,7 +5,9 @@ pub use commands::{CommandError, CommandStack, ProjectCommand};
 pub use import::{ArchiveImportError, ArchiveImportReport, import_gpx_archive_into_project};
 
 use crate::domain::{LayerId, Project};
-use crate::infrastructure::import::{OziMapParseError, OziRasterKind, parse_ozi_map_metadata};
+use crate::infrastructure::import::{
+    OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
+};
 use crate::infrastructure::lizaalert;
 use std::collections::VecDeque;
 use std::fmt;
@@ -148,6 +150,7 @@ struct LizaAlertState {
 #[derive(Debug)]
 enum BackgroundMessage {
     ProjectsLoaded(Result<Vec<LizaProjectSummary>, String>),
+    ProjectLoadProgress(String),
     ProjectLoaded(Result<LizaProject, String>),
     MapDownloadProgress(MapDownloadProgress),
     MapDownloaded(Result<ActiveMapSelection, String>),
@@ -226,6 +229,9 @@ impl AppState {
                     }
                 }
             }
+            BackgroundMessage::ProjectLoadProgress(message) => {
+                self.update_status(DiagnosticLevel::Info, message);
+            }
             BackgroundMessage::MapDownloadProgress(progress) => {
                 self.update_status(DiagnosticLevel::Info, format_map_download_status(progress));
             }
@@ -302,9 +308,10 @@ impl AppState {
         let sender = self.lizaalert.sender.clone();
 
         thread::spawn(move || {
-            let _ = sender.send(BackgroundMessage::ProjectLoaded(lizaalert::open_project(
-                summary,
-            )));
+            let result = lizaalert::open_project(summary, |progress| {
+                let _ = sender.send(BackgroundMessage::ProjectLoadProgress(progress.message));
+            });
+            let _ = sender.send(BackgroundMessage::ProjectLoaded(result));
         });
     }
 
@@ -403,7 +410,7 @@ impl AppState {
         package_name: String,
         map_path: PathBuf,
     ) -> Result<(), OpenLocalMapError> {
-        let contents = std::fs::read_to_string(&map_path).map_err(OpenLocalMapError::Read)?;
+        let contents = read_ozi_map_text(&map_path).map_err(OpenLocalMapError::Read)?;
         let metadata =
             parse_ozi_map_metadata(&map_path, &contents).map_err(OpenLocalMapError::Parse)?;
 
@@ -683,6 +690,22 @@ mod tests {
         assert_eq!(
             state.lizaalert.status,
             "Downloading map... 50% (2.0 KiB/4.0 KiB)"
+        );
+    }
+
+    #[test]
+    fn project_progress_message_updates_status_while_busy() {
+        let mut state = AppState::default();
+        state.lizaalert.busy = true;
+
+        state.handle_background_message(BackgroundMessage::ProjectLoadProgress(
+            "Downloading project bundle: 2026-03-29 demo".to_owned(),
+        ));
+
+        assert!(state.lizaalert.busy);
+        assert_eq!(
+            state.lizaalert.status,
+            "Downloading project bundle: 2026-03-29 demo"
         );
     }
 

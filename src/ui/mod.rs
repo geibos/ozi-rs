@@ -1,7 +1,9 @@
 mod sqlite_tiles;
 
 use crate::application::{ActiveMapKind, AppState, DiagnosticEntry, DiagnosticLevel};
-use crate::infrastructure::import::{decode_ozi_raster_image, parse_ozi_map_metadata};
+use crate::infrastructure::import::{
+    decode_ozi_raster_image, parse_ozi_map_metadata, read_ozi_map_text,
+};
 use eframe::egui;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -10,7 +12,6 @@ use walkers::{HttpTiles, Map, MapMemory, Position, lon_lat, sources::OpenStreetM
 use self::sqlite_tiles::SqliteTiles;
 
 pub struct OziApp {
-    local_ozi_map_path: String,
     project_search: String,
     state: AppState,
     fps_counter: FpsCounter,
@@ -56,9 +57,6 @@ impl FpsCounter {
 impl OziApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         Self {
-            local_ozi_map_path:
-                "example_data/2021-07-30_Murino/5-Ozi(Win&Android)_Topo_EEKO/Maps/2021-07-30_Murino_Topo_EEKO_z16_ozf.map"
-                    .to_owned(),
             project_search: String::new(),
             state: AppState::new(),
             fps_counter: FpsCounter::new(),
@@ -140,21 +138,6 @@ impl OziApp {
 
                 ui.label(self.state.lizaalert_status());
                 self.show_diagnostics_console(ui);
-                ui.separator();
-                ui.heading("Local OZI map");
-                ui.add(
-                    egui::TextEdit::singleline(&mut self.local_ozi_map_path)
-                        .hint_text("Path to .map file"),
-                );
-                if ui.button("Open OZI map").clicked() {
-                    let path = self.local_ozi_map_path.trim();
-                    if path.is_empty() {
-                        self.state
-                            .report_runtime_error("Local OZI map path is empty".to_owned());
-                    } else if let Err(error) = self.state.open_local_ozi_map(path) {
-                        self.state.report_runtime_error(error.to_string());
-                    }
-                }
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label("Projects");
@@ -318,7 +301,7 @@ fn load_ozi_texture(
     ctx: &egui::Context,
     map_path: &std::path::Path,
 ) -> Result<egui::TextureHandle, String> {
-    let map_contents = std::fs::read_to_string(map_path).map_err(|error| error.to_string())?;
+    let map_contents = read_ozi_map_text(map_path).map_err(|error| error.to_string())?;
     let metadata =
         parse_ozi_map_metadata(map_path, &map_contents).map_err(|error| error.to_string())?;
     let image = decode_ozi_raster_image(&metadata).map_err(|error| error.to_string())?;

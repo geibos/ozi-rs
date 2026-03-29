@@ -1,7 +1,7 @@
 use crate::application::{
     ActiveMapKind, ActiveMapSelection, LizaMapPackage, LizaProject, LizaProjectSummary, MapCenter,
 };
-use crate::infrastructure::import::parse_ozi_map_metadata;
+use crate::infrastructure::import::{parse_ozi_map_metadata, read_ozi_map_text};
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::fs::{self, File};
@@ -17,6 +17,10 @@ const PROJECT_CACHE_DIR: &str = "lizaalert-projects";
 pub struct DownloadProgress {
     pub downloaded_bytes: u64,
     pub total_bytes: Option<u64>,
+}
+
+pub struct ProjectOpenProgress {
+    pub message: String,
 }
 
 pub fn fetch_project_summaries() -> Result<Vec<LizaProjectSummary>, String> {
@@ -58,11 +62,27 @@ pub fn fetch_project(summary: LizaProjectSummary) -> Result<LizaProject, String>
     })
 }
 
-pub fn open_project(summary: LizaProjectSummary) -> Result<LizaProject, String> {
+pub fn open_project<F>(
+    summary: LizaProjectSummary,
+    mut on_progress: F,
+) -> Result<LizaProject, String>
+where
+    F: FnMut(ProjectOpenProgress),
+{
     if !is_project_cached(&summary.slug) {
-        cache_project(&summary)?;
+        on_progress(ProjectOpenProgress {
+            message: format!("Downloading project bundle: {}", summary.name),
+        });
+        cache_project(&summary, &mut on_progress)?;
+    } else {
+        on_progress(ProjectOpenProgress {
+            message: format!("Opening cached project bundle: {}", summary.name),
+        });
     }
 
+    on_progress(ProjectOpenProgress {
+        message: format!("Indexing cached project maps: {}", summary.name),
+    });
     load_cached_project(summary)
 }
 
@@ -193,14 +213,27 @@ fn client() -> Result<Client, String> {
     Client::builder().build().map_err(|err| err.to_string())
 }
 
-fn cache_project(summary: &LizaProjectSummary) -> Result<(), String> {
+fn cache_project<F>(summary: &LizaProjectSummary, on_progress: &mut F) -> Result<(), String>
+where
+    F: FnMut(ProjectOpenProgress),
+{
     let source_root = project_source_root(&project_cache_root(), &summary.slug);
     fs::create_dir_all(&source_root).map_err(|err| err.to_string())?;
-    mirror_remote_directory(&summary.url, &source_root)
+    mirror_remote_directory(&summary.url, &source_root, on_progress)
 }
 
-fn mirror_remote_directory(url: &str, local_dir: &Path) -> Result<(), String> {
+fn mirror_remote_directory<F>(
+    url: &str,
+    local_dir: &Path,
+    on_progress: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(ProjectOpenProgress),
+{
     fs::create_dir_all(local_dir).map_err(|err| err.to_string())?;
+    on_progress(ProjectOpenProgress {
+        message: format!("Scanning {}", local_dir.display()),
+    });
     let html = fetch_text(url)?;
 
     for entry in parse_directory_entries(&html)? {
@@ -208,8 +241,11 @@ fn mirror_remote_directory(url: &str, local_dir: &Path) -> Result<(), String> {
         let child_path = local_dir.join(&entry.name);
 
         if entry.is_dir {
-            mirror_remote_directory(&child_url, &child_path)?;
+            mirror_remote_directory(&child_url, &child_path, on_progress)?;
         } else {
+            on_progress(ProjectOpenProgress {
+                message: format!("Downloading {}", child_path.display()),
+            });
             download_to_path(&child_url, &child_path)?;
         }
     }
@@ -384,7 +420,7 @@ fn read_cached_ozi_map_packages(source_root: &Path) -> Result<Vec<LizaMapPackage
     let mut packages = Vec::new();
 
     for map_path in map_files {
-        let contents = fs::read_to_string(&map_path).map_err(|err| err.to_string())?;
+        let contents = read_ozi_map_text(&map_path).map_err(|err| err.to_string())?;
         let metadata =
             parse_ozi_map_metadata(&map_path, &contents).map_err(|err| err.to_string())?;
         let relative_name = map_path
