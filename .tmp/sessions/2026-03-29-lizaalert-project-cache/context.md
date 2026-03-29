@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-lizaalert-project-cache
 Created: 2026-03-29T07:25:00Z
-Status: bundle_utf8_and_progress_regression_fixed
+Status: bundle_text_decoding_fully_hardened
 
 ## Current Request
 Opening an online LizaAlert project should always use a unified UI flow: if the project is already cached locally, open it from the local copy; otherwise download the whole project structure once, store it locally, and then open it from that local cache without extra buttons.
@@ -60,6 +60,7 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - Fixed a regression where mirrored OZI `.map` discovery failed on non-UTF-8 map text by moving cached-project OZI reads to a shared lossy-safe map-text loader.
 - Restored clearer project-open progress reporting by adding background `ProjectLoadProgress` messages during cached bundle download/indexing instead of only a single initial status line.
 - Removed the manual `Local OZI map` controls from the main sidebar so the normal workflow stays centered on project bundles only.
+- Hardened the remaining LizaAlert bundle text boundaries by replacing HTTP `.text()` decoding with byte-based lossy-safe decoding and by loading cached `2-Coordinates.txt` through the same lossy-safe text path.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -71,3 +72,4 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - [x] Cached mirrored OZI `.map` files can be opened from the same project UI path as cached sqlite maps.
 - [x] Cached bundle loading no longer fails when mirrored OZI `.map` files contain non-UTF-8 bytes.
 - [x] Project-open progress/status is visible again during cached bundle download/indexing.
+- [x] Remaining bundle text reads (`HTTP` listings and cached coordinates files) no longer require valid UTF-8.
