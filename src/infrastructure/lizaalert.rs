@@ -200,13 +200,15 @@ fn parse_map_packages(html: &str, base_url: &str) -> Result<Vec<LizaMapPackage>,
 }
 
 fn fetch_text(url: &str) -> Result<String, String> {
-    client()?
+    let bytes = client()?
         .get(url)
         .send()
         .and_then(|response| response.error_for_status())
         .map_err(|err| err.to_string())?
-        .text()
-        .map_err(|err| err.to_string())
+        .bytes()
+        .map_err(|err| err.to_string())?;
+
+    Ok(decode_text_bytes(bytes.as_ref()))
 }
 
 fn client() -> Result<Client, String> {
@@ -340,6 +342,18 @@ fn decode_entry_name(href: &str) -> Option<String> {
     Some(decoded)
 }
 
+fn read_text_file_lossy(path: &Path) -> Result<String, std::io::Error> {
+    let bytes = fs::read(path)?;
+    Ok(decode_text_bytes(&bytes))
+}
+
+fn decode_text_bytes(bytes: &[u8]) -> String {
+    match String::from_utf8(bytes.to_vec()) {
+        Ok(text) => text,
+        Err(error) => String::from_utf8_lossy(&error.into_bytes()).into_owned(),
+    }
+}
+
 fn load_cached_project(summary: LizaProjectSummary) -> Result<LizaProject, String> {
     load_cached_project_from_root(summary, &project_cache_root())
 }
@@ -348,7 +362,7 @@ fn load_cached_project_from_root(
     summary: LizaProjectSummary,
     root: &Path,
 ) -> Result<LizaProject, String> {
-    let coordinates_text = fs::read_to_string(project_coordinates_path(root, &summary.slug))
+    let coordinates_text = read_text_file_lossy(&project_coordinates_path(root, &summary.slug))
         .map_err(|err| err.to_string())?;
     let center = parse_center(&coordinates_text)?;
     let maps = read_cached_map_packages(root, &summary.slug)?;
@@ -518,7 +532,8 @@ struct DirectoryEntry {
 #[cfg(test)]
 mod tests {
     use super::{
-        load_cached_project_from_root, parse_center, parse_directory_entries, parse_map_packages,
+        decode_text_bytes, load_cached_project_from_root, parse_center, parse_directory_entries,
+        parse_map_packages, read_text_file_lossy,
     };
     use crate::application::LizaProjectSummary;
     use std::fs;
@@ -590,6 +605,32 @@ mod tests {
             project.maps[1].local_path.as_deref(),
             Some(expected_sqlite_path.as_path())
         );
+    }
+
+    #[test]
+    fn decode_text_bytes_falls_back_lossy_for_non_utf8() {
+        let text = decode_text_bytes(b"demo \xFF bundle");
+
+        assert!(text.contains("demo "));
+        assert!(text.contains("bundle"));
+    }
+
+    #[test]
+    fn read_text_file_lossy_reads_non_utf8_coordinates_file() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "ozi-rs-non-utf8-coordinates-{}-{unique}.txt",
+            std::process::id()
+        ));
+        fs::write(&path, b"N 54.32821 E 048.40917 \xFF").expect("write coordinates bytes");
+
+        let text = read_text_file_lossy(&path).expect("lossy coordinates text");
+
+        assert!(text.contains("54.32821"));
+        assert!(text.contains("048.40917"));
     }
 
     fn write_cached_project_fixture() -> std::path::PathBuf {

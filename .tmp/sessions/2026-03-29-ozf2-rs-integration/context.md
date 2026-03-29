@@ -69,6 +69,7 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - Added focused coverage for cached OZI project entries in both infrastructure and application tests.
 - Added shared `read_ozi_map_text(...)` handling so OZI `.map` metadata and UI loading tolerate mirrored non-UTF-8 map text instead of failing bundle load/open with a UTF-8 decoding error.
 - Removed the manual sidebar `Open OZI map` controls so the active workflow remains centered on mirrored project bundles instead of ad hoc local map opening.
+- Hardened the surrounding LizaAlert bundle-loading path so remote directory listings and cached coordinates files are also decoded from raw bytes with a lossy-safe fallback instead of strict UTF-8.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -79,3 +80,4 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - [x] Cached mirrored project `.map` entries reuse the same application/UI OZI opening path.
 - [x] Validation passes for the touched slice.
 - [x] Cached mirrored `.map` files no longer require valid UTF-8 text encoding to be indexed and opened.
+- [x] The surrounding bundle-loading path no longer relies on strict UTF-8 decoding for remote text responses or cached coordinates files.
