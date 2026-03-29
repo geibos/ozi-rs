@@ -100,6 +100,16 @@ impl TrackLayer {
     pub fn add_track(&mut self, track: Track) {
         self.tracks.push(track);
     }
+
+    pub fn track_mut(&mut self, track_id: crate::domain::TrackId) -> Option<&mut Track> {
+        self.tracks.iter_mut().find(|t| t.id() == track_id)
+    }
+
+    pub fn set_track_visible(&mut self, track_id: crate::domain::TrackId, visible: bool) {
+        if let Some(track) = self.tracks.iter_mut().find(|t| t.id() == track_id) {
+            track.style_mut().visible = visible;
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -203,6 +213,28 @@ impl Project {
 
     pub fn add_waypoint_layer(&mut self, layer: WaypointLayer) {
         self.waypoint_layers.push(layer);
+    }
+
+    pub fn track_mut(
+        &mut self,
+        layer_id: LayerId,
+        track_id: crate::domain::TrackId,
+    ) -> Option<&mut Track> {
+        self.track_layers
+            .iter_mut()
+            .find(|l| l.id() == layer_id)?
+            .track_mut(track_id)
+    }
+
+    pub fn set_track_visible_in_layer(
+        &mut self,
+        layer_id: LayerId,
+        track_id: crate::domain::TrackId,
+        visible: bool,
+    ) {
+        if let Some(layer) = self.track_layers.iter_mut().find(|l| l.id() == layer_id) {
+            layer.set_track_visible(track_id, visible);
+        }
     }
 
     pub fn add_track_to_layer(
