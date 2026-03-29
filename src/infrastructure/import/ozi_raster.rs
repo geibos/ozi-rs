@@ -50,7 +50,7 @@ pub struct OziRasterLevelMetadata {
 }
 
 impl OziRasterLevelMetadata {
-    fn new(
+    pub(crate) fn new(
         level_index: usize,
         width: u32,
         height: u32,
