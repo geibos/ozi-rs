@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-ozf2-rs-integration
 Created: 2026-03-29T06:35:00Z
-Status: cached_project_ozi_zip_validated
+Status: large_ozi_texture_limit_fixed
 
 ## Current Request
 Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that reference `.ozf2` payloads can start moving from deferred metadata-only handling toward actual in-app display.
@@ -72,6 +72,8 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - Hardened the surrounding LizaAlert bundle-loading path so remote directory listings and cached coordinates files are also decoded from raw bytes with a lossy-safe fallback instead of strict UTF-8.
 - Added cached OZI ZIP extraction so mirrored online project archives are unpacked into a deterministic extracted tree and their `.map` + `.ozf2` contents can flow into the existing cached-project OZI opening path.
 - Kept archive extraction inside infrastructure by reusing ZIP inventory/classification and a safe extraction helper, while application/UI behavior remained unchanged.
+- Added a UI-side oversized-texture safeguard so decoded OZI rasters larger than the GPU texture limit are proportionally downscaled before `egui` texture upload instead of crashing `wgpu` with a validation error.
+- Added focused UI helper tests covering unchanged sizing below the limit, proportional fit for oversized rasters, and actual downscaling of oversized RGBA images before upload.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -84,3 +86,4 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - [x] Cached mirrored `.map` files no longer require valid UTF-8 text encoding to be indexed and opened.
 - [x] The surrounding bundle-loading path no longer relies on strict UTF-8 decoding for remote text responses or cached coordinates files.
 - [x] Mirrored online OZI ZIP bundles are extracted so their cached `.map` entries can reuse the same OZI open/render path.
+- [x] Oversized decoded OZI rasters no longer panic when their dimensions exceed the GPU texture limit during `egui` upload.

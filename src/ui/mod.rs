@@ -11,6 +11,8 @@ use walkers::{HttpTiles, Map, MapMemory, Position, lon_lat, sources::OpenStreetM
 
 use self::sqlite_tiles::SqliteTiles;
 
+const MAX_OZI_TEXTURE_SIDE: usize = 8192;
+
 pub struct OziApp {
     project_search: String,
     state: AppState,
@@ -305,16 +307,70 @@ fn load_ozi_texture(
     let metadata =
         parse_ozi_map_metadata(map_path, &map_contents).map_err(|error| error.to_string())?;
     let image = decode_ozi_raster_image(&metadata).map_err(|error| error.to_string())?;
-    let color_image = egui::ColorImage::from_rgba_unmultiplied(
-        [image.width() as usize, image.height() as usize],
+    let prepared_image = prepare_ozi_color_image(
+        image.width() as usize,
+        image.height() as usize,
         image.rgba_pixels(),
+        MAX_OZI_TEXTURE_SIDE,
     );
 
     Ok(ctx.load_texture(
         format!("ozi-raster:{}", map_path.display()),
-        color_image,
+        prepared_image,
         egui::TextureOptions::LINEAR,
     ))
+}
+
+fn prepare_ozi_color_image(
+    width: usize,
+    height: usize,
+    rgba_pixels: &[u8],
+    texture_limit: usize,
+) -> egui::ColorImage {
+    let (prepared_width, prepared_height) = fit_size_within_limit(width, height, texture_limit);
+
+    if prepared_width == width && prepared_height == height {
+        return egui::ColorImage::from_rgba_unmultiplied([width, height], rgba_pixels);
+    }
+
+    let resized_pixels =
+        resize_rgba_nearest(rgba_pixels, width, height, prepared_width, prepared_height);
+    egui::ColorImage::from_rgba_unmultiplied([prepared_width, prepared_height], &resized_pixels)
+}
+
+fn fit_size_within_limit(width: usize, height: usize, limit: usize) -> (usize, usize) {
+    if width <= limit && height <= limit {
+        return (width, height);
+    }
+
+    let scale = (limit as f64 / width as f64).min(limit as f64 / height as f64);
+    let fitted_width = ((width as f64 * scale).floor() as usize).max(1);
+    let fitted_height = ((height as f64 * scale).floor() as usize).max(1);
+    (fitted_width, fitted_height)
+}
+
+fn resize_rgba_nearest(
+    rgba_pixels: &[u8],
+    source_width: usize,
+    source_height: usize,
+    target_width: usize,
+    target_height: usize,
+) -> Vec<u8> {
+    let mut resized = vec![0; target_width * target_height * 4];
+
+    for target_y in 0..target_height {
+        let source_y = target_y * source_height / target_height;
+
+        for target_x in 0..target_width {
+            let source_x = target_x * source_width / target_width;
+            let source_offset = (source_y * source_width + source_x) * 4;
+            let target_offset = (target_y * target_width + target_x) * 4;
+            resized[target_offset..target_offset + 4]
+                .copy_from_slice(&rgba_pixels[source_offset..source_offset + 4]);
+        }
+    }
+
+    resized
 }
 
 fn render_ozi_texture(ui: &mut egui::Ui, texture: &egui::TextureHandle) {
@@ -332,7 +388,7 @@ fn render_ozi_texture(ui: &mut egui::Ui, texture: &egui::TextureHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::project_matches_query;
+    use super::{fit_size_within_limit, prepare_ozi_color_image, project_matches_query};
     use crate::application::LizaProjectSummary;
 
     fn sample_project() -> LizaProjectSummary {
@@ -361,5 +417,24 @@ mod tests {
     #[test]
     fn project_search_rejects_non_matching_query() {
         assert!(!project_matches_query(&sample_project(), "missing"));
+    }
+
+    #[test]
+    fn fit_size_within_limit_keeps_smaller_images_unchanged() {
+        assert_eq!(fit_size_within_limit(2048, 1024, 8192), (2048, 1024));
+    }
+
+    #[test]
+    fn fit_size_within_limit_scales_large_images_proportionally() {
+        assert_eq!(fit_size_within_limit(8961, 2817, 8192), (8192, 2575));
+    }
+
+    #[test]
+    fn prepare_ozi_color_image_downscales_oversized_rasters() {
+        let pixels = vec![255; 8961 * 2 * 4];
+
+        let image = prepare_ozi_color_image(8961, 2, &pixels, 8192);
+
+        assert_eq!(image.size, [8192, 1]);
     }
 }
