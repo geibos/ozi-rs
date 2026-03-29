@@ -1,8 +1,12 @@
 use crate::application::{CommandError, CommandStack, ProjectCommand};
 use crate::domain::{LayerId, Project};
-use crate::infrastructure::import::{ArchivedGpxImportError, import_gpx_entries_from_archive};
+use crate::infrastructure::import::{
+    ArchivedGpxImport, ArchivedGpxImportError, PltImportError, import_gpx_entries_from_archive,
+    import_gpx_file, import_plt_file,
+};
 use std::fmt;
 use std::io::{Read, Seek};
+use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArchiveImportReport {
@@ -74,6 +78,45 @@ impl From<CommandError> for ArchiveImportError {
     }
 }
 
+/// Import a single standalone `.gpx` file into the project as a new track layer.
+pub fn import_gpx_file_into_project(
+    project: &mut Project,
+    history: &mut CommandStack,
+    path: &Path,
+) -> Result<ArchiveImportReport, ArchiveImportError> {
+    let import = import_gpx_file(path)?;
+    let mut report = ArchiveImportReport::new();
+    apply_gpx_import(project, history, import, &mut report)?;
+    Ok(report)
+}
+
+/// Import a single `.plt` file into the project as a new track layer.
+pub fn import_plt_file_into_project(
+    project: &mut Project,
+    history: &mut CommandStack,
+    path: &Path,
+) -> Result<ArchiveImportReport, PltImportError> {
+    let import = import_plt_file(path)?;
+    let mut report = ArchiveImportReport::new();
+
+    let layer_id = next_layer_id(project);
+    let layer_name = format!("Imported tracks: {}", import.source_path);
+    history
+        .apply(
+            project,
+            &ProjectCommand::add_track_layer(layer_id, layer_name),
+        )
+        .ok();
+    report.imported_track_layers += 1;
+    history
+        .apply(project, &ProjectCommand::add_track(layer_id, import.track))
+        .ok();
+    report.imported_tracks += 1;
+    report.imported_entries += 1;
+
+    Ok(report)
+}
+
 pub fn import_gpx_archive_into_project<R>(
     project: &mut Project,
     history: &mut CommandStack,
@@ -87,42 +130,52 @@ where
 
     for imported_entry in imports {
         report.imported_entries += 1;
-
-        if !imported_entry.tracks().is_empty() {
-            let layer_id = next_layer_id(project);
-            let layer_name = format!("Imported tracks: {}", imported_entry.source_path());
-            history.apply(
-                project,
-                &ProjectCommand::add_track_layer(layer_id, layer_name),
-            )?;
-            report.imported_track_layers += 1;
-
-            for track in imported_entry.tracks() {
-                history.apply(project, &ProjectCommand::add_track(layer_id, track.clone()))?;
-                report.imported_tracks += 1;
-            }
-        }
-
-        if !imported_entry.waypoints().is_empty() {
-            let layer_id = next_layer_id(project);
-            let layer_name = format!("Imported waypoints: {}", imported_entry.source_path());
-            history.apply(
-                project,
-                &ProjectCommand::add_waypoint_layer(layer_id, layer_name),
-            )?;
-            report.imported_waypoint_layers += 1;
-
-            for waypoint in imported_entry.waypoints() {
-                history.apply(
-                    project,
-                    &ProjectCommand::add_waypoint(layer_id, waypoint.clone()),
-                )?;
-                report.imported_waypoints += 1;
-            }
-        }
+        apply_gpx_import(project, history, imported_entry, &mut report)?;
     }
 
     Ok(report)
+}
+
+fn apply_gpx_import(
+    project: &mut Project,
+    history: &mut CommandStack,
+    import: ArchivedGpxImport,
+    report: &mut ArchiveImportReport,
+) -> Result<(), ArchiveImportError> {
+    if !import.tracks().is_empty() {
+        let layer_id = next_layer_id(project);
+        let layer_name = format!("Imported tracks: {}", import.source_path());
+        history.apply(
+            project,
+            &ProjectCommand::add_track_layer(layer_id, layer_name),
+        )?;
+        report.imported_track_layers += 1;
+
+        for track in import.tracks() {
+            history.apply(project, &ProjectCommand::add_track(layer_id, track.clone()))?;
+            report.imported_tracks += 1;
+        }
+    }
+
+    if !import.waypoints().is_empty() {
+        let layer_id = next_layer_id(project);
+        let layer_name = format!("Imported waypoints: {}", import.source_path());
+        history.apply(
+            project,
+            &ProjectCommand::add_waypoint_layer(layer_id, layer_name),
+        )?;
+        report.imported_waypoint_layers += 1;
+
+        for waypoint in import.waypoints() {
+            history.apply(
+                project,
+                &ProjectCommand::add_waypoint(layer_id, waypoint.clone()),
+            )?;
+            report.imported_waypoints += 1;
+        }
+    }
+
+    Ok(())
 }
 
 fn next_layer_id(project: &Project) -> LayerId {
