@@ -102,11 +102,26 @@ impl FpsCounter {
     }
 }
 
+const STORAGE_KEY_LAST_PROJECT: &str = "last_project_path";
+
 impl OziApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut state = AppState::new();
+
+        state.load_projects();
+
+        let last_project_path: Option<PathBuf> = cc
+            .storage
+            .and_then(|s| eframe::get_value(s, STORAGE_KEY_LAST_PROJECT));
+        if let Some(path) = last_project_path {
+            if path.exists() {
+                state.load_project_from(path);
+            }
+        }
+
         Self {
             project_search: String::new(),
-            state: AppState::new(),
+            state,
             fps_counter: FpsCounter::new(),
             loaded_map_path: None,
             map_center: lon_lat(37.6176, 55.7558),
@@ -270,6 +285,12 @@ impl OziApp {
 }
 
 impl eframe::App for OziApp {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        if let Some(path) = self.state.project_file_path() {
+            eframe::set_value(storage, STORAGE_KEY_LAST_PROJECT, &path);
+        }
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.state.poll_background_tasks();
         self.sync_active_map(ctx);
