@@ -1,6 +1,7 @@
 pub mod archive;
 pub mod gpx;
 pub mod ozi_map;
+pub mod ozi_raster;
 
 pub use archive::{
     ArchiveEntry, ArchiveEntryKind, ArchiveInventoryError, SupportedArchiveEntryKind,
@@ -10,3 +11,4 @@ pub use gpx::{ArchivedGpxImport, ArchivedGpxImportError, import_gpx_entries_from
 pub use ozi_map::{
     DirectImageFormat, OziMapMetadata, OziMapParseError, OziRasterKind, parse_ozi_map_metadata,
 };
+pub use ozi_raster::{DecodedOziRasterImage, OziRasterDecodeError, decode_ozi_raster_image};

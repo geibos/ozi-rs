@@ -2854,12 +2854,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ozf2-rs"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+]
+
+[[package]]
 name = "ozi-rs"
 version = "0.1.0"
 dependencies = [
  "eframe",
  "gpx",
  "lru",
+ "ozf2-rs",
  "regex",
  "reqwest 0.13.2",
  "rusqlite",

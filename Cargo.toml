@@ -12,3 +12,4 @@ rusqlite = { version = "0.39.0", features = ["bundled"] }
 walkers = "0.53.0"
 gpx = "0.10"
 zip = { version = "8.4", default-features = false, features = ["deflate"] }
+ozf2-rs = { path = "../ozf2-rs" }

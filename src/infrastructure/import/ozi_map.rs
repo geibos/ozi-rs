@@ -51,7 +51,8 @@ impl OziMapMetadata {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OziRasterKind {
     DirectImage(DirectImageFormat),
-    DeferredOzf,
+    Ozf2,
+    Ozfx3,
     Unsupported,
 }
 
@@ -99,9 +100,8 @@ pub fn parse_ozi_map_metadata(
     let title = required_line(&lines, 1).ok_or(OziMapParseError::MissingTitle)?;
     let raster_reference =
         required_line(&lines, 2).ok_or(OziMapParseError::MissingRasterReference)?;
-    let projection_name =
-        required_line(&lines, 4).ok_or(OziMapParseError::MissingProjectionName)?;
-    let datum_name = required_line(&lines, 6).ok_or(OziMapParseError::MissingDatumName)?;
+    let projection_name = projection_name(&lines).ok_or(OziMapParseError::MissingProjectionName)?;
+    let datum_name = datum_name(&lines).ok_or(OziMapParseError::MissingDatumName)?;
 
     Ok(OziMapMetadata {
         title: title.to_owned(),
@@ -155,6 +155,47 @@ fn calibration_points(lines: &[&str]) -> Vec<String> {
         .collect()
 }
 
+fn projection_name<'a>(lines: &'a [&str]) -> Option<&'a str> {
+    lines
+        .iter()
+        .map(|line| line.trim())
+        .find(|line| line.starts_with("Map Projection,"))
+}
+
+fn datum_name<'a>(lines: &'a [&str]) -> Option<&'a str> {
+    lines
+        .iter()
+        .skip(3)
+        .map(|line| line.trim())
+        .find_map(parse_datum_line)
+}
+
+fn parse_datum_line(line: &str) -> Option<&str> {
+    if line.is_empty() || is_non_datum_record(line) {
+        return None;
+    }
+
+    Some(line.split(',').next().unwrap_or(line).trim())
+}
+
+fn is_non_datum_record(line: &str) -> bool {
+    line.starts_with("Point")
+        || line.starts_with("Map Projection,")
+        || line.starts_with("Projection Setup")
+        || line.starts_with("Map Feature")
+        || line.starts_with("Track File")
+        || line.starts_with("Moving Map Parameters")
+        || line.starts_with("MM")
+        || line.starts_with("GRGRID")
+        || line.starts_with("MOP")
+        || line.starts_with("IWH")
+        || line.starts_with("MLP")
+        || line.starts_with("Reserved")
+        || line.starts_with("Magnetic Variation")
+        || line.starts_with("Other Grid Setup")
+        || line.starts_with("1 ,Map Code")
+}
+
 fn is_populated_calibration_point(line: &str) -> bool {
     let mut fields = line.split(',').map(str::trim);
     let _point_name = fields.next();
@@ -171,11 +212,22 @@ fn resolve_raster_path(source_path: &Path, raster_reference: &str) -> PathBuf {
         return safe_file_name_path(reference);
     };
 
-    if reference.is_absolute() || contains_parent_dir(reference) {
+    if reference.is_absolute()
+        || looks_like_windows_absolute_path(raster_reference)
+        || contains_parent_dir(reference)
+    {
         return map_dir.join(safe_file_name_path(reference));
     }
 
     map_dir.join(reference)
+}
+
+fn looks_like_windows_absolute_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/')
 }
 
 fn contains_parent_dir(path: &Path) -> bool {
@@ -184,7 +236,10 @@ fn contains_parent_dir(path: &Path) -> bool {
 }
 
 fn safe_file_name_path(path: &Path) -> PathBuf {
-    path.file_name()
+    let raw = path.to_string_lossy();
+    raw.rsplit(['/', '\\'])
+        .next()
+        .filter(|segment| !segment.is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(path.as_os_str()))
 }
@@ -202,7 +257,8 @@ fn classify_raster_reference(raster_reference: &str) -> OziRasterKind {
         Some("gif") => OziRasterKind::DirectImage(DirectImageFormat::Gif),
         Some("tif") | Some("tiff") => OziRasterKind::DirectImage(DirectImageFormat::Tiff),
         Some("webp") => OziRasterKind::DirectImage(DirectImageFormat::WebP),
-        Some("ozf2") | Some("ozfx3") => OziRasterKind::DeferredOzf,
+        Some("ozf2") => OziRasterKind::Ozf2,
+        Some("ozfx3") => OziRasterKind::Ozfx3,
         _ => OziRasterKind::Unsupported,
     }
 }
@@ -271,7 +327,18 @@ mod tests {
         )
         .expect("metadata");
 
-        assert_eq!(metadata.raster_kind(), &OziRasterKind::DeferredOzf);
+        assert_eq!(metadata.raster_kind(), &OziRasterKind::Ozf2);
+    }
+
+    #[test]
+    fn parse_ozi_map_metadata_marks_ozfx3_payloads_separately() {
+        let metadata = parse_ozi_map_metadata(
+            PathBuf::from("archives/field/calibration.map"),
+            &sample_map("maps/base.ozfx3"),
+        )
+        .expect("metadata");
+
+        assert_eq!(metadata.raster_kind(), &OziRasterKind::Ozfx3);
     }
 
     #[test]
