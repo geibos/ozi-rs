@@ -251,7 +251,6 @@ impl OziApp {
                 }
 
                 ui.label(self.state.lizaalert_status());
-                self.show_diagnostics_console(ui);
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label("Projects");
@@ -485,16 +484,39 @@ impl OziApp {
             });
     }
 
-    fn show_diagnostics_console(&self, ui: &mut egui::Ui) {
-        egui::CollapsingHeader::new("Diagnostics")
-            .default_open(true)
-            .show(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .id_salt("diagnostics_console")
-                    .max_height(160.0)
+    fn show_diagnostics_overlay(&self, ctx: &egui::Context, anchor: egui::Pos2) {
+        let entries: Vec<_> = self.state.recent_diagnostics().rev().take(5).collect();
+        if entries.is_empty() {
+            return;
+        }
+
+        egui::Area::new(egui::Id::new("diagnostics_overlay"))
+            .order(egui::Order::Foreground)
+            .pivot(egui::Align2::LEFT_BOTTOM)
+            .fixed_pos(anchor)
+            .interactable(false)
+            .show(ctx, |ui| {
+                egui::Frame::new()
+                    .fill(egui::Color32::from_black_alpha(160))
+                    .corner_radius(egui::CornerRadius::same(6))
+                    .inner_margin(egui::Margin::same(8))
                     .show(ui, |ui| {
-                        for entry in self.state.recent_diagnostics().rev() {
-                            render_diagnostic_entry(ui, entry);
+                        ui.set_max_width(520.0);
+                        for entry in entries {
+                            let (color, prefix) = match entry.level() {
+                                DiagnosticLevel::Info => (egui::Color32::from_gray(210), ""),
+                                DiagnosticLevel::Error => {
+                                    (egui::Color32::from_rgb(255, 110, 90), "⚠ ")
+                                }
+                            };
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(format!("{}{}", prefix, entry.message()))
+                                        .small()
+                                        .color(color),
+                                )
+                                .wrap(),
+                            );
                         }
                     });
             });
@@ -532,6 +554,8 @@ impl eframe::App for OziApp {
         self.show_tracks_panel(ui);
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
+            let panel_bottom_left = ui.max_rect().left_bottom() + egui::vec2(8.0, -8.0);
+
             ui.horizontal(|ui| {
                 ui.heading("ozi-rs");
                 ui.label(format!("Project: {}", self.state.project_name()));
@@ -614,6 +638,8 @@ impl eframe::App for OziApp {
 
                 ui.add(map);
             }
+
+            self.show_diagnostics_overlay(ui.ctx(), panel_bottom_left);
         });
     }
 }
@@ -731,15 +757,6 @@ fn project_matches_query(project: &crate::application::LizaProjectSummary, query
     let query = query.to_ascii_lowercase();
     project.name.to_ascii_lowercase().contains(&query)
         || project.slug.to_ascii_lowercase().contains(&query)
-}
-
-fn render_diagnostic_entry(ui: &mut egui::Ui, entry: &DiagnosticEntry) {
-    let (prefix, color) = match entry.level() {
-        DiagnosticLevel::Info => ("INFO", egui::Color32::LIGHT_GRAY),
-        DiagnosticLevel::Error => ("ERROR", egui::Color32::LIGHT_RED),
-    };
-
-    ui.colored_label(color, format!("[{prefix}] {}", entry.message()));
 }
 
 impl OziRasterRenderer {
