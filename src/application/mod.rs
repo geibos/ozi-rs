@@ -34,6 +34,7 @@ pub struct LizaMapPackage {
     pub file_name: String,
     pub url: String,
     pub base_zoom: u8,
+    pub local_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -292,14 +293,16 @@ impl AppState {
         };
 
         self.lizaalert.busy = true;
-        self.update_status(
-            DiagnosticLevel::Info,
-            format!("Loading project {}...", summary.name),
-        );
+        let status = if lizaalert::is_project_cached(&summary.slug) {
+            format!("Opening cached project {}...", summary.name)
+        } else {
+            format!("Downloading project {}...", summary.name)
+        };
+        self.update_status(DiagnosticLevel::Info, status);
         let sender = self.lizaalert.sender.clone();
 
         thread::spawn(move || {
-            let _ = sender.send(BackgroundMessage::ProjectLoaded(lizaalert::fetch_project(
+            let _ = sender.send(BackgroundMessage::ProjectLoaded(lizaalert::open_project(
                 summary,
             )));
         });
@@ -326,6 +329,28 @@ impl AppState {
         };
 
         let selection = lizaalert::build_active_map_selection(&project, &map);
+
+        if map.local_path.is_some() {
+            let status = match self.register_active_map_layer(&selection) {
+                Ok(true) => format!(
+                    "Opened cached map: {} / {}",
+                    selection.project_name, selection.package_name
+                ),
+                Ok(false) => format!(
+                    "Opened cached map: {} / {} (already registered)",
+                    selection.project_name, selection.package_name
+                ),
+                Err(error) => format!(
+                    "Opened cached map: {} / {} (project layer registration failed: {error:?})",
+                    selection.project_name, selection.package_name
+                ),
+            };
+
+            self.lizaalert.active_map = Some(selection);
+            self.update_status(DiagnosticLevel::Info, status);
+            return;
+        }
+
         self.lizaalert.busy = true;
         self.update_status(
             DiagnosticLevel::Info,
@@ -699,6 +724,38 @@ mod tests {
             error,
             OpenLocalMapError::UnsupportedRasterKind(OziRasterKind::Ozfx3)
         ));
+    }
+
+    #[test]
+    fn open_selected_map_prefers_cached_project_map_without_downloading() {
+        let mut state = AppState::default();
+        let local_map_path = std::env::temp_dir().join("cached-project-map.sqlitedb");
+
+        state.lizaalert.selected_project = Some(super::LizaProject {
+            summary: super::LizaProjectSummary {
+                slug: "2026-03-29_demo".to_owned(),
+                name: "2026-03-29 demo".to_owned(),
+                url: "https://example.test/project/".to_owned(),
+            },
+            center: MapCenter {
+                lat: 54.0,
+                lon: 48.0,
+            },
+            maps: vec![super::LizaMapPackage {
+                name: "demo_z16.sqlitedb".to_owned(),
+                file_name: "demo_z16.sqlitedb".to_owned(),
+                url: String::new(),
+                base_zoom: 16,
+                local_path: Some(local_map_path.clone()),
+            }],
+        });
+
+        state.open_selected_map("demo_z16.sqlitedb");
+
+        let active_map = state.active_map().expect("active map");
+        assert_eq!(active_map.kind, ActiveMapKind::SqliteTiles);
+        assert_eq!(active_map.local_path, local_map_path);
+        assert!(!state.lizaalert_busy());
     }
 
     fn write_temp_ozi_map(contents: String) -> PathBuf {
