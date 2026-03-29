@@ -5,8 +5,10 @@ pub use commands::{CommandError, CommandStack, ProjectCommand};
 pub use import::{ArchiveImportError, ArchiveImportReport, import_gpx_archive_into_project};
 
 use crate::domain::{LayerId, Project};
+use crate::infrastructure::import::{OziMapParseError, OziRasterKind, parse_ozi_map_metadata};
 use crate::infrastructure::lizaalert;
 use std::collections::VecDeque;
+use std::fmt;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -42,13 +44,52 @@ pub struct LizaProject {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ActiveMapKind {
+    SqliteTiles,
+    OziRaster,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ActiveMapSelection {
+    pub kind: ActiveMapKind,
     pub project_name: String,
     pub package_name: String,
     pub remote_url: String,
     pub local_path: PathBuf,
     pub center: MapCenter,
     pub base_zoom: u8,
+}
+
+#[derive(Debug)]
+pub enum OpenLocalMapError {
+    Read(std::io::Error),
+    Parse(OziMapParseError),
+    UnsupportedRasterKind(OziRasterKind),
+    Register(CommandError),
+}
+
+impl fmt::Display for OpenLocalMapError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Read(error) => write!(f, "failed to read OZI map file: {error}"),
+            Self::Parse(error) => write!(f, "failed to parse OZI map metadata: {error}"),
+            Self::UnsupportedRasterKind(kind) => {
+                write!(f, "unsupported OZI raster kind for UI opening: {kind:?}")
+            }
+            Self::Register(error) => write!(f, "failed to register OZI map layer: {error:?}"),
+        }
+    }
+}
+
+impl std::error::Error for OpenLocalMapError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Read(error) => Some(error),
+            Self::Parse(error) => Some(error),
+            Self::UnsupportedRasterKind(_) => None,
+            Self::Register(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -305,6 +346,59 @@ impl AppState {
         });
     }
 
+    pub fn open_local_ozi_map(
+        &mut self,
+        map_path: impl Into<PathBuf>,
+    ) -> Result<(), OpenLocalMapError> {
+        let map_path = map_path.into();
+        let contents = std::fs::read_to_string(&map_path).map_err(OpenLocalMapError::Read)?;
+        let metadata =
+            parse_ozi_map_metadata(&map_path, &contents).map_err(OpenLocalMapError::Parse)?;
+
+        match metadata.raster_kind() {
+            OziRasterKind::Ozf2 => {}
+            kind => return Err(OpenLocalMapError::UnsupportedRasterKind(kind.clone())),
+        }
+
+        let file_name = map_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("local-ozi.map")
+            .to_owned();
+        let selection = ActiveMapSelection {
+            kind: ActiveMapKind::OziRaster,
+            project_name: "Local OZI".to_owned(),
+            package_name: file_name,
+            remote_url: String::new(),
+            local_path: map_path,
+            center: MapCenter { lat: 0.0, lon: 0.0 },
+            base_zoom: 0,
+        };
+
+        match self.register_active_map_layer(&selection) {
+            Ok(true) => {
+                self.lizaalert.active_map = Some(selection.clone());
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Opened local OZI map: {}", selection.package_name),
+                );
+                Ok(())
+            }
+            Ok(false) => {
+                self.lizaalert.active_map = Some(selection.clone());
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!(
+                        "Opened local OZI map: {} (already registered)",
+                        selection.package_name
+                    ),
+                );
+                Ok(())
+            }
+            Err(error) => Err(OpenLocalMapError::Register(error)),
+        }
+    }
+
     pub fn active_map(&self) -> Option<&ActiveMapSelection> {
         self.lizaalert.active_map.as_ref()
     }
@@ -441,11 +535,14 @@ fn format_bytes(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ActiveMapSelection, AppState, BackgroundMessage, DiagnosticLevel, MapCenter,
-        MapDownloadProgress, format_map_download_status,
+        ActiveMapKind, ActiveMapSelection, AppState, BackgroundMessage, DiagnosticLevel, MapCenter,
+        MapDownloadProgress, OpenLocalMapError, format_map_download_status,
     };
+    use crate::infrastructure::import::OziRasterKind;
+    use std::fs;
     use std::path::Path;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn default_window_title_uses_untitled_project() {
@@ -460,6 +557,7 @@ mod tests {
 
         let inserted = state
             .register_active_map_layer(&ActiveMapSelection {
+                kind: ActiveMapKind::SqliteTiles,
                 project_name: "Search Demo".to_owned(),
                 package_name: "demo_z16.sqlitedb".to_owned(),
                 remote_url: "https://example.com/demo_z16.sqlitedb".to_owned(),
@@ -484,6 +582,7 @@ mod tests {
     fn registering_same_active_map_twice_does_not_duplicate_layer() {
         let mut state = AppState::default();
         let selection = ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
             project_name: "Search Demo".to_owned(),
             package_name: "demo_z16.sqlitedb".to_owned(),
             remote_url: "https://example.com/demo_z16.sqlitedb".to_owned(),
@@ -570,5 +669,54 @@ mod tests {
             .expect("latest diagnostic entry");
         assert_eq!(oldest.message(), "diagnostic 20");
         assert_eq!(latest.message(), "diagnostic 119");
+    }
+
+    #[test]
+    fn open_local_ozi_map_sets_active_ozi_selection() {
+        let mut state = AppState::default();
+        let map_path = write_temp_ozi_map(sample_ozi_map("bundle/sample.ozf2"));
+
+        state
+            .open_local_ozi_map(&map_path)
+            .expect("local ozi map should open");
+
+        let active_map = state.active_map().expect("active map");
+        assert_eq!(active_map.kind, ActiveMapKind::OziRaster);
+        assert_eq!(active_map.local_path, map_path);
+        assert_eq!(state.map_layer_count(), 1);
+    }
+
+    #[test]
+    fn open_local_ozi_map_rejects_unsupported_ozfx3_payloads() {
+        let mut state = AppState::default();
+        let map_path = write_temp_ozi_map(sample_ozi_map("bundle/sample.ozfx3"));
+
+        let error = state
+            .open_local_ozi_map(&map_path)
+            .expect_err("ozfx3 should stay unsupported");
+
+        assert!(matches!(
+            error,
+            OpenLocalMapError::UnsupportedRasterKind(OziRasterKind::Ozfx3)
+        ));
+    }
+
+    fn write_temp_ozi_map(contents: String) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "ozi-rs-open-local-ozi-map-{}-{unique}.map",
+            std::process::id()
+        ));
+        fs::write(&path, contents).expect("write temp map");
+        path
+    }
+
+    fn sample_ozi_map(raster_reference: &str) -> String {
+        format!(
+            "OziExplorer Map Data File Version 2.2\nForest map\n{raster_reference}\n1 ,Map Code,\nWGS 84,,0.0000,N,0.0000,E,0.000000,0.000000,WGS 84\nReserved 1\nReserved 2\nMagnetic Variation,,,E\nMap Projection,Latitude/Longitude,PolyCal,No,AutoCalOnly,No,BSBUseWPX,No\nProjection Setup,,,,,,,,,,\nPoint01,xy,10,20,in, deg,54,30.000,N,48,24.000,E, grid, , , ,N\n"
+        )
     }
 }
