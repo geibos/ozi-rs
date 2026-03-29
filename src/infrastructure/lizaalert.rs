@@ -101,8 +101,9 @@ pub fn is_project_cached(project_slug: &str, root: &Path) -> bool {
 
 /// Open an arbitrary local bundle directory that follows the LizaAlert structure.
 ///
-/// The directory is expected to be the `{slug}/` folder that contains a `source/` subdirectory
-/// with `2-Coordinates.txt`, OZI archives/maps, and `8-Android&iOS/` SQLite tiles.
+/// Handles two layouts:
+/// - **Downloaded** (our app): `{slug}/source/2-Coordinates.txt` — root+slug structure.
+/// - **Flat** (real cartographer folder): `{slug}/2-Coordinates.txt` — files directly in dir.
 pub fn open_bundle_directory<F>(dir: &Path, mut on_progress: F) -> Result<LizaProject, String>
 where
     F: FnMut(ProjectOpenProgress),
@@ -112,7 +113,6 @@ where
         .and_then(|n| n.to_str())
         .unwrap_or("bundle")
         .to_owned();
-    let root = dir.parent().unwrap_or(dir);
     let name = slug.replace('_', " ");
     let summary = LizaProjectSummary {
         slug: slug.clone(),
@@ -120,15 +120,107 @@ where
         url: String::new(),
     };
 
+    // Detect structure: if source/ subdir exists use root+slug path, otherwise treat dir as
+    // the source root directly (real cartographer flat layout).
+    let root = dir.parent().unwrap_or(dir);
+    let has_source_subdir = project_source_root(root, &slug).exists();
+
     on_progress(ProjectOpenProgress {
         message: format!("Extracting OZI archives in: {name}"),
     });
-    materialize_cached_ozi_archives(root, &slug, &mut on_progress)?;
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Indexing maps in: {name}"),
-    });
-    load_cached_project_from_root(summary, root)
+    if has_source_subdir {
+        materialize_cached_ozi_archives(root, &slug, &mut on_progress)?;
+        on_progress(ProjectOpenProgress {
+            message: format!("Indexing maps in: {name}"),
+        });
+        load_cached_project_from_root(summary, root)
+    } else {
+        // Flat layout: dir IS the source root.
+        materialize_flat_ozi_archives(dir, &mut on_progress)?;
+        on_progress(ProjectOpenProgress {
+            message: format!("Indexing maps in: {name}"),
+        });
+        load_project_from_flat_dir(summary, dir)
+    }
+}
+
+/// Extract OZI ZIP archives found directly in `source_dir` into `source_dir/extracted/`.
+fn materialize_flat_ozi_archives<F>(source_dir: &Path, on_progress: &mut F) -> Result<(), String>
+where
+    F: FnMut(ProjectOpenProgress),
+{
+    let extracted_root = source_dir.join("extracted");
+    let mut zip_files = Vec::new();
+    collect_cached_zip_files(source_dir, &mut zip_files)?;
+
+    for zip_path in zip_files {
+        if !is_ozi_archive_file(&zip_path)? {
+            continue;
+        }
+        let destination = extraction_destination_for_archive(&extracted_root, &zip_path);
+        if destination.exists() {
+            continue;
+        }
+        on_progress(ProjectOpenProgress {
+            message: format!("Extracting {}", zip_path.display()),
+        });
+        extract_cached_archive(&zip_path, &destination)?;
+    }
+
+    Ok(())
+}
+
+/// Load a `LizaProject` from a flat directory where files sit directly (no `source/` subdir).
+fn load_project_from_flat_dir(
+    summary: LizaProjectSummary,
+    source_dir: &Path,
+) -> Result<LizaProject, String> {
+    let coords_path = source_dir.join("2-Coordinates.txt");
+    let center = if coords_path.exists() {
+        let text = read_text_file_lossy(&coords_path).map_err(|e| e.to_string())?;
+        parse_center(&text).unwrap_or(crate::application::MapCenter { lat: 0.0, lon: 0.0 })
+    } else {
+        crate::application::MapCenter { lat: 0.0, lon: 0.0 }
+    };
+
+    let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|e| e.to_string())?;
+    let mut maps = Vec::new();
+
+    // SQLite tiles in 8-Android&iOS/
+    let mobile_dir = source_dir.join(MOBILE_MAPS_DIR_NAME);
+    if mobile_dir.exists() {
+        for entry in fs::read_dir(&mobile_dir).map_err(|e| e.to_string())? {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            let file_name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) if n.ends_with(".sqlitedb") => n.to_owned(),
+                _ => continue,
+            };
+            let base_zoom = zoom_regex
+                .captures(&file_name)
+                .and_then(|c| c.get(1))
+                .and_then(|m| m.as_str().parse::<u8>().ok())
+                .unwrap_or(0);
+            maps.push(LizaMapPackage {
+                name: file_name.clone(),
+                file_name,
+                url: String::new(),
+                base_zoom,
+                local_path: Some(path),
+            });
+        }
+    }
+
+    // OZI maps scanned recursively from source_dir and source_dir/extracted/
+    maps.extend(read_cached_ozi_map_packages(source_dir)?);
+    maps.extend(read_cached_ozi_map_packages(&source_dir.join("extracted"))?);
+
+    maps.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(LizaProject {
+        summary,
+        center,
+        maps,
+    })
 }
 
 /// Return the root directory of the bundle for the given slug.
