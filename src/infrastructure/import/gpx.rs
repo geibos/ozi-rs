@@ -6,7 +6,8 @@ use crate::infrastructure::import::archive::{
 };
 use gpx::read;
 use std::fmt;
-use std::io::{Cursor, Read, Seek};
+use std::io::{BufReader, Cursor, Read, Seek};
+use std::path::Path;
 use zip::ZipArchive;
 use zip::result::ZipError;
 
@@ -122,6 +123,41 @@ where
     Ok(imports)
 }
 
+/// Import a standalone `.gpx` file from disk.
+pub fn import_gpx_file(path: &Path) -> Result<ArchivedGpxImport, ArchivedGpxImportError> {
+    let file = std::fs::File::open(path).map_err(|source| {
+        ArchivedGpxImportError::ReadArchiveEntryBytes {
+            path: path.display().to_string(),
+            source,
+        }
+    })?;
+    let gpx = read(BufReader::new(file)).map_err(|source| ArchivedGpxImportError::ParseGpx {
+        path: path.display().to_string(),
+        source,
+    })?;
+
+    let file_stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("track")
+        .to_owned();
+    let path_str = path.display().to_string();
+    let tracks = gpx
+        .tracks
+        .into_iter()
+        .enumerate()
+        .map(|(i, t)| convert_track(i, &file_stem, t))
+        .collect();
+    let waypoints = gpx
+        .waypoints
+        .into_iter()
+        .enumerate()
+        .map(|(i, w)| convert_waypoint(i, &file_stem, w))
+        .collect();
+
+    Ok(ArchivedGpxImport::new(path_str, tracks, waypoints))
+}
+
 fn parse_gpx_archive_entry(
     path: &str,
     bytes: &[u8],
@@ -175,12 +211,27 @@ fn convert_segment(segment_index: usize, segment: gpx::TrackSegment) -> TrackSeg
 
 fn convert_track_point(point_index: usize, point: gpx::Waypoint) -> TrackPoint {
     let coordinates = point.point();
-
-    TrackPoint::new(
+    let mut tp = TrackPoint::new(
         TrackPointId::new((point_index + 1) as u64),
         coordinates.y(),
         coordinates.x(),
-    )
+    );
+    if let Some(elev) = point.elevation {
+        tp = tp.with_elevation(elev);
+    }
+    if let Some(t) = point.time.and_then(gpx_time_to_chrono) {
+        tp = tp.with_timestamp(t);
+    }
+    tp
+}
+
+/// Convert `gpx::Time` (wraps `time::OffsetDateTime`) to `chrono::DateTime<Utc>`.
+/// Uses the ISO 8601 string representation as a bridge to avoid a direct `time` crate dependency.
+fn gpx_time_to_chrono(t: gpx::Time) -> Option<chrono::DateTime<chrono::Utc>> {
+    let s = t.format().ok()?;
+    chrono::DateTime::parse_from_rfc3339(&s)
+        .ok()
+        .map(|dt| dt.with_timezone(&chrono::Utc))
 }
 
 fn convert_waypoint(waypoint_index: usize, file_stem: &str, waypoint: gpx::Waypoint) -> Waypoint {
