@@ -1,6 +1,6 @@
 use crate::domain::{
-    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackLayer, Waypoint, WaypointId,
-    WaypointLayer,
+    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, Waypoint,
+    WaypointId, WaypointLayer,
 };
 use std::path::PathBuf;
 
@@ -47,6 +47,12 @@ pub enum ProjectCommand {
         waypoint_id: WaypointId,
         latitude: f64,
         longitude: f64,
+    },
+    RenameTrack {
+        layer_id: LayerId,
+        track_id: TrackId,
+        old_name: String,
+        new_name: String,
     },
 }
 
@@ -106,6 +112,20 @@ impl ProjectCommand {
         }
     }
 
+    pub fn rename_track(
+        layer_id: LayerId,
+        track_id: TrackId,
+        old_name: impl Into<String>,
+        new_name: impl Into<String>,
+    ) -> Self {
+        Self::RenameTrack {
+            layer_id,
+            track_id,
+            old_name: old_name.into(),
+            new_name: new_name.into(),
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -147,6 +167,17 @@ impl ProjectCommand {
                 longitude,
             } => {
                 project.move_waypoint_in_layer(*layer_id, *waypoint_id, *latitude, *longitude)?;
+                Ok(())
+            }
+            Self::RenameTrack {
+                layer_id,
+                track_id,
+                new_name,
+                ..
+            } => {
+                if let Some(track) = project.track_mut(*layer_id, *track_id) {
+                    track.set_name(new_name.clone());
+                }
                 Ok(())
             }
         }
