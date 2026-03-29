@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-28-ozi-map-display-first-slice
 Created: 2026-03-28T10:10:00Z
-Status: parser_component_validated
+Status: local_ozi_display_validated
 
 ## Current Request
 Allow the application UI to display OZI map content from folders such as `5-OZI*`, `6-OZI*`, `7-OZI*`, and other OZI-named directories.
@@ -61,10 +61,14 @@ Allow the application UI to display OZI map content from folders such as `5-OZI*
 - Added focused unit tests in `src/infrastructure/import/ozi_map.rs` for minimal valid parse, missing header, missing raster reference, deferred `ozf2`, and safe raster path resolution.
 - Tightened calibration point filtering so only populated `PointNN` rows with explicit XY coordinates are retained.
 - Validation passed with `cargo fmt --check`, `cargo test --test import_ozi_map_metadata`, and `cargo test parse_ozi_map_metadata --lib`.
+- Added application-level local OZI opening via `AppState::open_local_ozi_map(...)` so `.map` parsing and map-layer registration stay out of the UI event handlers.
+- Added minimal UI support for opening a local `.map` path and rendering decoded `ozf2` raster content as an egui texture while preserving the sqlite/OSM map flow.
+- Added explicit `ozfx3` rejection in the application opening path so unsupported payloads surface deterministic errors instead of failing later in rendering.
+- Validation passed for the app/UI slice with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
 - [x] `.map` files can be parsed into project-facing map metadata with resolved raster references.
-- [ ] The application can register an OZI map source without coupling parsing to the UI.
-- [ ] The UI can display an OZI map when the raster payload is a directly supported image format.
-- [ ] Unsupported `ozf2/ozfx3` references surface explicit diagnostics instead of silent failure.
+- [x] The application can register an OZI map source without coupling parsing to the UI.
+- [x] The UI can display an OZI map when the raster payload is a directly supported image format.
+- [x] Unsupported `ozf2/ozfx3` references surface explicit diagnostics instead of silent failure.
 - [x] Focused tests cover parser success/failure and first-slice workflow behavior.

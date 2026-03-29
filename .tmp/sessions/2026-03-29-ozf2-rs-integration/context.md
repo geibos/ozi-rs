@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-ozf2-rs-integration
 Created: 2026-03-29T06:35:00Z
-Status: infrastructure_slice_validated
+Status: application_ui_slice_validated
 
 ## Current Request
 Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that reference `.ozf2` payloads can start moving from deferred metadata-only handling toward actual in-app display.
@@ -25,6 +25,7 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - /Users/sobieg/Projects/ozi-rs/src/application/import.rs
 - /Users/sobieg/Projects/ozi-rs/src/domain/project.rs
 - /Users/sobieg/Projects/ozi-rs/src/ui/mod.rs
+- /Users/sobieg/Projects/ozi-rs/src/infrastructure/lizaalert.rs
 - /Users/sobieg/Projects/ozi-rs/Cargo.toml
 - /Users/sobieg/Projects/ozf2-rs/Cargo.toml
 - /Users/sobieg/Projects/ozf2-rs/src/lib.rs
@@ -57,10 +58,17 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - Added integration coverage for the real example bundle under `example_data/2021-07-30_Murino/...`, including `.map` parsing and `.ozf2` decode.
 - Kept the binary `.ozf2` decode test as an ignored manual integration test because `example_data/` is local/untracked; the repo-safe suite still validates the adapter shape without requiring that local fixture.
 - Validation passed with `cargo fmt --check`, `cargo test --test import_ozi_map_metadata`, `cargo test --test import_ozi_raster`, `cargo test --test import_ozi_raster -- --ignored`, and `cargo test parse_ozi_map_metadata --lib`.
+- Added `ActiveMapKind` so the app can distinguish sqlite-backed maps from local OZI raster maps without coupling UI logic to infrastructure parsing details.
+- Added `AppState::open_local_ozi_map(...)` with explicit `OpenLocalMapError` handling, local `.map` parsing, `ozf2`-only acceptance, map-layer registration, and diagnostics-friendly status updates.
+- Updated the existing LizaAlert mobile-map flow to construct `ActiveMapSelection` with `ActiveMapKind::SqliteTiles`.
+- Added a minimal UI path input and `Open OZI map` action in the sidebar, keeping the existing LizaAlert picker intact.
+- Added a dedicated OZI render path in `src/ui/mod.rs` that parses the selected `.map`, decodes the `ozf2` raster through the infrastructure adapter, uploads it as an egui texture, and displays it in the central panel while preserving the sqlite/OSM fallback path.
+- Added focused application tests covering successful local OZI opening and explicit rejection of unsupported `ozfx3` payloads.
+- Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
 - [x] `ozi-rs` depends on `../ozf2-rs` through a narrow adapter boundary.
 - [x] `.map` metadata distinguishes supported `ozf2` from still-unsupported `ozfx3`.
 - [x] A decoded OZF raster can be opened through `ozi-rs` infrastructure with focused tests.
-- [x] Application/UI wiring for OZI-backed maps is explicitly split into the next slice.
+- [x] Application/UI wiring for OZI-backed maps is implemented for local `.map` + `ozf2` opening.
 - [x] Validation passes for the touched slice.

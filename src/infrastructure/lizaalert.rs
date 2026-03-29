@@ -1,5 +1,5 @@
 use crate::application::{
-    ActiveMapSelection, LizaMapPackage, LizaProject, LizaProjectSummary, MapCenter,
+    ActiveMapKind, ActiveMapSelection, LizaMapPackage, LizaProject, LizaProjectSummary, MapCenter,
 };
 use regex::Regex;
 use reqwest::blocking::Client;
@@ -103,6 +103,7 @@ pub fn build_active_map_selection(
     let local_path = cache_path(&project.summary.slug, &map.file_name);
 
     ActiveMapSelection {
+        kind: ActiveMapKind::SqliteTiles,
         project_name: project.summary.name.clone(),
         package_name: map.name.clone(),
         remote_url: map.url.clone(),
