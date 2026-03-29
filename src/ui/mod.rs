@@ -1,16 +1,19 @@
 mod sqlite_tiles;
 
 use crate::application::{ActiveMapKind, AppState, DiagnosticEntry, DiagnosticLevel};
+use crate::domain::TrackLayer;
 use crate::infrastructure::import::{
-    OziRasterLevelMetadata, OziRasterTileSource, open_ozi_raster_tile_source,
-    parse_ozi_map_metadata, read_ozi_map_text,
+    OziGeoreference, OziRasterLevelMetadata, OziRasterTileSource, open_ozi_raster_tile_source,
+    parse_ozi_georeference, parse_ozi_map_metadata, read_ozi_map_text,
 };
 use eframe::egui;
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use walkers::{HttpTiles, Map, MapMemory, Position, lon_lat, sources::OpenStreetMap};
+use walkers::{
+    HttpTiles, Map, MapMemory, Plugin, Position, Projector, lon_lat, sources::OpenStreetMap,
+};
 
 use self::sqlite_tiles::SqliteTiles;
 
@@ -28,6 +31,8 @@ pub struct OziApp {
     offline_tiles: Option<SqliteTiles>,
     ozi_renderer: Option<OziRasterRenderer>,
     osm_tiles: HttpTiles,
+    track_name_edits:
+        std::collections::HashMap<(crate::domain::LayerId, crate::domain::TrackId), String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -41,6 +46,7 @@ struct OziRasterRenderer {
     tile_source: OziRasterTileSource,
     textures: LruCache<OziTileCacheKey, egui::TextureHandle>,
     viewport: OziViewportState,
+    georeference: Option<OziGeoreference>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -104,6 +110,7 @@ impl FpsCounter {
 
 const STORAGE_KEY_LAST_PROJECT: &str = "last_project_path";
 const STORAGE_KEY_ACTIVE_MAP: &str = "active_map";
+const STORAGE_KEY_BUNDLES_ROOT: &str = "bundles_root";
 
 impl OziApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -112,6 +119,12 @@ impl OziApp {
         state.load_projects();
 
         if let Some(storage) = cc.storage {
+            let bundles_root: Option<PathBuf> =
+                eframe::get_value(storage, STORAGE_KEY_BUNDLES_ROOT);
+            if let Some(root) = bundles_root {
+                state.set_bundles_root(root);
+            }
+
             let last_project_path: Option<PathBuf> =
                 eframe::get_value(storage, STORAGE_KEY_LAST_PROJECT);
             if let Some(path) = last_project_path {
@@ -137,6 +150,7 @@ impl OziApp {
             offline_tiles: None,
             ozi_renderer: None,
             osm_tiles: HttpTiles::new(OpenStreetMap, cc.egui_ctx.clone()),
+            track_name_edits: std::collections::HashMap::new(),
         }
     }
 
@@ -202,6 +216,30 @@ impl OziApp {
             .default_size(280.0)
             .show_inside(ui, |ui| {
                 ui.heading("Map Picker");
+
+                // Bundles storage directory settings
+                egui::CollapsingHeader::new("Map Bundles Storage")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new(self.state.bundles_root().display().to_string())
+                                .small()
+                                .color(egui::Color32::GRAY),
+                        );
+                        ui.horizontal(|ui| {
+                            if ui.button("Change…").clicked() {
+                                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                                    self.state.set_bundles_root(dir);
+                                }
+                            }
+                            if ui.button("Open local bundle…").clicked() {
+                                if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                                    self.state.open_local_bundle(dir);
+                                }
+                            }
+                        });
+                    });
+
                 ui.label("Source: maps.lizaalert.ru");
 
                 if ui.button("Refresh projects").clicked() {
@@ -276,6 +314,177 @@ impl OziApp {
             });
     }
 
+    fn show_tracks_panel(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::right("tracks_panel")
+            .resizable(true)
+            .default_size(240.0)
+            .show_inside(ui, |ui| {
+                ui.heading("Tracks");
+
+                ui.horizontal(|ui| {
+                    if ui.button("Import GPX…").clicked() {
+                        if let Some(path) = pick_gpx_file() {
+                            match self.state.import_gpx_file(path) {
+                                Ok(report) => self.state.report_runtime_info(format!(
+                                    "Imported {} track(s) from GPX",
+                                    report.imported_tracks()
+                                )),
+                                Err(e) => self
+                                    .state
+                                    .report_runtime_error(format!("GPX import failed: {e}")),
+                            }
+                        }
+                    }
+                    if ui.button("Import PLT…").clicked() {
+                        if let Some(path) = pick_plt_file() {
+                            match self.state.import_plt_file(path) {
+                                Ok(report) => self.state.report_runtime_info(format!(
+                                    "Imported {} track(s) from PLT",
+                                    report.imported_tracks()
+                                )),
+                                Err(e) => self
+                                    .state
+                                    .report_runtime_error(format!("PLT import failed: {e}")),
+                            }
+                        }
+                    }
+                });
+
+                ui.separator();
+
+                // Collect deferred mutations to avoid borrow conflicts.
+                let mut visibility_toggles: Vec<(crate::domain::LayerId, crate::domain::TrackId)> =
+                    Vec::new();
+                let mut color_changes: Vec<(
+                    crate::domain::LayerId,
+                    crate::domain::TrackId,
+                    [u8; 4],
+                )> = Vec::new();
+                let mut renames: Vec<(crate::domain::LayerId, crate::domain::TrackId, String)> =
+                    Vec::new();
+                let mut export_layer: Option<(crate::domain::LayerId, String)> = None;
+
+                egui::ScrollArea::vertical()
+                    .id_salt("tracks_scroll")
+                    .show(ui, |ui| {
+                        for layer in self.state.track_layers() {
+                            let layer_header =
+                                egui::CollapsingHeader::new(layer.name()).default_open(true);
+                            layer_header.show(ui, |ui| {
+                                if ui.small_button("Export GPX…").clicked() {
+                                    export_layer = Some((layer.id(), layer.name().to_owned()));
+                                }
+                                for track in layer.tracks() {
+                                    ui.horizontal(|ui| {
+                                        // Visibility checkbox
+                                        let mut visible = track.style().visible;
+                                        if ui.checkbox(&mut visible, "").changed() {
+                                            visibility_toggles.push((layer.id(), track.id()));
+                                        }
+
+                                        // Color picker button
+                                        let [r, g, b, a] = track.style().color;
+                                        let mut egui_color =
+                                            egui::Color32::from_rgba_unmultiplied(r, g, b, a);
+                                        if egui::color_picker::color_edit_button_srgba(
+                                            ui,
+                                            &mut egui_color,
+                                            egui::color_picker::Alpha::Opaque,
+                                        )
+                                        .changed()
+                                        {
+                                            color_changes.push((
+                                                layer.id(),
+                                                track.id(),
+                                                egui_color.to_array(),
+                                            ));
+                                        }
+                                    });
+
+                                    // Editable track name with OK standard validation hint
+                                    let edit_key = (layer.id(), track.id());
+                                    let edit_buf = self
+                                        .track_name_edits
+                                        .entry(edit_key)
+                                        .or_insert_with(|| track.name().to_owned());
+
+                                    let name_valid = is_ok_track_name(edit_buf);
+                                    let name_color = if name_valid {
+                                        ui.visuals().text_color()
+                                    } else {
+                                        egui::Color32::from_rgb(220, 160, 60)
+                                    };
+                                    let response = ui.add(
+                                        egui::TextEdit::singleline(edit_buf)
+                                            .desired_width(f32::INFINITY)
+                                            .text_color(name_color)
+                                            .hint_text("YYYYMMDD_Callsign"),
+                                    );
+                                    if response.lost_focus()
+                                        && !edit_buf.is_empty()
+                                        && edit_buf.as_str() != track.name()
+                                    {
+                                        renames.push((layer.id(), track.id(), edit_buf.clone()));
+                                    }
+                                    if !name_valid {
+                                        ui.label(
+                                            egui::RichText::new("⚠ name: YYYYMMDD_Callsign")
+                                                .small()
+                                                .color(egui::Color32::from_rgb(220, 160, 60)),
+                                        );
+                                    }
+
+                                    // Stats line
+                                    let dist = track.total_distance_km();
+                                    let pts = track.point_count();
+                                    let stats = if let Some(dur) = track.total_duration() {
+                                        let total_secs = dur.num_seconds().abs();
+                                        let h = total_secs / 3600;
+                                        let m = (total_secs % 3600) / 60;
+                                        format!("{dist:.1} km  {h}h{m:02}m  {pts} pts")
+                                    } else {
+                                        format!("{dist:.1} km  {pts} pts")
+                                    };
+                                    ui.add(
+                                        egui::Label::new(
+                                            egui::RichText::new(stats)
+                                                .small()
+                                                .color(egui::Color32::GRAY),
+                                        )
+                                        .wrap(),
+                                    );
+                                }
+                            });
+                        }
+                    });
+
+                for (layer_id, track_id) in visibility_toggles {
+                    self.state.toggle_track_visible(layer_id, track_id);
+                }
+                for (layer_id, track_id, color) in color_changes {
+                    self.state.set_track_color(layer_id, track_id, color);
+                }
+                for (layer_id, track_id, new_name) in renames {
+                    // Keep buffer in sync after commit
+                    self.track_name_edits
+                        .insert((layer_id, track_id), new_name.clone());
+                    self.state.rename_track(layer_id, track_id, new_name);
+                }
+                if let Some((layer_id, layer_name)) = export_layer {
+                    let suggested_dir = self.state.active_bundle_dir().map(|d| d.join("10-Tracks"));
+                    let suggested_name = format!("{}.gpx", ok_safe_file_name(&layer_name));
+                    if let Some(path) =
+                        save_gpx_file_dialog(suggested_dir.as_deref(), &suggested_name)
+                    {
+                        if let Some(parent) = path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        self.state.export_layer_to_gpx(layer_id, path);
+                    }
+                }
+            });
+    }
+
     fn show_diagnostics_console(&self, ui: &mut egui::Ui) {
         egui::CollapsingHeader::new("Diagnostics")
             .default_open(true)
@@ -294,6 +503,11 @@ impl OziApp {
 
 impl eframe::App for OziApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(
+            storage,
+            STORAGE_KEY_BUNDLES_ROOT,
+            &self.state.bundles_root(),
+        );
         if let Some(path) = self.state.project_file_path() {
             eframe::set_value(storage, STORAGE_KEY_LAST_PROJECT, &path);
         }
@@ -315,6 +529,7 @@ impl eframe::App for OziApp {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.show_project_sidebar(ui);
+        self.show_tracks_panel(ui);
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.horizontal(|ui| {
@@ -346,12 +561,23 @@ impl eframe::App for OziApp {
             });
 
             if let Some(active_map) = self.state.active_map() {
-                ui.label(format!(
-                    "Loaded project map: {} / {}",
-                    active_map.project_name, active_map.package_name
-                ));
+                ui.horizontal(|ui| {
+                    ui.label(format!(
+                        "Loaded: {} / {}",
+                        active_map.project_name, active_map.package_name
+                    ));
+                    if self.state.active_bundle_dir().is_some()
+                        && ui.small_button("Show in Finder").clicked()
+                    {
+                        self.state.reveal_active_bundle();
+                    }
+                });
                 if active_map.kind == ActiveMapKind::OziRaster {
-                    ui.label(format!("OZI source: {}", active_map.local_path.display()));
+                    ui.label(
+                        egui::RichText::new(active_map.local_path.display().to_string())
+                            .small()
+                            .color(egui::Color32::GRAY),
+                    );
                 }
             } else {
                 ui.label(
@@ -365,19 +591,25 @@ impl eframe::App for OziApp {
 
             ui.separator();
 
+            let track_layers = self.state.track_layers();
             if let Some(renderer) = self.ozi_renderer.as_mut() {
-                if let Err(error) = renderer.render(ui) {
+                if let Err(error) = renderer.render(ui, track_layers) {
                     ui.colored_label(egui::Color32::LIGHT_RED, error);
                 }
             } else {
+                let track_plugin = TrackPlugin {
+                    layers: track_layers,
+                };
                 let map = if let Some(offline_tiles) = self.offline_tiles.as_mut() {
                     Map::new(Some(offline_tiles), &mut self.map_memory, self.map_center)
+                        .with_plugin(track_plugin)
                 } else {
                     Map::new(
                         Some(&mut self.osm_tiles),
                         &mut self.map_memory,
                         self.map_center,
                     )
+                    .with_plugin(track_plugin)
                 };
 
                 ui.add(map);
@@ -386,9 +618,101 @@ impl eframe::App for OziApp {
     }
 }
 
+struct TrackPlugin<'a> {
+    layers: &'a [TrackLayer],
+}
+
+impl Plugin for TrackPlugin<'_> {
+    fn run(
+        self: Box<Self>,
+        ui: &mut egui::Ui,
+        _response: &egui::Response,
+        projector: &Projector,
+        _map_memory: &MapMemory,
+    ) {
+        let painter = ui.painter();
+        for layer in self.layers {
+            for track in layer.tracks() {
+                let style = track.style();
+                if !style.visible {
+                    continue;
+                }
+                let alpha = (style.color[3] as f32 * style.opacity).clamp(0.0, 255.0) as u8;
+                let color = egui::Color32::from_rgba_unmultiplied(
+                    style.color[0],
+                    style.color[1],
+                    style.color[2],
+                    alpha,
+                );
+                let stroke = egui::Stroke::new(style.line_width, color);
+
+                for segment in track.segments() {
+                    let screen_points: Vec<egui::Pos2> = segment
+                        .points()
+                        .iter()
+                        .map(|p| {
+                            let v = projector.project(lon_lat(p.longitude(), p.latitude()));
+                            egui::pos2(v.x, v.y)
+                        })
+                        .collect();
+
+                    for pair in screen_points.windows(2) {
+                        painter.line_segment([pair[0], pair[1]], stroke);
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn pick_project_file() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .add_filter("ozi-rs project", &["ozp"])
+        .pick_file()
+}
+
+fn pick_gpx_file() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("GPX track", &["gpx"])
+        .pick_file()
+}
+
+fn save_gpx_file_dialog(suggested_dir: Option<&std::path::Path>, name: &str) -> Option<PathBuf> {
+    let dialog = rfd::FileDialog::new()
+        .add_filter("GPX track", &["gpx"])
+        .set_file_name(name);
+    let dialog = if let Some(dir) = suggested_dir {
+        dialog.set_directory(dir)
+    } else {
+        dialog
+    };
+    dialog.save_file()
+}
+
+/// Check if a track name follows the LizaAlert OK standard: only Latin letters, digits, `_`, `-`.
+fn is_ok_track_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+/// Strip characters not allowed in the LizaAlert OK file naming standard.
+fn ok_safe_file_name(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn pick_plt_file() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .add_filter("OziExplorer track", &["plt"])
         .pick_file()
 }
 
@@ -425,6 +749,7 @@ impl OziRasterRenderer {
             parse_ozi_map_metadata(map_path, &map_contents).map_err(|error| error.to_string())?;
         let tile_source =
             open_ozi_raster_tile_source(&metadata).map_err(|error| error.to_string())?;
+        let georeference = parse_ozi_georeference(metadata.calibration_points());
 
         Ok(Self {
             tile_source,
@@ -432,10 +757,11 @@ impl OziRasterRenderer {
                 NonZeroUsize::new(OZI_TILE_TEXTURE_CACHE_SIZE).expect("cache size"),
             ),
             viewport: OziViewportState::default(),
+            georeference,
         })
     }
 
-    fn render(&mut self, ui: &mut egui::Ui) -> Result<(), String> {
+    fn render(&mut self, ui: &mut egui::Ui, track_layers: &[TrackLayer]) -> Result<(), String> {
         let available_size = ui.available_size();
         let desired_size = egui::vec2(available_size.x.max(1.0), available_size.y.max(1.0));
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::drag());
@@ -502,7 +828,55 @@ impl OziRasterRenderer {
             egui::StrokeKind::Outside,
         );
 
+        self.render_tracks(&painter, rect, track_layers);
+
         Ok(())
+    }
+
+    fn render_tracks(
+        &self,
+        painter: &egui::Painter,
+        viewport_rect: egui::Rect,
+        track_layers: &[TrackLayer],
+    ) {
+        let Some(geo) = &self.georeference else {
+            return;
+        };
+
+        for layer in track_layers {
+            for track in layer.tracks() {
+                let style = track.style();
+                if !style.visible {
+                    continue;
+                }
+                let alpha = (style.color[3] as f32 * style.opacity).clamp(0.0, 255.0) as u8;
+                let color = egui::Color32::from_rgba_unmultiplied(
+                    style.color[0],
+                    style.color[1],
+                    style.color[2],
+                    alpha,
+                );
+                let stroke = egui::Stroke::new(style.line_width, color);
+
+                for segment in track.segments() {
+                    let screen_points: Vec<egui::Pos2> = segment
+                        .points()
+                        .iter()
+                        .map(|p| {
+                            let (px, py) = geo.lat_lon_to_pixel(p.latitude(), p.longitude());
+                            viewport_rect.min
+                                + (egui::vec2(px as f32, py as f32)
+                                    - self.viewport.top_left_base_pixels)
+                                    * self.viewport.zoom
+                        })
+                        .collect();
+
+                    for pair in screen_points.windows(2) {
+                        painter.line_segment([pair[0], pair[1]], stroke);
+                    }
+                }
+            }
+        }
     }
 
     fn load_tile_texture(
