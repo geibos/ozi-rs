@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-ozf2-rs-integration
 Created: 2026-03-29T06:35:00Z
-Status: cached_project_ozi_open_validated
+Status: cached_project_ozi_utf8_safe_validated
 
 ## Current Request
 Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that reference `.ozf2` payloads can start moving from deferred metadata-only handling toward actual in-app display.
@@ -67,6 +67,8 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - Extended cached LizaAlert project loading so mirrored `.map` files are discovered from the local project tree, surfaced as project map entries, and opened through the same project map selection flow as cached sqlite packages.
 - Updated `lizaalert::build_active_map_selection(...)` to infer `ActiveMapKind` from the cached local path, allowing `.map` selections to route into the existing OZI renderer without introducing a second project-opening mode.
 - Added focused coverage for cached OZI project entries in both infrastructure and application tests.
+- Added shared `read_ozi_map_text(...)` handling so OZI `.map` metadata and UI loading tolerate mirrored non-UTF-8 map text instead of failing bundle load/open with a UTF-8 decoding error.
+- Removed the manual sidebar `Open OZI map` controls so the active workflow remains centered on mirrored project bundles instead of ad hoc local map opening.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -76,3 +78,4 @@ Integrate the sibling `../ozf2-rs` project into `ozi-rs` so OZI maps that refere
 - [x] Application/UI wiring for OZI-backed maps is implemented for local `.map` + `ozf2` opening.
 - [x] Cached mirrored project `.map` entries reuse the same application/UI OZI opening path.
 - [x] Validation passes for the touched slice.
+- [x] Cached mirrored `.map` files no longer require valid UTF-8 text encoding to be indexed and opened.

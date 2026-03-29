@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-lizaalert-project-cache
 Created: 2026-03-29T07:25:00Z
-Status: cached_ozi_slice_validated
+Status: bundle_utf8_and_progress_regression_fixed
 
 ## Current Request
 Opening an online LizaAlert project should always use a unified UI flow: if the project is already cached locally, open it from the local copy; otherwise download the whole project structure once, store it locally, and then open it from that local cache without extra buttons.
@@ -57,6 +57,9 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - Updated the project sidebar wording from mobile-only packages to generic cached project maps because the same project list can now include mirrored OZI entries.
 - Added focused tests for local cached project parsing, directory-entry parsing, remote package parsing, and cached map opening behavior.
 - Added focused tests covering cached project loading with both sqlite and OZI maps plus cached OZI opening without a download thread.
+- Fixed a regression where mirrored OZI `.map` discovery failed on non-UTF-8 map text by moving cached-project OZI reads to a shared lossy-safe map-text loader.
+- Restored clearer project-open progress reporting by adding background `ProjectLoadProgress` messages during cached bundle download/indexing instead of only a single initial status line.
+- Removed the manual `Local OZI map` controls from the main sidebar so the normal workflow stays centered on project bundles only.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -66,3 +69,5 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - [x] Subsequent opens use the local cache path.
 - [x] Focused tests cover the first cached-project slice.
 - [x] Cached mirrored OZI `.map` files can be opened from the same project UI path as cached sqlite maps.
+- [x] Cached bundle loading no longer fails when mirrored OZI `.map` files contain non-UTF-8 bytes.
+- [x] Project-open progress/status is visible again during cached bundle download/indexing.

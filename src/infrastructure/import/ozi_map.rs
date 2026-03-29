@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 const OZI_MAP_HEADER_PREFIX: &str = "OziExplorer Map Data File";
@@ -88,6 +89,15 @@ impl std::fmt::Display for OziMapParseError {
 }
 
 impl std::error::Error for OziMapParseError {}
+
+pub fn read_ozi_map_text(path: &Path) -> Result<String, std::io::Error> {
+    let bytes = fs::read(path)?;
+
+    match String::from_utf8(bytes) {
+        Ok(text) => Ok(text),
+        Err(error) => Ok(String::from_utf8_lossy(&error.into_bytes()).into_owned()),
+    }
+}
 
 pub fn parse_ozi_map_metadata(
     source_path: impl Into<PathBuf>,
@@ -267,9 +277,11 @@ fn classify_raster_reference(raster_reference: &str) -> OziRasterKind {
 mod tests {
     use super::{
         DirectImageFormat, OziMapParseError, OziRasterKind, parse_ozi_map_metadata,
-        resolve_raster_path,
+        read_ozi_map_text, resolve_raster_path,
     };
+    use std::fs;
     use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn parse_ozi_map_metadata_reads_minimal_supported_image_reference() {
@@ -349,6 +361,34 @@ mod tests {
         );
 
         assert_eq!(resolved, Path::new("archives/field/base.ozf2"));
+    }
+
+    #[test]
+    fn read_ozi_map_text_decodes_lossy_non_utf8_bytes() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "ozi-rs-non-utf8-map-{}-{unique}.map",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            [
+                b"OziExplorer Map Data File Version 2.2\n".as_slice(),
+                b"Demo ".as_slice(),
+                &[0xFF],
+                b" map\nimage.ozf2\n".as_slice(),
+            ]
+            .concat(),
+        )
+        .expect("write map bytes");
+
+        let contents = read_ozi_map_text(&path).expect("lossy text");
+
+        assert!(contents.starts_with("OziExplorer Map Data File Version 2.2"));
+        assert!(contents.contains("Demo "));
     }
 
     fn sample_map(raster_reference: &str) -> String {
