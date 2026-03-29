@@ -121,7 +121,7 @@ impl OziApp {
     }
 
     fn show_project_sidebar(&mut self, ui: &mut egui::Ui) {
-        egui::SidePanel::left("lizaalert_projects")
+        egui::Panel::left("lizaalert_projects")
             .resizable(true)
             .default_size(280.0)
             .show_inside(ui, |ui| {
