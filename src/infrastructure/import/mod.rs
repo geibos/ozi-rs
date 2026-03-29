@@ -4,8 +4,9 @@ pub mod ozi_map;
 pub mod ozi_raster;
 
 pub use archive::{
-    ArchiveEntry, ArchiveEntryKind, ArchiveInventoryError, SupportedArchiveEntryKind,
-    UnsupportedArchiveEntryKind, classify_archive_path, inventory_zip_entries,
+    ArchiveEntry, ArchiveEntryKind, ArchiveExtractError, ArchiveInventoryError,
+    SupportedArchiveEntryKind, UnsupportedArchiveEntryKind, classify_archive_path,
+    extract_zip_entries_to_directory, inventory_zip_entries,
 };
 pub use gpx::{ArchivedGpxImport, ArchivedGpxImportError, import_gpx_entries_from_archive};
 pub use ozi_map::{

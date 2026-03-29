@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io::{Read, Seek};
+use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 use zip::result::ZipError;
 
@@ -78,6 +79,16 @@ pub enum ArchiveInventoryError {
     ReadEntry(ZipError),
 }
 
+#[derive(Debug)]
+pub enum ArchiveExtractError {
+    OpenArchive(ZipError),
+    ReadEntry(ZipError),
+    InvalidEntryPath(String),
+    CreateDirectory(std::io::Error),
+    CreateFile(std::io::Error),
+    CopyEntry(std::io::Error),
+}
+
 impl fmt::Display for ArchiveInventoryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -88,6 +99,29 @@ impl fmt::Display for ArchiveInventoryError {
 }
 
 impl std::error::Error for ArchiveInventoryError {}
+
+impl fmt::Display for ArchiveExtractError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::OpenArchive(error) => {
+                write!(f, "failed to open ZIP archive for extraction: {error}")
+            }
+            Self::ReadEntry(error) => {
+                write!(f, "failed to read ZIP entry during extraction: {error}")
+            }
+            Self::InvalidEntryPath(path) => {
+                write!(f, "ZIP entry path is unsafe to extract: {path}")
+            }
+            Self::CreateDirectory(error) => {
+                write!(f, "failed to create extraction directory: {error}")
+            }
+            Self::CreateFile(error) => write!(f, "failed to create extracted file: {error}"),
+            Self::CopyEntry(error) => write!(f, "failed to copy extracted ZIP entry: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for ArchiveExtractError {}
 
 pub fn inventory_zip_entries<R>(reader: R) -> Result<Vec<ArchiveEntry>, ArchiveInventoryError>
 where
@@ -121,6 +155,49 @@ where
     Ok(entries)
 }
 
+pub fn extract_zip_entries_to_directory<R>(
+    reader: R,
+    destination_root: &Path,
+) -> Result<Vec<PathBuf>, ArchiveExtractError>
+where
+    R: Read + Seek,
+{
+    std::fs::create_dir_all(destination_root).map_err(ArchiveExtractError::CreateDirectory)?;
+
+    let mut archive = ZipArchive::new(reader).map_err(ArchiveExtractError::OpenArchive)?;
+    let mut extracted_paths = Vec::new();
+
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(ArchiveExtractError::ReadEntry)?;
+
+        let Some(relative_path) = entry.enclosed_name().map(PathBuf::from) else {
+            return Err(ArchiveExtractError::InvalidEntryPath(
+                entry.name().to_owned(),
+            ));
+        };
+
+        let output_path = destination_root.join(relative_path);
+
+        if entry.is_dir() {
+            std::fs::create_dir_all(&output_path).map_err(ArchiveExtractError::CreateDirectory)?;
+            continue;
+        }
+
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent).map_err(ArchiveExtractError::CreateDirectory)?;
+        }
+
+        let mut output =
+            std::fs::File::create(&output_path).map_err(ArchiveExtractError::CreateFile)?;
+        std::io::copy(&mut entry, &mut output).map_err(ArchiveExtractError::CopyEntry)?;
+        extracted_paths.push(output_path);
+    }
+
+    Ok(extracted_paths)
+}
+
 fn archive_file_name(path: &str) -> String {
     path.rsplit('/').next().unwrap_or(path).to_owned()
 }
@@ -151,8 +228,13 @@ fn extension(path: &str) -> Option<String> {
 mod tests {
     use super::{
         ArchiveEntryKind, SupportedArchiveEntryKind, UnsupportedArchiveEntryKind,
-        archive_file_name, classify_archive_path,
+        archive_file_name, classify_archive_path, extract_zip_entries_to_directory,
     };
+    use std::fs;
+    use std::io::{Cursor, Write};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use zip::write::SimpleFileOptions;
+    use zip::{CompressionMethod, ZipWriter};
 
     #[test]
     fn archive_file_name_returns_last_path_segment() {
@@ -185,5 +267,51 @@ mod tests {
             classify_archive_path("notes/readme.txt"),
             ArchiveEntryKind::Unsupported(UnsupportedArchiveEntryKind::Unknown)
         );
+    }
+
+    #[test]
+    fn extract_zip_entries_to_directory_writes_nested_files() {
+        let archive = build_archive(&[
+            ("maps/", b"".as_slice(), true),
+            ("maps/demo.map", b"map".as_slice(), false),
+            ("maps/demo.ozf2", b"ozf".as_slice(), false),
+        ]);
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let destination = std::env::temp_dir().join(format!("ozi-rs-zip-extract-{unique}"));
+
+        let extracted = extract_zip_entries_to_directory(Cursor::new(archive), &destination)
+            .expect("extract archive");
+
+        assert_eq!(extracted.len(), 2);
+        assert_eq!(
+            fs::read(destination.join("maps/demo.map")).expect("map bytes"),
+            b"map"
+        );
+        assert_eq!(
+            fs::read(destination.join("maps/demo.ozf2")).expect("ozf bytes"),
+            b"ozf"
+        );
+    }
+
+    fn build_archive(entries: &[(&str, &[u8], bool)]) -> Vec<u8> {
+        let mut buffer = Cursor::new(Vec::new());
+        let mut writer = ZipWriter::new(&mut buffer);
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+
+        for (path, contents, is_directory) in entries {
+            if *is_directory {
+                writer.add_directory(*path, options).expect("directory");
+                continue;
+            }
+
+            writer.start_file(*path, options).expect("file");
+            writer.write_all(contents).expect("contents");
+        }
+
+        writer.finish().expect("finish");
+        buffer.into_inner()
     }
 }

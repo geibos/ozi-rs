@@ -2,7 +2,7 @@
 
 Session ID: 2026-03-29-lizaalert-project-cache
 Created: 2026-03-29T07:25:00Z
-Status: bundle_text_decoding_fully_hardened
+Status: cached_ozi_zip_extraction_validated
 
 ## Current Request
 Opening an online LizaAlert project should always use a unified UI flow: if the project is already cached locally, open it from the local copy; otherwise download the whole project structure once, store it locally, and then open it from that local cache without extra buttons.
@@ -36,6 +36,7 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - application unified project open orchestration
 - diagnostics/progress updates that keep UI unchanged
 - cached local OZI map discovery and opening through the same project UI
+- cached OZI ZIP extraction into a deterministic local extracted tree
 
 ## Constraints
 - Opening online vs local projects must not diverge in UI behavior.
@@ -61,6 +62,10 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - Restored clearer project-open progress reporting by adding background `ProjectLoadProgress` messages during cached bundle download/indexing instead of only a single initial status line.
 - Removed the manual `Local OZI map` controls from the main sidebar so the normal workflow stays centered on project bundles only.
 - Hardened the remaining LizaAlert bundle text boundaries by replacing HTTP `.text()` decoding with byte-based lossy-safe decoding and by loading cached `2-Coordinates.txt` through the same lossy-safe text path.
+- Added cached OZI ZIP extraction during project open so mirrored archives are unpacked into `.tmp/lizaalert-projects/{project-slug}/extracted/{zip-stem}/...` before cached map indexing runs.
+- Reused the existing ZIP infrastructure boundary by adding a safe `extract_zip_entries_to_directory(...)` helper and using ZIP inventory to detect OZI-bearing archives before extraction.
+- Extended cached project indexing to scan both the mirrored `source/` tree and the extracted tree for `.map` files, so online OZI bundles become selectable through the same cached project map list.
+- Added focused tests covering safe ZIP extraction and cached project indexing after extracting an OZI ZIP bundle.
 - Validation passed with `cargo fmt --check` and `cargo test --lib`.
 
 ## Exit Criteria
@@ -70,6 +75,7 @@ Opening an online LizaAlert project should always use a unified UI flow: if the 
 - [x] Subsequent opens use the local cache path.
 - [x] Focused tests cover the first cached-project slice.
 - [x] Cached mirrored OZI `.map` files can be opened from the same project UI path as cached sqlite maps.
+- [x] Cached mirrored OZI ZIP bundles are extracted and their `.map` files become selectable through the same project UI path.
 - [x] Cached bundle loading no longer fails when mirrored OZI `.map` files contain non-UTF-8 bytes.
 - [x] Project-open progress/status is visible again during cached bundle download/indexing.
 - [x] Remaining bundle text reads (`HTTP` listings and cached coordinates files) no longer require valid UTF-8.
