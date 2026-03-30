@@ -1,9 +1,12 @@
 import "./app.css";
-import App from "./App.svelte";
 import { mount } from "svelte";
 
-const app = mount(App, {
-  target: document.getElementById("app")!,
-});
+const view = new URLSearchParams(window.location.search).get("view");
 
-export default app;
+if (view === "bundles") {
+  const { default: BundleLoaderView } = await import("./views/BundleLoaderView.svelte");
+  mount(BundleLoaderView, { target: document.getElementById("app")! });
+} else {
+  const { default: App } = await import("./App.svelte");
+  mount(App, { target: document.getElementById("app")! });
+}
