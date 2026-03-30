@@ -20,7 +20,6 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
-const MAX_DIAGNOSTIC_ENTRIES: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MapCenter {
@@ -747,13 +746,13 @@ impl AppState {
     }
 
     fn push_diagnostic(&mut self, level: DiagnosticLevel, message: String) {
+        match level {
+            DiagnosticLevel::Error => tracing::error!("{message}"),
+            DiagnosticLevel::Info => tracing::info!("{message}"),
+        }
         self.lizaalert
             .diagnostics
             .push_back(DiagnosticEntry::new(level, message));
-
-        while self.lizaalert.diagnostics.len() > MAX_DIAGNOSTIC_ENTRIES {
-            self.lizaalert.diagnostics.pop_front();
-        }
     }
 }
 
@@ -942,27 +941,6 @@ mod tests {
             .expect("latest diagnostic entry");
         assert_eq!(latest.level(), DiagnosticLevel::Error);
         assert_eq!(latest.message(), "Project not found");
-    }
-
-    #[test]
-    fn diagnostics_history_keeps_recent_entries_bounded() {
-        let mut state = AppState::default();
-
-        for index in 0..120 {
-            state.report_runtime_error(format!("diagnostic {index}"));
-        }
-
-        assert_eq!(state.recent_diagnostics().count(), 100);
-        let oldest = state
-            .recent_diagnostics()
-            .next()
-            .expect("oldest diagnostic entry");
-        let latest = state
-            .recent_diagnostics()
-            .next_back()
-            .expect("latest diagnostic entry");
-        assert_eq!(oldest.message(), "diagnostic 20");
-        assert_eq!(latest.message(), "diagnostic 119");
     }
 
     #[test]
