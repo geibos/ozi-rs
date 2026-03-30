@@ -1,0 +1,10 @@
+/Users/sobieg/Projects/ozi-rs/src-tauri/target/debug/deps/tauri_plugin_dialog-397edccf855719ec.d: /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/lib.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/desktop.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/commands.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/error.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/models.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/init-iife.js
+
+/Users/sobieg/Projects/ozi-rs/src-tauri/target/debug/deps/libtauri_plugin_dialog-397edccf855719ec.rmeta: /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/lib.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/desktop.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/commands.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/error.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/models.rs /Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/init-iife.js
+
+/Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/lib.rs:
+/Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/desktop.rs:
+/Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/commands.rs:
+/Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/error.rs:
+/Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/models.rs:
+/Users/sobieg/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.6.0/src/init-iife.js:

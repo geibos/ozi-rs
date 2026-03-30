@@ -1,0 +1,49 @@
+mod application;
+mod commands;
+mod domain;
+mod infrastructure;
+
+use commands::SharedState;
+use std::sync::{Arc, Mutex};
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    let state: SharedState = Arc::new(Mutex::new(application::AppState::new()));
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .manage(state)
+        .invoke_handler(tauri::generate_handler![
+            commands::get_app_state,
+            commands::get_tracks_geojson,
+            commands::load_projects,
+            commands::load_project,
+            commands::open_selected_map,
+            commands::open_local_bundle,
+            commands::set_bundles_root,
+            commands::save_project,
+            commands::load_project_file,
+            commands::import_gpx,
+            commands::import_plt,
+            commands::export_gpx,
+            commands::undo,
+            commands::redo,
+            commands::rename_track,
+            commands::set_track_color,
+            commands::toggle_track_visible,
+            commands::reveal_bundle,
+            commands::tiles::get_sqlite_tile,
+            commands::tiles::get_ozi_tile,
+            commands::tiles::get_ozi_metadata,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running ozi-rs");
+}
