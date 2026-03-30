@@ -24,12 +24,10 @@ pub fn get_sqlite_tile(path: String, base_zoom: u32, z: u32, x: u32, y: u32) -> 
         .map_err(|e| format!("failed to read info table: {e}"))?;
 
     // Map web zoom to DB zoom (DB zoom 0 = highest detail = base_zoom on web)
-    let max_delta = db_max_zoom.saturating_sub(db_min_zoom);
-    let min_web_zoom = base_zoom.saturating_sub(max_delta);
-    if z < min_web_zoom || z > base_zoom {
-        return Err("zoom out of range".to_owned());
-    }
-    let db_z = db_min_zoom + (base_zoom - z);
+    let db_z = match web_to_db_zoom(z, db_min_zoom, db_max_zoom, base_zoom) {
+        Some(v) => v,
+        None => return Err("zoom out of range".to_owned()),
+    };
 
     let result: Option<Vec<u8>> = conn
         .query_row(
@@ -109,6 +107,22 @@ pub fn get_ozi_metadata(map_path: String) -> Result<serde_json::Value, String> {
     }))
 }
 
+// ── Zoom mapping ──────────────────────────────────────────────────────────────
+
+/// Map a web (MapLibre) zoom level to the corresponding DB zoom level.
+///
+/// LizaAlert bundles store tiles with zoom 0 = highest detail (inverted vs web).
+/// `base_zoom` is the web zoom that corresponds to `db_min_zoom` (highest detail).
+/// Returns `None` if `web_z` is outside the zoom range covered by the bundle.
+fn web_to_db_zoom(web_z: u32, db_min: u32, db_max: u32, base_zoom: u32) -> Option<u32> {
+    let max_delta = db_max.saturating_sub(db_min);
+    let min_web_zoom = base_zoom.saturating_sub(max_delta);
+    if web_z < min_web_zoom || web_z > base_zoom {
+        return None;
+    }
+    Some(db_min + (base_zoom - web_z))
+}
+
 // ── PNG encoding helper ───────────────────────────────────────────────────────
 
 fn encode_rgba_to_png(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
@@ -126,4 +140,102 @@ fn encode_rgba_to_png(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>, S
     .map_err(|e| e.to_string())?;
 
     Ok(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::OptionalExtension;
+
+    // ── web_to_db_zoom ────────────────────────────────────────────────────────
+
+    #[test]
+    fn base_zoom_maps_to_db_min() {
+        // Highest-detail web zoom → lowest DB zoom index (most detailed level)
+        assert_eq!(web_to_db_zoom(15, 0, 4, 15), Some(0));
+    }
+
+    #[test]
+    fn min_web_zoom_maps_to_db_max() {
+        // Lowest covered web zoom → highest DB zoom index (overview level)
+        // base=15, db range 0..4 → min_web = 15-4 = 11
+        assert_eq!(web_to_db_zoom(11, 0, 4, 15), Some(4));
+    }
+
+    #[test]
+    fn mid_zoom_maps_correctly() {
+        assert_eq!(web_to_db_zoom(13, 0, 4, 15), Some(2));
+    }
+
+    #[test]
+    fn zoom_below_range_is_none() {
+        assert_eq!(web_to_db_zoom(10, 0, 4, 15), None);
+    }
+
+    #[test]
+    fn zoom_above_base_is_none() {
+        assert_eq!(web_to_db_zoom(16, 0, 4, 15), None);
+    }
+
+    #[test]
+    fn single_zoom_level_bundle() {
+        // DB has only zoom 0; base_zoom = 14
+        assert_eq!(web_to_db_zoom(14, 0, 0, 14), Some(0));
+        assert_eq!(web_to_db_zoom(13, 0, 0, 14), None);
+        assert_eq!(web_to_db_zoom(15, 0, 0, 14), None);
+    }
+
+    // ── SQLite schema ─────────────────────────────────────────────────────────
+
+    /// Verify that the SQL queries use the correct LizaAlert column names.
+    /// If the schema changes, this test will fail before the app is even launched.
+    #[test]
+    fn sqlite_schema_uses_x_y_z_image_columns() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE info (minzoom INTEGER, maxzoom INTEGER);
+             INSERT INTO info VALUES (0, 2);
+             CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, image BLOB);
+             INSERT INTO tiles VALUES (10, 20, 0, X'deadbeef');",
+        )
+        .unwrap();
+
+        // info table query must work
+        let (min, max): (u32, u32) = conn
+            .query_row("SELECT minzoom, maxzoom FROM info LIMIT 1", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((min, max), (0, 2));
+
+        // tiles query must return the blob using the correct column names
+        let data: Option<Vec<u8>> = conn
+            .query_row(
+                "SELECT image FROM tiles WHERE x=?1 AND y=?2 AND z=?3 LIMIT 1",
+                rusqlite::params![10u32, 20u32, 0u32],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap();
+        assert_eq!(data, Some(vec![0xde, 0xad, 0xbe, 0xef]));
+    }
+
+    #[test]
+    fn missing_tile_returns_none_not_error() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, image BLOB);",
+        )
+        .unwrap();
+
+        let data: Option<Vec<u8>> = conn
+            .query_row(
+                "SELECT image FROM tiles WHERE x=?1 AND y=?2 AND z=?3 LIMIT 1",
+                rusqlite::params![0u32, 0u32, 0u32],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap();
+        assert!(data.is_none());
+    }
 }

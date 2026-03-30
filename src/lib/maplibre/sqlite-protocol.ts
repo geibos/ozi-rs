@@ -1,5 +1,6 @@
 import { addProtocol } from "maplibre-gl";
 import { getSqliteTile } from "../api";
+import { parseSqliteTileUrl } from "./tile-url";
 
 /**
  * Register a custom `sqlite://` protocol with MapLibre.
@@ -17,20 +18,12 @@ import { getSqliteTile } from "../api";
  */
 export function registerSqliteProtocol() {
   addProtocol("sqlite", async (params, _abortController) => {
-    // Strip the "sqlite://" prefix
-    const rest = params.url.slice("sqlite://".length);
-
-    // Format: <path>/<base_zoom>/{z}/{x}/{y}
-    const match = rest.match(/^(.+?)\/(\d+)\/(\d+)\/(\d+)\/(\d+)$/);
-    if (!match) {
+    const parsed = parseSqliteTileUrl(params.url);
+    if (!parsed) {
       throw new Error(`Invalid sqlite tile URL: ${params.url}`);
     }
 
-    const [, filePath, baseZoomStr, zStr, xStr, yStr] = match;
-    const baseZoom = parseInt(baseZoomStr, 10);
-    const z = parseInt(zStr, 10);
-    const x = parseInt(xStr, 10);
-    const y = parseInt(yStr, 10);
+    const { filePath, baseZoom, z, x, y } = parsed;
 
     try {
       const data = await getSqliteTile(filePath, baseZoom, z, x, y);
