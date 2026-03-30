@@ -37,7 +37,7 @@ pub struct OziApp {
     track_name_edits:
         std::collections::HashMap<(crate::domain::LayerId, crate::domain::TrackId), String>,
     console_open: bool,
-    theme: CatppuccinFlavor,
+    theme: Option<CatppuccinFlavor>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -146,14 +146,10 @@ impl OziApp {
             }
         }
 
-        let theme: CatppuccinFlavor = cc
+        let theme: Option<CatppuccinFlavor> = cc
             .storage
             .and_then(|s| eframe::get_value(s, STORAGE_KEY_THEME))
-            .unwrap_or_else(|| match cc.egui_ctx.system_theme() {
-                Some(egui::Theme::Light) => CatppuccinFlavor::Latte,
-                _ => CatppuccinFlavor::Mocha,
-            });
-        theme.apply(&cc.egui_ctx);
+            .unwrap_or(None);
 
         Self {
             project_search: String::new(),
@@ -167,7 +163,7 @@ impl OziApp {
             osm_tiles: HttpTiles::new(OpenStreetMap, cc.egui_ctx.clone()),
             track_name_edits: std::collections::HashMap::new(),
             console_open: false,
-            theme: CatppuccinFlavor::Mocha,
+            theme,
         }
     }
 
@@ -236,15 +232,21 @@ impl OziApp {
                     ui.heading("Map Picker");
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let prev = self.theme;
+                        let label = self.theme.map_or("Auto", CatppuccinFlavor::name);
                         egui::ComboBox::from_id_salt("theme_picker")
-                            .selected_text(self.theme.name())
+                            .selected_text(label)
                             .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut self.theme, None, "Auto");
                                 for flavor in CatppuccinFlavor::ALL {
-                                    ui.selectable_value(&mut self.theme, flavor, flavor.name());
+                                    ui.selectable_value(
+                                        &mut self.theme,
+                                        Some(flavor),
+                                        flavor.name(),
+                                    );
                                 }
                             });
                         if self.theme != prev {
-                            self.theme.apply(ui.ctx());
+                            CatppuccinFlavor::resolve(self.theme, ui.ctx()).apply(ui.ctx());
                         }
                     });
                 });
@@ -615,7 +617,7 @@ impl eframe::App for OziApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.theme.apply(ctx);
+        CatppuccinFlavor::resolve(self.theme, ctx).apply(ctx);
         self.state.poll_background_tasks();
         self.sync_active_map(ctx);
         self.fps_counter.tick();

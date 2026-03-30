@@ -24,6 +24,17 @@ impl CatppuccinFlavor {
         ctx.set_visuals(self.visuals());
     }
 
+    /// Resolve `None` (Auto) to the appropriate flavor based on system theme.
+    pub fn resolve(flavor: Option<Self>, ctx: &egui::Context) -> Self {
+        match flavor {
+            Some(f) => f,
+            None => match ctx.system_theme() {
+                Some(egui::Theme::Light) => Self::Latte,
+                _ => Self::Mocha,
+            },
+        }
+    }
+
     fn palette(self) -> Palette {
         match self {
             Self::Latte => LATTE,
