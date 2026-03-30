@@ -41,7 +41,8 @@ impl std::error::Error for PltImportError {
 
 /// Import an OziExplorer `.plt` track file.
 pub fn import_plt_file(path: &Path) -> Result<PltImport, PltImportError> {
-    let text = std::fs::read_to_string(path).map_err(PltImportError::Io)?;
+    let bytes = std::fs::read(path).map_err(PltImportError::Io)?;
+    let text = String::from_utf8_lossy(&bytes);
     import_plt_text(path.display().to_string(), &text)
 }
 
