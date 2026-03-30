@@ -26,6 +26,7 @@
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
 
+  let projectFilter = $state("");
   let selectedSlug = $state<string>("");
 
   async function handleLoadProjects() {
@@ -106,15 +107,27 @@
     </button>
 
     {#if $projects.length > 0}
-      <select bind:value={selectedSlug} class="full">
-        <option value="">— select project —</option>
-        {#each $projects as p}
-          <option value={p.slug}>{p.name}</option>
+      {@const filtered = $projects.filter((p) =>
+        p.name.toLowerCase().includes(projectFilter.toLowerCase())
+      )}
+      <input
+        class="full"
+        type="search"
+        placeholder="Filter projects… ({$projects.length})"
+        bind:value={projectFilter}
+      />
+      <div class="project-list">
+        {#each filtered as p (p.slug)}
+          <button
+            class="project-item"
+            class:selected={selectedSlug === p.slug}
+            onclick={() => { selectedSlug = p.slug; handleSelectProject(); }}
+            disabled={$busy}
+          >{p.name}</button>
+        {:else}
+          <div class="empty-filter">No matches</div>
         {/each}
-      </select>
-      <button class="full" onclick={handleSelectProject} disabled={!selectedSlug || $busy}>
-        Open Project
-      </button>
+      </div>
     {/if}
 
     {#if $currentProject}
@@ -339,5 +352,47 @@
 
   .console-toggle:hover {
     color: var(--ctp-text);
+  }
+
+  input[type="search"].full {
+    width: 100%;
+  }
+
+  .project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .project-item {
+    width: 100%;
+    text-align: left;
+    font-size: 11px;
+    padding: 4px 6px;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--ctp-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .project-item:hover {
+    background: var(--ctp-surface0);
+  }
+
+  .project-item.selected {
+    background: var(--ctp-surface1);
+    color: var(--ctp-blue);
+  }
+
+  .empty-filter {
+    padding: 6px;
+    font-size: 11px;
+    color: var(--ctp-overlay1);
+    text-align: center;
   }
 </style>
