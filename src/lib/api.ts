@@ -94,11 +94,12 @@ export async function getOziMetadata(mapPath: string): Promise<OziMetadataDto> {
 /** Return raw tile bytes from SQLite bundle. Used by sqlite-protocol.ts. */
 export async function getSqliteTile(
   path: string,
+  baseZoom: number,
   z: number,
   x: number,
   y: number
 ): Promise<ArrayBuffer> {
-  return invoke("get_sqlite_tile", { path, z, x, y });
+  return invoke("get_sqlite_tile", { path, baseZoom, z, x, y });
 }
 
 /** Return PNG-encoded tile bytes from OZF2 file. Used by ozi-protocol.ts. */

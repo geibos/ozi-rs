@@ -6,22 +6,35 @@ use tauri::ipc::Response;
 
 // ── SQLite tile delivery ──────────────────────────────────────────────────────
 
-/// Return the raw PNG/JPEG bytes for a tile at (z, x, y) from a `.sqlitedb` bundle.
+/// Return the raw PNG/JPEG bytes for a tile at (z, x, y) from a LizaAlert `.sqlitedb` bundle.
 ///
-/// Tiles are stored verbatim in the SQLite file, so we return the raw blob
-/// without re-encoding. MapLibre accepts both PNG and JPEG transparently.
+/// LizaAlert SQLite schema: table `tiles`, columns `x`, `y`, `z`, `image`.
+/// Zoom levels are stored inverted relative to web zoom: `db_z = db_min + (base_zoom - web_z)`.
+/// Zoom range metadata comes from table `info`, columns `minzoom`/`maxzoom`.
+/// `base_zoom` is the web zoom level corresponding to db zoom 0 (highest detail).
 #[tauri::command]
-pub fn get_sqlite_tile(path: String, z: u32, x: u32, y: u32) -> Result<Response, String> {
+pub fn get_sqlite_tile(path: String, base_zoom: u32, z: u32, x: u32, y: u32) -> Result<Response, String> {
     let conn = rusqlite::Connection::open(&path).map_err(|e| e.to_string())?;
 
-    // MBTiles uses TMS (y=0 at bottom); flip y to match XYZ convention used by
-    // MapLibre and LizaAlert bundles.
-    let tms_y = (1u32 << z).saturating_sub(1).saturating_sub(y);
+    // Read zoom range from info table
+    let (db_min_zoom, db_max_zoom): (u32, u32) = conn
+        .query_row("SELECT minzoom, maxzoom FROM info LIMIT 1", [], |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, u32>(1)?))
+        })
+        .map_err(|e| format!("failed to read info table: {e}"))?;
+
+    // Map web zoom to DB zoom (DB zoom 0 = highest detail = base_zoom on web)
+    let max_delta = db_max_zoom.saturating_sub(db_min_zoom);
+    let min_web_zoom = base_zoom.saturating_sub(max_delta);
+    if z < min_web_zoom || z > base_zoom {
+        return Err("zoom out of range".to_owned());
+    }
+    let db_z = db_min_zoom + (base_zoom - z);
 
     let result: Option<Vec<u8>> = conn
         .query_row(
-            "SELECT tile_data FROM tiles WHERE zoom_level=?1 AND tile_column=?2 AND tile_row=?3",
-            rusqlite::params![z, x, tms_y],
+            "SELECT image FROM tiles WHERE x=?1 AND y=?2 AND z=?3 LIMIT 1",
+            rusqlite::params![x, y, db_z],
             |row| row.get(0),
         )
         .optional()
