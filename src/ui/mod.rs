@@ -1,4 +1,7 @@
 mod sqlite_tiles;
+mod theme;
+
+use theme::CatppuccinFlavor;
 
 use crate::application::{ActiveMapKind, AppState, DiagnosticLevel};
 use crate::domain::TrackLayer;
@@ -34,6 +37,7 @@ pub struct OziApp {
     track_name_edits:
         std::collections::HashMap<(crate::domain::LayerId, crate::domain::TrackId), String>,
     console_open: bool,
+    theme: CatppuccinFlavor,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -112,6 +116,7 @@ impl FpsCounter {
 const STORAGE_KEY_LAST_PROJECT: &str = "last_project_path";
 const STORAGE_KEY_ACTIVE_MAP: &str = "active_map";
 const STORAGE_KEY_BUNDLES_ROOT: &str = "bundles_root";
+const STORAGE_KEY_THEME: &str = "theme";
 
 impl OziApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -141,6 +146,12 @@ impl OziApp {
             }
         }
 
+        let theme: CatppuccinFlavor = cc
+            .storage
+            .and_then(|s| eframe::get_value(s, STORAGE_KEY_THEME))
+            .unwrap_or(CatppuccinFlavor::Mocha);
+        theme.apply(&cc.egui_ctx);
+
         Self {
             project_search: String::new(),
             state,
@@ -153,6 +164,7 @@ impl OziApp {
             osm_tiles: HttpTiles::new(OpenStreetMap, cc.egui_ctx.clone()),
             track_name_edits: std::collections::HashMap::new(),
             console_open: false,
+            theme: CatppuccinFlavor::Mocha,
         }
     }
 
@@ -217,7 +229,22 @@ impl OziApp {
             .resizable(true)
             .default_size(280.0)
             .show_inside(ui, |ui| {
-                ui.heading("Map Picker");
+                ui.horizontal(|ui| {
+                    ui.heading("Map Picker");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let prev = self.theme;
+                        egui::ComboBox::from_id_salt("theme_picker")
+                            .selected_text(self.theme.name())
+                            .show_ui(ui, |ui| {
+                                for flavor in CatppuccinFlavor::ALL {
+                                    ui.selectable_value(&mut self.theme, flavor, flavor.name());
+                                }
+                            });
+                        if self.theme != prev {
+                            self.theme.apply(ui.ctx());
+                        }
+                    });
+                });
 
                 // Bundles storage directory settings
                 egui::CollapsingHeader::new("Map Bundles Storage")
@@ -581,6 +608,7 @@ impl eframe::App for OziApp {
         if let Some(map) = self.state.active_map() {
             eframe::set_value(storage, STORAGE_KEY_ACTIVE_MAP, map);
         }
+        eframe::set_value(storage, STORAGE_KEY_THEME, &self.theme);
     }
 
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
