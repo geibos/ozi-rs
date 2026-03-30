@@ -62,11 +62,20 @@ check-legacy:
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 
-# Run all Rust tests
+# Run all tests (Rust + frontend)
 test:
     cargo test --manifest-path src-tauri/Cargo.toml
+    npm test
 
-# Run a specific test by name filter
+# Run only Rust tests
+test-rust:
+    cargo test --manifest-path src-tauri/Cargo.toml
+
+# Run only frontend tests (Vitest)
+test-ui:
+    npm test
+
+# Run a specific Rust test by name filter
 test-filter filter:
     cargo test --manifest-path src-tauri/Cargo.toml {{ filter }}
 
