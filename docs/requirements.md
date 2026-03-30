@@ -2,131 +2,175 @@
 
 ## Product Goal
 
-Build a Rust desktop application for working with raster maps, tracks, and waypoints as a modern replacement for the useful core of OziExplorer.
+Build a Rust desktop application for LizaAlert search-and-rescue volunteers to work with
+raster maps, tracks, and waypoints offline — as a modern replacement for the useful core
+of OziExplorer.
 
-The product must favor predictable behavior, explicit edits, and a testable architecture over legacy convenience shortcuts.
+The product must favor predictable behavior, explicit edits, and a testable architecture
+over legacy convenience shortcuts.
+
+## Context
+
+[LizaAlert](https://lizaalert.org) is a Russian volunteer SAR organization. Volunteers
+at field HQ use laptop computers to work with topo and satellite raster maps downloaded
+from [maps.lizaalert.ru](https://maps.lizaalert.ru). Field teams record GPS tracks
+(`.plt`, `.gpx`) that are later loaded and analyzed at HQ.
+
+The LizaAlert operational cartography standard defines naming and file layout
+conventions that the application must support and validate.
 
 ## Primary Users
 
-- operators who open raster maps and inspect field data;
-- users who import, create, and edit tracks;
-- users who manage waypoint collections;
-- contributors who need a maintainable and testable codebase.
+- **HQ operators** who open raster maps, load field tracks, and organize project data
+- **Track analysts** who import, review, simplify, and export GPS tracks
+- **Cartographers** who manage map bundles and maintain naming standards
+- **Contributors** who need a maintainable and testable codebase
+
+## Key Concepts
+
+### Map Bundle
+
+A directory containing one or more georeferenced raster maps for a geographic area.
+Bundles are downloaded from maps.lizaalert.ru or opened from a local folder.
+Stored in a user-configurable location. One bundle can be used by multiple projects.
+
+Typical bundle layout:
+
+```
+BundleName/
+  map.sqlitedb        # SQLite tile map
+  map.map + map.ozf2  # OziExplorer raster map
+  10-Tracks/          # tracks exported from this bundle's projects
+```
+
+### Project
+
+One SAR search operation. A project:
+- references a map bundle
+- contains track layers and waypoint layers
+- is saved as a local `.json` file
+- stores exported tracks in a `10-Tracks/` subfolder per the LizaAlert standard
+
+### LizaAlert OK Standard
+
+Track names must follow the pattern `YYYYMMDD_Callsign`
+(e.g. `20240601_Иванов`). The UI warns when a name does not match.
 
 ## Core User Workflows
 
-### 1. Open map and inspect project context
-- open a raster map file;
-- view it as an independent map layer;
-- load related tracks and waypoint collections into the same project.
+### 1. Open map and load field data
 
-### 2. Import and organize field data
-- import one or more tracks;
-- import one or more waypoint collections;
-- inspect imported tracks to keep relevant data and discard noise;
-- keep tracks and waypoint collections as separate first-class entities.
+- select a LizaAlert project from maps.lizaalert.ru, or open a local bundle
+- download or use a cached tile map or OZF2 raster map
+- import one or more GPX or PLT track files into the project
+- view tracks overlaid on the map
 
-### 3. Edit waypoints
-- add waypoint;
-- move waypoint;
-- rename waypoint;
-- delete selected waypoint(s).
+### 2. Review and organize tracks
 
-### 4. Edit tracks
-- create track;
-- insert track point;
-- move track point;
-- split segment;
-- join segments;
-- delete selected elements.
+- inspect per-track statistics (distance, duration, point count)
+- rename tracks to follow the OK standard
+- toggle track visibility
+- change track color and line width
+- remove tracks that are noise or duplicates
+
+### 3. Edit tracks
+
+- move or delete individual track points
+- split segment at a point
+- join adjacent segments
+- simplify track with Douglas-Peucker
+
+### 4. Edit waypoints
+
+- add waypoint by clicking on map
+- move waypoint
+- rename waypoint
+- delete waypoint
 
 ### 5. Save and export
-- save the current project state;
-- export supported data in external formats.
+
+- save project state
+- export track layer to GPX (with Garmin color extension)
+- export to `10-Tracks/` subfolder with suggested filename
+
+## Track Feature Requirements
+
+These requirements came from direct user input and must be reflected in design:
+
+- **Import**: GPX (single file and ZIP archive), PLT (including Windows-1251 encoding)
+- **Export**: GPX with Garmin color extension; PLT (planned)
+- **Display**: name, color, line width, visibility, opacity per track
+- **Simplification**: Douglas-Peucker with configurable tolerance (not stride-based)
+- **Point list**: all properties per point (lat/lon, elevation, timestamp, segment)
+- **Sort by timestamp**: fix out-of-order GPS recordings
+- **Edit mode**: move points by drag on map, delete selected points
+- **Segment ops**: split at point, join adjacent segments
+- **Undo/redo**: all edits reversible via command stack
+- **Statistics**: total distance (km), duration (h/m), point count
 
 ## MVP Scope
 
-The MVP should include:
-- raster map opening;
-- project model with independent map, track, and waypoint layers;
-- loading multiple tracks and waypoint collections;
-- explicit command-driven editing for tracks and waypoints;
-- undo/redo support via reversible commands or equivalent operation log;
-- project save/load;
-- export for core supported data.
+- raster map opening (SQLite tiles, OZF2)
+- project model with independent map, track, and waypoint layers
+- loading multiple tracks and waypoint collections
+- explicit command-driven editing for tracks and waypoints
+- undo/redo support
+- project save/load
+- GPX and PLT import/export
+- LizaAlert project browser and bundle management
 
 ## MVP Non-Goals
 
-The MVP should not include:
-- datum management;
-- advanced geodesy or projection systems beyond strict necessity;
-- GPS device sync;
-- routes, events, or live telemetry;
-- legacy privileged objects such as `Track 1`;
-- append-only editing models copied from legacy GIS workflows.
+- datum management
+- advanced geodesy or projection systems beyond strict necessity
+- GPS device sync and live telemetry
+- routes and events
+- legacy privileged objects such as `Track 1`
+- append-only editing models copied from legacy GIS workflows
+- polygon / search sector drawing (post-MVP)
+- multi-device coordination
 
 ## Functional Requirements
 
 ### Project Model
-- The system must represent `Project`, `MapLayer`, `TrackLayer`, `WaypointLayer`, `Track`, `TrackSegment`, `TrackPoint`, and `Waypoint` as distinct concepts.
-- The system must keep map, track, and waypoint data independent so changing the active map does not implicitly discard loaded field data.
-- UI-only selection or edit state should remain outside persisted domain entities where practical.
+
+- The system must represent `Project`, `MapLayer`, `TrackLayer`, `WaypointLayer`,
+  `Track`, `TrackSegment`, `TrackPoint`, and `Waypoint` as distinct concepts.
+- Map bundle and project must be separate concepts. Changing the active map must not
+  discard loaded tracks or waypoints.
+- UI-only selection or edit state must remain outside persisted domain entities.
 
 ### Editing
-- The system must express edits as explicit commands.
-- The system must support reversible edits suitable for undo/redo.
+
+- All non-trivial edits must be expressed as explicit commands.
+- The command stack must support undo/redo.
 - The system must avoid hidden mutable global state during editing workflows.
 
+### LizaAlert Integration
+
+- The application must be able to browse and download projects from maps.lizaalert.ru.
+- The application must validate track names against the `YYYYMMDD_Callsign` pattern and
+  surface a warning for non-conforming names.
+- The application must suggest `10-Tracks/` as the export destination when a bundle is
+  active.
+
 ### Architecture
+
 - Domain logic must not depend on GUI types.
 - Domain entities must remain serializable and testable without UI runtime dependencies.
 - Persistence formats must be treated as boundaries, not as the domain model itself.
 
 ### Quality
+
 - Every non-trivial feature must ship with tests.
 - New functionality must update relevant docs.
-- The application must remain aligned with the stated product intent and non-goals.
-- Common failure cases such as unsupported access paths or problematic file names should produce clear user-facing errors.
-
-## Acceptance Criteria For Kickoff
-
-- product scope and non-goals are documented;
-- architecture boundaries are documented;
-- testing strategy is documented;
-- implementation roadmap is prioritized;
-- initial architecture ADR is recorded.
-
-## Assumptions
-
-- the first implementation phase should prioritize correctness and edit-model clarity over UI polish;
-- import/export format breadth can grow incrementally after the project model and command system are stable;
-- external OziExplorer add-on references will inform backlog refinement, but they do not override the product constraints in `AGENTS.md`.
-
-## Yonote-Derived Backlog Signals
-
-The currently reviewed Yonote/OziExplorer material suggests these product directions:
-
-Adopt into MVP planning:
-- GPX track import;
-- GPX waypoint import;
-- imported-data triage flows for keeping relevant tracks and removing irrelevant ones;
-- preserving loaded tracks and waypoints when the visible map changes;
-- explicit handling for common file-open and import failures.
-
-Defer until after the core edit model is stable:
-- multi-map convenience workflows similar to OziManyMaps, but reformulated as first-class map/layer management rather than an external helper;
-- optional overlay and reference layers;
-- reusable style or naming templates for tracks, without legacy privileged categories;
-- workflow helpers or normalization tools only after their rules are made explicit and testable.
-
-Reject or reformulate:
-- GPS device synchronization during MVP;
-- hardware-specific COM configuration;
-- polygon-centric workflows not already justified by the MVP model;
-- domain-specific privileged callsigns or other hard-coded legacy exceptions.
+- Common failure cases must produce clear user-facing errors (surfaced in the console
+  and via `tracing` to stdout/stderr).
 
 ## Open Questions
 
-- which file formats should be supported first for map loading, track import/export, and waypoint import/export;
-- what minimum geometry support is required for split/join and selection workflows;
-- which OziExplorer-derived workflows from the Yonote references should land in MVP versus post-MVP once the screenshot-heavy material is fully extracted.
+- Which UI framework best supports drag-based point editing and native multi-window
+  layout? (egui has known limitations; iced and slint are candidates.)
+- Should sector/polygon drawing be added to the geometry model now to avoid a retrofit
+  later?
+- What is the priority of PLT export relative to track editing features?

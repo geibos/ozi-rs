@@ -1,104 +1,137 @@
 # Roadmap
 
-## Phase 0 - Kickoff
+## Phase 0 — Kickoff
 
-- define scope and non-goals;
-- record initial architecture;
-- define testing strategy;
-- create prioritized backlog.
+Status: **complete**
 
-Status: complete in documentation, with early implementation underway.
+- defined scope and non-goals
+- recorded initial architecture ADR
+- defined testing strategy
+- created prioritized backlog
 
-## Phase 1 - Core Model And Commands
+## Phase 1 — Core Model and Commands
 
-Target outcomes:
-- initial Rust workspace/application skeleton;
-- domain entities for project, layers, tracks, and waypoints;
-- explicit command model for edits;
-- undo/redo foundation.
+Status: **complete**
+
+- domain entities: Project, MapLayer, TrackLayer, WaypointLayer, Track, TrackSegment,
+  TrackPoint, Waypoint
+- explicit command model with CommandStack
+- undo/redo via full project snapshots
+- unit and workflow tests for core edits
+
+## Phase 2 — Project Persistence
+
+Status: **complete**
+
+- JSON project save/load
+- last open project restored on startup
+- persistence boundaries separated from UI state
+
+## Phase 3 — Data Import/Export
+
+Status: **complete**
+
+- GPX import (single file and ZIP archive)
+- PLT import (handles Windows-1251 encoding)
+- GPX export with Garmin color extension
+- clear user-facing error reporting
+
+Deferred to later:
+- PLT export
+- KML import/export
+- WPT import/export
+
+## Phase 4 — Map Display
+
+Status: **complete**
+
+- SQLite tile maps (LizaAlert format)
+- OziExplorer OZF2 raster maps
+- OZI georeference (`.map` file parsing)
+- tiled rendering with zoom level selection and LRU texture cache
+- OpenStreetMap online fallback
+- track overlay on all map types
+
+## Phase 5 — LizaAlert Integration
+
+Status: **complete**
+
+- browse and download projects from maps.lizaalert.ru
+- configurable bundle storage directory
+- open local bundle from folder
+- reveal active bundle in Finder/Explorer
+- automatic `10-Tracks/` subfolder on export
+- LizaAlert OK-standard track name validation (`YYYYMMDD_Callsign`)
+- last active map restored on startup
+
+## Phase 6 — UI Polish
+
+Status: **in progress**
+
+Done:
+- Catppuccin theme with Auto/Latte/Frappé/Macchiato/Mocha picker, persisted
+- floating resizable Tracks window
+- developer console toggled with backtick, full scroll history
+- structured logging via `tracing` / `RUST_LOG`
+
+Pending:
+- review UI framework choice (egui limitations for drag editing and native windows)
+- separate Tracks window as a real OS-level window
+
+## Phase 7 — Track Editing (next)
 
 Priority backlog:
-1. scaffold Rust project structure around `domain`, `application`, `infrastructure`, and `ui` boundaries;
-2. implement core entities and identifiers;
-3. ensure map switching does not implicitly discard loaded tracks or waypoints;
-4. implement command abstractions and reversible operations;
-5. add unit and workflow tests for core edits.
 
-## Phase 2 - Project Persistence
+1. track point list panel: all properties (lat/lon, elevation, timestamp)
+2. sort track points by timestamp (fix out-of-order GPS recordings)
+3. select and delete track points
+4. move track point in edit mode (drag on map)
+5. split track segment at selected point
+6. join adjacent segments
+7. insert track point
+8. create track from scratch on map
 
-Target outcomes:
-- save/load for internal project representation;
-- persistence boundaries separated from UI state;
-- integration tests for round-trip behavior.
+All edits must flow through CommandStack for undo/redo.
 
-Priority backlog:
-1. define persisted project schema;
-2. implement serialization boundaries;
-3. add integration tests for project round-trips.
+## Phase 8 — Track Simplification
 
-## Phase 3 - Data Import/Export
+- Douglas-Peucker simplification with configurable tolerance
+- preview before committing
+- preserve timestamp and elevation through simplification
 
-Target outcomes:
-- first supported import/export paths for tracks and waypoints;
-- failure handling for malformed files;
-- regression tests for parser edge cases.
+## Phase 9 — Waypoint Editing UI
 
-Priority backlog:
-1. add ZIP archive inventory and supported-entry detection in the infrastructure layer;
-2. implement GPX import as the first archive-backed track/waypoint path;
-3. support imported-data triage workflows so users can inspect results and remove irrelevant tracks or point sets;
-4. add later adapters for KML and Ozi text formats (`.plt`, `.wpt`, `.map`) once the archive boundary is stable;
-5. investigate `ozf2` feasibility separately before committing to native raster support;
-6. implement export adapters;
-7. add parser and round-trip tests;
-8. add clear error reporting for common file-open and import failures.
+The domain model already supports waypoints; the UI is missing:
 
-## Phase 4 - Initial UI Workflow
+1. waypoint list panel
+2. add waypoint by clicking on map
+3. move waypoint by drag
+4. rename waypoint inline
+5. delete waypoint
+6. waypoint icon or symbol support
 
-Target outcomes:
-- open a project with map, track, and waypoint layers;
-- perform basic command-driven edits from the UI;
-- view and manipulate selection state outside persisted domain entities.
+## Phase 10 — Export and Print
 
-Priority backlog:
-1. define minimal UI shell;
-2. connect UI actions to application commands;
-3. add smoke-level workflow coverage where feasible.
+- PLT export
+- print map view with tracks and waypoints to PDF or image
+- configurable scale and paper size
 
-## Phase 5 - Workflow Expansion
+## Deferred
 
-Candidate areas after the core is stable:
-- richer track editing workflows;
-- polygon-like or task-oriented workflows if they fit the modern model;
-- configurable styles and templates;
-- settings and workflow helpers inspired by OziExplorer add-ons, filtered through current product goals.
+- GPS device sync and live track recording
+- KML import/export
+- datum management and advanced projection
+- multi-map simultaneous display
+- polygon / search sector drawing
+- overlay layers (wiki, hybrid, archive)
+- style and naming templates
 
-## Yonote-Derived Triage
+## Open Questions
 
-Adopt soon:
-- GPX-oriented import workflows;
-- ZIP-backed GPX import so field data can arrive bundled with other artifacts;
-- imported-track review and cleanup;
-- project semantics where field data survives map changes;
-- clearer file-open diagnostics.
-
-Defer pending stronger product evidence or architecture maturity:
-- multi-map helper workflows inspired by OziManyMaps;
-- overlay/reference layers such as wiki, hybrid, OSM, or archive views;
-- KML and Ozi text import after the first archive-backed GPX slice is stable;
-- style and naming templates for tracks;
-- explicit normalization helpers for tracks and waypoints.
-
-Reject or heavily reformulate:
-- GPS device sync;
-- COM-port configuration UX;
-- legacy privileged track or callsign behavior;
-- helper-specific hidden config files as the primary user workflow.
-
-## Deferred Until Better Evidence
-
-- any feature that depends heavily on screenshot-only Yonote material not yet fully extracted;
-- native `ozf2` decoding until feasibility and licensing are clearer;
-- advanced GIS/projection behavior;
-- GPS-device workflows;
-- legacy workflow quirks that conflict with explicit commands or clean data boundaries.
+- **UI framework**: egui works but has real limitations for drag-based point editing
+  and native multi-window UIs. Alternatives (iced, slint) should be evaluated before
+  Phase 7 begins. Cost of migration grows with each UI-heavy feature added.
+- **PLT export**: needed for round-trip compatibility with OziExplorer in the field;
+  assess priority with users.
+- **Sector drawing**: LizaAlert workflows involve drawing search sectors on maps;
+  this is post-MVP but should inform the geometry model now.
