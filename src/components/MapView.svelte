@@ -56,7 +56,7 @@
 
     const tileUrl =
       am.kind === "sqlite"
-        ? `sqlite://${am.local_path}/{z}/{x}/{y}`
+        ? `sqlite://${am.local_path}/${am.base_zoom}/{z}/{x}/{y}`
         : `ozi://${am.local_path}/{z}/{x}/{y}`;
 
     map.addSource(sourceId, {
