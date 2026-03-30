@@ -1,0 +1,34 @@
+[package]
+name = "ozi-rs"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "ozi_rs_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+
+# Domain / infrastructure
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1.12"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+rusqlite = { version = "0.39", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+gpx = "0.10"
+zip = { version = "8.4", default-features = false, features = ["deflate"] }
+ozf2-rs = { path = "../../ozf2-rs" }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# PNG encoding for tile delivery
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
