@@ -1,6 +1,6 @@
 mod sqlite_tiles;
 
-use crate::application::{ActiveMapKind, AppState, DiagnosticEntry, DiagnosticLevel};
+use crate::application::{ActiveMapKind, AppState, DiagnosticLevel};
 use crate::domain::TrackLayer;
 use crate::infrastructure::import::{
     OziGeoreference, OziRasterLevelMetadata, OziRasterTileSource, open_ozi_raster_tile_source,
@@ -33,6 +33,7 @@ pub struct OziApp {
     osm_tiles: HttpTiles,
     track_name_edits:
         std::collections::HashMap<(crate::domain::LayerId, crate::domain::TrackId), String>,
+    console_open: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -151,6 +152,7 @@ impl OziApp {
             ozi_renderer: None,
             osm_tiles: HttpTiles::new(OpenStreetMap, cc.egui_ctx.clone()),
             track_name_edits: std::collections::HashMap::new(),
+            console_open: false,
         }
     }
 
@@ -313,11 +315,12 @@ impl OziApp {
             });
     }
 
-    fn show_tracks_panel(&mut self, ui: &mut egui::Ui) {
-        egui::Panel::right("tracks_panel")
+    fn show_tracks_panel(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Tracks")
+            .id(egui::Id::new("tracks_window"))
             .resizable(true)
-            .default_size(240.0)
-            .show_inside(ui, |ui| {
+            .default_size([280.0, 500.0])
+            .show(ctx, |ui| {
                 ui.heading("Tracks");
 
                 ui.horizontal(|ui| {
@@ -484,35 +487,77 @@ impl OziApp {
             });
     }
 
-    fn show_diagnostics_overlay(&self, ctx: &egui::Context, anchor: egui::Pos2) {
-        let entries: Vec<_> = self.state.recent_diagnostics().rev().take(5).collect();
-        if entries.is_empty() {
+    fn show_console(&mut self, ctx: &egui::Context) {
+        // Toggle on tilde/backtick
+        if ctx.input(|i| i.key_pressed(egui::Key::Backtick)) {
+            self.console_open = !self.console_open;
+        }
+
+        if !self.console_open {
             return;
         }
 
-        egui::Area::new(egui::Id::new("diagnostics_overlay"))
-            .order(egui::Order::Foreground)
-            .pivot(egui::Align2::LEFT_BOTTOM)
-            .fixed_pos(anchor)
-            .interactable(false)
-            .show(ctx, |ui| {
+        let screen = ctx.content_rect();
+        let console_height = (screen.height() * 0.45).min(400.0);
+
+        egui::Window::new("Console")
+            .id(egui::Id::new("dev_console"))
+            .title_bar(false)
+            .resizable(false)
+            .collapsible(false)
+            .fixed_rect(egui::Rect::from_min_size(
+                egui::pos2(0.0, 0.0),
+                egui::vec2(screen.width(), console_height),
+            ))
+            .frame(
                 egui::Frame::new()
-                    .fill(egui::Color32::from_black_alpha(160))
-                    .corner_radius(egui::CornerRadius::same(6))
-                    .inner_margin(egui::Margin::same(8))
+                    .fill(egui::Color32::from_rgba_premultiplied(20, 20, 20, 230))
+                    .inner_margin(egui::Margin::same(6)),
+            )
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.monospace(
+                        egui::RichText::new("Console")
+                            .color(egui::Color32::from_gray(180))
+                            .strong(),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .small_button(
+                                egui::RichText::new("✕").color(egui::Color32::from_gray(160)),
+                            )
+                            .clicked()
+                        {
+                            self.console_open = false;
+                        }
+                        ui.monospace(
+                            egui::RichText::new("~ to toggle")
+                                .color(egui::Color32::from_gray(100))
+                                .small(),
+                        );
+                    });
+                });
+
+                ui.separator();
+
+                let available = ui.available_height();
+                egui::ScrollArea::vertical()
+                    .id_salt("console_scroll")
+                    .max_height(available)
+                    .stick_to_bottom(true)
                     .show(ui, |ui| {
-                        ui.set_max_width(520.0);
-                        for entry in entries {
+                        for entry in self.state.recent_diagnostics() {
                             let (color, prefix) = match entry.level() {
-                                DiagnosticLevel::Info => (egui::Color32::from_gray(210), ""),
+                                DiagnosticLevel::Info => (egui::Color32::from_gray(200), ""),
                                 DiagnosticLevel::Error => {
-                                    (egui::Color32::from_rgb(255, 110, 90), "⚠ ")
+                                    (egui::Color32::from_rgb(255, 100, 80), "[ERROR] ")
                                 }
                             };
                             ui.add(
                                 egui::Label::new(
                                     egui::RichText::new(format!("{}{}", prefix, entry.message()))
-                                        .small()
+                                        .monospace()
+                                        .size(11.0)
                                         .color(color),
                                 )
                                 .wrap(),
@@ -551,11 +596,9 @@ impl eframe::App for OziApp {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.show_project_sidebar(ui);
-        self.show_tracks_panel(ui);
+        self.show_tracks_panel(ui.ctx());
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            let panel_bottom_left = ui.max_rect().left_bottom() + egui::vec2(8.0, -8.0);
-
             ui.horizontal(|ui| {
                 ui.heading("ozi-rs");
                 ui.label(format!("Project: {}", self.state.project_name()));
@@ -639,7 +682,7 @@ impl eframe::App for OziApp {
                 ui.add(map);
             }
 
-            self.show_diagnostics_overlay(ui.ctx(), panel_bottom_left);
+            self.show_console(ui.ctx());
         });
     }
 }
