@@ -38,6 +38,7 @@ export interface AppStateDto {
   project_saved: boolean;
   status: string;
   busy: boolean;
+  downloading_maps: string[];
   projects: LizaProjectSummaryDto[];
   current_project: LizaProjectDto | null;
   active_map: ActiveMapDto | null;
@@ -66,6 +67,7 @@ export interface OziMetadataDto {
 }
 
 export interface DownloadProgressPayload {
+  package_name: string;
   downloaded_bytes: number;
   total_bytes?: number;
 }

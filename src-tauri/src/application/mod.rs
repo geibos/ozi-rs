@@ -11,7 +11,7 @@ use crate::infrastructure::import::{
 };
 use crate::infrastructure::lizaalert;
 use crate::infrastructure::persistence;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::fmt;
 use std::path::PathBuf;
 
@@ -136,7 +136,10 @@ struct LizaAlertState {
     active_map: Option<ActiveMapSelection>,
     diagnostics: VecDeque<DiagnosticEntry>,
     status: String,
+    /// True while project list or project metadata is loading (blocks re-entry).
     busy: bool,
+    /// Package names currently being downloaded (allows parallel map downloads).
+    downloading: HashSet<String>,
 }
 
 impl Default for AppState {
@@ -163,6 +166,7 @@ impl AppState {
                 )]),
                 status: "Load projects from maps.lizaalert.ru".to_owned(),
                 busy: false,
+                downloading: HashSet::new(),
             },
         }
     }
@@ -204,26 +208,34 @@ impl AppState {
         Some((summary, self.bundles_root.clone()))
     }
 
-    /// Returns `None` if busy or map/project not found; otherwise returns data for thread.
+    /// Returns `None` if map/project not found or this package is already downloading.
+    /// Multiple different packages can download in parallel.
     pub fn begin_open_map(&mut self, map_name: &str) -> Option<OpenMapRequest> {
-        if self.lizaalert.busy {
-            return None;
-        }
         let project = self.lizaalert.selected_project.clone()?;
         let map = project.maps.iter().find(|m| m.name == map_name)?.clone();
         let selection = lizaalert::build_active_map_selection(&project, &map, &self.bundles_root);
 
-        // If already local, handle synchronously
+        // If already local, handle synchronously (no dedup needed)
         if map.local_path.is_some() {
             return Some(OpenMapRequest::Local(selection));
         }
 
-        self.lizaalert.busy = true;
+        // Prevent duplicate download of the same package
+        if self.lizaalert.downloading.contains(&selection.package_name) {
+            return None;
+        }
+
+        self.lizaalert.downloading.insert(selection.package_name.clone());
         self.update_status(
             DiagnosticLevel::Info,
             format!("Downloading {}...", selection.package_name),
         );
         Some(OpenMapRequest::Download(selection))
+    }
+
+    /// Returns the set of package names currently being downloaded.
+    pub fn downloading_maps(&self) -> &HashSet<String> {
+        &self.lizaalert.downloading
     }
 
     /// Returns `None` if busy; otherwise sets busy and returns directory for thread.
@@ -270,8 +282,12 @@ impl AppState {
         }
     }
 
-    pub fn apply_map_downloaded(&mut self, result: Result<ActiveMapSelection, String>) {
-        self.lizaalert.busy = false;
+    pub fn apply_map_downloaded(
+        &mut self,
+        package_name: &str,
+        result: Result<ActiveMapSelection, String>,
+    ) {
+        self.lizaalert.downloading.remove(package_name);
         match result {
             Ok(selection) => {
                 let status = match self.register_active_map_layer(&selection) {
