@@ -43,6 +43,7 @@ export function updateDownloadProgress(payload: DownloadProgressPayload) {
 // UI-only state (not persisted)
 export const consoleOpen = writable(false);
 export const tracksPanelOpen = writable(true);
+export const bundleLoaderOpen = writable(false);
 export const selectedTheme = writable<string>(
   localStorage.getItem("theme") ?? "auto"
 );

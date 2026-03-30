@@ -1,66 +1,17 @@
 <script lang="ts">
-  import {
-    appState,
-    busy,
-    status,
-    projects,
-    currentProject,
-    activeMap,
-    tracksPanelOpen,
-    consoleOpen,
-    downloadingMaps,
-    downloadProgress,
-  } from "../lib/stores";
-  import {
-    loadProjects,
-    loadProject,
-    openSelectedMap,
-    openLocalBundle,
-    importGpx,
-    importPlt,
-    setBundlesRoot,
-    saveProject,
-    loadProjectFile,
-    undo,
-    redo,
-    revealBundle,
-  } from "../lib/api";
+  import { appState, status, activeMap, tracksPanelOpen, consoleOpen } from "../lib/stores";
+  import { importGpx, importPlt, saveProject, loadProjectFile, undo, redo, revealBundle } from "../lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
-
-  let projectFilter = $state("");
-  let selectedSlug = $state<string>("");
-
-  async function handleLoadProjects() {
-    await loadProjects();
-  }
-
-  async function handleSelectProject() {
-    if (selectedSlug) await loadProject(selectedSlug);
-  }
-
-  async function handleOpenMap(mapName: string) {
-    await openSelectedMap(mapName);
-  }
-
-  async function handleOpenBundle() {
-    const dir = await open({ directory: true, multiple: false });
-    if (dir) await openLocalBundle(dir as string);
-  }
+  import { openBundleLoader } from "../lib/windows";
 
   async function handleImportGpx() {
-    const path = await open({
-      multiple: false,
-      filters: [{ name: "GPX", extensions: ["gpx", "zip"] }],
-    });
+    const path = await open({ multiple: false, filters: [{ name: "GPX", extensions: ["gpx", "zip"] }] });
     if (path) await importGpx(path as string);
   }
 
   async function handleImportPlt() {
-    const path = await open({
-      multiple: false,
-      filters: [{ name: "PLT track", extensions: ["plt"] }],
-    });
+    const path = await open({ multiple: false, filters: [{ name: "PLT track", extensions: ["plt"] }] });
     if (path) await importPlt(path as string);
   }
 
@@ -73,16 +24,8 @@
   }
 
   async function handleOpen() {
-    const path = await open({
-      multiple: false,
-      filters: [{ name: "OZI Project", extensions: ["ozp"] }],
-    });
+    const path = await open({ multiple: false, filters: [{ name: "OZI Project", extensions: ["ozp"] }] });
     if (path) await loadProjectFile(path as string);
-  }
-
-  async function handleSetBundlesRoot() {
-    const dir = await open({ directory: true, multiple: false });
-    if (dir) await setBundlesRoot(dir as string);
   }
 </script>
 
@@ -97,89 +40,20 @@
     <div class="btn-row">
       <button onclick={handleOpen}>Open</button>
       <button onclick={handleSave}>Save</button>
-      <button onclick={undo}>↩</button>
-      <button onclick={redo}>↪</button>
+      <button onclick={undo} title="Undo">↩</button>
+      <button onclick={redo} title="Redo">↪</button>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">LizaAlert Maps</div>
-    <button class="full" onclick={handleLoadProjects} disabled={$busy}>
-      {$busy ? "Loading…" : "Refresh Projects"}
-    </button>
-
-    {#if $projects.length > 0}
-      {@const filtered = $projects.filter((p) =>
-        p.name.toLowerCase().includes(projectFilter.toLowerCase())
-      )}
-      <input
-        class="full"
-        type="search"
-        placeholder="Filter projects… ({$projects.length})"
-        bind:value={projectFilter}
-      />
-      <div class="project-list">
-        {#each filtered as p (p.slug)}
-          <button
-            class="project-item"
-            class:selected={selectedSlug === p.slug}
-            onclick={() => { selectedSlug = p.slug; handleSelectProject(); }}
-            disabled={$busy}
-          >{p.name}</button>
-        {:else}
-          <div class="empty-filter">No matches</div>
-        {/each}
-      </div>
-    {/if}
-
-    {#if $currentProject}
-      <div class="map-list">
-        {#each $currentProject.maps as m}
-          {@const isDownloading = $downloadingMaps.has(m.name)}
-          {@const progress = $downloadProgress.get(m.name)}
-          {@const pct = progress?.total_bytes
-            ? Math.round((progress.downloaded_bytes / progress.total_bytes) * 100)
-            : null}
-          <button
-            class="map-item"
-            class:downloading={isDownloading}
-            onclick={() => handleOpenMap(m.name)}
-            disabled={isDownloading}
-            title={m.name}
-          >
-            <div class="map-item-row">
-              <span class="map-name">{m.name}</span>
-              {#if isDownloading}
-                <span class="badge downloading-badge">
-                  {pct != null ? `${pct}%` : "…"}
-                </span>
-              {:else if m.downloaded}
-                <span class="badge cached">cached</span>
-              {:else}
-                <span class="badge remote">↓</span>
-              {/if}
-            </div>
-            {#if isDownloading}
-              <div class="progress-track">
-                <div
-                  class="progress-fill"
-                  style="width: {pct != null ? pct : 100}%"
-                  class:indeterminate={pct == null}
-                ></div>
-              </div>
-            {/if}
-          </button>
-        {/each}
-      </div>
-    {/if}
-
-    <button class="full" onclick={handleOpenBundle}>Open Local Bundle…</button>
-    <button class="full secondary" onclick={handleSetBundlesRoot}>Set Bundles Root…</button>
+    <div class="section-title">Map</div>
+    <button class="full primary" onclick={openBundleLoader}>Maps…</button>
 
     {#if $activeMap}
       <div class="active-map">
-        <div class="active-map-label">Active Map</div>
-        <div class="active-map-name">{$activeMap.project_name} / {$activeMap.package_name}</div>
+        <div class="active-map-label">Active</div>
+        <div class="active-map-name">{$activeMap.project_name}</div>
+        <div class="active-map-pkg">{$activeMap.package_name}</div>
         <button class="full secondary small" onclick={revealBundle}>Reveal in Finder</button>
       </div>
     {/if}
@@ -196,19 +70,22 @@
     </button>
   </div>
 
-  <div class="status-bar" class:error={$status.toLowerCase().includes("error") || $status.toLowerCase().includes("failed")}>
+  <div
+    class="status-bar"
+    class:error={$status.toLowerCase().includes("error") || $status.toLowerCase().includes("failed")}
+  >
     <span>{$status}</span>
     <button
       class="console-toggle"
       onclick={() => consoleOpen.update((v) => !v)}
-      title="Toggle console (backtick)"
+      title="Toggle console (`)"
     >›_</button>
   </div>
 </aside>
 
 <style>
   .sidebar {
-    width: 240px;
+    width: 200px;
     height: 100%;
     background: var(--ctp-mantle);
     border-right: 1px solid var(--ctp-surface0);
@@ -261,6 +138,14 @@
     text-align: left;
   }
 
+  button.primary {
+    background: var(--ctp-blue);
+    color: var(--ctp-base);
+    border-color: var(--ctp-blue);
+  }
+
+  button.primary:hover { filter: brightness(1.1); }
+
   button.secondary {
     background: transparent;
     border-color: var(--ctp-surface2);
@@ -270,94 +155,6 @@
   button.small {
     font-size: 11px;
     padding: 2px 6px;
-  }
-
-  select.full {
-    width: 100%;
-  }
-
-  .map-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    max-height: 160px;
-    overflow-y: auto;
-  }
-
-  .map-item {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    text-align: left;
-    font-size: 11px;
-    padding: 4px 6px;
-  }
-
-  .map-item.downloading {
-    opacity: 0.8;
-    cursor: default;
-  }
-
-  .map-item-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .map-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .progress-track {
-    height: 3px;
-    background: var(--ctp-surface1);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: var(--ctp-blue);
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
-
-  @keyframes indeterminate {
-    0%   { transform: translateX(-100%); width: 40%; }
-    100% { transform: translateX(350%);  width: 40%; }
-  }
-
-  .progress-fill.indeterminate {
-    width: 40% !important;
-    animation: indeterminate 1.2s ease-in-out infinite;
-  }
-
-  .badge {
-    font-size: 10px;
-    padding: 1px 4px;
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
-
-  .badge.cached {
-    background: var(--ctp-green);
-    color: var(--ctp-base);
-  }
-
-  .badge.remote {
-    background: var(--ctp-peach);
-    color: var(--ctp-base);
-  }
-
-  .badge.downloading-badge {
-    background: var(--ctp-blue);
-    color: var(--ctp-base);
-    font-variant-numeric: tabular-nums;
   }
 
   .active-map {
@@ -376,7 +173,16 @@
 
   .active-map-name {
     font-size: 11px;
+    font-weight: 500;
     color: var(--ctp-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .active-map-pkg {
+    font-size: 11px;
+    color: var(--ctp-subtext0);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -395,9 +201,7 @@
     min-height: 24px;
   }
 
-  .status-bar.error {
-    color: var(--ctp-red);
-  }
+  .status-bar.error { color: var(--ctp-red); }
 
   .status-bar span {
     flex: 1;
@@ -416,49 +220,5 @@
     flex-shrink: 0;
   }
 
-  .console-toggle:hover {
-    color: var(--ctp-text);
-  }
-
-  input[type="search"].full {
-    width: 100%;
-  }
-
-  .project-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .project-item {
-    width: 100%;
-    text-align: left;
-    font-size: 11px;
-    padding: 4px 6px;
-    background: transparent;
-    border: none;
-    border-radius: 3px;
-    color: var(--ctp-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .project-item:hover {
-    background: var(--ctp-surface0);
-  }
-
-  .project-item.selected {
-    background: var(--ctp-surface1);
-    color: var(--ctp-blue);
-  }
-
-  .empty-filter {
-    padding: 6px;
-    font-size: 11px;
-    color: var(--ctp-overlay1);
-    text-align: center;
-  }
+  .console-toggle:hover { color: var(--ctp-text); }
 </style>
