@@ -27,6 +27,7 @@ pub struct AppStateDto {
     pub project_saved: bool,
     pub status: String,
     pub busy: bool,
+    pub downloading_maps: Vec<String>,
     pub projects: Vec<LizaProjectSummaryDto>,
     pub current_project: Option<LizaProjectDto>,
     pub active_map: Option<ActiveMapDto>,
@@ -70,6 +71,7 @@ pub struct ActiveMapDto {
 // Events
 #[derive(serde::Serialize, Clone)]
 struct DownloadProgressPayload {
+    package_name: String,
     downloaded_bytes: u64,
     total_bytes: Option<u64>,
 }
@@ -139,6 +141,7 @@ pub fn get_app_state(state: State<SharedState>) -> AppStateDto {
         project_saved: s.project_file_path().is_some(),
         status: s.lizaalert_status().to_owned(),
         busy: s.lizaalert_busy(),
+        downloading_maps: s.downloading_maps().iter().cloned().collect(),
         projects,
         current_project,
         active_map,
@@ -261,17 +264,20 @@ pub fn open_selected_map(map_name: String, state: State<SharedState>, app: AppHa
         }
         OpenMapRequest::Download(selection) => {
             let state_arc = Arc::clone(&state);
+            let package_name = selection.package_name.clone();
             thread::spawn(move || {
+                let pkg = package_name.clone();
                 let result = lizaalert::download_map(selection, |progress| {
                     let _ = app.emit(
                         "download-progress",
                         DownloadProgressPayload {
+                            package_name: pkg.clone(),
                             downloaded_bytes: progress.downloaded_bytes,
                             total_bytes: progress.total_bytes,
                         },
                     );
                 });
-                state_arc.lock().unwrap().apply_map_downloaded(result);
+                state_arc.lock().unwrap().apply_map_downloaded(&package_name, result);
                 let _ = app.emit("state-changed", ());
             });
         }

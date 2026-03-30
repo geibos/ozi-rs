@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
-  import { appState } from "./lib/stores";
+  import { appState, updateDownloadProgress } from "./lib/stores";
   import MapView from "./components/MapView.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import TracksPanel from "./components/TracksPanel.svelte";
@@ -17,12 +17,9 @@
       await appState.refresh();
     });
 
-    // Download progress events (for progress bar, future feature)
     const unlistenProgress = await listen<DownloadProgressPayload>(
       "download-progress",
-      (_event) => {
-        // TODO: show download progress bar
-      }
+      (event) => updateDownloadProgress(event.payload)
     );
 
     return () => {

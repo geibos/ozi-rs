@@ -8,6 +8,8 @@
     activeMap,
     tracksPanelOpen,
     consoleOpen,
+    downloadingMaps,
+    downloadProgress,
   } from "../lib/stores";
   import {
     loadProjects,
@@ -133,16 +135,38 @@
     {#if $currentProject}
       <div class="map-list">
         {#each $currentProject.maps as m}
+          {@const isDownloading = $downloadingMaps.has(m.name)}
+          {@const progress = $downloadProgress.get(m.name)}
+          {@const pct = progress?.total_bytes
+            ? Math.round((progress.downloaded_bytes / progress.total_bytes) * 100)
+            : null}
           <button
             class="map-item"
+            class:downloading={isDownloading}
             onclick={() => handleOpenMap(m.name)}
-            disabled={$busy}
+            disabled={isDownloading}
+            title={m.name}
           >
-            <span class="map-name">{m.name}</span>
-            {#if m.downloaded}
-              <span class="badge cached">cached</span>
-            {:else}
-              <span class="badge remote">↓</span>
+            <div class="map-item-row">
+              <span class="map-name">{m.name}</span>
+              {#if isDownloading}
+                <span class="badge downloading-badge">
+                  {pct != null ? `${pct}%` : "…"}
+                </span>
+              {:else if m.downloaded}
+                <span class="badge cached">cached</span>
+              {:else}
+                <span class="badge remote">↓</span>
+              {/if}
+            </div>
+            {#if isDownloading}
+              <div class="progress-track">
+                <div
+                  class="progress-fill"
+                  style="width: {pct != null ? pct : 100}%"
+                  class:indeterminate={pct == null}
+                ></div>
+              </div>
             {/if}
           </button>
         {/each}
@@ -261,13 +285,25 @@
   }
 
   .map-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: left;
+    font-size: 11px;
+    padding: 4px 6px;
+  }
+
+  .map-item.downloading {
+    opacity: 0.8;
+    cursor: default;
+  }
+
+  .map-item-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 6px;
-    text-align: left;
-    font-size: 11px;
-    padding: 3px 6px;
   }
 
   .map-name {
@@ -275,6 +311,30 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .progress-track {
+    height: 3px;
+    background: var(--ctp-surface1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--ctp-blue);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  @keyframes indeterminate {
+    0%   { transform: translateX(-100%); width: 40%; }
+    100% { transform: translateX(350%);  width: 40%; }
+  }
+
+  .progress-fill.indeterminate {
+    width: 40% !important;
+    animation: indeterminate 1.2s ease-in-out infinite;
   }
 
   .badge {
@@ -292,6 +352,12 @@
   .badge.remote {
     background: var(--ctp-peach);
     color: var(--ctp-base);
+  }
+
+  .badge.downloading-badge {
+    background: var(--ctp-blue);
+    color: var(--ctp-base);
+    font-variant-numeric: tabular-nums;
   }
 
   .active-map {
