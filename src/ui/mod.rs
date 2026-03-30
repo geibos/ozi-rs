@@ -149,7 +149,10 @@ impl OziApp {
         let theme: CatppuccinFlavor = cc
             .storage
             .and_then(|s| eframe::get_value(s, STORAGE_KEY_THEME))
-            .unwrap_or(CatppuccinFlavor::Mocha);
+            .unwrap_or_else(|| match cc.egui_ctx.system_theme() {
+                Some(egui::Theme::Light) => CatppuccinFlavor::Latte,
+                _ => CatppuccinFlavor::Mocha,
+            });
         theme.apply(&cc.egui_ctx);
 
         Self {
