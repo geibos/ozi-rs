@@ -615,6 +615,7 @@ impl eframe::App for OziApp {
     }
 
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.theme.apply(ctx);
         self.state.poll_background_tasks();
         self.sync_active_map(ctx);
         self.fps_counter.tick();
