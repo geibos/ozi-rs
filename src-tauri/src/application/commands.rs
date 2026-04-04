@@ -2462,4 +2462,69 @@ mod tests {
 
         assert_eq!(project.track_layers()[0].tracks().len(), 0);
     }
+
+    #[test]
+    fn move_track_point_missing_layer_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let result = history.apply(
+            &mut project,
+            &ProjectCommand::move_track_point(
+                LayerId::new(999),
+                TrackId::new(1),
+                TrackSegmentId::new(1),
+                TrackPointId::new(1),
+                55.0,
+                37.0,
+                55.0,
+                37.0,
+            ),
+        );
+        assert!(result.is_err(), "expected Err when layer does not exist");
+    }
+
+    #[test]
+    fn rename_waypoint_missing_layer_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let result = history.apply(
+            &mut project,
+            &ProjectCommand::rename_waypoint(
+                LayerId::new(999),
+                WaypointId::new(1),
+                "Old",
+                "New",
+            ),
+        );
+        assert!(result.is_err(), "expected Err when waypoint layer does not exist");
+    }
+
+    #[test]
+    fn simplify_track_missing_track_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let cmd = ProjectCommand::SimplifyTrack {
+            layer_id: LayerId::new(999),
+            track_id: TrackId::new(1),
+            tolerance_km: 0.001,
+            removed: vec![(
+                TrackSegmentId::new(1),
+                0,
+                TrackPoint::new(TrackPointId::new(1), 55.0, 37.0),
+            )],
+        };
+        let result = history.apply(&mut project, &cmd);
+        assert!(result.is_err(), "expected Err when layer does not exist and removed is non-empty");
+    }
+
+    #[test]
+    fn create_empty_track_duplicate_id_or_missing_layer_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let result = history.apply(
+            &mut project,
+            &ProjectCommand::create_empty_track(LayerId::new(999), TrackId::new(1), "Ghost Track"),
+        );
+        assert!(result.is_err(), "expected Err when track layer does not exist");
+    }
 }
