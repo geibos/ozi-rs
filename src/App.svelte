@@ -7,6 +7,7 @@
   import Sidebar from "./components/Sidebar.svelte";
   import TracksPanel from "./components/TracksPanel.svelte";
   import TrackPointsPanel from "./components/TrackPointsPanel.svelte";
+  import WaypointsPanel from "./components/WaypointsPanel.svelte";
   import Console from "./components/Console.svelte";
   import type { DownloadProgressPayload } from "./lib/types";
 
@@ -39,6 +40,7 @@
 
 <TracksPanel />
 <TrackPointsPanel />
+<WaypointsPanel />
 <Console />
 
 <style>
