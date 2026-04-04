@@ -324,6 +324,72 @@ impl Track {
     pub fn point_count(&self) -> usize {
         self.segments.iter().map(|s| s.points().len()).sum()
     }
+
+    /// Remove a segment by id. Returns `(index, segment)` so undo can reinsert it.
+    pub fn remove_segment(
+        &mut self,
+        segment_id: u64,
+    ) -> Result<(usize, TrackSegment), crate::domain::ProjectLayerError> {
+        let sid = TrackSegmentId::new(segment_id);
+        let index = self.segments.iter().position(|s| s.id() == sid).ok_or(
+            crate::domain::ProjectLayerError::MissingTrackSegment {
+                layer_id: 0,
+                track_id: self.id.value(),
+                segment_id,
+            },
+        )?;
+        let removed = self.segments.remove(index);
+        Ok((index, removed))
+    }
+
+    /// Insert a segment at a given index (for undo of `remove_segment`).
+    pub fn insert_segment_at(&mut self, index: usize, segment: TrackSegment) {
+        let clamped = index.min(self.segments.len());
+        self.segments.insert(clamped, segment);
+    }
+
+    /// Join two adjacent segments: append all points from B into A, then remove B.
+    /// B must immediately follow A in the segments list (`index_b == index_a + 1`).
+    /// Returns the removed segment B so undo can split or reinsert it.
+    pub fn join_segments(
+        &mut self,
+        seg_id_a: u64,
+        seg_id_b: u64,
+    ) -> Result<TrackSegment, crate::domain::ProjectLayerError> {
+        let sid_a = TrackSegmentId::new(seg_id_a);
+        let sid_b = TrackSegmentId::new(seg_id_b);
+
+        let index_a = self.segments.iter().position(|s| s.id() == sid_a).ok_or(
+            crate::domain::ProjectLayerError::MissingTrackSegment {
+                layer_id: 0,
+                track_id: self.id.value(),
+                segment_id: seg_id_a,
+            },
+        )?;
+
+        let index_b = self.segments.iter().position(|s| s.id() == sid_b).ok_or(
+            crate::domain::ProjectLayerError::MissingTrackSegment {
+                layer_id: 0,
+                track_id: self.id.value(),
+                segment_id: seg_id_b,
+            },
+        )?;
+
+        if index_b != index_a + 1 {
+            return Err(crate::domain::ProjectLayerError::MissingTrackSegment {
+                layer_id: 0,
+                track_id: self.id.value(),
+                segment_id: seg_id_b,
+            });
+        }
+
+        // Remove B first (higher index), then drain its points into A.
+        let mut seg_b = self.segments.remove(index_b);
+        let points_b: Vec<TrackPoint> = seg_b.points_mut().drain(..).collect();
+        self.segments[index_a].points_mut().extend(points_b);
+
+        Ok(seg_b)
+    }
 }
 
 fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
@@ -491,6 +557,72 @@ mod tests {
         assert!(matches!(
             err,
             crate::domain::ProjectLayerError::MissingTrackPoint { point_id: 99, .. }
+        ));
+    }
+
+    fn make_track_with_two_segments() -> Track {
+        let mut track = Track::new(TrackId::new(1), "Route");
+        let mut seg_a = TrackSegment::new(TrackSegmentId::new(10));
+        seg_a.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
+        seg_a.add_point(TrackPoint::new(TrackPointId::new(2), 55.1, 37.1));
+        let mut seg_b = TrackSegment::new(TrackSegmentId::new(20));
+        seg_b.add_point(TrackPoint::new(TrackPointId::new(3), 55.2, 37.2));
+        seg_b.add_point(TrackPoint::new(TrackPointId::new(4), 55.3, 37.3));
+        track.add_segment(seg_a);
+        track.add_segment(seg_b);
+        track
+    }
+
+    #[test]
+    fn remove_segment_returns_correct_index_and_segment() {
+        let mut track = make_track_with_two_segments();
+
+        let (index, removed) = track.remove_segment(10).unwrap();
+
+        assert_eq!(index, 0);
+        assert_eq!(removed.id(), TrackSegmentId::new(10));
+        assert_eq!(track.segments().len(), 1);
+        assert_eq!(track.segments()[0].id(), TrackSegmentId::new(20));
+    }
+
+    #[test]
+    fn remove_segment_errors_on_missing_segment_id() {
+        let mut track = make_track_with_two_segments();
+
+        let err = track.remove_segment(99).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::MissingTrackSegment { segment_id: 99, .. }
+        ));
+    }
+
+    #[test]
+    fn join_segments_appends_b_points_into_a_and_removes_b() {
+        let mut track = make_track_with_two_segments();
+
+        let removed_b = track.join_segments(10, 20).unwrap();
+
+        assert_eq!(track.segments().len(), 1);
+        assert_eq!(track.segments()[0].id(), TrackSegmentId::new(10));
+        assert_eq!(track.segments()[0].points().len(), 4);
+        assert_eq!(track.segments()[0].points()[2].id(), TrackPointId::new(3));
+        assert_eq!(track.segments()[0].points()[3].id(), TrackPointId::new(4));
+        assert_eq!(removed_b.id(), TrackSegmentId::new(20));
+    }
+
+    #[test]
+    fn join_segments_errors_on_non_adjacent_segments() {
+        let mut track = Track::new(TrackId::new(1), "Route");
+        track.add_segment(TrackSegment::new(TrackSegmentId::new(10)));
+        track.add_segment(TrackSegment::new(TrackSegmentId::new(20)));
+        track.add_segment(TrackSegment::new(TrackSegmentId::new(30)));
+
+        let err = track.join_segments(10, 30).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::MissingTrackSegment { segment_id: 30, .. }
         ));
     }
 }

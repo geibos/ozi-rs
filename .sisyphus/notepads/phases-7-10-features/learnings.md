@@ -40,3 +40,20 @@
 - Drag coalescing behavior is safe when `apply_or_merge` only updates the last entry's `forward` command and keeps the original `reverse`, so undo returns to the pre-drag coordinates.
 - Add/remove command pairs for layers/entities allow reversible add operations while preserving the existing public command payloads for caller-facing variants.
 - Enforcing `MAX_STACK_DEPTH` by dropping the oldest undo delta keeps memory bounded and naturally leaves earliest operations non-undoable once the cap is exceeded.
+
+## [2026-04-04] Task: T6
+- `TrackSegment` point mutations (`move_point`, `remove_point`, `insert_point_at`, `split_at_point`, `points_mut`) reuse `ProjectLayerError::MissingTrackPoint` for all error returns; at segment level, `layer_id`/`track_id` are set to 0 as placeholders — the project-level wrappers re-map errors with proper full context IDs.
+- `split_at_point` takes a `new_segment_id: TrackSegmentId` parameter; the project-level `split_segment_in_layer` generates the new ID by scanning `track.segments()` for the max existing segment ID and adding 1.
+- Sibling module reference (`track.rs` → `crate::domain::ProjectLayerError` from `project.rs`) compiles cleanly in Rust — no circular dependency despite both files living in the same `domain` module.
+- `insert_point_at` uses the same `MissingTrackPoint` error variant for index-out-of-bounds since there is no separate bounds-check variant; `point_id` field carries the out-of-bounds index value for debugging.
+- Project-level wrapper methods call `track_segment_mut()` helper for traversal then delegate to segment method, remapping any error to the full-context variant.
+- 8 new tests in `track.rs #[cfg(test)] mod tests`: 4 success + 4 error cases; helper `make_segment_with_points()` used to reduce boilerplate.
+
+## [2026-04-04] Task: T7
+- `remove_segment` returns `(index, TrackSegment)` so undo can call `insert_segment_at(index, segment)` (also added on `Track`).
+- `join_segments(a, b)` requires `index_b == index_a + 1`; adjacency check uses `position()` on both IDs, then compares indices — non-adjacent returns `MissingTrackSegment` with `segment_id: seg_id_b` since that's the only applicable variant (no separate adjacency error exists).
+- `join_segments` removes B before draining its points into A to avoid borrow issues with two `&mut` references into the same vec; drains via `seg_b.points_mut().drain(..).collect()` then `extend`.
+- Project-level wrappers (`remove_segment_from_layer`, `join_segments_in_layer`) call `track_mut()` then delegate to `Track` method, remapping to full-context `MissingTrackSegment`.
+- `insert_segment_at` uses `.min(len)` clamping to avoid panics on out-of-bounds undo scenarios.
+- 4 new tests in `track.rs`: `remove_segment` success + error, `join_segments` success + non-adjacent error; helper `make_track_with_two_segments()` used for reuse.
+- Final test count: 101 (was 97 before T7).

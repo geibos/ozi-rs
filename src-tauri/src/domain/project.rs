@@ -558,6 +558,39 @@ impl Project {
                 point_id,
             })
     }
+
+    pub fn remove_segment_from_layer(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+    ) -> Result<(usize, TrackSegment), ProjectLayerError> {
+        let track = self.track_mut(layer_id, track_id)?;
+        track
+            .remove_segment(segment_id)
+            .map_err(|_| ProjectLayerError::MissingTrackSegment {
+                layer_id,
+                track_id,
+                segment_id,
+            })
+    }
+
+    pub fn join_segments_in_layer(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        seg_id_a: u64,
+        seg_id_b: u64,
+    ) -> Result<TrackSegment, ProjectLayerError> {
+        let track = self.track_mut(layer_id, track_id)?;
+        track.join_segments(seg_id_a, seg_id_b).map_err(|_| {
+            ProjectLayerError::MissingTrackSegment {
+                layer_id,
+                track_id,
+                segment_id: seg_id_b,
+            }
+        })
+    }
 }
 
 impl Default for Project {
