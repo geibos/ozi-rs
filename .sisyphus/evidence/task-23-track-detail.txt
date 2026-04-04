@@ -1,0 +1,13 @@
+Task 23: get_track_detail endpoint with DTOs and inline test
+
+Added to src-tauri/src/commands/mod.rs:
+- PointDetailDto { id, lat, lon, elevation, timestamp }
+- SegmentDetailDto { id, points }
+- TrackDetailDto { id, name, segments }
+- get_track_detail(state, layer_id, track_id) -> Result<TrackDetailDto, String>
+- #[cfg(test)] mod tests { test_get_track_detail() }
+
+Registered in src-tauri/src/lib.rs:
+- commands::get_track_detail
+
+Tests: 148 pass (1 new test added and passing)

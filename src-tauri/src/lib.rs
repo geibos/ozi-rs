@@ -48,6 +48,7 @@ pub fn run() {
             commands::delete_waypoint,
             commands::rename_waypoint,
             commands::simplify_track,
+            commands::get_track_detail,
             commands::reveal_bundle,
             commands::tiles::get_sqlite_tile,
             commands::tiles::get_ozi_tile,

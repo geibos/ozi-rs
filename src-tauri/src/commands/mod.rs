@@ -744,10 +744,139 @@ pub fn simplify_track(
     Ok(())
 }
 
+// ── Read endpoints ────────────────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct PointDetailDto {
+    pub id: u64,
+    pub lat: f64,
+    pub lon: f64,
+    pub elevation: Option<f32>,
+    pub timestamp: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+pub struct SegmentDetailDto {
+    pub id: u64,
+    pub points: Vec<PointDetailDto>,
+}
+
+#[derive(serde::Serialize)]
+pub struct TrackDetailDto {
+    pub id: u64,
+    pub name: String,
+    pub segments: Vec<SegmentDetailDto>,
+}
+
+#[tauri::command]
+pub fn get_track_detail(
+    state: State<SharedState>,
+    layer_id: u64,
+    track_id: u64,
+) -> Result<TrackDetailDto, String> {
+    use crate::domain::{LayerId, TrackId};
+    let app_state = lock_app_state(state.inner())?;
+    let lid = LayerId::new(layer_id);
+    let tid = TrackId::new(track_id);
+
+    let layer = app_state
+        .track_layers()
+        .iter()
+        .find(|l| l.id() == lid)
+        .ok_or_else(|| format!("track layer {layer_id} not found"))?;
+
+    let track = layer
+        .tracks()
+        .iter()
+        .find(|t| t.id() == tid)
+        .ok_or_else(|| format!("track {track_id} not found in layer {layer_id}"))?;
+
+    let segments = track
+        .segments()
+        .iter()
+        .map(|seg| SegmentDetailDto {
+            id: seg.id().value(),
+            points: seg
+                .points()
+                .iter()
+                .map(|pt| PointDetailDto {
+                    id: pt.id().value(),
+                    lat: pt.latitude(),
+                    lon: pt.longitude(),
+                    elevation: pt.elevation().map(|e| e as f32),
+                    timestamp: pt
+                        .timestamp()
+                        .map(|ts| ts.to_rfc3339()),
+                })
+                .collect(),
+        })
+        .collect();
+
+    Ok(TrackDetailDto {
+        id: track.id().value(),
+        name: track.name().to_owned(),
+        segments,
+    })
+}
+
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub fn reveal_bundle(state: State<SharedState>) -> Result<(), String> {
     lock_app_state(state.inner())?.reveal_active_bundle();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PointDetailDto, SegmentDetailDto, TrackDetailDto};
+    use crate::domain::{
+        Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
+    };
+
+    #[test]
+    fn test_get_track_detail() {
+        let track_id = TrackId::new(10);
+        let segment_id = TrackSegmentId::new(5);
+
+        let mut track = Track::new(track_id, "My Track");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
+        segment.add_point(TrackPoint::new(TrackPointId::new(2), 55.1, 37.1));
+        track.add_segment(segment);
+
+        let dto = TrackDetailDto {
+            id: track.id().value(),
+            name: track.name().to_owned(),
+            segments: track
+                .segments()
+                .iter()
+                .map(|s| SegmentDetailDto {
+                    id: s.id().value(),
+                    points: s
+                        .points()
+                        .iter()
+                        .map(|p| PointDetailDto {
+                            id: p.id().value(),
+                            lat: p.latitude(),
+                            lon: p.longitude(),
+                            elevation: p.elevation().map(|e| e as f32),
+                            timestamp: p.timestamp().map(|ts| ts.to_rfc3339()),
+                        })
+                        .collect(),
+                })
+                .collect(),
+        };
+
+        assert_eq!(dto.id, 10);
+        assert_eq!(dto.name, "My Track");
+        assert_eq!(dto.segments.len(), 1);
+        assert_eq!(dto.segments[0].id, 5);
+        assert_eq!(dto.segments[0].points.len(), 2);
+        assert_eq!(dto.segments[0].points[0].lat, 55.0);
+        assert_eq!(dto.segments[0].points[0].lon, 37.0);
+        assert_eq!(dto.segments[0].points[1].lat, 55.1);
+        assert!(dto.segments[0].points[0].elevation.is_none());
+        assert!(dto.segments[0].points[0].timestamp.is_none());
+    }
 }
