@@ -8,11 +8,10 @@ use crate::infrastructure::import::{
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::fs::{self, File};
-use std::io::{BufReader, Cursor, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
-const MOBILE_MAPS_DIR_URL: &str = "8-Android%26iOS/";
 const MOBILE_MAPS_DIR_NAME: &str = "8-Android&iOS";
 const PROJECT_EXTRACTED_DIR: &str = "extracted";
 
@@ -47,22 +46,6 @@ pub fn fetch_project_summaries() -> Result<Vec<LizaProjectSummary>, String> {
 
     projects.sort_by(|left, right| right.slug.cmp(&left.slug));
     Ok(projects)
-}
-
-pub fn fetch_project(summary: LizaProjectSummary) -> Result<LizaProject, String> {
-    let coordinates_url = format!("{}{}/2-Coordinates.txt", ROOT_URL, summary.slug);
-    let maps_url = format!("{}{}/{MOBILE_MAPS_DIR_URL}", ROOT_URL, summary.slug);
-
-    let coordinates_text = fetch_text(&coordinates_url)?;
-    let center = parse_center(&coordinates_text)?;
-    let maps_html = fetch_text(&maps_url)?;
-    let maps = parse_map_packages(&maps_html, &maps_url)?;
-
-    Ok(LizaProject {
-        summary,
-        center,
-        maps,
-    })
 }
 
 pub fn open_project<F>(
@@ -225,6 +208,7 @@ fn parse_center(text: &str) -> Result<MapCenter, String> {
     })
 }
 
+#[allow(dead_code)]
 fn parse_map_packages(html: &str, base_url: &str) -> Result<Vec<LizaMapPackage>, String> {
     let link_regex = Regex::new(r#"href="([^"]+\.sqlitedb)"[^>]*>([^<]+)</a>"#)
         .map_err(|err| err.to_string())?;
@@ -624,7 +608,11 @@ where
         .filter_map(|(p, _)| p.file_name()?.to_str())
         .collect();
     on_progress(ProjectOpenProgress {
-        message: format!("Extracting {} in parallel: {}", to_extract.len(), names.join(", ")),
+        message: format!(
+            "Extracting {} in parallel: {}",
+            to_extract.len(),
+            names.join(", ")
+        ),
     });
 
     // Extract all archives concurrently; progress callback is not called from threads
@@ -637,7 +625,9 @@ where
             .collect();
 
         for handle in handles {
-            if let Ok(Err(e)) = handle.join() && first_error.is_none() {
+            if let Ok(Err(e)) = handle.join()
+                && first_error.is_none()
+            {
                 first_error = Some(e);
             }
         }
