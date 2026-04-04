@@ -106,6 +106,7 @@ export interface SimplifiedSegmentPreview {
   id: number;
   original_count: number;
   simplified_count: number;
+  kept_points: PointDetail[];
 }
 
 export interface SimplifiedPreview {
