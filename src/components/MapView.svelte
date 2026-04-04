@@ -3,7 +3,7 @@
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
   import { appState, activeMap } from "../lib/stores";
-  import { getTracksGeojson } from "../lib/api";
+  import { getTracksGeojson, getOziMetadata } from "../lib/api";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { initTracksLayer, updateTracksLayer } from "../lib/maplibre/tracks-layer";
@@ -70,6 +70,15 @@
     map.addControl(new maplibregl.ScaleControl(), "bottom-left");
 
     map.on("load", () => {
+      map.addSource("osm", {
+        type: "raster",
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+      });
+      map.addLayer({ id: "osm-tiles", type: "raster", source: "osm" });
+
       initTracksLayer(map);
     });
 
@@ -82,49 +91,72 @@
 
   // When active map changes, update the raster tile source
   $effect(() => {
-    if (!map || !map.isStyleLoaded()) return;
-
     const am = $activeMap;
-    if (!am) return;
+    if (!am || !map) return;
 
-    // Remove old map source/layer
-    if (currentMapSourceId) {
-      if (map.getLayer("map-tiles")) map.removeLayer("map-tiles");
-      if (map.getSource(currentMapSourceId)) map.removeSource(currentMapSourceId);
+    async function applyActiveMap() {
+      // Remove old map source/layer
+      if (currentMapSourceId) {
+        if (map.getLayer("map-tiles")) map.removeLayer("map-tiles");
+        if (map.getSource(currentMapSourceId)) map.removeSource(currentMapSourceId);
+      }
+
+      const sourceId = "active-map";
+      currentMapSourceId = sourceId;
+
+      let fitBoundsTarget: [number, number, number, number] | null = null;
+
+      if (am.kind === "ozi") {
+        const meta = await getOziMetadata(am.local_path);
+        const sourceSpec: maplibregl.RasterSourceSpecification = {
+          type: "raster",
+          tiles: [`ozi://${am.local_path}/{z}/{x}/{y}`],
+          tileSize: 256,
+          // maxzoom enables overzoom (pixelated) when zooming past the map's native resolution.
+          // minzoom prevents requesting tiles when zoomed out too far.
+          maxzoom: meta.native_zoom,
+          minzoom: meta.min_zoom,
+        };
+        if (meta.bounds) {
+          sourceSpec.bounds = meta.bounds;
+          fitBoundsTarget = meta.bounds;
+        }
+        map.addSource(sourceId, sourceSpec);
+      } else {
+        map.addSource(sourceId, {
+          type: "raster",
+          tiles: [`sqlite://${am.local_path}/${am.base_zoom}/{z}/{x}/{y}`],
+          tileSize: 256,
+        });
+      }
+
+      // Insert below tracks layer
+      const tracksLayerId = map.getLayer("tracks-lines") ? "tracks-lines" : undefined;
+
+      map.addLayer(
+        {
+          id: "map-tiles",
+          type: "raster",
+          source: sourceId,
+          paint: { "raster-opacity": 1 },
+        },
+        tracksLayerId
+      );
+
+      if (fitBoundsTarget) {
+        map.fitBounds(fitBoundsTarget, { padding: 0, animate: true });
+      } else if (am.center_lat !== 0 || am.center_lon !== 0) {
+        map.flyTo({
+          center: [am.center_lon, am.center_lat],
+          zoom: am.base_zoom || 12,
+        });
+      }
     }
 
-    const sourceId = "active-map";
-    currentMapSourceId = sourceId;
-
-    const tileUrl =
-      am.kind === "sqlite"
-        ? `sqlite://${am.local_path}/${am.base_zoom}/{z}/{x}/{y}`
-        : `ozi://${am.local_path}/{z}/{x}/{y}`;
-
-    map.addSource(sourceId, {
-      type: "raster",
-      tiles: [tileUrl],
-      tileSize: 256,
-    });
-
-    // Insert below tracks layer
-    const tracksLayerId = map.getLayer("tracks-lines") ? "tracks-lines" : undefined;
-
-    map.addLayer(
-      {
-        id: "map-tiles",
-        type: "raster",
-        source: sourceId,
-        paint: { "raster-opacity": 1 },
-      },
-      tracksLayerId
-    );
-
-    if (am.center_lat !== 0 || am.center_lon !== 0) {
-      map.flyTo({
-        center: [am.center_lon, am.center_lat],
-        zoom: am.base_zoom || 12,
-      });
+    if (!map.isStyleLoaded()) {
+      map.once("load", applyActiveMap);
+    } else {
+      applyActiveMap();
     }
   });
 

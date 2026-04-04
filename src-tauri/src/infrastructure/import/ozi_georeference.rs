@@ -21,6 +21,18 @@ impl OziGeoreference {
         let py = lat * self.scale_y + self.offset_y;
         (px, py)
     }
+
+    /// Inverse of `lat_lon_to_pixel`: returns `(lat, lon)` for the given pixel coordinate.
+    pub fn pixel_to_lat_lon(&self, px: f64, py: f64) -> (f64, f64) {
+        let lon = (px - self.offset_x) / self.scale_x;
+        let lat = (py - self.offset_y) / self.scale_y;
+        (lat, lon)
+    }
+
+    /// Absolute number of level-0 pixels per degree of longitude.
+    pub fn pixels_per_lon_degree(&self) -> f64 {
+        self.scale_x.abs()
+    }
 }
 
 /// Parse OZI calibration point strings into an `OziGeoreference`.

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import { appState, updateDownloadProgress } from "./lib/stores";
+  import { loadProjects } from "./lib/api";
   import MapView from "./components/MapView.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import TracksPanel from "./components/TracksPanel.svelte";
@@ -9,8 +10,9 @@
   import type { DownloadProgressPayload } from "./lib/types";
 
   onMount(async () => {
-    // Initial state load
+    // Initial state load + auto-scan bundles root
     await appState.refresh();
+    loadProjects().catch(() => {}); // non-blocking; fails silently if root not set
 
     // Listen for backend state-change events
     const unlisten = await listen<void>("state-changed", async () => {

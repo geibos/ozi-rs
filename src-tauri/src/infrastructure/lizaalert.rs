@@ -8,7 +8,7 @@ use crate::infrastructure::import::{
 use regex::Regex;
 use reqwest::blocking::Client;
 use std::fs::{self, File};
-use std::io::{Cursor, Read, Write};
+use std::io::{BufReader, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
@@ -599,20 +599,54 @@ where
     let mut zip_files = Vec::new();
     collect_cached_zip_files(&source_root, &mut zip_files)?;
 
-    for zip_path in zip_files {
-        if !is_ozi_archive_file(&zip_path)? {
-            continue;
-        }
+    // Filter to archives that exist, are OZI archives, and haven't been extracted yet.
+    // is_ozi_archive_file now uses BufReader so no full file load.
+    let to_extract: Vec<(PathBuf, PathBuf)> = zip_files
+        .into_iter()
+        .filter_map(|zip_path| {
+            if !is_ozi_archive_file(&zip_path).unwrap_or(false) {
+                return None;
+            }
+            let dest = extraction_destination_for_archive(&extracted_root, &zip_path);
+            if dest.exists() {
+                return None;
+            }
+            Some((zip_path, dest))
+        })
+        .collect();
 
-        let destination = extraction_destination_for_archive(&extracted_root, &zip_path);
-        if destination.exists() {
-            continue;
-        }
+    if to_extract.is_empty() {
+        return Ok(());
+    }
 
-        on_progress(ProjectOpenProgress {
-            message: format!("Extracting {}", zip_path.display()),
-        });
-        extract_cached_archive(&zip_path, &destination)?;
+    let names: Vec<&str> = to_extract
+        .iter()
+        .filter_map(|(p, _)| p.file_name()?.to_str())
+        .collect();
+    on_progress(ProjectOpenProgress {
+        message: format!("Extracting {} in parallel: {}", to_extract.len(), names.join(", ")),
+    });
+
+    // Extract all archives concurrently; progress callback is not called from threads
+    // (it is not Send), so we collect errors and report them after joining.
+    let mut first_error: Option<String> = None;
+    std::thread::scope(|s| {
+        let handles: Vec<_> = to_extract
+            .iter()
+            .map(|(zip_path, dest)| s.spawn(|| extract_cached_archive(zip_path, dest)))
+            .collect();
+
+        for handle in handles {
+            if let Ok(Err(e)) = handle.join() {
+                if first_error.is_none() {
+                    first_error = Some(e);
+                }
+            }
+        }
+    });
+
+    if let Some(e) = first_error {
+        return Err(e);
     }
 
     Ok(())
@@ -641,8 +675,8 @@ fn collect_cached_zip_files(dir: &Path, output: &mut Vec<PathBuf>) -> Result<(),
 }
 
 fn is_ozi_archive_file(path: &Path) -> Result<bool, String> {
-    let bytes = fs::read(path).map_err(|err| err.to_string())?;
-    let entries = inventory_zip_entries(Cursor::new(bytes)).map_err(|err| err.to_string())?;
+    let file = File::open(path).map_err(|err| err.to_string())?;
+    let entries = inventory_zip_entries(BufReader::new(file)).map_err(|err| err.to_string())?;
 
     Ok(entries.iter().any(|entry| {
         matches!(
@@ -661,8 +695,8 @@ fn is_ozi_archive_file(path: &Path) -> Result<bool, String> {
 }
 
 fn extract_cached_archive(archive_path: &Path, destination: &Path) -> Result<(), String> {
-    let bytes = fs::read(archive_path).map_err(|err| err.to_string())?;
-    extract_zip_entries_to_directory(Cursor::new(bytes), destination)
+    let file = File::open(archive_path).map_err(|err| err.to_string())?;
+    extract_zip_entries_to_directory(BufReader::new(file), destination)
         .map_err(|err| err.to_string())?;
     Ok(())
 }

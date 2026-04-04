@@ -1,5 +1,5 @@
 use crate::infrastructure::import::{
-    open_ozi_raster_tile_source, parse_ozi_map_metadata, read_ozi_map_text,
+    open_ozi_raster_tile_source, parse_ozi_georeference, parse_ozi_map_metadata, read_ozi_map_text,
 };
 use rusqlite::OptionalExtension;
 use tauri::ipc::Response;
@@ -97,6 +97,44 @@ pub fn get_ozi_metadata(map_path: String) -> Result<serde_json::Value, String> {
         })
         .collect();
 
+    // Compute geographic bounds and zoom hints from georeference + level-0 dimensions.
+    let (bounds, native_zoom, min_zoom) =
+        if let Some(geo) = parse_ozi_georeference(metadata.calibration_points()) {
+            if let Some(lvl0) = source.levels().first() {
+                let w = lvl0.width() as f64;
+                let h = lvl0.height() as f64;
+
+                // Geographic corners of the raster (top-left pixel = (0,0))
+                let (lat_tl, lon_tl) = geo.pixel_to_lat_lon(0.0, 0.0);
+                let (lat_br, lon_br) = geo.pixel_to_lat_lon(w, h);
+                let min_lon = lon_tl.min(lon_br);
+                let max_lon = lon_tl.max(lon_br);
+                let min_lat = lat_tl.min(lat_br);
+                let max_lat = lat_tl.max(lat_br);
+
+                // Web zoom where 1 OZF2 level-0 pixel ≈ 1 screen pixel.
+                // At zoom z: 256 * 2^z pixels cover 360°, so pixels/degree = 256*2^z/360.
+                let pixels_per_deg = geo.pixels_per_lon_degree();
+                let native_zoom =
+                    ((pixels_per_deg * 360.0 / 256.0).log2().round() as u32).min(22);
+
+                // Min zoom: one step below where the full map fits in a single tile.
+                let lon_span = (max_lon - min_lon).max(0.001);
+                let min_zoom = ((360.0_f64 / lon_span).log2().ceil() as u32)
+                    .saturating_sub(1);
+
+                (
+                    serde_json::json!([min_lon, min_lat, max_lon, max_lat]),
+                    native_zoom,
+                    min_zoom,
+                )
+            } else {
+                (serde_json::Value::Null, 14u32, 0u32)
+            }
+        } else {
+            (serde_json::Value::Null, 14u32, 0u32)
+        };
+
     Ok(serde_json::json!({
         "map_path": map_path,
         "title": metadata.title(),
@@ -104,6 +142,9 @@ pub fn get_ozi_metadata(map_path: String) -> Result<serde_json::Value, String> {
         "datum": metadata.datum_name(),
         "calibration_points": metadata.calibration_points(),
         "levels": levels,
+        "bounds": bounds,
+        "native_zoom": native_zoom,
+        "min_zoom": min_zoom,
     }))
 }
 
@@ -121,6 +162,164 @@ fn web_to_db_zoom(web_z: u32, db_min: u32, db_max: u32, base_zoom: u32) -> Optio
         return None;
     }
     Some(db_min + (base_zoom - web_z))
+}
+
+// ── OZI projected tile delivery ───────────────────────────────────────────────
+
+/// Return a 256×256 PNG for the Web Mercator tile `(tx, ty, tz)` by reprojecting
+/// from the OZF2 raster.  All coordinate math happens here in Rust; the JS side
+/// only passes the standard MapLibre z/x/y values.
+///
+/// Algorithm:
+/// 1. Compute the lat/lon bounding box of the requested Web Mercator tile.
+/// 2. Map the bbox to OZF2 level-0 pixel coordinates via the affine georeference.
+/// 3. Pick the coarsest OZF2 zoom level whose detail is close to 1 OZF2 pixel
+///    per output pixel (minimises the number of tiles that must be decoded).
+/// 4. Stitch the OZF2 tiles that overlap the bbox into a scratch buffer.
+/// 5. Nearest-neighbour scale the scratch buffer into a 256×256 output image.
+/// 6. Return the output as a PNG.
+#[tauri::command]
+pub fn get_ozi_tile_projected(
+    map_path: String,
+    tx: u32,
+    ty: u32,
+    tz: u32,
+) -> Result<Response, String> {
+    let path = std::path::PathBuf::from(&map_path);
+    let contents = read_ozi_map_text(&path).map_err(|e| e.to_string())?;
+    let metadata = parse_ozi_map_metadata(&path, &contents).map_err(|e| e.to_string())?;
+    let geo = parse_ozi_georeference(metadata.calibration_points())
+        .ok_or_else(|| "failed to parse georeference".to_owned())?;
+    let source = open_ozi_raster_tile_source(&metadata).map_err(|e| e.to_string())?;
+
+    let levels = source.levels();
+    if levels.is_empty() {
+        return Err("no OZF2 levels".to_owned());
+    }
+
+    // Lat/lon corners of the Web Mercator tile (top-left and bottom-right)
+    let (lon_tl, lat_tl) = tile_corner_lat_lon(tx, ty, tz);
+    let (lon_br, lat_br) = tile_corner_lat_lon(tx + 1, ty + 1, tz);
+
+    // OZF2 level-0 pixel coordinates for the tile corners
+    let (px0_tl, py0_tl) = geo.lat_lon_to_pixel(lat_tl, lon_tl);
+    let (px0_br, py0_br) = geo.lat_lon_to_pixel(lat_br, lon_br);
+
+    // Pick the coarsest OZF2 level where ≈1 level pixel ≈ 1 output pixel.
+    // Scale = level-0 pixels per 256-px output side; level L covers 2^L level-0 px/px.
+    let span = (px0_br - px0_tl).abs().max((py0_br - py0_tl).abs());
+    let scale = (span / 256.0).max(1.0);
+    let level_idx = (scale.log2().floor() as usize).min(levels.len() - 1);
+    let level_div = 1u32 << level_idx;
+
+    let lvl = &levels[level_idx];
+    let tile_w = lvl.tile_width();
+    let tile_h = lvl.tile_height();
+    let map_w = lvl.width();  // actual width at this level (not padded)
+    let map_h = lvl.height();
+
+    // Scale pixel coords to the chosen level
+    let px_tl = px0_tl / level_div as f64;
+    let py_tl = py0_tl / level_div as f64;
+    let px_br = px0_br / level_div as f64;
+    let py_br = py0_br / level_div as f64;
+
+    // Bounds check: reject tiles that don't intersect the map at all
+    if px_tl >= map_w as f64 || px_br < 0.0 || py_tl >= map_h as f64 || py_br < 0.0 {
+        return Err("tile out of bounds".to_owned());
+    }
+
+    // Clamp to map bounds (partial coverage at edges)
+    let src_x0 = px_tl.max(0.0);
+    let src_y0 = py_tl.max(0.0);
+    let src_x1 = px_br.min(map_w as f64);
+    let src_y1 = py_br.min(map_h as f64);
+
+    // Range of OZF2 tiles to decode
+    let oz_tx0 = (src_x0 / tile_w as f64).floor() as u32;
+    let oz_ty0 = (src_y0 / tile_h as f64).floor() as u32;
+    let oz_tx1 = ((src_x1 / tile_w as f64).ceil() as u32).min(lvl.tile_columns());
+    let oz_ty1 = ((src_y1 / tile_h as f64).ceil() as u32).min(lvl.tile_rows());
+
+    if oz_tx1 <= oz_tx0 || oz_ty1 <= oz_ty0 {
+        return Err("empty OZF2 tile range".to_owned());
+    }
+
+    // Stitch all required OZF2 tiles into one RGBA scratch buffer
+    let stitch_w = (oz_tx1 - oz_tx0) * tile_w;
+    let stitch_h = (oz_ty1 - oz_ty0) * tile_h;
+    let mut stitched = vec![0u8; stitch_w as usize * stitch_h as usize * 4];
+
+    for oty in oz_ty0..oz_ty1 {
+        for otx in oz_tx0..oz_tx1 {
+            if let Ok(tile) = source.decode_rgba_tile(level_idx, otx, oty) {
+                let tw = tile.width();
+                let th = tile.height();
+                let px_data = tile.rgba_pixels();
+                let dst_x = (otx - oz_tx0) * tile_w;
+                let dst_y = (oty - oz_ty0) * tile_h;
+                for row in 0..th {
+                    let src_off = row as usize * tw as usize * 4;
+                    let dst_off = ((dst_y + row) * stitch_w + dst_x) as usize * 4;
+                    let len = tw as usize * 4;
+                    if src_off + len <= px_data.len() && dst_off + len <= stitched.len() {
+                        stitched[dst_off..dst_off + len]
+                            .copy_from_slice(&px_data[src_off..src_off + len]);
+                    }
+                }
+            }
+        }
+    }
+
+    // Pixel offset of the clamped source region within the stitch buffer
+    let crop_x = src_x0 - oz_tx0 as f64 * tile_w as f64;
+    let crop_y = src_y0 - oz_ty0 as f64 * tile_h as f64;
+    let crop_w = (src_x1 - src_x0).max(1.0);
+    let crop_h = (src_y1 - src_y0).max(1.0);
+
+    // Destination region within the 256×256 output tile
+    let total_w = (px_br - px_tl).abs().max(1.0);
+    let total_h = (py_br - py_tl).abs().max(1.0);
+    let dst_x0 = ((src_x0 - px_tl) * 256.0 / total_w).round() as u32;
+    let dst_y0 = ((src_y0 - py_tl) * 256.0 / total_h).round() as u32;
+    let dst_w = ((crop_w * 256.0 / total_w).round() as u32).min(256 - dst_x0);
+    let dst_h = ((crop_h * 256.0 / total_h).round() as u32).min(256 - dst_y0);
+
+    if dst_w == 0 || dst_h == 0 {
+        return Err("zero-size output tile".to_owned());
+    }
+
+    // Nearest-neighbour resample stitch → 256×256 output
+    let mut out_rgba = vec![0u8; 256 * 256 * 4];
+    for dy in 0..dst_h {
+        for dx in 0..dst_w {
+            let sx = (crop_x + dx as f64 * crop_w / dst_w as f64) as u32;
+            let sy = (crop_y + dy as f64 * crop_h / dst_h as f64) as u32;
+            let sx = sx.min(stitch_w - 1);
+            let sy = sy.min(stitch_h - 1);
+            let src_off = (sy * stitch_w + sx) as usize * 4;
+            let out_off = ((dst_y0 + dy) * 256 + (dst_x0 + dx)) as usize * 4;
+            if src_off + 4 <= stitched.len() {
+                out_rgba[out_off..out_off + 4].copy_from_slice(&stitched[src_off..src_off + 4]);
+            }
+        }
+    }
+
+    let png = encode_rgba_to_png(&out_rgba, 256, 256)?;
+    Ok(Response::new(png))
+}
+
+// ── Web Mercator helpers ──────────────────────────────────────────────────────
+
+/// Convert Web Mercator tile corner `(tx, ty)` at zoom `tz` to `(lon, lat)` degrees.
+fn tile_corner_lat_lon(tx: u32, ty: u32, tz: u32) -> (f64, f64) {
+    let n = (1u64 << tz) as f64;
+    let lon = tx as f64 / n * 360.0 - 180.0;
+    let lat = (std::f64::consts::PI * (1.0 - 2.0 * ty as f64 / n))
+        .sinh()
+        .atan()
+        .to_degrees();
+    (lon, lat)
 }
 
 // ── PNG encoding helper ───────────────────────────────────────────────────────

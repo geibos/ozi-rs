@@ -42,6 +42,7 @@ pub fn run() {
             commands::reveal_bundle,
             commands::tiles::get_sqlite_tile,
             commands::tiles::get_ozi_tile,
+            commands::tiles::get_ozi_tile_projected,
             commands::tiles::get_ozi_metadata,
         ])
         .run(tauri::generate_context!())
