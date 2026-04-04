@@ -11,6 +11,7 @@
   let mapEl: HTMLDivElement;
   let map: maplibregl.Map;
   let currentMapSourceId: string | null = null;
+  let appliedMapPath: string | null = null;
 
   // FPS counter (toggle with F3)
   let fpsVisible = $state(false);
@@ -93,8 +94,11 @@
   $effect(() => {
     const am = $activeMap;
     if (!am || !map) return;
+    if (am.local_path === appliedMapPath) return;
 
     async function applyActiveMap() {
+      appliedMapPath = am.local_path;
+
       // Remove old map source/layer
       if (currentMapSourceId) {
         if (map.getLayer("map-tiles")) map.removeLayer("map-tiles");
