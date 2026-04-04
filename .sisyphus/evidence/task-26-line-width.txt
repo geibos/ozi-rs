@@ -1,0 +1,12 @@
+Task 26: set_track_line_width handler
+
+Added to src-tauri/src/application/mod.rs:
+- set_track_line_width(layer_id, track_id, width: f32) - bypasses command stack (like set_track_color), clamps width to 0.5..=20.0
+
+Added to src-tauri/src/commands/mod.rs:
+- set_track_line_width: Tauri command delegating to AppState::set_track_line_width
+
+Registered in src-tauri/src/lib.rs:
+- commands::set_track_line_width
+
+Tests: 148 pass, 0 clippy warnings

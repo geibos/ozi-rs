@@ -770,6 +770,17 @@ impl AppState {
             })
     }
 
+    pub fn set_track_line_width(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        width: f32,
+    ) {
+        if let Ok(track) = self.project.track_mut(layer_id.value(), track_id.value()) {
+            track.style_mut().line_width = width.clamp(0.5, 20.0);
+        }
+    }
+
     pub fn export_layer_to_gpx(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
         let Some(layer) = self
             .project
