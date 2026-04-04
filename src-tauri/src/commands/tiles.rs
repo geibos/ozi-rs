@@ -13,7 +13,13 @@ use tauri::ipc::Response;
 /// Zoom range metadata comes from table `info`, columns `minzoom`/`maxzoom`.
 /// `base_zoom` is the web zoom level corresponding to db zoom 0 (highest detail).
 #[tauri::command]
-pub fn get_sqlite_tile(path: String, base_zoom: u32, z: u32, x: u32, y: u32) -> Result<Response, String> {
+pub fn get_sqlite_tile(
+    path: String,
+    base_zoom: u32,
+    z: u32,
+    x: u32,
+    y: u32,
+) -> Result<Response, String> {
     let conn = rusqlite::Connection::open(&path).map_err(|e| e.to_string())?;
 
     // Read zoom range from info table
@@ -64,11 +70,7 @@ pub fn get_ozi_tile(
         .decode_rgba_tile(level, tile_x, tile_y)
         .map_err(|e| e.to_string())?;
 
-    let png_bytes = encode_rgba_to_png(
-        tile.rgba_pixels(),
-        tile.width(),
-        tile.height(),
-    )?;
+    let png_bytes = encode_rgba_to_png(tile.rgba_pixels(), tile.width(), tile.height())?;
 
     Ok(Response::new(png_bytes))
 }
@@ -115,13 +117,11 @@ pub fn get_ozi_metadata(map_path: String) -> Result<serde_json::Value, String> {
                 // Web zoom where 1 OZF2 level-0 pixel ≈ 1 screen pixel.
                 // At zoom z: 256 * 2^z pixels cover 360°, so pixels/degree = 256*2^z/360.
                 let pixels_per_deg = geo.pixels_per_lon_degree();
-                let native_zoom =
-                    ((pixels_per_deg * 360.0 / 256.0).log2().round() as u32).min(22);
+                let native_zoom = ((pixels_per_deg * 360.0 / 256.0).log2().round() as u32).min(22);
 
                 // Min zoom: one step below where the full map fits in a single tile.
                 let lon_span = (max_lon - min_lon).max(0.001);
-                let min_zoom = ((360.0_f64 / lon_span).log2().ceil() as u32)
-                    .saturating_sub(1);
+                let min_zoom = ((360.0_f64 / lon_span).log2().ceil() as u32).saturating_sub(1);
 
                 (
                     serde_json::json!([min_lon, min_lat, max_lon, max_lat]),
@@ -209,13 +209,14 @@ pub fn get_ozi_tile_projected(
     // Scale = level-0 pixels per 256-px output side; level L covers 2^L level-0 px/px.
     let span = (px0_br - px0_tl).abs().max((py0_br - py0_tl).abs());
     let scale = (span / 256.0).max(1.0);
-    let level_idx = (scale.log2().floor() as usize).min(levels.len() - 1);
+    let max_valid_level = levels.len() - 1;
+    let level_idx = (scale.log2().floor() as usize).min(max_valid_level);
     let level_div = 1u32 << level_idx;
 
     let lvl = &levels[level_idx];
     let tile_w = lvl.tile_width();
     let tile_h = lvl.tile_height();
-    let map_w = lvl.width();  // actual width at this level (not padded)
+    let map_w = lvl.width(); // actual width at this level (not padded)
     let map_h = lvl.height();
 
     // Scale pixel coords to the chosen level
@@ -299,7 +300,7 @@ pub fn get_ozi_tile_projected(
             let sy = sy.min(stitch_h - 1);
             let src_off = (sy * stitch_w + sx) as usize * 4;
             let out_off = ((dst_y0 + dy) * 256 + (dst_x0 + dx)) as usize * 4;
-            if src_off + 4 <= stitched.len() {
+            if src_off + 4 <= stitched.len() && out_off + 4 <= out_rgba.len() {
                 out_rgba[out_off..out_off + 4].copy_from_slice(&stitched[src_off..src_off + 4]);
             }
         }
@@ -332,11 +333,8 @@ fn encode_rgba_to_png(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>, S
             .ok_or("failed to construct image buffer from RGBA pixels")?;
 
     let mut buf = Vec::new();
-    img.write_to(
-        &mut std::io::Cursor::new(&mut buf),
-        image::ImageFormat::Png,
-    )
-    .map_err(|e| e.to_string())?;
+    img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
 
     Ok(buf)
 }
@@ -422,10 +420,8 @@ mod tests {
     #[test]
     fn missing_tile_returns_none_not_error() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, image BLOB);",
-        )
-        .unwrap();
+        conn.execute_batch("CREATE TABLE tiles (x INTEGER, y INTEGER, z INTEGER, image BLOB);")
+            .unwrap();
 
         let data: Option<Vec<u8>> = conn
             .query_row(
