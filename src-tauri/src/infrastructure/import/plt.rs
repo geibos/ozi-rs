@@ -184,10 +184,10 @@ fn parse_plt_point(line: &str, point_id: u64) -> Option<TrackPoint> {
         if alt_m > -777.0 {
             point = point.with_elevation(alt_m);
         }
-    } else if let Some(alt_ft) = fields.get(3).and_then(|s| s.parse::<f64>().ok()) {
-        if alt_ft > -777.0 {
-            point = point.with_elevation(alt_ft * 0.3048);
-        }
+    } else if let Some(alt_ft) = fields.get(3).and_then(|s| s.parse::<f64>().ok())
+        && alt_ft > -777.0
+    {
+        point = point.with_elevation(alt_ft * 0.3048);
     }
 
     // Timestamp from OLE Automation date (field index 4), only if valid flag (field 5) == 1
@@ -196,14 +196,13 @@ fn parse_plt_point(line: &str, point_id: u64) -> Option<TrackPoint> {
         .and_then(|s| s.parse::<u8>().ok())
         .unwrap_or(0)
         == 1;
-    if date_valid {
-        if let Some(ts) = fields
+    if date_valid
+        && let Some(ts) = fields
             .get(4)
             .and_then(|s| s.parse::<f64>().ok())
             .and_then(ole_date_to_chrono)
-        {
-            point = point.with_timestamp(ts);
-        }
+    {
+        point = point.with_timestamp(ts);
     }
 
     Some(point)

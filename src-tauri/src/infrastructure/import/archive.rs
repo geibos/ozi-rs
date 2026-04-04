@@ -172,7 +172,7 @@ where
             .by_index(index)
             .map_err(ArchiveExtractError::ReadEntry)?;
 
-        let Some(relative_path) = entry.enclosed_name().map(PathBuf::from) else {
+        let Some(relative_path) = entry.enclosed_name() else {
             return Err(ArchiveExtractError::InvalidEntryPath(
                 entry.name().to_owned(),
             ));

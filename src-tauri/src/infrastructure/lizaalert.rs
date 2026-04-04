@@ -637,10 +637,8 @@ where
             .collect();
 
         for handle in handles {
-            if let Ok(Err(e)) = handle.join() {
-                if first_error.is_none() {
-                    first_error = Some(e);
-                }
+            if let Ok(Err(e)) = handle.join() && first_error.is_none() {
+                first_error = Some(e);
             }
         }
     });

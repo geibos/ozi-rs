@@ -284,7 +284,7 @@ mod tests {
 
         assert_eq!(
             error,
-            CommandError::ProjectLayer(ProjectLayerError::MissingWaypointLayer(LayerId::new(30)))
+            CommandError::ProjectLayer(ProjectLayerError::WaypointLayerUnavailable(LayerId::new(30)))
         );
         assert!(!history.can_undo());
     }
@@ -368,7 +368,7 @@ mod tests {
 
         assert_eq!(
             error,
-            CommandError::ProjectLayer(ProjectLayerError::MissingWaypoint(
+            CommandError::ProjectLayer(ProjectLayerError::WaypointNotFound(
                 layer_id,
                 WaypointId::new(99)
             ))
