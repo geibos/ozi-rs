@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appState, status, activeMap, tracksPanelOpen, trackPointsPanelOpen, waypointsPanelOpen, consoleOpen } from "../lib/stores";
+  import { appState, status, activeMap, tracksPanelOpen, trackPointsPanelOpen, waypointsPanelOpen, addWaypointMode, consoleOpen } from "../lib/stores";
   import { importGpx, importPlt, saveProject, loadProjectFile, undo, redo, revealBundle } from "../lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -78,6 +78,14 @@
     <button class="full" onclick={() => waypointsPanelOpen.update(v => !v)}>
       {$waypointsPanelOpen ? "Hide" : "Show"} Waypoints Panel
     </button>
+    <button
+      class="full"
+      class:active={$addWaypointMode}
+      onclick={() => addWaypointMode.update(v => !v)}
+      title="Click on the map to place a waypoint. Press Escape to cancel."
+    >
+      {$addWaypointMode ? "Cancel Add Waypoint" : "Add Waypoint"}
+    </button>
   </div>
 
   <div
@@ -155,6 +163,14 @@
   }
 
   button.primary:hover { filter: brightness(1.1); }
+
+  button.active {
+    background: var(--ctp-green);
+    color: var(--ctp-base);
+    border-color: var(--ctp-green);
+  }
+
+  button.active:hover { filter: brightness(1.1); }
 
   button.secondary {
     background: transparent;

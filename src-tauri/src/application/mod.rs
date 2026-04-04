@@ -5,7 +5,7 @@ pub use crate::infrastructure::import::PltImportError;
 pub use commands::{CommandError, CommandStack, ProjectCommand};
 pub use import::{ArchiveImportError, ArchiveImportReport};
 
-use crate::domain::{LayerId, Project, ProjectLayerError, TrackId, TrackPointId, TrackSegmentId, WaypointId};
+use crate::domain::{LayerId, Project, ProjectLayerError, TrackId, TrackPointId, TrackSegmentId, Waypoint, WaypointId};
 use crate::infrastructure::import::{
     OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
@@ -731,6 +731,38 @@ impl AppState {
         waypoint_id: WaypointId,
     ) -> Result<(), ProjectLayerError> {
         let cmd = commands::ProjectCommand::delete_waypoint(layer_id, waypoint_id);
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    pub fn apply_add_waypoint(
+        &mut self,
+        layer_id: LayerId,
+        lat: f64,
+        lon: f64,
+        name: String,
+    ) -> Result<(), ProjectLayerError> {
+        let new_id = {
+            let max_id = self
+                .project
+                .waypoint_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .map(|l| {
+                    l.waypoints()
+                        .iter()
+                        .map(|w| w.id().value())
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+            WaypointId::new(max_id + 1)
+        };
+        let waypoint = Waypoint::new(new_id, name, lat, lon);
+        let cmd = commands::ProjectCommand::add_waypoint(layer_id, waypoint);
         self.history
             .apply(&mut self.project, &cmd)
             .map_err(|e| match e {

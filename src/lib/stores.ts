@@ -62,6 +62,7 @@ export function updateDownloadProgress(payload: DownloadProgressPayload) {
 export const consoleOpen = writable(false);
 export const tracksPanelOpen = writable(true);
 export const waypointsPanelOpen = writable(false);
+export const addWaypointMode = writable(false);
 export const trackPointsPanelOpen = writable(false);
 export const editModeActive = writable(false);
 export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | null>(null);
