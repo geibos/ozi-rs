@@ -3,6 +3,8 @@ mod commands;
 mod domain;
 mod infrastructure;
 
+pub use infrastructure::export::plt::{ExportError as PltExportError, export_plt as export_track_plt};
+
 use commands::SharedState;
 use std::sync::{Arc, Mutex};
 
