@@ -97,6 +97,38 @@ impl LayerId {
     }
 }
 
+pub trait LayerIdLike {
+    fn into_u64(self) -> u64;
+}
+
+impl LayerIdLike for u64 {
+    fn into_u64(self) -> u64 {
+        self
+    }
+}
+
+impl LayerIdLike for LayerId {
+    fn into_u64(self) -> u64 {
+        self.value()
+    }
+}
+
+pub trait WaypointIdLike {
+    fn into_u64(self) -> u64;
+}
+
+impl WaypointIdLike for u64 {
+    fn into_u64(self) -> u64 {
+        self
+    }
+}
+
+impl WaypointIdLike for WaypointId {
+    fn into_u64(self) -> u64 {
+        self.value()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct MapLayer {
     id: LayerId,
@@ -221,6 +253,62 @@ impl WaypointLayer {
 
     pub fn add_waypoint(&mut self, waypoint: Waypoint) {
         self.waypoints.push(waypoint);
+    }
+
+    pub fn remove_waypoint(
+        &mut self,
+        waypoint_id: u64,
+    ) -> Result<(usize, Waypoint), ProjectLayerError> {
+        let Some(index) = self
+            .waypoints
+            .iter()
+            .position(|waypoint| waypoint.id().value() == waypoint_id)
+        else {
+            return Err(ProjectLayerError::WaypointNotFound(
+                self.id,
+                WaypointId::new(waypoint_id),
+            ));
+        };
+
+        Ok((index, self.waypoints.remove(index)))
+    }
+
+    pub fn rename_waypoint(
+        &mut self,
+        waypoint_id: u64,
+        new_name: String,
+    ) -> Result<String, ProjectLayerError> {
+        let Some(waypoint) = self
+            .waypoints
+            .iter_mut()
+            .find(|waypoint| waypoint.id().value() == waypoint_id)
+        else {
+            return Err(ProjectLayerError::WaypointNotFound(
+                self.id,
+                WaypointId::new(waypoint_id),
+            ));
+        };
+
+        Ok(waypoint.set_name(new_name))
+    }
+
+    pub fn set_waypoint_symbol(
+        &mut self,
+        waypoint_id: u64,
+        symbol: Option<String>,
+    ) -> Result<Option<String>, ProjectLayerError> {
+        let Some(waypoint) = self
+            .waypoints
+            .iter_mut()
+            .find(|waypoint| waypoint.id().value() == waypoint_id)
+        else {
+            return Err(ProjectLayerError::WaypointNotFound(
+                self.id,
+                WaypointId::new(waypoint_id),
+            ));
+        };
+
+        Ok(waypoint.set_symbol(symbol))
     }
 
     pub fn move_waypoint(
@@ -433,51 +521,72 @@ impl Project {
         Ok(())
     }
 
-    pub fn remove_waypoint_from_layer(
+    pub fn remove_waypoint_from_layer<L: LayerIdLike, W: WaypointIdLike>(
         &mut self,
-        layer_id: LayerId,
-        waypoint_id: WaypointId,
-    ) -> Result<(), ProjectLayerError> {
-        let Some(layer) = self
-            .waypoint_layers
-            .iter_mut()
-            .find(|layer| layer.id() == layer_id)
-        else {
-            return Err(ProjectLayerError::WaypointLayerUnavailable(layer_id));
-        };
-
-        let Some(index) = layer
-            .waypoints
-            .iter()
-            .position(|waypoint| waypoint.id() == waypoint_id)
-        else {
-            return Err(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id));
-        };
-
-        layer.waypoints.remove(index);
-        Ok(())
+        layer_id: L,
+        waypoint_id: W,
+    ) -> Result<(usize, Waypoint), ProjectLayerError> {
+        let layer_id = layer_id.into_u64();
+        let waypoint_id = waypoint_id.into_u64();
+        let layer = self.waypoint_layer_mut(layer_id)?;
+        layer.remove_waypoint(waypoint_id)
     }
 
-    pub fn move_waypoint_in_layer(
+    pub fn rename_waypoint_in_layer<L: LayerIdLike, W: WaypointIdLike>(
         &mut self,
-        layer_id: LayerId,
-        waypoint_id: WaypointId,
+        layer_id: L,
+        waypoint_id: W,
+        new_name: String,
+    ) -> Result<String, ProjectLayerError> {
+        let layer_id = layer_id.into_u64();
+        let waypoint_id = waypoint_id.into_u64();
+        let layer = self.waypoint_layer_mut(layer_id)?;
+        layer.rename_waypoint(waypoint_id, new_name)
+    }
+
+    pub fn set_waypoint_symbol_in_layer<L: LayerIdLike, W: WaypointIdLike>(
+        &mut self,
+        layer_id: L,
+        waypoint_id: W,
+        symbol: Option<String>,
+    ) -> Result<Option<String>, ProjectLayerError> {
+        let layer_id = layer_id.into_u64();
+        let waypoint_id = waypoint_id.into_u64();
+        let layer = self.waypoint_layer_mut(layer_id)?;
+        layer.set_waypoint_symbol(waypoint_id, symbol)
+    }
+
+    pub fn move_waypoint_in_layer<L: LayerIdLike, W: WaypointIdLike>(
+        &mut self,
+        layer_id: L,
+        waypoint_id: W,
         latitude: f64,
         longitude: f64,
     ) -> Result<(), ProjectLayerError> {
-        let Some(layer) = self
-            .waypoint_layers
-            .iter_mut()
-            .find(|layer| layer.id() == layer_id)
-        else {
-            return Err(ProjectLayerError::WaypointLayerUnavailable(layer_id));
-        };
+        let layer_id = layer_id.into_u64();
+        let waypoint_id = waypoint_id.into_u64();
+        let layer = self.waypoint_layer_mut(layer_id)?;
 
-        if layer.move_waypoint(waypoint_id, latitude, longitude) {
+        if layer.move_waypoint(WaypointId::new(waypoint_id), latitude, longitude) {
             return Ok(());
         }
 
-        Err(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))
+        Err(ProjectLayerError::WaypointNotFound(
+            LayerId::new(layer_id),
+            WaypointId::new(waypoint_id),
+        ))
+    }
+
+    fn waypoint_layer_mut(
+        &mut self,
+        layer_id: u64,
+    ) -> Result<&mut WaypointLayer, ProjectLayerError> {
+        self.waypoint_layers
+            .iter_mut()
+            .find(|layer| layer.id().value() == layer_id)
+            .ok_or(ProjectLayerError::WaypointLayerUnavailable(LayerId::new(
+                layer_id,
+            )))
     }
 
     pub fn move_point_in_layer(
@@ -802,7 +911,7 @@ mod tests {
             .unwrap();
 
         project
-            .move_waypoint_in_layer(layer_id, waypoint_id, 54.1, 27.8)
+            .move_waypoint_in_layer(layer_id.value(), waypoint_id.value(), 54.1, 27.8)
             .unwrap();
 
         assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 54.1);
@@ -819,12 +928,98 @@ mod tests {
         project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
 
         let error = project
-            .move_waypoint_in_layer(layer_id, WaypointId::new(99), 54.1, 27.8)
+            .move_waypoint_in_layer(layer_id.value(), 99, 54.1, 27.8)
             .unwrap_err();
 
         assert_eq!(
             error,
             ProjectLayerError::WaypointNotFound(layer_id, WaypointId::new(99))
+        );
+    }
+
+    #[test]
+    fn project_renames_and_symbols_waypoints_in_matching_layer() {
+        let mut project = Project::untitled();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+        project
+            .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667))
+            .unwrap();
+
+        assert_eq!(
+            project
+                .rename_waypoint_in_layer(
+                    layer_id.value(),
+                    waypoint_id.value(),
+                    "Base camp".to_owned()
+                )
+                .unwrap(),
+            "Camp"
+        );
+        assert_eq!(
+            project
+                .set_waypoint_symbol_in_layer(
+                    layer_id.value(),
+                    waypoint_id.value(),
+                    Some("Flag".to_owned())
+                )
+                .unwrap(),
+            None
+        );
+
+        let waypoint = &project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.name(), "Base camp");
+        assert_eq!(waypoint.symbol(), Some("Flag"));
+    }
+
+    #[test]
+    fn project_reports_missing_waypoint_when_renaming_or_removing() {
+        let mut project = Project::untitled();
+        let layer_id = LayerId::new(30);
+        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+
+        let rename_error = project
+            .rename_waypoint_in_layer(layer_id.value(), 99, "Base camp".to_owned())
+            .unwrap_err();
+        assert_eq!(
+            rename_error,
+            ProjectLayerError::WaypointNotFound(layer_id, WaypointId::new(99))
+        );
+
+        let remove_error = project
+            .remove_waypoint_from_layer(layer_id.value(), 99)
+            .unwrap_err();
+        assert_eq!(
+            remove_error,
+            ProjectLayerError::WaypointNotFound(layer_id, WaypointId::new(99))
+        );
+    }
+
+    #[test]
+    fn waypoint_layer_remove_waypoint_returns_index_and_waypoint_for_undo() {
+        let mut waypoint_layer = WaypointLayer::new(LayerId::new(30), "Waypoints");
+        waypoint_layer.add_waypoint(Waypoint::new(WaypointId::new(4), "Camp", 53.9, 27.5667));
+        waypoint_layer.add_waypoint(Waypoint::new(WaypointId::new(5), "Cache", 53.8, 27.7));
+        let expected = waypoint_layer.waypoints()[0].clone();
+
+        let (index, waypoint) = waypoint_layer.remove_waypoint(4).unwrap();
+
+        assert_eq!(index, 0);
+        assert_eq!(waypoint, expected);
+        assert_eq!(waypoint_layer.waypoints().len(), 1);
+        assert_eq!(waypoint_layer.waypoints()[0].id(), WaypointId::new(5));
+    }
+
+    #[test]
+    fn waypoint_layer_remove_waypoint_reports_missing_waypoint() {
+        let mut waypoint_layer = WaypointLayer::new(LayerId::new(30), "Waypoints");
+
+        let error = waypoint_layer.remove_waypoint(99).unwrap_err();
+
+        assert_eq!(
+            error,
+            ProjectLayerError::WaypointNotFound(LayerId::new(30), WaypointId::new(99))
         );
     }
 

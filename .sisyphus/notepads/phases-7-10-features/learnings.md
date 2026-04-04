@@ -63,3 +63,8 @@
 - `Project::remove_track_from_layer` should delegate to the layer helper instead of duplicating the search/removal logic.
 - Track-layer removal failures use `ProjectLayerError::MissingTrack { layer_id, track_id }`, keeping the project-level error shape consistent with existing nested lookup helpers.
 - Inline tests now cover both success and missing-track cases for direct layer removal and project-level removal.
+
+## [2026-04-04] Task: T9
+- Waypoint undo-friendly mutations should mirror track patterns: `Waypoint::set_name` and `Waypoint::set_symbol` return previous values, and `WaypointLayer::remove_waypoint` returns `(index, Waypoint)` for reinsert-based undo.
+- GPX waypoint symbol support maps cleanly through `gpx::Waypoint.symbol`; export should emit `<sym>` only when present, and import should preserve `None` vs `Some(...)` without validation.
+- Project-level waypoint helpers can stay thin wrappers over layer helpers; keeping the existing `WaypointNotFound` error variant was enough for full-context remapping.
