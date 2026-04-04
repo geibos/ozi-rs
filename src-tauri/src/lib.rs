@@ -58,6 +58,7 @@ pub fn run() {
             commands::get_waypoints,
             commands::get_simplified_preview,
             commands::reveal_bundle,
+            commands::export_track_plt,
             commands::tiles::get_sqlite_tile,
             commands::tiles::get_ozi_tile,
             commands::tiles::get_ozi_tile_projected,

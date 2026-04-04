@@ -437,6 +437,45 @@ pub fn export_gpx(
     Ok(())
 }
 
+#[tauri::command]
+pub fn export_track_plt(
+    layer_id: u64,
+    track_id: u64,
+    path: String,
+    state: State<SharedState>,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId};
+    use crate::infrastructure::export::plt::export_plt;
+
+    let app_state = lock_app_state(state.inner())?;
+    let lid = LayerId::new(layer_id);
+    let tid = TrackId::new(track_id);
+
+    let layer = app_state
+        .track_layers()
+        .iter()
+        .find(|l| l.id() == lid)
+        .ok_or_else(|| format!("track layer {layer_id} not found"))?;
+
+    let track = layer
+        .tracks()
+        .iter()
+        .find(|t| t.id() == tid)
+        .ok_or_else(|| format!("track {track_id} not found in layer {layer_id}"))?;
+
+    let style = track.style();
+    let [r, g, b, _a] = style.color;
+    let color: u32 = (r as u32) << 16 | (g as u32) << 8 | (b as u32);
+    let width = style.line_width as f64;
+
+    let mut file = std::fs::File::create(PathBuf::from(&path))
+        .map_err(|e| format!("failed to create file {path}: {e}"))?;
+
+    export_plt(track, color, width, &mut file).map_err(|e| format!("{e}"))?;
+
+    Ok(())
+}
+
 // ── Undo / redo ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -1032,6 +1071,28 @@ pub fn get_simplified_preview(
 pub fn reveal_bundle(state: State<SharedState>) -> Result<(), String> {
     lock_app_state(state.inner())?.reveal_active_bundle();
     Ok(())
+}
+
+// ── Track creation ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn create_empty_track(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    name: String,
+) -> Result<u64, String> {
+    use crate::domain::LayerId;
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    let track_id = app_state
+        .apply_create_empty_track(LayerId::new(layer_id), name)
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(track_id.value())
 }
 
 #[cfg(test)]

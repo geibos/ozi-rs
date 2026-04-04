@@ -1,6 +1,6 @@
 <script lang="ts">
   import { appState, tracksPanelOpen, selectedTrack, simplifyState } from "../lib/stores";
-  import { getTracksGeojson, renameTrack, toggleTrackVisible, exportGpx } from "../lib/api";
+  import { getTracksGeojson, renameTrack, toggleTrackVisible, exportGpx, exportTrackPlt } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import SimplifyPanel from "./SimplifyPanel.svelte";
 
@@ -61,6 +61,17 @@
       await exportGpx(track.layerId, path as string);
     }
   }
+
+  async function handleExportPlt(track: TrackFeature) {
+    const path = await open({
+      save: true,
+      defaultPath: `${track.name}.plt`,
+      filters: [{ name: "PLT", extensions: ["plt"] }],
+    } as Parameters<typeof open>[0]);
+    if (path) {
+      await exportTrackPlt(track.layerId, track.trackId, path as string);
+    }
+  }
 </script>
 
 {#if $tracksPanelOpen}
@@ -118,6 +129,11 @@
                     });
                   }}
                 >〰</button>
+                <button
+                  class="icon-btn"
+                  title="Export as PLT"
+                  onclick={() => handleExportPlt(track)}
+                >PLT</button>
               {/if}
               <button
                 class="icon-btn"
