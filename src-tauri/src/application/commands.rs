@@ -98,6 +98,12 @@ pub enum ProjectCommand {
         layer_id: LayerId,
         waypoint_id: WaypointId,
     },
+    RenameWaypoint {
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_name: String,
+        new_name: String,
+    },
     RenameTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -288,6 +294,20 @@ impl ProjectCommand {
         }
     }
 
+    pub fn rename_waypoint(
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_name: impl Into<String>,
+        new_name: impl Into<String>,
+    ) -> Self {
+        Self::RenameWaypoint {
+            layer_id,
+            waypoint_id,
+            old_name: old_name.into(),
+            new_name: new_name.into(),
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -440,6 +460,15 @@ impl ProjectCommand {
                 waypoint_id,
             } => {
                 project.remove_waypoint_from_layer(*layer_id, *waypoint_id)?;
+                Ok(())
+            }
+            Self::RenameWaypoint {
+                layer_id,
+                waypoint_id,
+                new_name,
+                ..
+            } => {
+                project.rename_waypoint_in_layer(*layer_id, *waypoint_id, new_name.clone())?;
                 Ok(())
             }
             Self::RenameTrack {
@@ -687,6 +716,17 @@ impl ProjectCommand {
                     waypoint,
                 }
             }
+            Self::RenameWaypoint {
+                layer_id,
+                waypoint_id,
+                old_name,
+                new_name,
+            } => Self::RenameWaypoint {
+                layer_id: *layer_id,
+                waypoint_id: *waypoint_id,
+                old_name: new_name.clone(),
+                new_name: old_name.clone(),
+            },
             Self::RenameTrack {
                 layer_id,
                 track_id,
@@ -1940,6 +1980,73 @@ mod tests {
                 WaypointId::new(99)
             ))
         );
+    }
+
+    #[test]
+    fn rename_waypoint_apply_changes_name() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::rename_waypoint(layer_id, waypoint_id, "Camp", "Base camp"),
+            )
+            .unwrap();
+
+        assert_eq!(project.waypoint_layers()[0].waypoints()[0].name(), "Base camp");
+    }
+
+    #[test]
+    fn rename_waypoint_undo_restores_old_name() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::rename_waypoint(layer_id, waypoint_id, "Camp", "Base camp"),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        assert_eq!(project.waypoint_layers()[0].waypoints()[0].name(), "Camp");
     }
 
     #[test]
