@@ -77,6 +77,19 @@ pub enum ProjectCommand {
         index: usize,
         point: TrackPoint,
     },
+    SplitSegment {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        new_segment_id: TrackSegmentId,
+    },
+    JoinSegments {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id_a: TrackSegmentId,
+        segment_id_b: TrackSegmentId,
+    },
     RenameTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -226,6 +239,22 @@ impl ProjectCommand {
         }
     }
 
+    pub fn split_segment(
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        new_segment_id: TrackSegmentId,
+    ) -> Self {
+        Self::SplitSegment {
+            layer_id,
+            track_id,
+            segment_id,
+            point_id,
+            new_segment_id,
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -316,6 +345,43 @@ impl ProjectCommand {
                     segment_id.value(),
                     *index,
                     point.clone(),
+                )?;
+                Ok(())
+            }
+            Self::SplitSegment {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                ..
+            } => {
+                let new_segment = project.split_segment_in_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id.value(),
+                    point_id.value(),
+                )?;
+
+                let track = project.track_mut(layer_id.value(), track_id.value())?;
+                let insert_index = track
+                    .segments()
+                    .iter()
+                    .position(|segment| segment.id() == *segment_id)
+                    .map_or(track.segments().len(), |idx| idx + 1);
+                track.insert_segment_at(insert_index, new_segment);
+                Ok(())
+            }
+            Self::JoinSegments {
+                layer_id,
+                track_id,
+                segment_id_a,
+                segment_id_b,
+            } => {
+                project.join_segments_in_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id_a.value(),
+                    segment_id_b.value(),
                 )?;
                 Ok(())
             }
@@ -482,6 +548,68 @@ impl ProjectCommand {
                 removed_index: 0,
                 removed_point: point.clone(),
             },
+            Self::SplitSegment {
+                layer_id,
+                track_id,
+                segment_id,
+                ..
+            } => {
+                let predicted_new_segment_id = project
+                    .track_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| layer.tracks().iter().find(|track| track.id() == *track_id))
+                    .and_then(|track| {
+                        track
+                            .segments()
+                            .iter()
+                            .map(|segment| segment.id().value())
+                            .max()
+                    })
+                    .map(|max_id| TrackSegmentId::new(max_id + 1))
+                    .unwrap_or(TrackSegmentId::new(1));
+
+                Self::JoinSegments {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    segment_id_a: *segment_id,
+                    segment_id_b: predicted_new_segment_id,
+                }
+            }
+            Self::JoinSegments {
+                layer_id,
+                track_id,
+                segment_id_a,
+                segment_id_b,
+            } => {
+                let split_point_id = project
+                    .track_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| {
+                        layer
+                            .tracks()
+                            .iter()
+                            .find(|track| track.id() == *track_id)
+                            .and_then(|track| {
+                                track
+                                    .segments()
+                                    .iter()
+                                    .find(|segment| segment.id() == *segment_id_a)
+                                    .and_then(|segment| segment.points().last())
+                            })
+                    })
+                    .map(|point| point.id())
+                    .unwrap_or(TrackPointId::new(0));
+
+                Self::SplitSegment {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    segment_id: *segment_id_a,
+                    point_id: split_point_id,
+                    new_segment_id: *segment_id_b,
+                }
+            }
             Self::RenameTrack {
                 layer_id,
                 track_id,
@@ -1295,6 +1423,137 @@ mod tests {
                 track_id: track_id.value(),
                 segment_id: segment_id.value(),
                 point_id: 10,
+            })
+        );
+    }
+
+    #[test]
+    fn split_segment_apply_creates_two_segments() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        let new_segment_id = TrackSegmentId::new(99);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(10), 53.9, 27.5));
+        segment.add_point(TrackPoint::new(TrackPointId::new(11), 54.0, 27.6));
+        segment.add_point(TrackPoint::new(TrackPointId::new(12), 54.1, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::split_segment(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(11),
+                    new_segment_id,
+                ),
+            )
+            .unwrap();
+
+        let segments = project.track_layers()[0].tracks()[0].segments();
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].id(), segment_id);
+        assert_eq!(segments[1].id(), TrackSegmentId::new(3));
+    }
+
+    #[test]
+    fn split_segment_undo_merges_back_to_one() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(10), 53.9, 27.5));
+        segment.add_point(TrackPoint::new(TrackPointId::new(11), 54.0, 27.6));
+        segment.add_point(TrackPoint::new(TrackPointId::new(12), 54.1, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::split_segment(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(11),
+                    TrackSegmentId::new(99),
+                ),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        let segments = project.track_layers()[0].tracks()[0].segments();
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].points().len(), 4);
+    }
+
+    #[test]
+    fn split_segment_missing_point_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(10), 53.9, 27.5));
+        segment.add_point(TrackPoint::new(TrackPointId::new(11), 54.0, 27.6));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        let error = history
+            .apply(
+                &mut project,
+                &ProjectCommand::split_segment(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(99),
+                    TrackSegmentId::new(100),
+                ),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            CommandError::ProjectLayer(ProjectLayerError::MissingTrackPoint {
+                layer_id: layer_id.value(),
+                track_id: track_id.value(),
+                segment_id: segment_id.value(),
+                point_id: 99,
             })
         );
     }
