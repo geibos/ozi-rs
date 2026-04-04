@@ -473,6 +473,91 @@ impl Project {
 
         Err(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))
     }
+
+    pub fn move_point_in_layer(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        point_id: u64,
+        lat: f64,
+        lon: f64,
+    ) -> Result<(f64, f64), ProjectLayerError> {
+        let segment = self.track_segment_mut(layer_id, track_id, segment_id)?;
+        segment
+            .move_point(point_id, lat, lon)
+            .map_err(|_| ProjectLayerError::MissingTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+            })
+    }
+
+    pub fn remove_point_from_layer(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        point_id: u64,
+    ) -> Result<(usize, TrackPoint), ProjectLayerError> {
+        let segment = self.track_segment_mut(layer_id, track_id, segment_id)?;
+        segment
+            .remove_point(point_id)
+            .map_err(|_| ProjectLayerError::MissingTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+            })
+    }
+
+    pub fn insert_point_in_layer(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        index: usize,
+        point: TrackPoint,
+    ) -> Result<(), ProjectLayerError> {
+        let segment = self.track_segment_mut(layer_id, track_id, segment_id)?;
+        segment
+            .insert_point_at(index, point)
+            .map_err(|_| ProjectLayerError::MissingTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id: index as u64,
+            })
+    }
+
+    pub fn split_segment_in_layer(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        point_id: u64,
+    ) -> Result<TrackSegment, ProjectLayerError> {
+        let new_id = {
+            let track = self.track_mut(layer_id, track_id)?;
+            let max_id = track
+                .segments()
+                .iter()
+                .map(|s| s.id().value())
+                .max()
+                .unwrap_or(0);
+            TrackSegmentId::new(max_id + 1)
+        };
+        let segment = self.track_segment_mut(layer_id, track_id, segment_id)?;
+        segment
+            .split_at_point(point_id, new_id)
+            .map_err(|_| ProjectLayerError::MissingTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+            })
+    }
 }
 
 impl Default for Project {
