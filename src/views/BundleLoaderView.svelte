@@ -1,14 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { listen } from "@tauri-apps/api/event";
   import {
     appState,
+    appendProjectsChunk,
     busy,
-    status,
-    projects,
     currentProject,
-    downloadingMaps,
     downloadProgress,
+    downloadingMaps,
+    projects,
+    projectsLoading,
+    status,
+    syncProjectsFromAppState,
     updateDownloadProgress,
   } from "../lib/stores";
   import {
@@ -19,21 +23,33 @@
     setBundlesRoot,
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
-  import type { DownloadProgressPayload } from "../lib/types";
+  import type { DownloadProgressPayload, LizaProjectSummaryDto } from "../lib/types";
 
   let projectFilter = $state("");
   let selectedSlug = $state("");
 
   onMount(async () => {
     await appState.refresh();
+    syncProjectsFromAppState(get(appState));
 
-    const unlisten = await listen<void>("state-changed", () => appState.refresh());
+    const unlisten = await listen<void>("state-changed", async () => {
+      await appState.refresh();
+      const latest = get(appState);
+      syncProjectsFromAppState(latest);
+      if (latest && !latest.busy) {
+        projectsLoading.set(false);
+      }
+    });
     const unlistenProgress = await listen<DownloadProgressPayload>(
       "download-progress",
       (e) => updateDownloadProgress(e.payload)
     );
+    const unlistenProjectsChunk = await listen<LizaProjectSummaryDto[]>(
+      "projects-chunk",
+      (e) => appendProjectsChunk(e.payload)
+    );
 
-    return () => { unlisten(); unlistenProgress(); };
+    return () => { unlisten(); unlistenProgress(); unlistenProjectsChunk(); };
   });
 
   const filtered = $derived(
@@ -43,6 +59,7 @@
   );
 
   async function handleRefresh() {
+    projectsLoading.set(true);
     await loadProjects();
   }
 
@@ -83,12 +100,20 @@
       </button>
     </div>
 
-    <input
-      class="filter-input"
-      type="search"
-      placeholder="Filter… ({$projects.length})"
-      bind:value={projectFilter}
-    />
+    <div class="filter-row">
+      <input
+        class="filter-input"
+        type="search"
+        placeholder="Filter…"
+        bind:value={projectFilter}
+      />
+      <span class="filter-count">
+        ({$projects.length})
+        {#if $projectsLoading}
+          <span class="spinner"></span>
+        {/if}
+      </span>
+    </div>
 
     <div class="list">
       {#each filtered as p (p.slug)}
@@ -242,14 +267,29 @@
   .refresh-btn:hover { color: var(--ctp-text); }
 
   .filter-input {
-    margin: 6px 8px;
-    width: calc(100% - 16px);
+    width: 100%;
     font-size: 12px;
     padding: 4px 8px;
     background: var(--ctp-mantle);
     border: 1px solid var(--ctp-surface1);
     border-radius: 4px;
     color: var(--ctp-text);
+    flex-shrink: 0;
+  }
+
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 8px;
+  }
+
+  .filter-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--ctp-overlay1);
     flex-shrink: 0;
   }
 
