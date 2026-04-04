@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { appState, trackPointsPanelOpen, selectedTrack, selectedPointId } from "../lib/stores";
+  import {
+    appState,
+    editModeActive,
+    trackPointsPanelOpen,
+    selectedTrack,
+    selectedPointId,
+  } from "../lib/stores";
   import { getTrackDetail } from "../lib/api";
   import type { TrackDetail } from "../lib/types";
 
@@ -28,13 +34,27 @@
   function handlePointClick(id: number) {
     selectedPointId.set(BigInt(id));
   }
+
+  function toggleEditMode() {
+    if (!$selectedTrack) return;
+    editModeActive.update((current) => !current);
+  }
 </script>
 
 {#if $trackPointsPanelOpen}
   <div class="panel">
     <div class="panel-header">
       <span>Track Points</span>
-      <button onclick={() => trackPointsPanelOpen.set(false)}>✕</button>
+      <div class="header-actions">
+        <button
+          class:active-edit={$editModeActive}
+          disabled={!$selectedTrack}
+          onclick={toggleEditMode}
+        >
+          {$editModeActive ? "Stop Edit" : "Edit Mode"}
+        </button>
+        <button onclick={() => trackPointsPanelOpen.set(false)}>✕</button>
+      </div>
     </div>
     <div class="panel-body">
       {#if !$selectedTrack}
@@ -117,6 +137,31 @@
     border: none;
     color: var(--ctp-overlay1);
     padding: 0 2px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .header-actions button {
+    font-size: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--ctp-surface1);
+    padding: 2px 6px;
+    color: var(--ctp-text);
+    background: var(--ctp-surface0);
+  }
+
+  .header-actions button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .header-actions .active-edit {
+    border-color: var(--ctp-green);
+    color: var(--ctp-green);
   }
 
   .panel-body {

@@ -63,6 +63,7 @@ export const consoleOpen = writable(false);
 export const tracksPanelOpen = writable(true);
 export const waypointsPanelOpen = writable(false);
 export const trackPointsPanelOpen = writable(false);
+export const editModeActive = writable(false);
 export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | null>(null);
 export const selectedWaypointId: import("svelte/store").Writable<bigint | null> = writable(null);
 export const selectedPointId = writable<bigint | null>(null);
