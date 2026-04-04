@@ -210,6 +210,22 @@ impl ProjectCommand {
         }
     }
 
+    pub fn insert_track_point(
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        index: usize,
+        point: TrackPoint,
+    ) -> Self {
+        Self::InsertTrackPoint {
+            layer_id,
+            track_id,
+            segment_id,
+            index,
+            point,
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -1152,6 +1168,133 @@ mod tests {
                 track_id: track_id.value(),
                 segment_id: segment_id.value(),
                 point_id: 99,
+            })
+        );
+    }
+
+    #[test]
+    fn insert_track_point_apply_adds_point_at_index() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(3), 53.9, 27.5667));
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 54.0, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::insert_track_point(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    1,
+                    TrackPoint::new(TrackPointId::new(20), 53.95, 27.63),
+                ),
+            )
+            .unwrap();
+
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 3);
+        assert_eq!(points[1].id(), TrackPointId::new(20));
+    }
+
+    #[test]
+    fn insert_track_point_undo_removes_inserted_point() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(3), 53.9, 27.5667));
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 54.0, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::insert_track_point(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    1,
+                    TrackPoint::new(TrackPointId::new(20), 53.95, 27.63),
+                ),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 2);
+        assert_eq!(points[0].id(), TrackPointId::new(3));
+        assert_eq!(points[1].id(), TrackPointId::new(4));
+    }
+
+    #[test]
+    fn insert_track_point_out_of_bounds_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(3), 53.9, 27.5667));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        let error = history
+            .apply(
+                &mut project,
+                &ProjectCommand::insert_track_point(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    10,
+                    TrackPoint::new(TrackPointId::new(20), 53.95, 27.63),
+                ),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            CommandError::ProjectLayer(ProjectLayerError::MissingTrackPoint {
+                layer_id: layer_id.value(),
+                track_id: track_id.value(),
+                segment_id: segment_id.value(),
+                point_id: 10,
             })
         );
     }
