@@ -94,6 +94,10 @@ pub enum ProjectCommand {
         layer_id: LayerId,
         track_id: TrackId,
     },
+    DeleteWaypoint {
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+    },
     RenameTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -277,6 +281,13 @@ impl ProjectCommand {
         Self::DeleteTrack { layer_id, track_id }
     }
 
+    pub fn delete_waypoint(layer_id: LayerId, waypoint_id: WaypointId) -> Self {
+        Self::DeleteWaypoint {
+            layer_id,
+            waypoint_id,
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -422,6 +433,13 @@ impl ProjectCommand {
             }
             Self::DeleteTrack { layer_id, track_id } => {
                 project.remove_track_from_layer(*layer_id, *track_id)?;
+                Ok(())
+            }
+            Self::DeleteWaypoint {
+                layer_id,
+                waypoint_id,
+            } => {
+                project.remove_waypoint_from_layer(*layer_id, *waypoint_id)?;
                 Ok(())
             }
             Self::RenameTrack {
@@ -645,6 +663,28 @@ impl ProjectCommand {
                 Self::AddTrack {
                     layer_id: *layer_id,
                     track,
+                }
+            }
+            Self::DeleteWaypoint {
+                layer_id,
+                waypoint_id,
+            } => {
+                let waypoint = project
+                    .waypoint_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| {
+                        layer
+                            .waypoints()
+                            .iter()
+                            .find(|waypoint| waypoint.id() == *waypoint_id)
+                    })
+                    .cloned()
+                    .unwrap_or_else(|| Waypoint::new(*waypoint_id, "", 0.0, 0.0));
+
+                Self::AddWaypoint {
+                    layer_id: *layer_id,
+                    waypoint,
                 }
             }
             Self::RenameTrack {
@@ -1798,6 +1838,107 @@ mod tests {
                 layer_id: layer_id.value(),
                 track_id: 99,
             })
+        );
+    }
+
+    #[test]
+    fn delete_waypoint_apply_removes_waypoint() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_waypoint(layer_id, waypoint_id),
+            )
+            .unwrap();
+
+        assert!(project.waypoint_layers()[0].waypoints().is_empty());
+    }
+
+    #[test]
+    fn delete_waypoint_undo_restores_with_all_fields() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_waypoint(layer_id, waypoint_id),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        assert_eq!(project.waypoint_layers()[0].waypoints().len(), 1);
+        let restored = &project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(restored.id(), waypoint_id);
+        assert_eq!(restored.name(), "Camp");
+        assert_eq!(restored.latitude(), 53.9);
+        assert_eq!(restored.longitude(), 27.5667);
+    }
+
+    #[test]
+    fn delete_waypoint_missing_waypoint_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+
+        let error = history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_waypoint(layer_id, WaypointId::new(99)),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            CommandError::ProjectLayer(ProjectLayerError::WaypointNotFound(
+                layer_id,
+                WaypointId::new(99)
+            ))
         );
     }
 
