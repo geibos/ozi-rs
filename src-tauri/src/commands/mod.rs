@@ -495,7 +495,6 @@ pub fn redo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
 // ── Track mutations ───────────────────────────────────────────────────────────
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn rename_track(
     layer_id: u64,
     track_id: u64,
@@ -504,17 +503,13 @@ pub fn rename_track(
     app: AppHandle,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(app_state) => app_state,
-        Err(err) => return Err(err),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state.rename_track(LayerId::new(layer_id), TrackId::new(track_id), new_name);
     let _ = app.emit("state-changed", ());
     Ok(())
 }
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn set_track_color(
     layer_id: u64,
     track_id: u64,
@@ -523,17 +518,13 @@ pub fn set_track_color(
     app: AppHandle,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(app_state) => app_state,
-        Err(err) => return Err(err),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state.set_track_color(LayerId::new(layer_id), TrackId::new(track_id), color);
     let _ = app.emit("state-changed", ());
     Ok(())
 }
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn set_waypoint_symbol(
     layer_id: u64,
     waypoint_id: u64,
@@ -542,17 +533,13 @@ pub fn set_waypoint_symbol(
     app: AppHandle,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, WaypointId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(app_state) => app_state,
-        Err(err) => return Err(err),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state.set_waypoint_symbol(LayerId::new(layer_id), WaypointId::new(waypoint_id), symbol);
     let _ = app.emit("state-changed", ());
     Ok(())
 }
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn toggle_track_visible(
     layer_id: u64,
     track_id: u64,
@@ -560,10 +547,7 @@ pub fn toggle_track_visible(
     app: AppHandle,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(app_state) => app_state,
-        Err(err) => return Err(err),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state.toggle_track_visible(LayerId::new(layer_id), TrackId::new(track_id));
     let _ = app.emit("state-changed", ());
     Ok(())
@@ -647,7 +631,6 @@ pub fn insert_track_point(
 }
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn split_segment(
     state: State<SharedState>,
     app: AppHandle,
@@ -657,10 +640,7 @@ pub fn split_segment(
     point_id: u64,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId, TrackPointId, TrackSegmentId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(s) => s,
-        Err(e) => return Err(e),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state
         .apply_split_segment(
             LayerId::new(layer_id),
@@ -674,7 +654,6 @@ pub fn split_segment(
 }
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn join_segments(
     state: State<SharedState>,
     app: AppHandle,
@@ -684,10 +663,7 @@ pub fn join_segments(
     segment_id_b: u64,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId, TrackSegmentId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(s) => s,
-        Err(e) => return Err(e),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state
         .apply_join_segments(
             LayerId::new(layer_id),
@@ -778,7 +754,6 @@ pub fn move_waypoint(
 }
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn add_waypoint(
     state: State<SharedState>,
     app: AppHandle,
@@ -788,10 +763,7 @@ pub fn add_waypoint(
     name: String,
 ) -> Result<(), String> {
     use crate::domain::LayerId;
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(s) => s,
-        Err(e) => return Err(e),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state
         .apply_add_waypoint(LayerId::new(layer_id), lat, lon, name)
         .map_err(|e| format!("{e}"))?;
@@ -802,7 +774,6 @@ pub fn add_waypoint(
 // ── Track simplification ──────────────────────────────────────────────────────
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn simplify_track(
     state: State<SharedState>,
     app: AppHandle,
@@ -811,10 +782,7 @@ pub fn simplify_track(
     tolerance: f64,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(s) => s,
-        Err(e) => return Err(e),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state
         .apply_simplify_track(LayerId::new(layer_id), TrackId::new(track_id), tolerance)
         .map_err(|e| format!("{e}"))?;
@@ -825,7 +793,6 @@ pub fn simplify_track(
 // ── Track style ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
-#[allow(clippy::question_mark)]
 pub fn set_track_line_width(
     state: State<SharedState>,
     app: AppHandle,
@@ -834,10 +801,7 @@ pub fn set_track_line_width(
     width: f32,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    let mut app_state = match lock_app_state(state.inner()) {
-        Ok(s) => s,
-        Err(e) => return Err(e),
-    };
+    let mut app_state = lock_app_state(state.inner())?;
     app_state.set_track_line_width(LayerId::new(layer_id), TrackId::new(track_id), width);
     let _ = app.emit("state-changed", ());
     Ok(())
