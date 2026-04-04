@@ -674,6 +674,53 @@ pub fn delete_track(
     Ok(())
 }
 
+// ── Waypoint mutations ────────────────────────────────────────────────────────
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn delete_waypoint(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    waypoint_id: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_delete_waypoint(LayerId::new(layer_id), WaypointId::new(waypoint_id))
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn rename_waypoint(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    waypoint_id: u64,
+    new_name: String,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_rename_waypoint(
+            LayerId::new(layer_id),
+            WaypointId::new(waypoint_id),
+            new_name,
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]
