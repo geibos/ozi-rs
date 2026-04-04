@@ -1,0 +1,13 @@
+Task 24: get_waypoints endpoint with WaypointDto
+
+Added to src-tauri/src/application/mod.rs:
+- project_waypoint_layers() -> &[WaypointLayer]  (new accessor)
+
+Added to src-tauri/src/commands/mod.rs:
+- WaypointDto { id, name, lat, lon, symbol }
+- get_waypoints(state, layer_id) -> Result<Vec<WaypointDto>, String>
+
+Registered in src-tauri/src/lib.rs:
+- commands::get_waypoints
+
+Tests: 148 pass
