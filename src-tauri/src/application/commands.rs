@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::domain::{
-    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPointId,
-    TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
+    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint,
+    TrackPointId, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
 };
 use std::path::PathBuf;
 
@@ -61,6 +61,21 @@ pub enum ProjectCommand {
         lon: f64,
         old_lat: f64,
         old_lon: f64,
+    },
+    DeleteTrackPoint {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        removed_index: usize,
+        removed_point: TrackPoint,
+    },
+    InsertTrackPoint {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        index: usize,
+        point: TrackPoint,
     },
     RenameTrack {
         layer_id: LayerId,
@@ -179,6 +194,22 @@ impl ProjectCommand {
         }
     }
 
+    pub fn delete_track_point(
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+    ) -> Self {
+        Self::DeleteTrackPoint {
+            layer_id,
+            track_id,
+            segment_id,
+            point_id,
+            removed_index: 0,
+            removed_point: TrackPoint::new(TrackPointId::new(0), 0.0, 0.0),
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -238,6 +269,37 @@ impl ProjectCommand {
                     point_id.value(),
                     *lat,
                     *lon,
+                )?;
+                Ok(())
+            }
+            Self::DeleteTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                ..
+            } => {
+                project.remove_point_from_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id.value(),
+                    point_id.value(),
+                )?;
+                Ok(())
+            }
+            Self::InsertTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                index,
+                point,
+            } => {
+                project.insert_point_in_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id.value(),
+                    *index,
+                    point.clone(),
                 )?;
                 Ok(())
             }
@@ -345,6 +407,64 @@ impl ProjectCommand {
                 lon: *old_lon,
                 old_lat: *lat,
                 old_lon: *lon,
+            },
+            Self::DeleteTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                removed_index,
+                removed_point,
+            } => {
+                let found = project
+                    .track_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| {
+                        layer
+                            .tracks()
+                            .iter()
+                            .find(|track| track.id() == *track_id)
+                            .and_then(|track| {
+                                track
+                                    .segments()
+                                    .iter()
+                                    .find(|segment| segment.id() == *segment_id)
+                                    .and_then(|segment| {
+                                        segment
+                                            .points()
+                                            .iter()
+                                            .enumerate()
+                                            .find(|(_, point)| point.id() == *point_id)
+                                            .map(|(index, point)| (index, point.clone()))
+                                    })
+                            })
+                    });
+
+                let (index, point) = found
+                    .unwrap_or((*removed_index, removed_point.clone()));
+
+                Self::InsertTrackPoint {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    segment_id: *segment_id,
+                    index,
+                    point,
+                }
+            }
+            Self::InsertTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point,
+                ..
+            } => Self::DeleteTrackPoint {
+                layer_id: *layer_id,
+                track_id: *track_id,
+                segment_id: *segment_id,
+                point_id: point.id(),
+                removed_index: 0,
+                removed_point: point.clone(),
             },
             Self::RenameTrack {
                 layer_id,
@@ -917,6 +1037,123 @@ mod tests {
         let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
         assert_eq!(point.latitude(), 53.9);
         assert_eq!(point.longitude(), 27.5667);
+    }
+
+    #[test]
+    fn delete_track_point_apply_removes_point() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        let point_id = TrackPointId::new(3);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(point_id, 53.9, 27.5667));
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 54.0, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_track_point(layer_id, track_id, segment_id, point_id),
+            )
+            .unwrap();
+
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 1);
+        assert_eq!(points[0].id(), TrackPointId::new(4));
+    }
+
+    #[test]
+    fn delete_track_point_undo_restores_at_same_index() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        let point_id = TrackPointId::new(3);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(point_id, 53.9, 27.5667));
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 54.0, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_track_point(layer_id, track_id, segment_id, point_id),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 2);
+        assert_eq!(points[0].id(), point_id);
+        assert_eq!(points[1].id(), TrackPointId::new(4));
+    }
+
+    #[test]
+    fn delete_track_point_missing_point_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 54.0, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        let error = history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_track_point(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(99),
+                ),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            CommandError::ProjectLayer(ProjectLayerError::MissingTrackPoint {
+                layer_id: layer_id.value(),
+                track_id: track_id.value(),
+                segment_id: segment_id.value(),
+                point_id: 99,
+            })
+        );
     }
 
     #[test]
