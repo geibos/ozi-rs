@@ -1,0 +1,2 @@
+    Checking ozi-rs v0.1.0 (/Users/sobieg/Projects/ozi-rs/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.45s
