@@ -57,3 +57,9 @@
 - `insert_segment_at` uses `.min(len)` clamping to avoid panics on out-of-bounds undo scenarios.
 - 4 new tests in `track.rs`: `remove_segment` success + error, `join_segments` success + non-adjacent error; helper `make_track_with_two_segments()` used for reuse.
 - Final test count: 101 (was 97 before T7).
+
+## [2026-04-04] Task: T8
+- `TrackLayer::remove_track` mirrors `Track::remove_segment`: return `(index, Track)` so undo can reinsert at the same position.
+- `Project::remove_track_from_layer` should delegate to the layer helper instead of duplicating the search/removal logic.
+- Track-layer removal failures use `ProjectLayerError::MissingTrack { layer_id, track_id }`, keeping the project-level error shape consistent with existing nested lookup helpers.
+- Inline tests now cover both success and missing-track cases for direct layer removal and project-level removal.
