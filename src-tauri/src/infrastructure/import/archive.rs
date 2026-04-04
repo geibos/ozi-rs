@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fmt;
 use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
