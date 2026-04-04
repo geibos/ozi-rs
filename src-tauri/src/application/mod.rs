@@ -7,7 +7,7 @@ pub use import::{ArchiveImportError, ArchiveImportReport};
 
 use crate::domain::{LayerId, Project, TrackId};
 use crate::infrastructure::import::{
-    OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
+    parse_ozi_map_metadata, read_ozi_map_text, OziMapParseError, OziRasterKind,
 };
 use crate::infrastructure::lizaalert;
 use crate::infrastructure::persistence;
@@ -225,7 +225,9 @@ impl AppState {
             return None;
         }
 
-        self.lizaalert.downloading.insert(selection.package_name.clone());
+        self.lizaalert
+            .downloading
+            .insert(selection.package_name.clone());
         self.update_status(
             DiagnosticLevel::Info,
             format!("Downloading {}...", selection.package_name),
@@ -319,10 +321,7 @@ impl AppState {
 
     // ── Synchronous map-open helpers ──
 
-    pub fn open_local_map_selection(
-        &mut self,
-        selection: ActiveMapSelection,
-    ) {
+    pub fn open_local_map_selection(&mut self, selection: ActiveMapSelection) {
         let status = match self.register_active_map_layer(&selection) {
             Ok(true) => format!(
                 "Opened cached map: {} / {}",
@@ -399,6 +398,7 @@ impl AppState {
         self.lizaalert.active_map.as_ref()
     }
 
+    #[allow(dead_code)]
     pub fn map_layer_count(&self) -> usize {
         self.project.map_layers().len()
     }
@@ -431,6 +431,7 @@ impl AppState {
         self.project_path.as_deref()
     }
 
+    #[allow(dead_code)]
     pub fn bundles_root(&self) -> &std::path::Path {
         &self.bundles_root
     }
@@ -496,13 +497,8 @@ impl AppState {
         import::import_plt_file_into_project(&mut self.project, &mut self.history, &path)
     }
 
-    pub fn set_track_color(
-        &mut self,
-        layer_id: LayerId,
-        track_id: TrackId,
-        color: [u8; 4],
-    ) {
-        if let Some(track) = self.project.track_mut(layer_id, track_id) {
+    pub fn set_track_color(&mut self, layer_id: LayerId, track_id: TrackId, color: [u8; 4]) {
+        if let Ok(track) = self.project.track_mut(layer_id.value(), track_id.value()) {
             track.style_mut().color = color;
         }
     }
@@ -565,6 +561,7 @@ impl AppState {
         self.history.redo(&mut self.project);
     }
 
+    #[allow(dead_code)]
     pub fn restore_active_map(&mut self, selection: ActiveMapSelection) {
         if selection.local_path.exists() {
             self.lizaalert.active_map = Some(selection);
@@ -597,6 +594,7 @@ impl AppState {
         self.push_diagnostic(DiagnosticLevel::Error, message.into());
     }
 
+    #[allow(dead_code)]
     pub fn report_runtime_info(&mut self, message: impl Into<String>) {
         self.push_diagnostic(DiagnosticLevel::Info, message.into());
     }

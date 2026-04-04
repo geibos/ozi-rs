@@ -21,6 +21,11 @@
 - State change: emit `state-changed` event via `app_handle.emit()`
 - Style mutations (non-undoable): direct `track.style_mut().set_X()` — no CommandStack
 
+## Track Lookup Updates
+- `Project` now exposes `track_layer_mut(layer_id: u64)`, `track_mut(layer_id, track_id)`, `track_segment_mut(layer_id, track_id, segment_id)`, and `track_point_mut(layer_id, track_id, segment_id, point_id)` as `Result`-returning helpers.
+- `ProjectLayerError` uses manual `Display` strings for missing track/segment/point lookups, matching the existing layer/waypoint error style.
+- `TrackId`, `TrackSegmentId`, `TrackPointId`, and `WaypointId` now expose `value()` accessors for readable error formatting and lookup helpers.
+
 ## Lint Cleanup Notes
 - `clippy::enum_variant_names` was resolved by renaming `ProjectLayerError` and `OziMapParseError` variants to avoid shared prefixes/postfixes.
 - `double_ended_iterator_last` in track duration logic now uses `next_back()` on the timestamp iterator.

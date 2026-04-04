@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct TrackId(u64);
@@ -5,6 +7,10 @@ pub struct TrackId(u64);
 impl TrackId {
     pub const fn new(value: u64) -> Self {
         Self(value)
+    }
+
+    pub const fn value(&self) -> u64 {
+        self.0
     }
 }
 
@@ -16,6 +22,10 @@ impl TrackSegmentId {
     pub const fn new(value: u64) -> Self {
         Self(value)
     }
+
+    pub const fn value(&self) -> u64 {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -25,6 +35,10 @@ pub struct TrackPointId(u64);
 impl TrackPointId {
     pub const fn new(value: u64) -> Self {
         Self(value)
+    }
+
+    pub const fn value(&self) -> u64 {
+        self.0
     }
 }
 
@@ -127,6 +141,10 @@ impl TrackSegment {
     pub fn add_point(&mut self, point: TrackPoint) {
         self.points.push(point);
     }
+
+    pub fn point_mut(&mut self, point_id: TrackPointId) -> Option<&mut TrackPoint> {
+        self.points.iter_mut().find(|point| point.id() == point_id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -174,6 +192,12 @@ impl Track {
 
     pub fn add_segment(&mut self, segment: TrackSegment) {
         self.segments.push(segment);
+    }
+
+    pub fn segment_mut(&mut self, segment_id: TrackSegmentId) -> Option<&mut TrackSegment> {
+        self.segments
+            .iter_mut()
+            .find(|segment| segment.id() == segment_id)
     }
 
     /// Total distance across all segments in kilometres (Haversine).

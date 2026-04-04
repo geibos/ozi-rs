@@ -1,4 +1,9 @@
-use crate::domain::{Track, Waypoint, WaypointId};
+#![allow(dead_code)]
+
+use crate::domain::{
+    Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId, Waypoint, WaypointId,
+};
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -6,6 +11,66 @@ pub enum ProjectLayerError {
     TrackLayerNotPresent(LayerId),
     WaypointLayerUnavailable(LayerId),
     WaypointNotFound(LayerId, WaypointId),
+    MissingTrack {
+        layer_id: u64,
+        track_id: u64,
+    },
+    MissingTrackSegment {
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+    },
+    MissingTrackPoint {
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        point_id: u64,
+    },
+}
+
+impl fmt::Display for ProjectLayerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TrackLayerNotPresent(layer_id) => {
+                write!(f, "missing track layer with id {}", layer_id.value())
+            }
+            Self::WaypointLayerUnavailable(layer_id) => {
+                write!(f, "missing waypoint layer with id {}", layer_id.value())
+            }
+            Self::WaypointNotFound(layer_id, waypoint_id) => write!(
+                f,
+                "missing waypoint with id {} in layer {}",
+                waypoint_id.value(),
+                layer_id.value()
+            ),
+            Self::MissingTrack { layer_id, track_id } => {
+                write!(
+                    f,
+                    "missing track with id {} in layer {}",
+                    track_id, layer_id
+                )
+            }
+            Self::MissingTrackSegment {
+                layer_id,
+                track_id,
+                segment_id,
+            } => write!(
+                f,
+                "missing track segment with id {} in track {} in layer {}",
+                segment_id, track_id, layer_id
+            ),
+            Self::MissingTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+            } => write!(
+                f,
+                "missing track point with id {} in segment {} in track {} in layer {}",
+                point_id, segment_id, track_id, layer_id
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -215,15 +280,58 @@ impl Project {
         self.waypoint_layers.push(layer);
     }
 
-    pub fn track_mut(
-        &mut self,
-        layer_id: LayerId,
-        track_id: crate::domain::TrackId,
-    ) -> Option<&mut Track> {
+    pub fn track_layer_mut(&mut self, layer_id: u64) -> Result<&mut TrackLayer, ProjectLayerError> {
         self.track_layers
             .iter_mut()
-            .find(|l| l.id() == layer_id)?
-            .track_mut(track_id)
+            .find(|layer| layer.id().value() == layer_id)
+            .ok_or(ProjectLayerError::TrackLayerNotPresent(LayerId::new(
+                layer_id,
+            )))
+    }
+
+    pub fn track_mut(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+    ) -> Result<&mut Track, ProjectLayerError> {
+        let layer = self.track_layer_mut(layer_id)?;
+        layer
+            .track_mut(crate::domain::TrackId::new(track_id))
+            .ok_or(ProjectLayerError::MissingTrack { layer_id, track_id })
+    }
+
+    pub fn track_segment_mut(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+    ) -> Result<&mut TrackSegment, ProjectLayerError> {
+        let track = self.track_mut(layer_id, track_id)?;
+        track.segment_mut(TrackSegmentId::new(segment_id)).ok_or(
+            ProjectLayerError::MissingTrackSegment {
+                layer_id,
+                track_id,
+                segment_id,
+            },
+        )
+    }
+
+    pub fn track_point_mut(
+        &mut self,
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        point_id: u64,
+    ) -> Result<&mut TrackPoint, ProjectLayerError> {
+        let segment = self.track_segment_mut(layer_id, track_id, segment_id)?;
+        segment
+            .point_mut(TrackPointId::new(point_id))
+            .ok_or(ProjectLayerError::MissingTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+            })
     }
 
     pub fn set_track_visible_in_layer(
@@ -242,15 +350,7 @@ impl Project {
         layer_id: LayerId,
         track: Track,
     ) -> Result<(), ProjectLayerError> {
-        let Some(layer) = self
-            .track_layers
-            .iter_mut()
-            .find(|layer| layer.id() == layer_id)
-        else {
-            return Err(ProjectLayerError::TrackLayerNotPresent(layer_id));
-        };
-
-        layer.add_track(track);
+        self.track_layer_mut(layer_id.value())?.add_track(track);
         Ok(())
     }
 
@@ -283,7 +383,7 @@ impl Project {
             .iter_mut()
             .find(|layer| layer.id() == layer_id)
         else {
-            return Err(ProjectLayerError::MissingWaypointLayer(layer_id));
+            return Err(ProjectLayerError::WaypointLayerUnavailable(layer_id));
         };
 
         if layer.move_waypoint(waypoint_id, latitude, longitude) {
@@ -453,6 +553,84 @@ mod tests {
         assert_eq!(
             error,
             ProjectLayerError::WaypointNotFound(layer_id, WaypointId::new(99))
+        );
+    }
+
+    #[test]
+    fn project_layer_error_formats_new_track_variants() {
+        assert_eq!(
+            ProjectLayerError::MissingTrack {
+                layer_id: 2,
+                track_id: 7,
+            }
+            .to_string(),
+            "missing track with id 7 in layer 2"
+        );
+        assert_eq!(
+            ProjectLayerError::MissingTrackSegment {
+                layer_id: 2,
+                track_id: 7,
+                segment_id: 9,
+            }
+            .to_string(),
+            "missing track segment with id 9 in track 7 in layer 2"
+        );
+        assert_eq!(
+            ProjectLayerError::MissingTrackPoint {
+                layer_id: 2,
+                track_id: 7,
+                segment_id: 9,
+                point_id: 11,
+            }
+            .to_string(),
+            "missing track point with id 11 in segment 9 in track 7 in layer 2"
+        );
+    }
+
+    #[test]
+    fn project_reports_missing_nested_track_entities() {
+        let mut project = Project::untitled();
+        let layer_id = 20;
+        project.add_track_layer(TrackLayer::new(LayerId::new(layer_id), "Recorded tracks"));
+
+        let track_error = project.track_mut(layer_id, 7).unwrap_err();
+        assert_eq!(
+            track_error,
+            ProjectLayerError::MissingTrack {
+                layer_id,
+                track_id: 7,
+            }
+        );
+
+        project
+            .track_layer_mut(layer_id)
+            .unwrap()
+            .add_track(Track::new(TrackId::new(7), "Morning route"));
+
+        let segment_error = project.track_segment_mut(layer_id, 7, 9).unwrap_err();
+        assert_eq!(
+            segment_error,
+            ProjectLayerError::MissingTrackSegment {
+                layer_id,
+                track_id: 7,
+                segment_id: 9,
+            }
+        );
+
+        let mut track = Track::new(TrackId::new(7), "Morning route");
+        track.add_segment(TrackSegment::new(TrackSegmentId::new(9)));
+        project.track_layer_mut(layer_id).unwrap().tracks.clear();
+        project.track_layer_mut(layer_id).unwrap().add_track(track);
+
+        let point_error = project.track_point_mut(layer_id, 7, 9, 11).unwrap_err();
+        assert_eq!(
+            point_error,
+            ProjectLayerError::MissingTrackPoint {
+                layer_id,
+                track_id: 7,
+                segment_id: 9,
+                point_id: 11,
+            }
         );
     }
 }
