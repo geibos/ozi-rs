@@ -57,3 +57,35 @@
 - Tauri `move_track_point` expects `position` as `[lat, lon]` even though `Marker#getLngLat()` returns `{ lng, lat }`, so frontend must convert to `[lngLat.lat, lngLat.lng]`.
 - Edit mode UX is cleanest when map drag-pan is disabled and canvas cursor is switched (crosshair), then restored immediately on exit.
 - Track-point context menu should be positioned relative to map container (`clientX/Y - container rect`) so menu stays anchored correctly even with floating panels.
+
+## 2026-04-04 — Task 32 click-to-add waypoint mode
+
+- `add_waypoint` Tauri command needed to be added from scratch: backend had `ProjectCommand::add_waypoint` but no wired Tauri handler. Added `apply_add_waypoint` to `AppState` in `application/mod.rs`, then `#[tauri::command] pub fn add_waypoint` in `commands/mod.rs`, registered in `lib.rs`.
+- ID auto-generation: `max existing waypoint id in layer + 1` pattern, same as track point IDs.
+- `addWaypointMode` store (boolean) in `stores.ts` drives cursor (crosshair) and click interception.
+- MapView click handler is a single persistent `map.on("click", handler)`. Inside, it guards on `$addWaypointMode` before doing anything — safe because the reactive $effect re-reads the store value on each call.
+- Escape key exits `addWaypointMode` alongside context menu close — handle both in same `handleKeydown`.
+- Cursor precedence: `addWaypointMode` wins over default; restores only when `!editModeActive` (so edit mode cursor is not clobbered by the waypoint effect running at wrong time).
+- Waypoint markers use `maplibregl.Marker` with a `div.waypoint-marker` element; style must be `:global(.waypoint-marker)` since the element is appended outside Svelte's scoped CSS.
+- `refreshWaypointMarkers` is async and may throw if the waypoint layer doesn't exist yet (e.g. fresh project) — wrap with try/catch, silently ignore the error.
+- Waypoint name generation: `getWaypoints(layerId)` count + 1 → "Waypoint N".
+
+## 2026-04-04 — Task 33 waypoint drag on map
+
+- `move_waypoint` Tauri command did NOT exist yet (unlike `delete_waypoint`/`rename_waypoint`). Had to wire the full stack: `apply_move_waypoint` in `application/mod.rs` → `pub fn move_waypoint` in `commands/mod.rs` → registered in `lib.rs`.
+- `ProjectCommand::move_waypoint(layer_id, waypoint_id, lat, lon)` already existed in `application/commands.rs` and is fully undo-able — no extra reverse-state capture needed.
+- MapLibre `Marker` draggable opt: `new maplibregl.Marker({ element: el, draggable: true })`. Drag events use `.on("dragstart", fn)` and `.on("dragend", fn)` on the marker instance.
+- `marker.getLngLat()` returns `{ lat, lng }`. Pass to `moveWaypoint` as `[lngLat.lat, lngLat.lng]` (lat-first, matching Tauri position: [lat, lon] convention).
+- Cursor management: set `el.style.cursor = "grab"` after element creation; change to `"grabbing"` on dragstart, restore on dragend. CSS `:active` alone is insufficient because MapLibre prevents browser's native drag events.
+- After `moveWaypoint`, the backend emits `state-changed` (via Tauri `AppHandle::emit`), `appState.refresh()` fires in `App.svelte`, `$appState` changes, `$effect` in MapView calls `refreshWaypointMarkers()` — no extra wiring needed.
+- `wpId` must be captured per-loop-iteration (`const wpId = wp.id`) before the async closure so BigInt conversion uses the correct value.
+- `position` arg in Tauri command is `[f64; 2]` (lat, lon order), consistent with `move_track_point` pattern.
+
+## 2026-04-04 — Task 35 PLT export
+
+- Added `infrastructure::export::plt::export_plt(track, color, width, writer)` with strict Windows CRLF output and explicit Ozi header lines.
+- PLT COLORREF conversion in exporter uses BGR byte order from `0xRRGGBB` input (`(b << 16) | (g << 8) | r`).
+- Width mapping for PLT track-info line must clamp to integer `1..=7` after rounding the floating UI width.
+- OLE date encoding is implemented from UTC `DateTime` via CE-day delta from 1899-12-30 + fraction-of-day seconds.
+- Segment starts are encoded in the trailing data-field (`...,<segment_flag>`), with `1` for first point in each segment and `0` for subsequent points.
+- Round-trip verification currently compares flattened points (`lat/lon/elevation/timestamp`) because importer segment splitting uses field 3 while exporter writes segment markers in the trailing field required by Ozi format.
