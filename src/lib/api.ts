@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AppStateDto,
   OziMetadataDto,
+  TrackDetail,
+  WaypointData,
+  SimplifiedPreview,
 } from "./types";
 
 export async function getAppState(): Promise<AppStateDto> {
@@ -120,4 +123,102 @@ export async function getOziTileProjected(
   tz: number,
 ): Promise<ArrayBuffer> {
   return invoke("get_ozi_tile_projected", { mapPath, tx, ty, tz });
+}
+
+export async function moveTrackPoint(
+  layerId: bigint,
+  trackId: bigint,
+  segmentId: bigint,
+  pointId: bigint,
+  position: [number, number]
+): Promise<void> {
+  return invoke("move_track_point", { layerId, trackId, segmentId, pointId, position });
+}
+
+export async function deleteTrackPoint(
+  layerId: bigint,
+  trackId: bigint,
+  segmentId: bigint,
+  pointId: bigint
+): Promise<void> {
+  return invoke("delete_track_point", { layerId, trackId, segmentId, pointId });
+}
+
+export async function insertTrackPoint(
+  layerId: bigint,
+  trackId: bigint,
+  segmentId: bigint,
+  index: number,
+  position: [number, number]
+): Promise<void> {
+  return invoke("insert_track_point", { layerId, trackId, segmentId, index, position });
+}
+
+export async function splitSegment(
+  layerId: bigint,
+  trackId: bigint,
+  segmentId: bigint,
+  pointId: bigint
+): Promise<void> {
+  return invoke("split_segment", { layerId, trackId, segmentId, pointId });
+}
+
+export async function joinSegments(
+  layerId: bigint,
+  trackId: bigint,
+  segIdA: bigint,
+  segIdB: bigint
+): Promise<void> {
+  return invoke("join_segments", { layerId, trackId, segIdA, segIdB });
+}
+
+export async function deleteTrack(layerId: bigint, trackId: bigint): Promise<void> {
+  return invoke("delete_track", { layerId, trackId });
+}
+
+export async function deleteWaypoint(layerId: bigint, waypointId: bigint): Promise<void> {
+  return invoke("delete_waypoint", { layerId, waypointId });
+}
+
+export async function renameWaypoint(
+  layerId: bigint,
+  waypointId: bigint,
+  newName: string
+): Promise<void> {
+  return invoke("rename_waypoint", { layerId, waypointId, newName });
+}
+
+export async function simplifyTrack(
+  layerId: bigint,
+  trackId: bigint,
+  tolerance: number
+): Promise<void> {
+  return invoke("simplify_track", { layerId, trackId, tolerance });
+}
+
+export async function setTrackLineWidth(
+  layerId: bigint,
+  trackId: bigint,
+  width: number
+): Promise<void> {
+  return invoke("set_track_line_width", { layerId, trackId, width });
+}
+
+export async function getTrackDetail(
+  layerId: bigint,
+  trackId: bigint
+): Promise<TrackDetail> {
+  return invoke("get_track_detail", { layerId, trackId });
+}
+
+export async function getWaypoints(layerId: bigint): Promise<WaypointData[]> {
+  return invoke("get_waypoints", { layerId });
+}
+
+export async function getSimplifiedPreview(
+  layerId: bigint,
+  trackId: bigint,
+  tolerance: number
+): Promise<SimplifiedPreview> {
+  return invoke("get_simplified_preview", { layerId, trackId, tolerance });
 }

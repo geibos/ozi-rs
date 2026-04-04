@@ -74,3 +74,42 @@ export interface DownloadProgressPayload {
   downloaded_bytes: number;
   total_bytes?: number;
 }
+
+export interface PointDetail {
+  id: number;
+  lat: number;
+  lon: number;
+  elevation?: number;
+  timestamp?: string;
+}
+
+export interface SegmentDetail {
+  id: number;
+  points: PointDetail[];
+}
+
+export interface TrackDetail {
+  id: number;
+  name: string;
+  segments: SegmentDetail[];
+}
+
+export interface WaypointData {
+  id: number;
+  name: string;
+  lat: number;
+  lon: number;
+  symbol?: string;
+}
+
+export interface SimplifiedSegmentPreview {
+  id: number;
+  original_count: number;
+  simplified_count: number;
+}
+
+export interface SimplifiedPreview {
+  original_count: number;
+  simplified_count: number;
+  segments: SimplifiedSegmentPreview[];
+}
