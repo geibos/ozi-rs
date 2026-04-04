@@ -166,6 +166,20 @@ impl TrackLayer {
         self.tracks.push(track);
     }
 
+    pub fn remove_track(
+        &mut self,
+        track_id: crate::domain::TrackId,
+    ) -> Result<(usize, Track), ProjectLayerError> {
+        let Some(index) = self.tracks.iter().position(|track| track.id() == track_id) else {
+            return Err(ProjectLayerError::MissingTrack {
+                layer_id: self.id.value(),
+                track_id: track_id.value(),
+            });
+        };
+
+        Ok((index, self.tracks.remove(index)))
+    }
+
     pub fn track_mut(&mut self, track_id: crate::domain::TrackId) -> Option<&mut Track> {
         self.tracks.iter_mut().find(|t| t.id() == track_id)
     }
@@ -397,17 +411,9 @@ impl Project {
         &mut self,
         layer_id: LayerId,
         track_id: crate::domain::TrackId,
-    ) -> Result<(), ProjectLayerError> {
+    ) -> Result<(usize, Track), ProjectLayerError> {
         let layer = self.track_layer_mut(layer_id.value())?;
-        let Some(index) = layer.tracks.iter().position(|track| track.id() == track_id) else {
-            return Err(ProjectLayerError::MissingTrack {
-                layer_id: layer_id.value(),
-                track_id: track_id.value(),
-            });
-        };
-
-        layer.tracks.remove(index);
-        Ok(())
+        layer.remove_track(track_id)
     }
 
     pub fn add_waypoint_to_layer(
@@ -702,6 +708,73 @@ mod tests {
         assert_eq!(
             error,
             ProjectLayerError::TrackLayerNotPresent(LayerId::new(99))
+        );
+    }
+
+    #[test]
+    fn track_layer_remove_track_returns_index_and_track_for_undo() {
+        let mut track_layer = TrackLayer::new(LayerId::new(20), "Recorded tracks");
+        track_layer.add_track(Track::new(TrackId::new(1), "First"));
+        track_layer.add_track(Track::new(TrackId::new(2), "Second"));
+        let expected = track_layer.tracks()[0].clone();
+
+        let (index, track) = track_layer.remove_track(TrackId::new(1)).unwrap();
+
+        assert_eq!(index, 0);
+        assert_eq!(track, expected);
+        assert_eq!(track_layer.tracks().len(), 1);
+        assert_eq!(track_layer.tracks()[0].id(), TrackId::new(2));
+    }
+
+    #[test]
+    fn track_layer_remove_track_reports_missing_track() {
+        let mut track_layer = TrackLayer::new(LayerId::new(20), "Recorded tracks");
+
+        let error = track_layer.remove_track(TrackId::new(99)).unwrap_err();
+
+        assert_eq!(
+            error,
+            ProjectLayerError::MissingTrack {
+                layer_id: 20,
+                track_id: 99,
+            }
+        );
+    }
+
+    #[test]
+    fn project_removes_track_from_matching_track_layer() {
+        let mut project = Project::untitled();
+        let layer_id = LayerId::new(20);
+        project.add_track_layer(TrackLayer::new(layer_id, "Recorded tracks"));
+        project
+            .add_track_to_layer(layer_id, Track::new(TrackId::new(1), "Morning route"))
+            .unwrap();
+
+        let (index, track) = project
+            .remove_track_from_layer(layer_id, TrackId::new(1))
+            .unwrap();
+
+        assert_eq!(index, 0);
+        assert_eq!(track.id(), TrackId::new(1));
+        assert!(project.track_layers()[0].tracks().is_empty());
+    }
+
+    #[test]
+    fn project_reports_missing_track_when_removing_unknown_track() {
+        let mut project = Project::untitled();
+        let layer_id = LayerId::new(20);
+        project.add_track_layer(TrackLayer::new(layer_id, "Recorded tracks"));
+
+        let error = project
+            .remove_track_from_layer(layer_id, TrackId::new(99))
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            ProjectLayerError::MissingTrack {
+                layer_id: 20,
+                track_id: 99,
+            }
         );
     }
 
