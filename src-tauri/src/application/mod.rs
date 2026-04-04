@@ -710,6 +710,48 @@ impl AppState {
             })
     }
 
+    pub fn apply_delete_waypoint(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+    ) -> Result<(), ProjectLayerError> {
+        let cmd = commands::ProjectCommand::delete_waypoint(layer_id, waypoint_id);
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    pub fn apply_rename_waypoint(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        new_name: String,
+    ) -> Result<(), ProjectLayerError> {
+        let old_name = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .and_then(|l| {
+                l.waypoints()
+                    .iter()
+                    .find(|w| w.id() == waypoint_id)
+                    .map(|w| w.name().to_owned())
+            })
+            .unwrap_or_default();
+
+        let cmd = commands::ProjectCommand::rename_waypoint(
+            layer_id, waypoint_id, old_name, new_name,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
     pub fn export_layer_to_gpx(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
         let Some(layer) = self
             .project

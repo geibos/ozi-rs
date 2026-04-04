@@ -1,0 +1,15 @@
+Task 21: Waypoint command handlers
+
+Added to src-tauri/src/application/mod.rs:
+- apply_delete_waypoint(layer_id, waypoint_id) -> Result<(), ProjectLayerError>
+- apply_rename_waypoint(layer_id, waypoint_id, new_name) -> Result<(), ProjectLayerError>
+
+Added to src-tauri/src/commands/mod.rs:
+- delete_waypoint: Tauri command delegating to apply_delete_waypoint
+- rename_waypoint: Tauri command delegating to apply_rename_waypoint
+
+Registered in src-tauri/src/lib.rs:
+- commands::delete_waypoint
+- commands::rename_waypoint
+
+Tests: 147 pass (all existing tests continue to pass)
