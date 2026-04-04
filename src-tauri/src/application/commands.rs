@@ -90,6 +90,10 @@ pub enum ProjectCommand {
         segment_id_a: TrackSegmentId,
         segment_id_b: TrackSegmentId,
     },
+    DeleteTrack {
+        layer_id: LayerId,
+        track_id: TrackId,
+    },
     RenameTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -269,6 +273,10 @@ impl ProjectCommand {
         }
     }
 
+    pub fn delete_track(layer_id: LayerId, track_id: TrackId) -> Self {
+        Self::DeleteTrack { layer_id, track_id }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -410,6 +418,10 @@ impl ProjectCommand {
                     segment_id_a.value(),
                     segment_id_b.value(),
                 )?;
+                Ok(())
+            }
+            Self::DeleteTrack { layer_id, track_id } => {
+                project.remove_track_from_layer(*layer_id, *track_id)?;
                 Ok(())
             }
             Self::RenameTrack {
@@ -619,6 +631,20 @@ impl ProjectCommand {
                     segment_id: *segment_id_a,
                     point_id: split_point_id,
                     new_segment_id: *segment_id_b,
+                }
+            }
+            Self::DeleteTrack { layer_id, track_id } => {
+                let track = project
+                    .track_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| layer.tracks().iter().find(|track| track.id() == *track_id))
+                    .cloned()
+                    .unwrap_or_else(|| Track::new(*track_id, ""));
+
+                Self::AddTrack {
+                    layer_id: *layer_id,
+                    track,
                 }
             }
             Self::RenameTrack {
@@ -1695,6 +1721,82 @@ mod tests {
                 layer_id: layer_id.value(),
                 track_id: track_id.value(),
                 segment_id: 99,
+            })
+        );
+    }
+
+    #[test]
+    fn delete_track_apply_removes_track() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track(layer_id, Track::new(track_id, "Morning route")),
+            )
+            .unwrap();
+
+        history
+            .apply(&mut project, &ProjectCommand::delete_track(layer_id, track_id))
+            .unwrap();
+
+        assert!(project.track_layers()[0].tracks().is_empty());
+    }
+
+    #[test]
+    fn delete_track_undo_restores_track() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track(layer_id, Track::new(track_id, "Morning route")),
+            )
+            .unwrap();
+
+        history
+            .apply(&mut project, &ProjectCommand::delete_track(layer_id, track_id))
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        assert_eq!(project.track_layers()[0].tracks().len(), 1);
+        assert_eq!(project.track_layers()[0].tracks()[0].id(), track_id);
+    }
+
+    #[test]
+    fn delete_track_missing_track_returns_error() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let error = history
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_track(layer_id, TrackId::new(99)),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            CommandError::ProjectLayer(ProjectLayerError::MissingTrack {
+                layer_id: layer_id.value(),
+                track_id: 99,
             })
         );
     }
