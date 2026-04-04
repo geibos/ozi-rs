@@ -255,6 +255,20 @@ impl ProjectCommand {
         }
     }
 
+    pub fn join_segments(
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id_a: TrackSegmentId,
+        segment_id_b: TrackSegmentId,
+    ) -> Self {
+        Self::JoinSegments {
+            layer_id,
+            track_id,
+            segment_id_a,
+            segment_id_b,
+        }
+    }
+
     pub fn apply(&self, project: &mut Project) -> Result<(), CommandError> {
         match self {
             Self::AddMapLayer { id, name } => {
@@ -353,14 +367,27 @@ impl ProjectCommand {
                 track_id,
                 segment_id,
                 point_id,
-                ..
+                new_segment_id,
             } => {
-                let new_segment = project.split_segment_in_layer(
-                    layer_id.value(),
-                    track_id.value(),
-                    segment_id.value(),
-                    point_id.value(),
-                )?;
+                let new_segment = {
+                    let track = project.track_mut(layer_id.value(), track_id.value())?;
+                    let segment = track.segment_mut(*segment_id).ok_or(
+                        ProjectLayerError::MissingTrackSegment {
+                            layer_id: layer_id.value(),
+                            track_id: track_id.value(),
+                            segment_id: segment_id.value(),
+                        },
+                    )?;
+
+                    segment
+                        .split_at_point(point_id.value(), *new_segment_id)
+                        .map_err(|_| ProjectLayerError::MissingTrackPoint {
+                            layer_id: layer_id.value(),
+                            track_id: track_id.value(),
+                            segment_id: segment_id.value(),
+                            point_id: point_id.value(),
+                        })?
+                };
 
                 let track = project.track_mut(layer_id.value(), track_id.value())?;
                 let insert_index = track
@@ -552,30 +579,14 @@ impl ProjectCommand {
                 layer_id,
                 track_id,
                 segment_id,
+                new_segment_id,
                 ..
-            } => {
-                let predicted_new_segment_id = project
-                    .track_layers()
-                    .iter()
-                    .find(|layer| layer.id() == *layer_id)
-                    .and_then(|layer| layer.tracks().iter().find(|track| track.id() == *track_id))
-                    .and_then(|track| {
-                        track
-                            .segments()
-                            .iter()
-                            .map(|segment| segment.id().value())
-                            .max()
-                    })
-                    .map(|max_id| TrackSegmentId::new(max_id + 1))
-                    .unwrap_or(TrackSegmentId::new(1));
-
-                Self::JoinSegments {
-                    layer_id: *layer_id,
-                    track_id: *track_id,
-                    segment_id_a: *segment_id,
-                    segment_id_b: predicted_new_segment_id,
-                }
-            }
+            } => Self::JoinSegments {
+                layer_id: *layer_id,
+                track_id: *track_id,
+                segment_id_a: *segment_id,
+                segment_id_b: *new_segment_id,
+            },
             Self::JoinSegments {
                 layer_id,
                 track_id,
@@ -1467,7 +1478,7 @@ mod tests {
         let segments = project.track_layers()[0].tracks()[0].segments();
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].id(), segment_id);
-        assert_eq!(segments[1].id(), TrackSegmentId::new(3));
+        assert_eq!(segments[1].id(), new_segment_id);
     }
 
     #[test]
@@ -1554,6 +1565,136 @@ mod tests {
                 track_id: track_id.value(),
                 segment_id: segment_id.value(),
                 point_id: 99,
+            })
+        );
+    }
+
+    #[test]
+    fn join_segments_apply_combines_into_one() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment_a = TrackSegment::new(TrackSegmentId::new(10));
+        segment_a.add_point(TrackPoint::new(TrackPointId::new(1), 53.9, 27.5));
+        segment_a.add_point(TrackPoint::new(TrackPointId::new(2), 54.0, 27.6));
+        let mut segment_b = TrackSegment::new(TrackSegmentId::new(20));
+        segment_b.add_point(TrackPoint::new(TrackPointId::new(3), 54.1, 27.7));
+        segment_b.add_point(TrackPoint::new(TrackPointId::new(4), 54.2, 27.8));
+        track.add_segment(segment_a);
+        track.add_segment(segment_b);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::join_segments(
+                    layer_id,
+                    track_id,
+                    TrackSegmentId::new(10),
+                    TrackSegmentId::new(20),
+                ),
+            )
+            .unwrap();
+
+        let segments = project.track_layers()[0].tracks()[0].segments();
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].id(), TrackSegmentId::new(10));
+        assert_eq!(segments[0].points().len(), 4);
+    }
+
+    #[test]
+    fn join_segments_undo_restores_both() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment_a = TrackSegment::new(TrackSegmentId::new(10));
+        segment_a.add_point(TrackPoint::new(TrackPointId::new(1), 53.9, 27.5));
+        segment_a.add_point(TrackPoint::new(TrackPointId::new(2), 54.0, 27.6));
+        let mut segment_b = TrackSegment::new(TrackSegmentId::new(20));
+        segment_b.add_point(TrackPoint::new(TrackPointId::new(3), 54.1, 27.7));
+        segment_b.add_point(TrackPoint::new(TrackPointId::new(4), 54.2, 27.8));
+        track.add_segment(segment_a);
+        track.add_segment(segment_b);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::join_segments(
+                    layer_id,
+                    track_id,
+                    TrackSegmentId::new(10),
+                    TrackSegmentId::new(20),
+                ),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        let segments = project.track_layers()[0].tracks()[0].segments();
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].id(), TrackSegmentId::new(10));
+        assert_eq!(segments[1].id(), TrackSegmentId::new(20));
+    }
+
+    #[test]
+    fn join_segments_error_on_missing_segment() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment_a = TrackSegment::new(TrackSegmentId::new(10));
+        segment_a.add_point(TrackPoint::new(TrackPointId::new(1), 53.9, 27.5));
+        segment_a.add_point(TrackPoint::new(TrackPointId::new(2), 54.0, 27.6));
+        track.add_segment(segment_a);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        let error = history
+            .apply(
+                &mut project,
+                &ProjectCommand::join_segments(
+                    layer_id,
+                    track_id,
+                    TrackSegmentId::new(10),
+                    TrackSegmentId::new(99),
+                ),
+            )
+            .unwrap_err();
+
+        assert_eq!(
+            error,
+            CommandError::ProjectLayer(ProjectLayerError::MissingTrackSegment {
+                layer_id: layer_id.value(),
+                track_id: track_id.value(),
+                segment_id: 99,
             })
         );
     }
