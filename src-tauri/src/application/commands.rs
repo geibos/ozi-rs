@@ -104,6 +104,17 @@ pub enum ProjectCommand {
         old_name: String,
         new_name: String,
     },
+    SimplifyTrack {
+        layer_id: LayerId,
+        track_id: TrackId,
+        tolerance_km: f64,
+        removed: Vec<(TrackSegmentId, usize, TrackPoint)>,
+    },
+    RestoreTrackPoints {
+        layer_id: LayerId,
+        track_id: TrackId,
+        points: Vec<(TrackSegmentId, usize, TrackPoint)>,
+    },
     RenameTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -185,6 +196,7 @@ impl ProjectCommand {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn move_track_point(
         layer_id: LayerId,
         track_id: TrackId,
@@ -305,6 +317,15 @@ impl ProjectCommand {
             waypoint_id,
             old_name: old_name.into(),
             new_name: new_name.into(),
+        }
+    }
+
+    pub fn simplify_track(layer_id: LayerId, track_id: TrackId, tolerance_km: f64) -> Self {
+        Self::SimplifyTrack {
+            layer_id,
+            track_id,
+            tolerance_km,
+            removed: Vec::new(),
         }
     }
 
@@ -469,6 +490,49 @@ impl ProjectCommand {
                 ..
             } => {
                 project.rename_waypoint_in_layer(*layer_id, *waypoint_id, new_name.clone())?;
+                Ok(())
+            }
+            Self::SimplifyTrack {
+                layer_id,
+                track_id,
+                tolerance_km,
+                removed,
+            } => {
+                let removed_points = if removed.is_empty() {
+                    collect_simplify_removed(project, *layer_id, *track_id, *tolerance_km)
+                } else {
+                    removed.clone()
+                };
+
+                for (segment_id, _, point) in removed_points.iter().rev() {
+                    project.remove_point_from_layer(
+                        layer_id.value(),
+                        track_id.value(),
+                        segment_id.value(),
+                        point.id().value(),
+                    )?;
+                }
+
+                Ok(())
+            }
+            Self::RestoreTrackPoints {
+                layer_id,
+                track_id,
+                points,
+            } => {
+                let mut sorted = points.clone();
+                sorted.sort_by_key(|(segment_id, index, _)| (segment_id.value(), *index));
+
+                for (segment_id, index, point) in sorted {
+                    project.insert_point_in_layer(
+                        layer_id.value(),
+                        track_id.value(),
+                        segment_id.value(),
+                        index,
+                        point,
+                    )?;
+                }
+
                 Ok(())
             }
             Self::RenameTrack {
@@ -727,6 +791,34 @@ impl ProjectCommand {
                 old_name: new_name.clone(),
                 new_name: old_name.clone(),
             },
+            Self::SimplifyTrack {
+                layer_id,
+                track_id,
+                tolerance_km,
+                removed,
+            } => {
+                let points = if removed.is_empty() {
+                    collect_simplify_removed(project, *layer_id, *track_id, *tolerance_km)
+                } else {
+                    removed.clone()
+                };
+
+                Self::RestoreTrackPoints {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    points,
+                }
+            }
+            Self::RestoreTrackPoints {
+                layer_id,
+                track_id,
+                points,
+            } => Self::SimplifyTrack {
+                layer_id: *layer_id,
+                track_id: *track_id,
+                tolerance_km: 0.0,
+                removed: points.clone(),
+            },
             Self::RenameTrack {
                 layer_id,
                 track_id,
@@ -870,6 +962,126 @@ impl ProjectCommand {
             _ => false,
         }
     }
+}
+
+fn collect_simplify_removed(
+    project: &Project,
+    layer_id: LayerId,
+    track_id: TrackId,
+    tolerance_km: f64,
+) -> Vec<(TrackSegmentId, usize, TrackPoint)> {
+    project
+        .track_layers()
+        .iter()
+        .find(|layer| layer.id() == layer_id)
+        .and_then(|layer| layer.tracks().iter().find(|track| track.id() == track_id))
+        .map(|track| {
+            let mut removed = Vec::new();
+            for segment in track.segments() {
+                let keep = simplify_points_for_command(segment.points(), tolerance_km);
+                let keep_set: std::collections::BTreeSet<usize> = keep.into_iter().collect();
+
+                for (index, point) in segment.points().iter().enumerate() {
+                    if !keep_set.contains(&index) {
+                        removed.push((segment.id(), index, point.clone()));
+                    }
+                }
+            }
+            removed
+        })
+        .unwrap_or_default()
+}
+
+fn simplify_points_for_command(points: &[TrackPoint], tolerance_km: f64) -> Vec<usize> {
+    match points.len() {
+        0 => return vec![],
+        1 => return vec![0],
+        2 => return vec![0, 1],
+        _ => {}
+    }
+
+    if tolerance_km <= 0.0 {
+        return (0..points.len()).collect();
+    }
+
+    let mut kept = std::collections::BTreeSet::new();
+    rdp_indices(points, 0, points.len() - 1, tolerance_km, &mut kept);
+    kept.into_iter().collect()
+}
+
+fn rdp_indices(
+    points: &[TrackPoint],
+    start: usize,
+    end: usize,
+    tolerance_km: f64,
+    kept: &mut std::collections::BTreeSet<usize>,
+) {
+    kept.insert(start);
+    kept.insert(end);
+
+    if end <= start + 1 {
+        return;
+    }
+
+    let a = &points[start];
+    let b = &points[end];
+
+    let mut max_dist = 0.0_f64;
+    let mut max_idx = start;
+
+    for (i, p) in points.iter().enumerate().take(end).skip(start + 1) {
+        let d = perpendicular_distance_km(
+            p.latitude(),
+            p.longitude(),
+            a.latitude(),
+            a.longitude(),
+            b.latitude(),
+            b.longitude(),
+        );
+        if d > max_dist {
+            max_dist = d;
+            max_idx = i;
+        }
+    }
+
+    if max_dist > tolerance_km {
+        rdp_indices(points, start, max_idx, tolerance_km, kept);
+        rdp_indices(points, max_idx, end, tolerance_km, kept);
+    }
+}
+
+fn perpendicular_distance_km(
+    p_lat: f64,
+    p_lon: f64,
+    a_lat: f64,
+    a_lon: f64,
+    b_lat: f64,
+    b_lon: f64,
+) -> f64 {
+    let dlat = b_lat - a_lat;
+    let dlon = b_lon - a_lon;
+    let len_sq = dlat * dlat + dlon * dlon;
+
+    if len_sq == 0.0 {
+        return haversine_km(a_lat, a_lon, p_lat, p_lon);
+    }
+
+    let t = ((p_lat - a_lat) * dlat + (p_lon - a_lon) * dlon) / len_sq;
+    let t = t.clamp(0.0, 1.0);
+
+    let q_lat = a_lat + t * dlat;
+    let q_lon = a_lon + t * dlon;
+
+    haversine_km(p_lat, p_lon, q_lat, q_lon)
+}
+
+fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    const R: f64 = 6_371.0;
+    let dlat = (lat2 - lat1).to_radians();
+    let dlon = (lon2 - lon1).to_radians();
+    let a = (dlat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
+    2.0 * R * a.sqrt().asin()
 }
 
 #[derive(Debug, Clone)]
@@ -2047,6 +2259,115 @@ mod tests {
 
         assert!(history.undo(&mut project));
         assert_eq!(project.waypoint_layers()[0].waypoints()[0].name(), "Camp");
+    }
+
+    #[test]
+    fn simplify_track_apply_reduces_point_count() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
+        segment.add_point(TrackPoint::new(TrackPointId::new(2), 55.025, 37.025));
+        segment.add_point(TrackPoint::new(TrackPointId::new(3), 55.05, 37.05));
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 55.075, 37.075));
+        segment.add_point(TrackPoint::new(TrackPointId::new(5), 55.1, 37.1));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::simplify_track(layer_id, track_id, 0.001),
+            )
+            .unwrap();
+
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 2);
+    }
+
+    #[test]
+    fn simplify_track_undo_restores_all_points() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
+        segment.add_point(TrackPoint::new(TrackPointId::new(2), 55.025, 37.025));
+        segment.add_point(TrackPoint::new(TrackPointId::new(3), 55.05, 37.05));
+        segment.add_point(TrackPoint::new(TrackPointId::new(4), 55.075, 37.075));
+        segment.add_point(TrackPoint::new(TrackPointId::new(5), 55.1, 37.1));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::simplify_track(layer_id, track_id, 0.001),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 5);
+        assert_eq!(points[1].id(), TrackPointId::new(2));
+        assert_eq!(points[3].id(), TrackPointId::new(4));
+    }
+
+    #[test]
+    fn simplify_track_zero_tolerance_keeps_all() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
+        segment.add_point(TrackPoint::new(TrackPointId::new(2), 55.025, 37.025));
+        segment.add_point(TrackPoint::new(TrackPointId::new(3), 55.05, 37.05));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::simplify_track(layer_id, track_id, 0.0),
+            )
+            .unwrap();
+
+        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        assert_eq!(points.len(), 3);
     }
 
     #[test]
