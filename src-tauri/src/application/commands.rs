@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::domain::{
-    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint,
-    TrackPointId, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
+    simplify_track_points, LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId,
+    TrackLayer, TrackPoint, TrackPointId, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
 };
 use std::path::PathBuf;
 
@@ -978,7 +978,7 @@ fn collect_simplify_removed(
         .map(|track| {
             let mut removed = Vec::new();
             for segment in track.segments() {
-                let keep = simplify_points_for_command(segment.points(), tolerance_km);
+                let keep = simplify_track_points(segment.points(), tolerance_km);
                 let keep_set: std::collections::BTreeSet<usize> = keep.into_iter().collect();
 
                 for (index, point) in segment.points().iter().enumerate() {
@@ -990,98 +990,6 @@ fn collect_simplify_removed(
             removed
         })
         .unwrap_or_default()
-}
-
-fn simplify_points_for_command(points: &[TrackPoint], tolerance_km: f64) -> Vec<usize> {
-    match points.len() {
-        0 => return vec![],
-        1 => return vec![0],
-        2 => return vec![0, 1],
-        _ => {}
-    }
-
-    if tolerance_km <= 0.0 {
-        return (0..points.len()).collect();
-    }
-
-    let mut kept = std::collections::BTreeSet::new();
-    rdp_indices(points, 0, points.len() - 1, tolerance_km, &mut kept);
-    kept.into_iter().collect()
-}
-
-fn rdp_indices(
-    points: &[TrackPoint],
-    start: usize,
-    end: usize,
-    tolerance_km: f64,
-    kept: &mut std::collections::BTreeSet<usize>,
-) {
-    kept.insert(start);
-    kept.insert(end);
-
-    if end <= start + 1 {
-        return;
-    }
-
-    let a = &points[start];
-    let b = &points[end];
-
-    let mut max_dist = 0.0_f64;
-    let mut max_idx = start;
-
-    for (i, p) in points.iter().enumerate().take(end).skip(start + 1) {
-        let d = perpendicular_distance_km(
-            p.latitude(),
-            p.longitude(),
-            a.latitude(),
-            a.longitude(),
-            b.latitude(),
-            b.longitude(),
-        );
-        if d > max_dist {
-            max_dist = d;
-            max_idx = i;
-        }
-    }
-
-    if max_dist > tolerance_km {
-        rdp_indices(points, start, max_idx, tolerance_km, kept);
-        rdp_indices(points, max_idx, end, tolerance_km, kept);
-    }
-}
-
-fn perpendicular_distance_km(
-    p_lat: f64,
-    p_lon: f64,
-    a_lat: f64,
-    a_lon: f64,
-    b_lat: f64,
-    b_lon: f64,
-) -> f64 {
-    let dlat = b_lat - a_lat;
-    let dlon = b_lon - a_lon;
-    let len_sq = dlat * dlat + dlon * dlon;
-
-    if len_sq == 0.0 {
-        return haversine_km(a_lat, a_lon, p_lat, p_lon);
-    }
-
-    let t = ((p_lat - a_lat) * dlat + (p_lon - a_lon) * dlon) / len_sq;
-    let t = t.clamp(0.0, 1.0);
-
-    let q_lat = a_lat + t * dlat;
-    let q_lon = a_lon + t * dlon;
-
-    haversine_km(p_lat, p_lon, q_lat, q_lon)
-}
-
-fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    const R: f64 = 6_371.0;
-    let dlat = (lat2 - lat1).to_radians();
-    let dlon = (lon2 - lon1).to_radians();
-    let a = (dlat / 2.0).sin().powi(2)
-        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
-    2.0 * R * a.sqrt().asin()
 }
 
 #[derive(Debug, Clone)]
