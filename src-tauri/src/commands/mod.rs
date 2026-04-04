@@ -744,6 +744,27 @@ pub fn simplify_track(
     Ok(())
 }
 
+// ── Track style ───────────────────────────────────────────────────────────────
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn set_track_line_width(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    width: f32,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state.set_track_line_width(LayerId::new(layer_id), TrackId::new(track_id), width);
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Read endpoints ────────────────────────────────────────────────────────────
 
 #[derive(serde::Serialize)]

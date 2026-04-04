@@ -48,6 +48,7 @@ pub fn run() {
             commands::delete_waypoint,
             commands::rename_waypoint,
             commands::simplify_track,
+            commands::set_track_line_width,
             commands::get_track_detail,
             commands::get_waypoints,
             commands::get_simplified_preview,
