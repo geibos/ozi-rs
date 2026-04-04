@@ -511,6 +511,169 @@ pub fn toggle_track_visible(
     Ok(())
 }
 
+// ── Track point and track mutations ───────────────────────────────────────────
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn move_track_point(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    segment_id: u64,
+    point_id: u64,
+    position: [f64; 2],
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId, TrackPointId, TrackSegmentId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_move_track_point(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackSegmentId::new(segment_id),
+            TrackPointId::new(point_id),
+            position[0],
+            position[1],
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn delete_track_point(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    segment_id: u64,
+    point_id: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId, TrackPointId, TrackSegmentId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_delete_track_point(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackSegmentId::new(segment_id),
+            TrackPointId::new(point_id),
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn insert_track_point(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    segment_id: u64,
+    index: usize,
+    position: [f64; 2],
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId, TrackSegmentId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_insert_track_point(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackSegmentId::new(segment_id),
+            index,
+            position[0],
+            position[1],
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn split_segment(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    segment_id: u64,
+    point_id: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId, TrackPointId, TrackSegmentId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_split_segment(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackSegmentId::new(segment_id),
+            TrackPointId::new(point_id),
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn join_segments(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    segment_id_a: u64,
+    segment_id_b: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId, TrackSegmentId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_join_segments(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackSegmentId::new(segment_id_a),
+            TrackSegmentId::new(segment_id_b),
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn delete_track(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_delete_track(LayerId::new(layer_id), TrackId::new(track_id))
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]

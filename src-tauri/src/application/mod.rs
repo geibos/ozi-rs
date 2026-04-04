@@ -5,7 +5,7 @@ pub use crate::infrastructure::import::PltImportError;
 pub use commands::{CommandError, CommandStack, ProjectCommand};
 pub use import::{ArchiveImportError, ArchiveImportReport};
 
-use crate::domain::{LayerId, Project, TrackId};
+use crate::domain::{LayerId, Project, ProjectLayerError, TrackId, TrackPointId, TrackSegmentId, WaypointId};
 use crate::infrastructure::import::{
     OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
@@ -543,6 +543,171 @@ impl AppState {
             &mut self.project,
             &commands::ProjectCommand::rename_track(layer_id, track_id, old_name, new_name),
         );
+    }
+
+    /// Move a track point (uses apply_or_merge for drag coalescing).
+    pub fn apply_move_track_point(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        lat: f64,
+        lon: f64,
+    ) -> Result<(), ProjectLayerError> {
+        let (old_lat, old_lon) = self
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+            .and_then(|t| t.segments().iter().find(|s| s.id() == segment_id))
+            .and_then(|s| s.points().iter().find(|p| p.id() == point_id))
+            .map(|p| (p.latitude(), p.longitude()))
+            .unwrap_or((lat, lon));
+
+        let cmd = commands::ProjectCommand::move_track_point(
+            layer_id, track_id, segment_id, point_id, lat, lon, old_lat, old_lon,
+        );
+        self.history
+            .apply_or_merge(cmd, &mut self.project)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    /// Delete a track point.
+    pub fn apply_delete_track_point(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+    ) -> Result<(), ProjectLayerError> {
+        let cmd = commands::ProjectCommand::delete_track_point(
+            layer_id, track_id, segment_id, point_id,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    /// Insert a track point at a given index. Generates a new point ID.
+    pub fn apply_insert_track_point(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        index: usize,
+        lat: f64,
+        lon: f64,
+    ) -> Result<(), ProjectLayerError> {
+        use crate::domain::TrackPoint;
+
+        let new_id = {
+            let max_id = self
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+                .map(|t| {
+                    t.segments()
+                        .iter()
+                        .flat_map(|s| s.points().iter().map(|p| p.id().value()))
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+            TrackPointId::new(max_id + 1)
+        };
+
+        let point = TrackPoint::new(new_id, lat, lon);
+        let cmd = commands::ProjectCommand::insert_track_point(
+            layer_id, track_id, segment_id, index, point,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    /// Split a track segment at a given point. Pre-generates new segment ID.
+    pub fn apply_split_segment(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+    ) -> Result<(), ProjectLayerError> {
+        let new_segment_id = {
+            let max_id = self
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+                .map(|t| {
+                    t.segments()
+                        .iter()
+                        .map(|s| s.id().value())
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+            TrackSegmentId::new(max_id + 1)
+        };
+
+        let cmd = commands::ProjectCommand::split_segment(
+            layer_id,
+            track_id,
+            segment_id,
+            point_id,
+            new_segment_id,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    /// Join two track segments.
+    pub fn apply_join_segments(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id_a: TrackSegmentId,
+        segment_id_b: TrackSegmentId,
+    ) -> Result<(), ProjectLayerError> {
+        let cmd = commands::ProjectCommand::join_segments(
+            layer_id,
+            track_id,
+            segment_id_a,
+            segment_id_b,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    /// Delete a track from a layer.
+    pub fn apply_delete_track(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+    ) -> Result<(), ProjectLayerError> {
+        let cmd = commands::ProjectCommand::delete_track(layer_id, track_id);
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
     }
 
     pub fn export_layer_to_gpx(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
