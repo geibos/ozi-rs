@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
-  import { appState, activeMap, editModeActive, selectedPointId, selectedTrack, addWaypointMode } from "../lib/stores";
+  import { appState, activeMap, editModeActive, selectedPointId, selectedTrack, addWaypointMode, simplifyState } from "../lib/stores";
   import {
     deleteTrackPoint,
     getTrackDetail,
@@ -440,6 +440,69 @@
       canvas.style.cursor = "crosshair";
     } else if (!$editModeActive) {
       canvas.style.cursor = "";
+    }
+  });
+
+  $effect(() => {
+    if (!map) return;
+
+    const state = $simplifyState;
+
+    function updateSimplifyPreview() {
+      if (!map) return;
+      if (!state.active || !state.preview) {
+        if (map.getLayer("simplify-preview-line")) {
+          map.removeLayer("simplify-preview-line");
+        }
+        if (map.getSource("simplify-preview")) {
+          map.removeSource("simplify-preview");
+        }
+        return;
+      }
+
+      const { preview } = state;
+      const geojson: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
+        type: "FeatureCollection",
+        features: preview.segments.map((seg) => ({
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: seg.kept_points.map((pt) => [pt.lon, pt.lat]),
+          },
+        })),
+      };
+
+      if (!map.getSource("simplify-preview")) {
+        map.addSource("simplify-preview", {
+          type: "geojson",
+          data: geojson,
+        });
+        map.addLayer({
+          id: "simplify-preview-line",
+          type: "line",
+          source: "simplify-preview",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#ff6600",
+            "line-width": 3,
+          },
+        });
+      } else {
+        const source = map.getSource("simplify-preview");
+        if (source && source.type === "geojson") {
+          source.setData(geojson);
+        }
+      }
+    }
+
+    if (!map.isStyleLoaded()) {
+      map.once("load", updateSimplifyPreview);
+    } else {
+      updateSimplifyPreview();
     }
   });
 </script>

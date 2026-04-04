@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { appState, tracksPanelOpen, selectedTrack } from "../lib/stores";
+  import { appState, tracksPanelOpen, selectedTrack, simplifyState } from "../lib/stores";
   import { getTracksGeojson, renameTrack, toggleTrackVisible, exportGpx } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
+  import SimplifyPanel from "./SimplifyPanel.svelte";
 
   interface TrackFeature {
     layerId: bigint;
@@ -103,6 +104,21 @@
             {/if}
 
             <div class="actions">
+              {#if $selectedTrack?.trackId === track.trackId}
+                <button
+                  class="icon-btn"
+                  title="Simplify Track"
+                  onclick={() => {
+                    simplifyState.set({
+                      active: true,
+                      layerId: track.layerId,
+                      trackId: track.trackId,
+                      tolerance: 10,
+                      preview: null
+                    });
+                  }}
+                >〰</button>
+              {/if}
               <button
                 class="icon-btn"
                 title={track.visible ? "Hide" : "Show"}
@@ -120,6 +136,7 @@
         {/each}
       {/if}
     </div>
+    <SimplifyPanel />
   </div>
 {/if}
 

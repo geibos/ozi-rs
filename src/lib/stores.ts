@@ -3,6 +3,7 @@ import type {
   AppStateDto,
   DownloadProgressPayload,
   LizaProjectSummaryDto,
+  SimplifiedPreview,
 } from "./types";
 import { getAppState } from "./api";
 
@@ -69,6 +70,19 @@ export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | nul
 export const selectedWaypointId: import("svelte/store").Writable<bigint | null> = writable(null);
 export const selectedPointId = writable<bigint | null>(null);
 export const bundleLoaderOpen = writable(false);
+export const simplifyState = writable<{
+  active: boolean;
+  layerId: bigint;
+  trackId: bigint;
+  tolerance: number;
+  preview: SimplifiedPreview | null;
+}>({
+  active: false,
+  layerId: BigInt(0),
+  trackId: BigInt(0),
+  tolerance: 10,
+  preview: null,
+});
 export const selectedTheme = writable<string>(
   localStorage.getItem("theme") ?? "auto"
 );
