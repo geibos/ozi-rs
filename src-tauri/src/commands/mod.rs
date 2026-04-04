@@ -858,6 +858,86 @@ pub fn get_waypoints(
     Ok(waypoints)
 }
 
+#[derive(serde::Serialize)]
+pub struct SimplifiedSegmentDto {
+    pub id: u64,
+    pub original_count: usize,
+    pub simplified_count: usize,
+    pub kept_points: Vec<PointDetailDto>,
+}
+
+#[derive(serde::Serialize)]
+pub struct SimplifiedPreviewDto {
+    pub original_count: usize,
+    pub simplified_count: usize,
+    pub segments: Vec<SimplifiedSegmentDto>,
+}
+
+#[tauri::command]
+pub fn get_simplified_preview(
+    state: State<SharedState>,
+    layer_id: u64,
+    track_id: u64,
+    tolerance: f64,
+) -> Result<SimplifiedPreviewDto, String> {
+    use crate::domain::{simplify_track_points, LayerId, TrackId};
+    let app_state = lock_app_state(state.inner())?;
+    let lid = LayerId::new(layer_id);
+    let tid = TrackId::new(track_id);
+
+    let layer = app_state
+        .track_layers()
+        .iter()
+        .find(|l| l.id() == lid)
+        .ok_or_else(|| format!("track layer {layer_id} not found"))?;
+
+    let track = layer
+        .tracks()
+        .iter()
+        .find(|t| t.id() == tid)
+        .ok_or_else(|| format!("track {track_id} not found in layer {layer_id}"))?;
+
+    let mut total_original = 0usize;
+    let mut total_simplified = 0usize;
+
+    let segments = track
+        .segments()
+        .iter()
+        .map(|seg| {
+            let pts = seg.points();
+            let kept_indices = simplify_track_points(pts, tolerance);
+            let original_count = pts.len();
+            let simplified_count = kept_indices.len();
+            total_original += original_count;
+            total_simplified += simplified_count;
+
+            let kept_points = kept_indices
+                .iter()
+                .map(|&i| PointDetailDto {
+                    id: pts[i].id().value(),
+                    lat: pts[i].latitude(),
+                    lon: pts[i].longitude(),
+                    elevation: pts[i].elevation().map(|e| e as f32),
+                    timestamp: pts[i].timestamp().map(|ts| ts.to_rfc3339()),
+                })
+                .collect();
+
+            SimplifiedSegmentDto {
+                id: seg.id().value(),
+                original_count,
+                simplified_count,
+                kept_points,
+            }
+        })
+        .collect();
+
+    Ok(SimplifiedPreviewDto {
+        original_count: total_original,
+        simplified_count: total_simplified,
+        segments,
+    })
+}
+
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]
