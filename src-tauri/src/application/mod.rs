@@ -514,6 +514,17 @@ impl AppState {
         import::import_plt_file_into_project(&mut self.project, &mut self.history, &path)
     }
 
+    pub fn set_waypoint_symbol(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        symbol: Option<String>,
+    ) {
+        let _ = self
+            .project
+            .set_waypoint_symbol_in_layer(layer_id, waypoint_id, symbol);
+    }
+
     pub fn set_track_color(&mut self, layer_id: LayerId, track_id: TrackId, color: [u8; 4]) {
         if let Ok(track) = self.project.track_mut(layer_id.value(), track_id.value()) {
             track.style_mut().color = color;

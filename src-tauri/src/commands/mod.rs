@@ -495,6 +495,25 @@ pub fn set_track_color(
 
 #[tauri::command]
 #[allow(clippy::question_mark)]
+pub fn set_waypoint_symbol(
+    layer_id: u64,
+    waypoint_id: u64,
+    symbol: Option<String>,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(app_state) => app_state,
+        Err(err) => return Err(err),
+    };
+    app_state.set_waypoint_symbol(LayerId::new(layer_id), WaypointId::new(waypoint_id), symbol);
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
 pub fn toggle_track_visible(
     layer_id: u64,
     track_id: u64,

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { appState, waypointsPanelOpen, selectedWaypointId } from "../lib/stores";
-  import { getWaypoints, deleteWaypoint, renameWaypoint } from "../lib/api";
+  import { getWaypoints, deleteWaypoint, renameWaypoint, setWaypointSymbol } from "../lib/api";
   import type { WaypointData } from "../lib/types";
+  import SymbolPicker from "./SymbolPicker.svelte";
 
   // Note: MVP single-layer assumption.
   // We'll hardcode layerId 1n until backend fully provides layer ID list.
@@ -10,23 +11,6 @@
   let waypoints: WaypointData[] = $state([]);
   let editingWaypoint: number | null = $state(null);
   let editName = $state("");
-
-  const SYMBOL_ICONS: Record<string, string> = {
-    flag: '🏁',
-    camp: '🏕️',
-    danger: '⚠️',
-    water: '💧',
-    shelter: '🏠',
-    'meeting-point': '👥',
-    start: '🟢',
-    finish: '🏁',
-    viewpoint: '👁️',
-    parking: '🅿️',
-  };
-
-  function symbolIcon(symbol?: string): string {
-    return symbol ? (SYMBOL_ICONS[symbol] ?? '📍') : '📍';
-  }
 
   $effect(() => {
     if ($appState) {
@@ -66,6 +50,10 @@
   function selectWaypoint(wp: WaypointData) {
     selectedWaypointId.set(BigInt(wp.id));
   }
+
+  async function handleSetSymbol(wp: WaypointData, symbol: string | null) {
+    await setWaypointSymbol(currentLayerId, BigInt(wp.id), symbol);
+  }
 </script>
 
 {#if $waypointsPanelOpen}
@@ -80,10 +68,10 @@
       {:else}
         {#each waypoints as wp (wp.id)}
           <div class="waypoint-row">
-            <span class="symbol-icon" title={wp.symbol ?? "default"}>
-              {symbolIcon(wp.symbol)}
-            </span>
-            <!-- TODO: SymbolPicker integration -->
+            <SymbolPicker
+              symbol={wp.symbol}
+              onSelect={(symbol) => handleSetSymbol(wp, symbol)}
+            />
 
             {#if editingWaypoint === wp.id}
               <input
@@ -178,16 +166,6 @@
 
   .waypoint-row:hover {
     background: var(--ctp-surface0);
-  }
-
-  .symbol-icon {
-    font-size: 14px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
   }
 
   .waypoint-name {
