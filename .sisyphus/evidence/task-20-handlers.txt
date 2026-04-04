@@ -1,0 +1,24 @@
+Task 20: Tauri handlers for track commands (6 handlers)
+
+Handlers added to src-tauri/src/commands/mod.rs:
+- move_track_point(state, app, layer_id, track_id, segment_id, point_id, position: [f64;2])
+- delete_track_point(state, app, layer_id, track_id, segment_id, point_id)
+- insert_track_point(state, app, layer_id, track_id, segment_id, index, position: [f64;2])
+- split_segment(state, app, layer_id, track_id, segment_id, point_id)
+- join_segments(state, app, layer_id, track_id, segment_id_a, segment_id_b)
+- delete_track(state, app, layer_id, track_id)
+
+AppState methods added to src-tauri/src/application/mod.rs:
+- apply_move_track_point(...) -> Result<(), ProjectLayerError>   [uses apply_or_merge for drag coalescing]
+- apply_delete_track_point(...) -> Result<(), ProjectLayerError>
+- apply_insert_track_point(...) -> Result<(), ProjectLayerError> [generates new TrackPointId via max+1]
+- apply_split_segment(...) -> Result<(), ProjectLayerError>      [generates new TrackSegmentId via max+1]
+- apply_join_segments(...) -> Result<(), ProjectLayerError>
+- apply_delete_track(...) -> Result<(), ProjectLayerError>
+
+All 6 registered in generate_handler! in src-tauri/src/lib.rs
+
+Note: move_track_point and insert_track_point use position: [f64; 2] instead of lat/lon to stay under clippy's 7-arg limit.
+
+cargo test: 148 passed
+cargo clippy: 0 warnings
