@@ -10,6 +10,7 @@
     getOziMetadata,
     insertTrackPoint,
     moveTrackPoint,
+    moveWaypoint,
     addWaypoint,
     getWaypoints,
   } from "../lib/api";
@@ -234,10 +235,27 @@
       for (const wp of waypoints) {
         const el = document.createElement("div");
         el.className = "waypoint-marker";
-        const marker = new maplibregl.Marker({ element: el })
+        el.style.cursor = "grab";
+        const wpId = wp.id;
+        const marker = new maplibregl.Marker({ element: el, draggable: true })
           .setLngLat([wp.lon, wp.lat])
           .setPopup(new maplibregl.Popup({ offset: 16 }).setText(wp.name))
           .addTo(map);
+
+        marker.on("dragstart", () => {
+          el.style.cursor = "grabbing";
+        });
+
+        marker.on("dragend", async () => {
+          el.style.cursor = "grab";
+          const lngLat = marker.getLngLat();
+          try {
+            await moveWaypoint(1n, BigInt(wpId), [lngLat.lat, lngLat.lng]); // TODO: multi-layer
+          } catch (error) {
+            console.error("Failed to move waypoint", error);
+          }
+        });
+
         waypointMarkers.push(marker);
       }
     } catch {
@@ -515,6 +533,10 @@
     background: var(--ctp-yellow, #e5c890);
     border: 2px solid var(--ctp-crust, #232634);
     border-radius: 50%;
-    cursor: pointer;
+    cursor: grab;
+  }
+
+  :global(.waypoint-marker:active) {
+    cursor: grabbing;
   }
 </style>
