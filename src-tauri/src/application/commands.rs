@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::domain::{
-    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, Waypoint,
-    WaypointId, WaypointLayer,
+    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPointId,
+    TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
 };
 use std::path::PathBuf;
 
@@ -51,6 +51,16 @@ pub enum ProjectCommand {
         waypoint_id: WaypointId,
         latitude: f64,
         longitude: f64,
+    },
+    MoveTrackPoint {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        lat: f64,
+        lon: f64,
+        old_lat: f64,
+        old_lon: f64,
     },
     RenameTrack {
         layer_id: LayerId,
@@ -133,6 +143,28 @@ impl ProjectCommand {
         }
     }
 
+    pub fn move_track_point(
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        lat: f64,
+        lon: f64,
+        old_lat: f64,
+        old_lon: f64,
+    ) -> Self {
+        Self::MoveTrackPoint {
+            layer_id,
+            track_id,
+            segment_id,
+            point_id,
+            lat,
+            lon,
+            old_lat,
+            old_lon,
+        }
+    }
+
     pub fn rename_track(
         layer_id: LayerId,
         track_id: TrackId,
@@ -188,6 +220,25 @@ impl ProjectCommand {
                 longitude,
             } => {
                 project.move_waypoint_in_layer(*layer_id, *waypoint_id, *latitude, *longitude)?;
+                Ok(())
+            }
+            Self::MoveTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                lat,
+                lon,
+                ..
+            } => {
+                project.move_point_in_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id.value(),
+                    point_id.value(),
+                    *lat,
+                    *lon,
+                )?;
                 Ok(())
             }
             Self::RenameTrack {
@@ -276,6 +327,25 @@ impl ProjectCommand {
                     longitude: previous_longitude,
                 }
             }
+            Self::MoveTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                lat,
+                lon,
+                old_lat,
+                old_lon,
+            } => Self::MoveTrackPoint {
+                layer_id: *layer_id,
+                track_id: *track_id,
+                segment_id: *segment_id,
+                point_id: *point_id,
+                lat: *old_lat,
+                lon: *old_lon,
+                old_lat: *lat,
+                old_lon: *lon,
+            },
             Self::RenameTrack {
                 layer_id,
                 track_id,
@@ -383,6 +453,27 @@ impl ProjectCommand {
                     ..
                 },
             ) => left_layer_id == right_layer_id && left_waypoint_id == right_waypoint_id,
+            (
+                Self::MoveTrackPoint {
+                    layer_id: left_layer_id,
+                    track_id: left_track_id,
+                    segment_id: left_segment_id,
+                    point_id: left_point_id,
+                    ..
+                },
+                Self::MoveTrackPoint {
+                    layer_id: right_layer_id,
+                    track_id: right_track_id,
+                    segment_id: right_segment_id,
+                    point_id: right_point_id,
+                    ..
+                },
+            ) => {
+                left_layer_id == right_layer_id
+                    && left_track_id == right_track_id
+                    && left_segment_id == right_segment_id
+                    && left_point_id == right_point_id
+            }
             (
                 Self::RenameTrack {
                     layer_id: left_layer_id,
@@ -492,8 +583,8 @@ impl CommandStack {
 mod tests {
     use super::{CommandError, CommandStack, ProjectCommand};
     use crate::domain::{
-        LayerId, Project, ProjectLayerError, Track, TrackId, TrackLayer, Waypoint, WaypointId,
-        WaypointLayer,
+        LayerId, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint,
+        TrackPointId, TrackSegment, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
     };
     use std::path::Path;
 
@@ -706,6 +797,126 @@ mod tests {
         let waypoint = &project.waypoint_layers()[0].waypoints()[0];
         assert_eq!(waypoint.latitude(), 53.9);
         assert_eq!(waypoint.longitude(), 27.5667);
+    }
+
+    #[test]
+    fn move_track_point_apply_changes_coordinates() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        let point_id = TrackPointId::new(3);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(point_id, 53.9, 27.5667));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::move_track_point(
+                    layer_id, track_id, segment_id, point_id, 54.1, 27.8, 53.9, 27.5667,
+                ),
+            )
+            .unwrap();
+
+        let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
+        assert_eq!(point.latitude(), 54.1);
+        assert_eq!(point.longitude(), 27.8);
+    }
+
+    #[test]
+    fn move_track_point_undo_restores_coordinates() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        let point_id = TrackPointId::new(3);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(point_id, 53.9, 27.5667));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::move_track_point(
+                    layer_id, track_id, segment_id, point_id, 54.1, 27.8, 53.9, 27.5667,
+                ),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
+        assert_eq!(point.latitude(), 53.9);
+        assert_eq!(point.longitude(), 27.5667);
+    }
+
+    #[test]
+    fn coalesce_move_track_point_merges_sequential_moves() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        let point_id = TrackPointId::new(3);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(point_id, 53.9, 27.5667));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply_or_merge(
+                ProjectCommand::move_track_point(
+                    layer_id, track_id, segment_id, point_id, 54.0, 27.7, 53.9, 27.5667,
+                ),
+                &mut project,
+            )
+            .unwrap();
+
+        history
+            .apply_or_merge(
+                ProjectCommand::move_track_point(
+                    layer_id, track_id, segment_id, point_id, 54.2, 27.9, 53.9, 27.5667,
+                ),
+                &mut project,
+            )
+            .unwrap();
+
+        assert_eq!(history.undo_history.len(), 3);
+        assert!(history.undo(&mut project));
+        let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
+        assert_eq!(point.latitude(), 53.9);
+        assert_eq!(point.longitude(), 27.5667);
     }
 
     #[test]
