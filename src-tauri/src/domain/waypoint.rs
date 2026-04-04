@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct WaypointId(u64);
@@ -5,6 +7,10 @@ pub struct WaypointId(u64);
 impl WaypointId {
     pub const fn new(value: u64) -> Self {
         Self(value)
+    }
+
+    pub const fn value(&self) -> u64 {
+        self.0
     }
 }
 

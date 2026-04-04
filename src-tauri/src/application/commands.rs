@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::domain::{
     LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, Waypoint,
     WaypointId, WaypointLayer,
@@ -175,7 +177,7 @@ impl ProjectCommand {
                 new_name,
                 ..
             } => {
-                if let Some(track) = project.track_mut(*layer_id, *track_id) {
+                if let Ok(track) = project.track_mut(layer_id.value(), track_id.value()) {
                     track.set_name(new_name.clone());
                 }
                 Ok(())
@@ -284,7 +286,9 @@ mod tests {
 
         assert_eq!(
             error,
-            CommandError::ProjectLayer(ProjectLayerError::WaypointLayerUnavailable(LayerId::new(30)))
+            CommandError::ProjectLayer(ProjectLayerError::WaypointLayerUnavailable(LayerId::new(
+                30
+            )))
         );
         assert!(!history.can_undo());
     }
