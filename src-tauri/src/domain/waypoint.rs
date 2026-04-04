@@ -18,6 +18,7 @@ impl WaypointId {
 pub struct Waypoint {
     id: WaypointId,
     name: String,
+    symbol: Option<String>,
     latitude: f64,
     longitude: f64,
 }
@@ -27,6 +28,7 @@ impl Waypoint {
         Self {
             id,
             name: name.into(),
+            symbol: None,
             latitude,
             longitude,
         }
@@ -40,6 +42,10 @@ impl Waypoint {
         &self.name
     }
 
+    pub fn symbol(&self) -> Option<&str> {
+        self.symbol.as_deref()
+    }
+
     pub const fn latitude(&self) -> f64 {
         self.latitude
     }
@@ -51,6 +57,14 @@ impl Waypoint {
     pub fn move_to(&mut self, latitude: f64, longitude: f64) {
         self.latitude = latitude;
         self.longitude = longitude;
+    }
+
+    pub fn set_name(&mut self, name: String) -> String {
+        std::mem::replace(&mut self.name, name)
+    }
+
+    pub fn set_symbol(&mut self, symbol: Option<String>) -> Option<String> {
+        std::mem::replace(&mut self.symbol, symbol)
     }
 }
 
@@ -76,5 +90,18 @@ mod tests {
 
         assert_eq!(waypoint.latitude(), 54.1);
         assert_eq!(waypoint.longitude(), 27.8);
+    }
+
+    #[test]
+    fn waypoint_setters_return_previous_values_for_undo() {
+        let mut waypoint = Waypoint::new(WaypointId::new(8), "Camp", 53.9, 27.5667);
+
+        assert_eq!(waypoint.symbol(), None);
+        assert_eq!(waypoint.set_name("Base camp".to_owned()), "Camp");
+        assert_eq!(waypoint.name(), "Base camp");
+        assert_eq!(waypoint.set_symbol(Some("Flag".to_owned())), None);
+        assert_eq!(waypoint.symbol(), Some("Flag"));
+        assert_eq!(waypoint.set_symbol(None), Some("Flag".to_owned()));
+        assert_eq!(waypoint.symbol(), None);
     }
 }

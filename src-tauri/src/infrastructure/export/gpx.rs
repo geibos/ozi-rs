@@ -1,4 +1,4 @@
-use crate::domain::{Track, TrackLayer};
+use crate::domain::{Track, TrackLayer, Waypoint};
 use std::fmt::Write as FmtWrite;
 use std::io;
 use std::path::Path;
@@ -20,6 +20,21 @@ pub fn build_gpx_xml(tracks: &[Track]) -> String {
 
     for track in tracks {
         write_track(&mut out, track);
+    }
+
+    out.push_str("</gpx>\n");
+    out
+}
+
+pub fn build_waypoint_gpx_xml(waypoints: &[Waypoint]) -> String {
+    let mut out = String::new();
+
+    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    out.push_str("<gpx version=\"1.1\" creator=\"ozi-rs\"\n");
+    out.push_str("  xmlns=\"http://www.topografix.com/GPX/1/1\">\n");
+
+    for waypoint in waypoints {
+        write_waypoint(&mut out, waypoint);
     }
 
     out.push_str("</gpx>\n");
@@ -64,6 +79,27 @@ fn write_track(out: &mut String, track: &Track) {
 
     out.push_str("  </trk>\n");
 }
+
+fn write_waypoint(out: &mut String, waypoint: &Waypoint) {
+    let _ = writeln!(
+        out,
+        "  <wpt lat=\"{:.6}\" lon=\"{:.6}\">",
+        waypoint.latitude(),
+        waypoint.longitude()
+    );
+    out.push_str("    <name>");
+    xml_escape_into(out, waypoint.name());
+    out.push_str("</name>\n");
+    if let Some(symbol) = waypoint.symbol() {
+        out.push_str("    <sym>");
+        xml_escape_into(out, symbol);
+        out.push_str("</sym>\n");
+    }
+    out.push_str("  </wpt>\n");
+}
+
+const _: fn(&[Waypoint]) -> String = build_waypoint_gpx_xml;
+const _: fn(&mut String, &Waypoint) = write_waypoint;
 
 fn xml_escape_into(out: &mut String, s: &str) {
     for ch in s.chars() {
@@ -120,8 +156,11 @@ pub fn rgba_to_garmin_color(rgba: [u8; 4]) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_gpx_xml, rgba_to_garmin_color};
-    use crate::domain::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+    use super::{build_gpx_xml, build_waypoint_gpx_xml, rgba_to_garmin_color};
+    use crate::domain::{
+        Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId, Waypoint,
+        WaypointId,
+    };
 
     #[test]
     fn rgba_to_garmin_color_maps_pure_red() {
@@ -190,6 +229,26 @@ mod tests {
         let xml = build_gpx_xml(&[track]);
 
         assert!(xml.contains("Route &amp; &lt;test&gt;"));
+    }
+
+    #[test]
+    fn build_waypoint_gpx_xml_writes_symbol_when_present() {
+        let mut waypoint = Waypoint::new(WaypointId::new(1), "Camp", 55.0, 37.0);
+        waypoint.set_symbol(Some("Flag".to_owned()));
+
+        let xml = build_waypoint_gpx_xml(&[waypoint]);
+
+        assert!(xml.contains("<name>Camp</name>"));
+        assert!(xml.contains("<sym>Flag</sym>"));
+    }
+
+    #[test]
+    fn build_waypoint_gpx_xml_skips_symbol_when_absent() {
+        let waypoint = Waypoint::new(WaypointId::new(1), "Camp", 55.0, 37.0);
+
+        let xml = build_waypoint_gpx_xml(&[waypoint]);
+
+        assert!(!xml.contains("<sym>"));
     }
 
     #[test]

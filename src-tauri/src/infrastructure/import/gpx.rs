@@ -236,15 +236,20 @@ fn gpx_time_to_chrono(t: gpx::Time) -> Option<chrono::DateTime<chrono::Utc>> {
 
 fn convert_waypoint(waypoint_index: usize, file_stem: &str, waypoint: gpx::Waypoint) -> Waypoint {
     let coordinates = waypoint.point();
-
-    Waypoint::new(
+    let mut imported_waypoint = Waypoint::new(
         WaypointId::new((waypoint_index + 1) as u64),
         waypoint
             .name
             .unwrap_or_else(|| format!("{file_stem} waypoint {}", waypoint_index + 1)),
         coordinates.y(),
         coordinates.x(),
-    )
+    );
+
+    if let Some(symbol) = waypoint.symbol {
+        let _ = imported_waypoint.set_symbol(Some(symbol));
+    }
+
+    imported_waypoint
 }
 
 fn archive_file_stem(path: &str) -> String {
@@ -259,10 +264,36 @@ fn archive_file_stem(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::archive_file_stem;
+    use super::{archive_file_stem, import_gpx_file};
+    use std::path::PathBuf;
 
     #[test]
     fn archive_file_stem_uses_last_path_segment_without_extension() {
         assert_eq!(archive_file_stem("nested/field-track.gpx"), "field-track");
+    }
+
+    #[test]
+    fn import_gpx_file_reads_waypoint_symbol() {
+        let path = PathBuf::from(format!(
+            "{}/ozi-rs-waypoint-symbol-{}.gpx",
+            std::env::temp_dir().display(),
+            std::process::id()
+        ));
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ozi-rs" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="55.000000" lon="37.000000">
+    <name>Camp</name>
+    <sym>Flag</sym>
+  </wpt>
+</gpx>
+"#;
+
+        std::fs::write(&path, xml).unwrap();
+        let imported = import_gpx_file(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(imported.waypoints().len(), 1);
+        assert_eq!(imported.waypoints()[0].name(), "Camp");
+        assert_eq!(imported.waypoints()[0].symbol(), Some("Flag"));
     }
 }
