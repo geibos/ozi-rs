@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProjectLayerError {
-    MissingTrackLayer(LayerId),
-    MissingWaypointLayer(LayerId),
-    MissingWaypoint(LayerId, WaypointId),
+    TrackLayerNotPresent(LayerId),
+    WaypointLayerUnavailable(LayerId),
+    WaypointNotFound(LayerId, WaypointId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -247,7 +247,7 @@ impl Project {
             .iter_mut()
             .find(|layer| layer.id() == layer_id)
         else {
-            return Err(ProjectLayerError::MissingTrackLayer(layer_id));
+            return Err(ProjectLayerError::TrackLayerNotPresent(layer_id));
         };
 
         layer.add_track(track);
@@ -264,7 +264,7 @@ impl Project {
             .iter_mut()
             .find(|layer| layer.id() == layer_id)
         else {
-            return Err(ProjectLayerError::MissingWaypointLayer(layer_id));
+            return Err(ProjectLayerError::WaypointLayerUnavailable(layer_id));
         };
 
         layer.add_waypoint(waypoint);
@@ -290,7 +290,7 @@ impl Project {
             return Ok(());
         }
 
-        Err(ProjectLayerError::MissingWaypoint(layer_id, waypoint_id))
+        Err(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))
     }
 }
 
@@ -402,7 +402,7 @@ mod tests {
 
         assert_eq!(
             error,
-            ProjectLayerError::MissingTrackLayer(LayerId::new(99))
+            ProjectLayerError::TrackLayerNotPresent(LayerId::new(99))
         );
     }
 
@@ -452,7 +452,7 @@ mod tests {
 
         assert_eq!(
             error,
-            ProjectLayerError::MissingWaypoint(layer_id, WaypointId::new(99))
+            ProjectLayerError::WaypointNotFound(layer_id, WaypointId::new(99))
         );
     }
 }

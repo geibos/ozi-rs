@@ -205,7 +205,7 @@ impl Track {
             .iter()
             .flat_map(|s| s.points())
             .filter_map(|p| p.timestamp())
-            .last()?;
+            .next_back()?;
         Some(last - first)
     }
 

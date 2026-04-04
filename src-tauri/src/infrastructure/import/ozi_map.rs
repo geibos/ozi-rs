@@ -69,21 +69,21 @@ pub enum DirectImageFormat {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OziMapParseError {
-    MissingHeader,
-    MissingTitle,
-    MissingRasterReference,
-    MissingProjectionName,
-    MissingDatumName,
+    HeaderNotPresent,
+    TitleUnavailable,
+    RasterReferenceNotFound,
+    ProjectionNameUnknown,
+    DatumNameInvalid,
 }
 
 impl std::fmt::Display for OziMapParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingHeader => write!(f, "missing OziExplorer map header"),
-            Self::MissingTitle => write!(f, "missing OZI map title"),
-            Self::MissingRasterReference => write!(f, "missing OZI raster reference"),
-            Self::MissingProjectionName => write!(f, "missing OZI projection name"),
-            Self::MissingDatumName => write!(f, "missing OZI datum name"),
+            Self::HeaderNotPresent => write!(f, "missing OziExplorer map header"),
+            Self::TitleUnavailable => write!(f, "missing OZI map title"),
+            Self::RasterReferenceNotFound => write!(f, "missing OZI raster reference"),
+            Self::ProjectionNameUnknown => write!(f, "missing OZI projection name"),
+            Self::DatumNameInvalid => write!(f, "missing OZI datum name"),
         }
     }
 }
@@ -107,11 +107,11 @@ pub fn parse_ozi_map_metadata(
     let lines = normalized_lines(contents);
 
     validate_header(&lines)?;
-    let title = required_line(&lines, 1).ok_or(OziMapParseError::MissingTitle)?;
+    let title = required_line(&lines, 1).ok_or(OziMapParseError::TitleUnavailable)?;
     let raster_reference =
-        required_line(&lines, 2).ok_or(OziMapParseError::MissingRasterReference)?;
-    let projection_name = projection_name(&lines).ok_or(OziMapParseError::MissingProjectionName)?;
-    let datum_name = datum_name(&lines).ok_or(OziMapParseError::MissingDatumName)?;
+        required_line(&lines, 2).ok_or(OziMapParseError::RasterReferenceNotFound)?;
+    let projection_name = projection_name(&lines).ok_or(OziMapParseError::ProjectionNameUnknown)?;
+    let datum_name = datum_name(&lines).ok_or(OziMapParseError::DatumNameInvalid)?;
 
     Ok(OziMapMetadata {
         title: title.to_owned(),
@@ -134,14 +134,14 @@ fn normalized_lines(contents: &str) -> Vec<&str> {
 
 fn validate_header(lines: &[&str]) -> Result<(), OziMapParseError> {
     let Some(header) = required_line(lines, 0) else {
-        return Err(OziMapParseError::MissingHeader);
+        return Err(OziMapParseError::HeaderNotPresent);
     };
 
     if header.starts_with(OZI_MAP_HEADER_PREFIX) {
         return Ok(());
     }
 
-    Err(OziMapParseError::MissingHeader)
+    Err(OziMapParseError::HeaderNotPresent)
 }
 
 fn required_line<'a>(lines: &'a [&str], index: usize) -> Option<&'a str> {
@@ -317,7 +317,7 @@ mod tests {
         )
         .expect_err("missing header");
 
-        assert_eq!(error, OziMapParseError::MissingHeader);
+        assert_eq!(error, OziMapParseError::HeaderNotPresent);
     }
 
     #[test]
@@ -328,7 +328,7 @@ mod tests {
         )
         .expect_err("missing raster");
 
-        assert_eq!(error, OziMapParseError::MissingRasterReference);
+        assert_eq!(error, OziMapParseError::RasterReferenceNotFound);
     }
 
     #[test]

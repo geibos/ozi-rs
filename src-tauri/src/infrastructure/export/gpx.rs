@@ -35,9 +35,9 @@ fn write_track(out: &mut String, track: &Track) {
     let color_name = rgba_to_garmin_color(track.style().color);
     out.push_str("    <extensions>\n");
     out.push_str("      <gpxx:TrackExtension>\n");
-    let _ = write!(
+    let _ = writeln!(
         out,
-        "        <gpxx:DisplayColor>{color_name}</gpxx:DisplayColor>\n"
+        "        <gpxx:DisplayColor>{color_name}</gpxx:DisplayColor>"
     );
     out.push_str("      </gpxx:TrackExtension>\n");
     out.push_str("    </extensions>\n");
@@ -45,17 +45,17 @@ fn write_track(out: &mut String, track: &Track) {
     for segment in track.segments() {
         out.push_str("    <trkseg>\n");
         for point in segment.points() {
-            let _ = write!(
+            let _ = writeln!(
                 out,
-                "      <trkpt lat=\"{:.6}\" lon=\"{:.6}\">\n",
+                "      <trkpt lat=\"{:.6}\" lon=\"{:.6}\">",
                 point.latitude(),
                 point.longitude()
             );
             if let Some(elev) = point.elevation() {
-                let _ = write!(out, "        <ele>{:.1}</ele>\n", elev);
+                let _ = writeln!(out, "        <ele>{:.1}</ele>", elev);
             }
             if let Some(ts) = point.timestamp() {
-                let _ = write!(out, "        <time>{}</time>\n", ts.format("%+"));
+                let _ = writeln!(out, "        <time>{}</time>", ts.format("%+"));
             }
             out.push_str("      </trkpt>\n");
         }
