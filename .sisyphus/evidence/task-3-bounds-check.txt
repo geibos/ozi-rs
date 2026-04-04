@@ -1,0 +1,2 @@
+cargo test --all: 83 passed, 0 failed
+cargo clippy --all-targets --all-features -- -D warnings: passed

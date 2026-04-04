@@ -1,10 +1,6 @@
 pub mod tiles;
 
-pub use tiles::{get_ozi_metadata, get_ozi_tile, get_sqlite_tile};
-
-use crate::application::{
-    ActiveMapKind, AppState, DiagnosticLevel, OpenMapRequest,
-};
+use crate::application::{ActiveMapKind, AppState, DiagnosticLevel, OpenMapRequest};
 use crate::infrastructure::lizaalert;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -12,6 +8,14 @@ use std::thread;
 use tauri::{AppHandle, Emitter, State};
 
 pub type SharedState = Arc<Mutex<AppState>>;
+
+fn lock_app_state<'a>(
+    state: &'a SharedState,
+) -> Result<std::sync::MutexGuard<'a, AppState>, String> {
+    state
+        .lock()
+        .map_err(|e| format!("State lock poisoned: {}", e))
+}
 
 // ── Serializable DTOs ────────────────────────────────────────────────────────
 
@@ -76,17 +80,11 @@ struct DownloadProgressPayload {
     total_bytes: Option<u64>,
 }
 
-#[derive(serde::Serialize, Clone)]
-struct DiagnosticPayload {
-    level: &'static str,
-    message: String,
-}
-
 // ── State snapshot ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn get_app_state(state: State<SharedState>) -> AppStateDto {
-    let s = state.lock().unwrap();
+pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
+    let s = lock_app_state(state.inner())?;
 
     let projects = s
         .lizaalert_projects()
@@ -136,7 +134,7 @@ pub fn get_app_state(state: State<SharedState>) -> AppStateDto {
         })
         .collect();
 
-    AppStateDto {
+    Ok(AppStateDto {
         project_name: s.project_name().to_owned(),
         project_saved: s.project_file_path().is_some(),
         status: s.lizaalert_status().to_owned(),
@@ -148,14 +146,14 @@ pub fn get_app_state(state: State<SharedState>) -> AppStateDto {
         diagnostics,
         track_layer_count: s.track_layer_count(),
         waypoint_layer_count: s.waypoint_layer_count(),
-    }
+    })
 }
 
 // ── Track GeoJSON ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn get_tracks_geojson(state: State<SharedState>) -> serde_json::Value {
-    let s = state.lock().unwrap();
+pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value, String> {
+    let s = lock_app_state(state.inner())?;
     let mut features = Vec::new();
 
     for layer in s.track_layers() {
@@ -194,55 +192,66 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> serde_json::Value {
         }
     }
 
-    serde_json::json!({
+    Ok(serde_json::json!({
         "type": "FeatureCollection",
         "features": features,
-    })
+    }))
 }
 
 // ── LizaAlert project loading ─────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn load_projects(state: State<SharedState>, app: AppHandle) {
-    let started = state.lock().unwrap().begin_load_projects();
+pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+    let started = lock_app_state(state.inner())?.begin_load_projects();
     if started.is_none() {
-        return;
+        return Ok(());
     }
 
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
         let result = lizaalert::fetch_project_summaries();
-        state_arc.lock().unwrap().apply_projects_loaded(result);
+        if let Ok(mut s) = lock_app_state(&state_arc) {
+            s.apply_projects_loaded(result);
+        }
         let _ = app.emit("state-changed", ());
     });
+
+    Ok(())
 }
 
 #[tauri::command]
-pub fn load_project(slug: String, state: State<SharedState>, app: AppHandle) {
-    let data = state.lock().unwrap().begin_load_project(&slug);
+pub fn load_project(slug: String, state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+    let data = lock_app_state(state.inner())?.begin_load_project(&slug);
     let Some((summary, bundles_root)) = data else {
-        return;
+        return Ok(());
     };
 
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
         let result = lizaalert::open_project(summary, &bundles_root, |progress| {
-            state_arc
-                .lock()
-                .unwrap()
-                .apply_progress(progress.message.clone());
+            if let Ok(mut s) = lock_app_state(&state_arc) {
+                s.apply_progress(progress.message.clone());
+            }
             let _ = app.emit("state-changed", ());
         });
-        state_arc.lock().unwrap().apply_project_loaded(result);
+        if let Ok(mut s) = lock_app_state(&state_arc) {
+            s.apply_project_loaded(result);
+        }
         let _ = app.emit("state-changed", ());
     });
+
+    Ok(())
 }
 
 #[tauri::command]
-pub fn open_selected_map(map_name: String, state: State<SharedState>, app: AppHandle) {
-    let request = state.lock().unwrap().begin_open_map(&map_name);
+pub fn open_selected_map(
+    map_name: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let request = lock_app_state(state.inner())?.begin_open_map(&map_name);
     let Some(request) = request else {
-        return;
+        return Ok(());
     };
 
     match request {
@@ -250,15 +259,12 @@ pub fn open_selected_map(map_name: String, state: State<SharedState>, app: AppHa
             // OZI raster — open synchronously
             if selection.kind == ActiveMapKind::OziRaster {
                 let path = selection.local_path.clone();
-                match state.lock().unwrap().open_local_ozi_map(path) {
+                match lock_app_state(state.inner())?.open_local_ozi_map(path) {
                     Ok(()) => {}
-                    Err(e) => state
-                        .lock()
-                        .unwrap()
-                        .report_runtime_error(e.to_string()),
+                    Err(e) => lock_app_state(state.inner())?.report_runtime_error(e.to_string()),
                 }
             } else {
-                state.lock().unwrap().open_local_map_selection(selection);
+                lock_app_state(state.inner())?.open_local_map_selection(selection);
             }
             let _ = app.emit("state-changed", ());
         }
@@ -277,95 +283,111 @@ pub fn open_selected_map(map_name: String, state: State<SharedState>, app: AppHa
                         },
                     );
                 });
-                state_arc.lock().unwrap().apply_map_downloaded(&package_name, result);
+                if let Ok(mut s) = lock_app_state(&state_arc) {
+                    s.apply_map_downloaded(&package_name, result);
+                }
                 let _ = app.emit("state-changed", ());
             });
         }
     }
+
+    Ok(())
 }
 
 #[tauri::command]
-pub fn open_local_bundle(dir: String, state: State<SharedState>, app: AppHandle) {
-    let data = state
-        .lock()
-        .unwrap()
-        .begin_open_local_bundle(PathBuf::from(&dir));
+pub fn open_local_bundle(
+    dir: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let data = lock_app_state(state.inner())?.begin_open_local_bundle(PathBuf::from(&dir));
     let Some(dir_path) = data else {
-        return;
+        return Ok(());
     };
 
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
         let result = lizaalert::open_bundle_directory(&dir_path, |progress| {
-            state_arc
-                .lock()
-                .unwrap()
-                .apply_progress(progress.message.clone());
+            if let Ok(mut s) = lock_app_state(&state_arc) {
+                s.apply_progress(progress.message.clone());
+            }
             let _ = app.emit("state-changed", ());
         });
-        state_arc.lock().unwrap().apply_project_loaded(result);
+        if let Ok(mut s) = lock_app_state(&state_arc) {
+            s.apply_project_loaded(result);
+        }
         let _ = app.emit("state-changed", ());
     });
+
+    Ok(())
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn set_bundles_root(path: String, state: State<SharedState>, app: AppHandle) {
-    state
-        .lock()
-        .unwrap()
-        .set_bundles_root(PathBuf::from(path));
+pub fn set_bundles_root(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    lock_app_state(state.inner())?.set_bundles_root(PathBuf::from(path));
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 // ── Project persistence ───────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn save_project(path: String, state: State<SharedState>, app: AppHandle) {
-    state
-        .lock()
-        .unwrap()
-        .save_project_to(PathBuf::from(path));
+pub fn save_project(path: String, state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+    lock_app_state(state.inner())?.save_project_to(PathBuf::from(path));
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 #[tauri::command]
-pub fn load_project_file(path: String, state: State<SharedState>, app: AppHandle) {
-    state
-        .lock()
-        .unwrap()
-        .load_project_from(PathBuf::from(path));
+pub fn load_project_file(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    lock_app_state(state.inner())?.load_project_from(PathBuf::from(path));
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 // ── Import / export ───────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn import_gpx(path: String, state: State<SharedState>, app: AppHandle) -> Result<String, String> {
-    let result = state
-        .lock()
-        .unwrap()
+pub fn import_gpx(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let result = lock_app_state(state.inner())?
         .import_gpx_file(PathBuf::from(path))
         .map_err(|e| e.to_string())?;
     let _ = app.emit("state-changed", ());
     Ok(format!(
         "Imported {} tracks in {} layers",
-        result.imported_tracks(), result.imported_track_layers()
+        result.imported_tracks(),
+        result.imported_track_layers()
     ))
 }
 
 #[tauri::command]
-pub fn import_plt(path: String, state: State<SharedState>, app: AppHandle) -> Result<String, String> {
-    let result = state
-        .lock()
-        .unwrap()
+pub fn import_plt(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let result = lock_app_state(state.inner())?
         .import_plt_file(PathBuf::from(path))
         .map_err(|e| e.to_string())?;
     let _ = app.emit("state-changed", ());
     Ok(format!(
         "Imported {} tracks in {} layers",
-        result.imported_tracks(), result.imported_track_layers()
+        result.imported_tracks(),
+        result.imported_track_layers()
     ))
 }
 
@@ -375,81 +397,91 @@ pub fn export_gpx(
     path: String,
     state: State<SharedState>,
     app: AppHandle,
-) {
+) -> Result<(), String> {
     use crate::domain::LayerId;
-    state
-        .lock()
-        .unwrap()
-        .export_layer_to_gpx(LayerId::new(layer_id), PathBuf::from(path));
+    lock_app_state(state.inner())?.export_layer_to_gpx(LayerId::new(layer_id), PathBuf::from(path));
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 // ── Undo / redo ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn undo(state: State<SharedState>, app: AppHandle) {
-    state.lock().unwrap().undo();
+pub fn undo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+    lock_app_state(state.inner())?.undo();
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 #[tauri::command]
-pub fn redo(state: State<SharedState>, app: AppHandle) {
-    state.lock().unwrap().redo();
+pub fn redo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+    lock_app_state(state.inner())?.redo();
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 // ── Track mutations ───────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[allow(clippy::question_mark)]
 pub fn rename_track(
     layer_id: u64,
     track_id: u64,
     new_name: String,
     state: State<SharedState>,
     app: AppHandle,
-) {
+) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    state
-        .lock()
-        .unwrap()
-        .rename_track(LayerId::new(layer_id), TrackId::new(track_id), new_name);
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(app_state) => app_state,
+        Err(err) => return Err(err),
+    };
+    app_state.rename_track(LayerId::new(layer_id), TrackId::new(track_id), new_name);
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 #[tauri::command]
+#[allow(clippy::question_mark)]
 pub fn set_track_color(
     layer_id: u64,
     track_id: u64,
     color: [u8; 4],
     state: State<SharedState>,
     app: AppHandle,
-) {
+) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    state
-        .lock()
-        .unwrap()
-        .set_track_color(LayerId::new(layer_id), TrackId::new(track_id), color);
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(app_state) => app_state,
+        Err(err) => return Err(err),
+    };
+    app_state.set_track_color(LayerId::new(layer_id), TrackId::new(track_id), color);
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 #[tauri::command]
+#[allow(clippy::question_mark)]
 pub fn toggle_track_visible(
     layer_id: u64,
     track_id: u64,
     state: State<SharedState>,
     app: AppHandle,
-) {
+) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
-    state
-        .lock()
-        .unwrap()
-        .toggle_track_visible(LayerId::new(layer_id), TrackId::new(track_id));
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(app_state) => app_state,
+        Err(err) => return Err(err),
+    };
+    app_state.toggle_track_visible(LayerId::new(layer_id), TrackId::new(track_id));
     let _ = app.emit("state-changed", ());
+    Ok(())
 }
 
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn reveal_bundle(state: State<SharedState>) {
-    state.lock().unwrap().reveal_active_bundle();
+pub fn reveal_bundle(state: State<SharedState>) -> Result<(), String> {
+    lock_app_state(state.inner())?.reveal_active_bundle();
+    Ok(())
 }

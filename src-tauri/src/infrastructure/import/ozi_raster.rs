@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use crate::infrastructure::import::{OziMapMetadata, OziRasterKind};
-use ozf2_rs::{DecodedTile, OzfError, OziRaster};
+use ozf2_rs::{DecodedTile, OzfError, OziRaster, PaletteEntry};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -353,7 +355,16 @@ fn indexed_tile_to_rgba(tile: &DecodedTile) -> Vec<u8> {
     let mut rgba_pixels = Vec::with_capacity(tile.pixels().len() * 4);
 
     for palette_index in tile.pixels() {
-        let color = tile.palette()[*palette_index as usize];
+        let color = tile
+            .palette()
+            .get(*palette_index as usize)
+            .copied()
+            .unwrap_or(PaletteEntry {
+                red: 0,
+                green: 0,
+                blue: 0,
+                alpha: 0,
+            });
         rgba_pixels.extend_from_slice(&[color.red, color.green, color.blue, color.alpha]);
     }
 
@@ -368,7 +379,7 @@ fn visible_tile_extent(total_extent: u32, tile_extent: u32, tile_index: u32) -> 
 #[cfg(test)]
 mod tests {
     use super::{
-        OziRasterLevelMetadata, crop_rgba_tile, indexed_tile_to_rgba, visible_tile_extent,
+        crop_rgba_tile, indexed_tile_to_rgba, visible_tile_extent, OziRasterLevelMetadata,
     };
     use ozf2_rs::{DecodedTile, PaletteEntry};
 
@@ -411,9 +422,7 @@ mod tests {
         assert_eq!(rgba.len(), 2 * 2 * 4);
         assert_eq!(
             rgba,
-            vec![
-                10, 20, 30, 255, 40, 50, 60, 255, 10, 20, 30, 255, 40, 50, 60, 255,
-            ]
+            vec![10, 20, 30, 255, 40, 50, 60, 255, 10, 20, 30, 255, 40, 50, 60, 255,]
         );
     }
 
