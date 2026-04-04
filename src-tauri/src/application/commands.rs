@@ -6,6 +6,8 @@ use crate::domain::{
 };
 use std::path::PathBuf;
 
+const MAX_STACK_DEPTH: usize = 100;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum CommandError {
     ProjectLayer(ProjectLayerError),
@@ -55,6 +57,23 @@ pub enum ProjectCommand {
         track_id: TrackId,
         old_name: String,
         new_name: String,
+    },
+    RemoveMapLayer {
+        layer: MapLayer,
+    },
+    RemoveTrackLayer {
+        layer: TrackLayer,
+    },
+    RemoveWaypointLayer {
+        layer: WaypointLayer,
+    },
+    RemoveTrack {
+        layer_id: LayerId,
+        track: Track,
+    },
+    RemoveWaypoint {
+        layer_id: LayerId,
+        waypoint: Waypoint,
     },
 }
 
@@ -182,14 +201,215 @@ impl ProjectCommand {
                 }
                 Ok(())
             }
+            Self::RemoveMapLayer { layer } => {
+                project.remove_map_layer(layer.id());
+                Ok(())
+            }
+            Self::RemoveTrackLayer { layer } => {
+                project.remove_track_layer(layer.id());
+                Ok(())
+            }
+            Self::RemoveWaypointLayer { layer } => {
+                project.remove_waypoint_layer(layer.id());
+                Ok(())
+            }
+            Self::RemoveTrack { layer_id, track } => {
+                project.remove_track_from_layer(*layer_id, track.id())?;
+                Ok(())
+            }
+            Self::RemoveWaypoint { layer_id, waypoint } => {
+                project.remove_waypoint_from_layer(*layer_id, waypoint.id())?;
+                Ok(())
+            }
+        }
+    }
+
+    pub fn reverse(&self, project: &Project) -> ProjectCommand {
+        match self {
+            Self::AddMapLayer { id, name } => Self::RemoveMapLayer {
+                layer: MapLayer::new(*id, name.clone()),
+            },
+            Self::AddMapLayerWithSource {
+                id,
+                name,
+                source_path,
+            } => Self::RemoveMapLayer {
+                layer: MapLayer::with_source_path(*id, name.clone(), Some(source_path.clone())),
+            },
+            Self::AddTrackLayer { id, name } => Self::RemoveTrackLayer {
+                layer: TrackLayer::new(*id, name.clone()),
+            },
+            Self::AddWaypointLayer { id, name } => Self::RemoveWaypointLayer {
+                layer: WaypointLayer::new(*id, name.clone()),
+            },
+            Self::AddTrack { layer_id, track } => Self::RemoveTrack {
+                layer_id: *layer_id,
+                track: track.clone(),
+            },
+            Self::AddWaypoint { layer_id, waypoint } => Self::RemoveWaypoint {
+                layer_id: *layer_id,
+                waypoint: waypoint.clone(),
+            },
+            Self::MoveWaypoint {
+                layer_id,
+                waypoint_id,
+                latitude,
+                longitude,
+            } => {
+                let (previous_latitude, previous_longitude) = project
+                    .waypoint_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| {
+                        layer
+                            .waypoints()
+                            .iter()
+                            .find(|waypoint| waypoint.id() == *waypoint_id)
+                            .map(|waypoint| (waypoint.latitude(), waypoint.longitude()))
+                    })
+                    .unwrap_or((*latitude, *longitude));
+
+                Self::MoveWaypoint {
+                    layer_id: *layer_id,
+                    waypoint_id: *waypoint_id,
+                    latitude: previous_latitude,
+                    longitude: previous_longitude,
+                }
+            }
+            Self::RenameTrack {
+                layer_id,
+                track_id,
+                old_name,
+                new_name,
+            } => {
+                let previous_name = project
+                    .track_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| {
+                        layer
+                            .tracks()
+                            .iter()
+                            .find(|track| track.id() == *track_id)
+                            .map(|track| track.name().to_owned())
+                    })
+                    .unwrap_or_else(|| old_name.clone());
+
+                Self::RenameTrack {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    old_name: new_name.clone(),
+                    new_name: previous_name,
+                }
+            }
+            Self::RemoveMapLayer { layer } => {
+                if let Some(source_path) = layer.source_path() {
+                    Self::AddMapLayerWithSource {
+                        id: layer.id(),
+                        name: layer.name().to_owned(),
+                        source_path: source_path.to_path_buf(),
+                    }
+                } else {
+                    Self::AddMapLayer {
+                        id: layer.id(),
+                        name: layer.name().to_owned(),
+                    }
+                }
+            }
+            Self::RemoveTrackLayer { layer } => Self::AddTrackLayer {
+                id: layer.id(),
+                name: layer.name().to_owned(),
+            },
+            Self::RemoveWaypointLayer { layer } => Self::AddWaypointLayer {
+                id: layer.id(),
+                name: layer.name().to_owned(),
+            },
+            Self::RemoveTrack { layer_id, track } => Self::AddTrack {
+                layer_id: *layer_id,
+                track: track.clone(),
+            },
+            Self::RemoveWaypoint { layer_id, waypoint } => Self::AddWaypoint {
+                layer_id: *layer_id,
+                waypoint: waypoint.clone(),
+            },
+        }
+    }
+
+    fn targets_same_entity(&self, other: &ProjectCommand) -> bool {
+        match (self, other) {
+            (Self::AddMapLayer { id: left_id, .. }, Self::AddMapLayer { id: right_id, .. }) => {
+                left_id == right_id
+            }
+            (
+                Self::AddMapLayerWithSource { id: left_id, .. },
+                Self::AddMapLayerWithSource { id: right_id, .. },
+            ) => left_id == right_id,
+            (Self::AddTrackLayer { id: left_id, .. }, Self::AddTrackLayer { id: right_id, .. }) => {
+                left_id == right_id
+            }
+            (
+                Self::AddWaypointLayer { id: left_id, .. },
+                Self::AddWaypointLayer { id: right_id, .. },
+            ) => left_id == right_id,
+            (
+                Self::AddTrack {
+                    layer_id: left_layer_id,
+                    track: left_track,
+                },
+                Self::AddTrack {
+                    layer_id: right_layer_id,
+                    track: right_track,
+                },
+            ) => left_layer_id == right_layer_id && left_track.id() == right_track.id(),
+            (
+                Self::AddWaypoint {
+                    layer_id: left_layer_id,
+                    waypoint: left_waypoint,
+                },
+                Self::AddWaypoint {
+                    layer_id: right_layer_id,
+                    waypoint: right_waypoint,
+                },
+            ) => left_layer_id == right_layer_id && left_waypoint.id() == right_waypoint.id(),
+            (
+                Self::MoveWaypoint {
+                    layer_id: left_layer_id,
+                    waypoint_id: left_waypoint_id,
+                    ..
+                },
+                Self::MoveWaypoint {
+                    layer_id: right_layer_id,
+                    waypoint_id: right_waypoint_id,
+                    ..
+                },
+            ) => left_layer_id == right_layer_id && left_waypoint_id == right_waypoint_id,
+            (
+                Self::RenameTrack {
+                    layer_id: left_layer_id,
+                    track_id: left_track_id,
+                    ..
+                },
+                Self::RenameTrack {
+                    layer_id: right_layer_id,
+                    track_id: right_track_id,
+                    ..
+                },
+            ) => left_layer_id == right_layer_id && left_track_id == right_track_id,
+            _ => false,
         }
     }
 }
 
+#[derive(Debug, Clone)]
+struct CommandDelta {
+    forward: ProjectCommand,
+    reverse: ProjectCommand,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct CommandStack {
-    undo_history: Vec<Project>,
-    redo_history: Vec<Project>,
+    undo_history: Vec<CommandDelta>,
+    redo_history: Vec<CommandDelta>,
 }
 
 impl CommandStack {
@@ -198,11 +418,32 @@ impl CommandStack {
         project: &mut Project,
         command: &ProjectCommand,
     ) -> Result<(), CommandError> {
-        self.undo_history.push(project.clone());
+        self.apply_or_merge(command.clone(), project)
+    }
+
+    pub fn apply_or_merge(
+        &mut self,
+        command: ProjectCommand,
+        project: &mut Project,
+    ) -> Result<(), CommandError> {
         self.redo_history.clear();
-        if let Err(error) = command.apply(project) {
-            self.undo_history.pop();
-            return Err(error);
+
+        if let Some(last_delta) = self.undo_history.last_mut()
+            && last_delta.forward.targets_same_entity(&command)
+        {
+            command.apply(project)?;
+            last_delta.forward = command;
+            return Ok(());
+        }
+
+        let reverse = command.reverse(project);
+        command.apply(project)?;
+        self.undo_history.push(CommandDelta {
+            forward: command,
+            reverse,
+        });
+        if self.undo_history.len() > MAX_STACK_DEPTH {
+            self.undo_history.remove(0);
         }
 
         Ok(())
@@ -217,23 +458,31 @@ impl CommandStack {
     }
 
     pub fn undo(&mut self, project: &mut Project) -> bool {
-        let Some(previous_project) = self.undo_history.pop() else {
+        let Some(delta) = self.undo_history.pop() else {
             return false;
         };
 
-        self.redo_history.push(project.clone());
-        *project = previous_project;
+        if delta.reverse.apply(project).is_err() {
+            self.undo_history.push(delta);
+            return false;
+        }
+
+        self.redo_history.push(delta);
 
         true
     }
 
     pub fn redo(&mut self, project: &mut Project) -> bool {
-        let Some(next_project) = self.redo_history.pop() else {
+        let Some(delta) = self.redo_history.pop() else {
             return false;
         };
 
-        self.undo_history.push(project.clone());
-        *project = next_project;
+        if delta.forward.apply(project).is_err() {
+            self.redo_history.push(delta);
+            return false;
+        }
+
+        self.undo_history.push(delta);
 
         true
     }
@@ -243,7 +492,8 @@ impl CommandStack {
 mod tests {
     use super::{CommandError, CommandStack, ProjectCommand};
     use crate::domain::{
-        LayerId, Project, ProjectLayerError, Track, TrackId, Waypoint, WaypointId,
+        LayerId, Project, ProjectLayerError, Track, TrackId, TrackLayer, Waypoint, WaypointId,
+        WaypointLayer,
     };
     use std::path::Path;
 
@@ -376,6 +626,188 @@ mod tests {
                 layer_id,
                 WaypointId::new(99)
             ))
+        );
+    }
+
+    #[test]
+    fn undo_and_redo_move_waypoint_round_trip_coordinates() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.1, 27.8),
+            )
+            .unwrap();
+
+        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 54.1);
+        assert!(history.undo(&mut project));
+        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 53.9);
+        assert!(history.redo(&mut project));
+        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 54.1);
+    }
+
+    #[test]
+    fn apply_or_merge_coalesces_sequential_waypoint_moves_into_single_undo_step() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+
+        history
+            .apply_or_merge(
+                ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.0, 27.7),
+                &mut project,
+            )
+            .unwrap();
+        history
+            .apply_or_merge(
+                ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.2, 27.9),
+                &mut project,
+            )
+            .unwrap();
+
+        assert_eq!(history.undo_history.len(), 3);
+        assert!(history.undo(&mut project));
+        let waypoint = &project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.latitude(), 53.9);
+        assert_eq!(waypoint.longitude(), 27.5667);
+    }
+
+    #[test]
+    fn command_stack_drops_oldest_entries_when_max_depth_exceeded() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+
+        for id in 1..=101 {
+            history
+                .apply(
+                    &mut project,
+                    &ProjectCommand::add_map_layer(LayerId::new(id), format!("Layer {id}")),
+                )
+                .unwrap();
+        }
+
+        assert_eq!(history.undo_history.len(), 100);
+        for _ in 0..100 {
+            assert!(history.undo(&mut project));
+        }
+        assert!(!history.undo(&mut project));
+        assert_eq!(project.map_layers().len(), 1);
+        assert_eq!(project.map_layers()[0].id(), LayerId::new(1));
+    }
+
+    #[test]
+    fn undo_restores_state_for_all_existing_command_variants() {
+        fn assert_round_trip(mut project: Project, command: ProjectCommand) {
+            let before = project.clone();
+            let mut history = CommandStack::default();
+
+            history.apply(&mut project, &command).unwrap();
+            assert!(history.undo(&mut project));
+            assert_eq!(project, before);
+        }
+
+        assert_round_trip(
+            Project::untitled(),
+            ProjectCommand::add_map_layer(LayerId::new(10), "Map"),
+        );
+
+        assert_round_trip(
+            Project::untitled(),
+            ProjectCommand::add_map_layer_with_source(LayerId::new(11), "Map", "demo.sqlitedb"),
+        );
+
+        assert_round_trip(
+            Project::untitled(),
+            ProjectCommand::add_track_layer(LayerId::new(20), "Tracks"),
+        );
+
+        assert_round_trip(
+            Project::untitled(),
+            ProjectCommand::add_waypoint_layer(LayerId::new(30), "Waypoints"),
+        );
+
+        let mut add_track_project = Project::untitled();
+        add_track_project.add_track_layer(TrackLayer::new(LayerId::new(20), "Tracks"));
+        assert_round_trip(
+            add_track_project,
+            ProjectCommand::add_track(LayerId::new(20), Track::new(TrackId::new(1), "Morning")),
+        );
+
+        let mut add_waypoint_project = Project::untitled();
+        add_waypoint_project.add_waypoint_layer(WaypointLayer::new(LayerId::new(30), "Waypoints"));
+        assert_round_trip(
+            add_waypoint_project,
+            ProjectCommand::add_waypoint(
+                LayerId::new(30),
+                Waypoint::new(WaypointId::new(4), "Camp", 53.9, 27.5667),
+            ),
+        );
+
+        let mut move_waypoint_project = Project::untitled();
+        move_waypoint_project.add_waypoint_layer(WaypointLayer::new(LayerId::new(30), "Waypoints"));
+        move_waypoint_project
+            .add_waypoint_to_layer(
+                LayerId::new(30),
+                Waypoint::new(WaypointId::new(4), "Camp", 53.9, 27.5667),
+            )
+            .unwrap();
+        assert_round_trip(
+            move_waypoint_project,
+            ProjectCommand::move_waypoint(LayerId::new(30), WaypointId::new(4), 54.1, 27.8),
+        );
+
+        let mut rename_track_project = Project::untitled();
+        rename_track_project.add_track_layer(TrackLayer::new(LayerId::new(20), "Tracks"));
+        rename_track_project
+            .add_track_to_layer(
+                LayerId::new(20),
+                Track::new(TrackId::new(1), "Morning route"),
+            )
+            .unwrap();
+        assert_round_trip(
+            rename_track_project,
+            ProjectCommand::rename_track(
+                LayerId::new(20),
+                TrackId::new(1),
+                "Morning route",
+                "Renamed route",
+            ),
         );
     }
 }

@@ -34,3 +34,9 @@
 - PLT parsing and threaded archive extraction use let-chains to collapse nested `if` statements.
 - Bounds-sensitive raster work should use `.get(...)` for palette lookups and check destination slices before copying; this kept OZF2 tile conversion/reprojection safe without changing the rendering flow.
 - Tauri command handlers that lock shared state need to return `Result<_, String>` so `?` can propagate poisoned-lock errors cleanly.
+
+## [2026-04-04] Task: T5
+- Delta-based undo/redo can stay command-only (no project snapshot cloning) by storing per-entry `{ forward, reverse }` and generating `reverse` from pre-apply state.
+- Drag coalescing behavior is safe when `apply_or_merge` only updates the last entry's `forward` command and keeps the original `reverse`, so undo returns to the pre-drag coordinates.
+- Add/remove command pairs for layers/entities allow reversible add operations while preserving the existing public command payloads for caller-facing variants.
+- Enforcing `MAX_STACK_DEPTH` by dropping the oldest undo delta keeps memory bounded and naturally leaves earliest operations non-undoable once the cap is exceeded.

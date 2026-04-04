@@ -272,12 +272,51 @@ impl Project {
         self.map_layers.push(layer);
     }
 
+    pub fn remove_map_layer(&mut self, layer_id: LayerId) -> bool {
+        let Some(index) = self
+            .map_layers
+            .iter()
+            .position(|layer| layer.id() == layer_id)
+        else {
+            return false;
+        };
+
+        self.map_layers.remove(index);
+        true
+    }
+
     pub fn add_track_layer(&mut self, layer: TrackLayer) {
         self.track_layers.push(layer);
     }
 
+    pub fn remove_track_layer(&mut self, layer_id: LayerId) -> bool {
+        let Some(index) = self
+            .track_layers
+            .iter()
+            .position(|layer| layer.id() == layer_id)
+        else {
+            return false;
+        };
+
+        self.track_layers.remove(index);
+        true
+    }
+
     pub fn add_waypoint_layer(&mut self, layer: WaypointLayer) {
         self.waypoint_layers.push(layer);
+    }
+
+    pub fn remove_waypoint_layer(&mut self, layer_id: LayerId) -> bool {
+        let Some(index) = self
+            .waypoint_layers
+            .iter()
+            .position(|layer| layer.id() == layer_id)
+        else {
+            return false;
+        };
+
+        self.waypoint_layers.remove(index);
+        true
     }
 
     pub fn track_layer_mut(&mut self, layer_id: u64) -> Result<&mut TrackLayer, ProjectLayerError> {
@@ -354,6 +393,23 @@ impl Project {
         Ok(())
     }
 
+    pub fn remove_track_from_layer(
+        &mut self,
+        layer_id: LayerId,
+        track_id: crate::domain::TrackId,
+    ) -> Result<(), ProjectLayerError> {
+        let layer = self.track_layer_mut(layer_id.value())?;
+        let Some(index) = layer.tracks.iter().position(|track| track.id() == track_id) else {
+            return Err(ProjectLayerError::MissingTrack {
+                layer_id: layer_id.value(),
+                track_id: track_id.value(),
+            });
+        };
+
+        layer.tracks.remove(index);
+        Ok(())
+    }
+
     pub fn add_waypoint_to_layer(
         &mut self,
         layer_id: LayerId,
@@ -368,6 +424,31 @@ impl Project {
         };
 
         layer.add_waypoint(waypoint);
+        Ok(())
+    }
+
+    pub fn remove_waypoint_from_layer(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+    ) -> Result<(), ProjectLayerError> {
+        let Some(layer) = self
+            .waypoint_layers
+            .iter_mut()
+            .find(|layer| layer.id() == layer_id)
+        else {
+            return Err(ProjectLayerError::WaypointLayerUnavailable(layer_id));
+        };
+
+        let Some(index) = layer
+            .waypoints
+            .iter()
+            .position(|waypoint| waypoint.id() == waypoint_id)
+        else {
+            return Err(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id));
+        };
+
+        layer.waypoints.remove(index);
         Ok(())
     }
 
