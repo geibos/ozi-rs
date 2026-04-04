@@ -55,6 +55,14 @@ export async function exportGpx(layerId: bigint, path: string): Promise<void> {
   return invoke("export_gpx", { layerId, path });
 }
 
+export async function exportTrackPlt(
+  layerId: bigint,
+  trackId: bigint,
+  path: string
+): Promise<void> {
+  return invoke("export_track_plt", { layerId, trackId, path });
+}
+
 export async function undo(): Promise<void> {
   return invoke("undo");
 }

@@ -138,6 +138,11 @@ pub enum ProjectCommand {
         layer_id: LayerId,
         waypoint: Waypoint,
     },
+    CreateEmptyTrack {
+        layer_id: LayerId,
+        track_id: TrackId,
+        name: String,
+    },
 }
 
 impl ProjectCommand {
@@ -326,6 +331,14 @@ impl ProjectCommand {
             track_id,
             tolerance_km,
             removed: Vec::new(),
+        }
+    }
+
+    pub fn create_empty_track(layer_id: LayerId, track_id: TrackId, name: impl Into<String>) -> Self {
+        Self::CreateEmptyTrack {
+            layer_id,
+            track_id,
+            name: name.into(),
         }
     }
 
@@ -564,6 +577,15 @@ impl ProjectCommand {
             }
             Self::RemoveWaypoint { layer_id, waypoint } => {
                 project.remove_waypoint_from_layer(*layer_id, waypoint.id())?;
+                Ok(())
+            }
+            Self::CreateEmptyTrack {
+                layer_id,
+                track_id,
+                name,
+            } => {
+                let layer = project.track_layer_mut(layer_id.value())?;
+                layer.create_empty_track(*track_id, name.clone());
                 Ok(())
             }
         }
@@ -874,6 +896,14 @@ impl ProjectCommand {
             Self::RemoveWaypoint { layer_id, waypoint } => Self::AddWaypoint {
                 layer_id: *layer_id,
                 waypoint: waypoint.clone(),
+            },
+            Self::CreateEmptyTrack {
+                layer_id,
+                track_id,
+                name,
+            } => Self::RemoveTrack {
+                layer_id: *layer_id,
+                track: crate::domain::Track::new(*track_id, name.clone()),
             },
         }
     }
