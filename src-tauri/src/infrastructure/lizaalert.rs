@@ -14,6 +14,20 @@ use std::path::{Path, PathBuf};
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
 const MOBILE_MAPS_DIR_NAME: &str = "8-Android&iOS";
 const PROJECT_EXTRACTED_DIR: &str = "extracted";
+const PROJECTS_CACHE_FILE_NAME: &str = "projects-cache.json";
+const PROJECTS_CACHE_VERSION: u8 = 1;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct ProjectsCacheFile {
+    version: u8,
+    projects: Vec<LizaProjectSummaryCacheDto>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct LizaProjectSummaryCacheDto {
+    slug: String,
+    name: String,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DownloadProgress {
@@ -25,27 +39,98 @@ pub struct ProjectOpenProgress {
     pub message: String,
 }
 
-pub fn fetch_project_summaries() -> Result<Vec<LizaProjectSummary>, String> {
+pub fn fetch_project_summaries_streaming<F>(mut on_chunk: F) -> Result<Vec<LizaProjectSummary>, String>
+where
+    F: FnMut(Vec<LizaProjectSummary>),
+{
     let html = fetch_text(ROOT_URL)?;
     let link_regex =
         Regex::new(r#"href="([^"]+)"[^>]*>([^<]+)</a>"#).map_err(|err| err.to_string())?;
     let project_regex = Regex::new(r"^\d{4}-\d{2}-\d{2}_.+/$").map_err(|err| err.to_string())?;
 
-    let mut projects = link_regex
-        .captures_iter(&html)
-        .filter_map(|caps| {
-            let href = caps.get(1)?.as_str();
-            let label = caps.get(2)?.as_str();
-            project_regex.is_match(href).then(|| LizaProjectSummary {
-                slug: label.trim_end_matches('/').to_owned(),
-                name: label.trim_end_matches('/').replace('_', " "),
-                url: format!("{ROOT_URL}{href}"),
-            })
-        })
-        .collect::<Vec<_>>();
+    let mut projects = Vec::new();
+    let mut chunk = Vec::with_capacity(200);
 
-    projects.sort_by(|left, right| right.slug.cmp(&left.slug));
+    for captures in link_regex.captures_iter(&html) {
+        let Some(href) = captures.get(1).map(|value| value.as_str()) else {
+            continue;
+        };
+        let Some(label) = captures.get(2).map(|value| value.as_str()) else {
+            continue;
+        };
+
+        if !project_regex.is_match(href) {
+            continue;
+        }
+
+        let project = LizaProjectSummary {
+            slug: label.trim_end_matches('/').to_owned(),
+            name: label.trim_end_matches('/').replace('_', " "),
+            url: format!("{ROOT_URL}{href}"),
+        };
+
+        chunk.push(project.clone());
+        projects.push(project);
+
+        if chunk.len() >= 200 {
+            on_chunk(std::mem::take(&mut chunk));
+            chunk = Vec::with_capacity(200);
+        }
+    }
+
+    if !chunk.is_empty() {
+        on_chunk(chunk);
+    }
+
     Ok(projects)
+}
+
+pub fn load_project_summaries_cache(root: &Path) -> Result<Vec<LizaProjectSummary>, String> {
+    let cache_path = root.join(PROJECTS_CACHE_FILE_NAME);
+    if !cache_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let cache_text = fs::read_to_string(&cache_path).map_err(|err| err.to_string())?;
+    let cache: ProjectsCacheFile = serde_json::from_str(&cache_text).map_err(|err| err.to_string())?;
+
+    if cache.version != PROJECTS_CACHE_VERSION {
+        return Err(format!(
+            "Unsupported projects cache version: {}",
+            cache.version
+        ));
+    }
+
+    Ok(cache
+        .projects
+        .into_iter()
+        .map(|project| LizaProjectSummary {
+            slug: project.slug.clone(),
+            name: project.name,
+            url: format!("{ROOT_URL}{}/", project.slug),
+        })
+        .collect())
+}
+
+pub fn save_project_summaries_cache(
+    root: &Path,
+    projects: &[LizaProjectSummary],
+) -> Result<(), String> {
+    fs::create_dir_all(root).map_err(|err| err.to_string())?;
+
+    let cache = ProjectsCacheFile {
+        version: PROJECTS_CACHE_VERSION,
+        projects: projects
+            .iter()
+            .map(|project| LizaProjectSummaryCacheDto {
+                slug: project.slug.clone(),
+                name: project.name.clone(),
+            })
+            .collect(),
+    };
+
+    let cache_text = serde_json::to_string(&cache).map_err(|err| err.to_string())?;
+    fs::write(root.join(PROJECTS_CACHE_FILE_NAME), cache_text).map_err(|err| err.to_string())
 }
 
 pub fn open_project<F>(
@@ -420,12 +505,15 @@ fn read_cached_map_packages(
 ) -> Result<Vec<LizaMapPackage>, String> {
     let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
     let bundle_dir = project_source_root(root, project_slug);
-    let mut maps = read_cached_sqlite_map_packages(root, project_slug, &zoom_regex)?;
     // OZI maps: recursive scan of the whole bundle dir (includes extracted/ subdir)
-    maps.extend(read_cached_ozi_map_packages(&bundle_dir)?);
+    let mut ozi_maps = read_cached_ozi_map_packages(&bundle_dir)?;
+    ozi_maps.sort_by(|left, right| left.name.cmp(&right.name));
 
-    maps.sort_by(|left, right| left.name.cmp(&right.name));
-    Ok(maps)
+    let mut sqlite_maps = read_cached_sqlite_map_packages(root, project_slug, &zoom_regex)?;
+    sqlite_maps.sort_by(|left, right| left.name.cmp(&right.name));
+
+    ozi_maps.extend(sqlite_maps);
+    Ok(ozi_maps)
 }
 
 fn read_cached_sqlite_map_packages(

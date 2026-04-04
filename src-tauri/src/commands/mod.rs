@@ -1,6 +1,8 @@
 pub mod tiles;
 
-use crate::application::{ActiveMapKind, AppState, DiagnosticLevel, OpenMapRequest};
+use crate::application::{
+    ActiveMapKind, AppState, DiagnosticLevel, LizaProjectSummary, OpenMapRequest,
+};
 use crate::infrastructure::lizaalert;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -40,7 +42,7 @@ pub struct AppStateDto {
     pub waypoint_layer_count: usize,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct LizaProjectSummaryDto {
     pub slug: String,
     pub name: String,
@@ -70,6 +72,16 @@ pub struct ActiveMapDto {
     pub center_lat: f64,
     pub center_lon: f64,
     pub base_zoom: u8,
+}
+
+fn to_project_summary_dtos(projects: &[LizaProjectSummary]) -> Vec<LizaProjectSummaryDto> {
+    projects
+        .iter()
+        .map(|project| LizaProjectSummaryDto {
+            slug: project.slug.clone(),
+            name: project.name.clone(),
+        })
+        .collect()
 }
 
 // Events
@@ -202,14 +214,35 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
 
 #[tauri::command]
 pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
-    let started = lock_app_state(state.inner())?.begin_load_projects();
-    if started.is_none() {
+    let Some(bundles_root) = lock_app_state(state.inner())?.begin_load_projects() else {
         return Ok(());
+    };
+
+    if let Ok(cached_projects) = lizaalert::load_project_summaries_cache(&bundles_root)
+        && !cached_projects.is_empty()
+    {
+        if let Ok(mut s) = lock_app_state(state.inner()) {
+            s.apply_projects_chunk(cached_projects.clone());
+        }
+        let _ = app.emit("projects-chunk", to_project_summary_dtos(&cached_projects));
     }
 
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
-        let result = lizaalert::fetch_project_summaries();
+        let chunk_state = Arc::clone(&state_arc);
+        let chunk_app = app.clone();
+        let result = lizaalert::fetch_project_summaries_streaming(move |chunk| {
+            let chunk_payload = to_project_summary_dtos(&chunk);
+            if let Ok(mut s) = lock_app_state(&chunk_state) {
+                s.apply_projects_chunk(chunk);
+            }
+            let _ = chunk_app.emit("projects-chunk", chunk_payload);
+        });
+
+        if let Ok(projects) = &result {
+            let _ = lizaalert::save_project_summaries_cache(&bundles_root, projects);
+        }
+
         if let Ok(mut s) = lock_app_state(&state_arc) {
             s.apply_projects_loaded(result);
         }

@@ -258,14 +258,27 @@ impl AppState {
     pub fn apply_projects_loaded(&mut self, result: Result<Vec<LizaProjectSummary>, String>) {
         self.lizaalert.busy = false;
         match result {
-            Ok(projects) => {
-                let count = projects.len();
-                self.lizaalert.projects = projects;
+            Ok(_) => {
+                let count = self.lizaalert.projects.len();
                 self.update_status(DiagnosticLevel::Info, format!("Loaded {count} projects"));
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, error);
             }
+        }
+    }
+
+    pub fn apply_projects_chunk(&mut self, chunk: Vec<LizaProjectSummary>) {
+        for project in chunk {
+            if self
+                .lizaalert
+                .projects
+                .iter()
+                .any(|existing| existing.slug == project.slug)
+            {
+                continue;
+            }
+            self.lizaalert.projects.push(project);
         }
     }
 

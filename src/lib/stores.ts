@@ -1,9 +1,13 @@
 import { writable, derived } from "svelte/store";
-import type { AppStateDto, DownloadProgressPayload } from "./types";
+import type {
+  AppStateDto,
+  DownloadProgressPayload,
+  LizaProjectSummaryDto,
+} from "./types";
 import { getAppState } from "./api";
 
 function createAppStore() {
-  const { subscribe, set, update } = writable<AppStateDto | null>(null);
+  const { subscribe, set } = writable<AppStateDto | null>(null);
 
   return {
     subscribe,
@@ -19,11 +23,25 @@ export const appState = createAppStore();
 export const busy = derived(appState, ($s) => $s?.busy ?? false);
 export const status = derived(appState, ($s) => $s?.status ?? "");
 export const diagnostics = derived(appState, ($s) => $s?.diagnostics ?? []);
-export const projects = derived(appState, ($s) => $s?.projects ?? []);
+export const projectsStore = writable<LizaProjectSummaryDto[]>([]);
+export const projects = derived(projectsStore, ($projects) => $projects);
+export const projectsLoading = writable(false);
 export const currentProject = derived(appState, ($s) => $s?.current_project ?? null);
 export const activeMap = derived(appState, ($s) => $s?.active_map ?? null);
 export const trackLayerCount = derived(appState, ($s) => $s?.track_layer_count ?? 0);
 export const downloadingMaps = derived(appState, ($s) => new Set($s?.downloading_maps ?? []));
+
+export function appendProjectsChunk(chunk: LizaProjectSummaryDto[]) {
+  projectsStore.update((current) => {
+    const known = new Set(current.map((project) => project.slug));
+    const additions = chunk.filter((project) => !known.has(project.slug));
+    return additions.length > 0 ? [...current, ...additions] : current;
+  });
+}
+
+export function syncProjectsFromAppState(state: AppStateDto | null) {
+  projectsStore.set(state?.projects ?? []);
+}
 
 // Per-package download progress: package_name → { downloaded, total? }
 export const downloadProgress = writable<Map<string, DownloadProgressPayload>>(new Map());
