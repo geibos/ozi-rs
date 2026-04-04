@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
-  import { appState, activeMap, editModeActive, selectedPointId, selectedTrack } from "../lib/stores";
+  import { appState, activeMap, editModeActive, selectedPointId, selectedTrack, addWaypointMode } from "../lib/stores";
   import {
     deleteTrackPoint,
     getTrackDetail,
@@ -10,6 +10,8 @@
     getOziMetadata,
     insertTrackPoint,
     moveTrackPoint,
+    addWaypoint,
+    getWaypoints,
   } from "../lib/api";
   import type { PointDetail, SegmentDetail, TrackDetail } from "../lib/types";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
@@ -22,6 +24,7 @@
   let appliedMapPath: string | null = null;
   let pointMarkers: maplibregl.Marker[] = [];
   let markerElements = new Map<number, HTMLDivElement>();
+  let waypointMarkers: maplibregl.Marker[] = [];
 
   type PointMenuTarget = {
     layerId: bigint;
@@ -70,6 +73,9 @@
 
     if (e.key === "Escape") {
       contextMenu = null;
+      if ($addWaypointMode) {
+        addWaypointMode.set(false);
+      }
     }
   }
 
@@ -212,6 +218,42 @@
     }
   }
 
+  function clearWaypointMarkers() {
+    for (const m of waypointMarkers) {
+      m.remove();
+    }
+    waypointMarkers = [];
+  }
+
+  async function refreshWaypointMarkers() {
+    if (!map) return;
+    clearWaypointMarkers();
+    if (!$appState || $appState.waypoint_layer_count === 0) return;
+    try {
+      const waypoints = await getWaypoints(1n); // TODO: multi-layer
+      for (const wp of waypoints) {
+        const el = document.createElement("div");
+        el.className = "waypoint-marker";
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([wp.lon, wp.lat])
+          .setPopup(new maplibregl.Popup({ offset: 16 }).setText(wp.name))
+          .addTo(map);
+        waypointMarkers.push(marker);
+      }
+    } catch {
+      // layer may not exist yet
+    }
+  }
+
+  async function handleMapClickForWaypoint(e: maplibregl.MapMouseEvent) {
+    if (!$addWaypointMode) return;
+    const { lat, lng } = e.lngLat;
+    const currentWaypoints = await getWaypoints(1n); // TODO: multi-layer
+    const nextIndex = currentWaypoints.length + 1;
+    await addWaypoint(1n, lat, lng, `Waypoint ${nextIndex}`); // TODO: multi-layer
+    addWaypointMode.set(false);
+  }
+
   onMount(() => {
     registerSqliteProtocol();
     registerOziProtocol();
@@ -246,14 +288,16 @@
       initTracksLayer(map);
     });
 
-    map.on("click", () => {
+    map.on("click", (e) => {
       contextMenu = null;
+      handleMapClickForWaypoint(e);
     });
 
     return () => {
       window.removeEventListener("keydown", handleKeydown);
       stopFpsCounter();
       clearPointMarkers();
+      clearWaypointMarkers();
       map.remove();
     };
   });
@@ -341,11 +385,13 @@
       map.once("load", async () => {
         const geojson = await getTracksGeojson();
         updateTracksLayer(map, geojson);
+        refreshWaypointMarkers();
       });
       return;
     }
 
-  getTracksGeojson().then((geojson) => updateTracksLayer(map, geojson));
+    getTracksGeojson().then((geojson) => updateTracksLayer(map, geojson));
+    refreshWaypointMarkers();
   });
 
   $effect(() => {
@@ -367,6 +413,16 @@
 
   $effect(() => {
     updateSelectedPointMarkerState();
+  });
+
+  $effect(() => {
+    if (!map) return;
+    const canvas = map.getCanvas();
+    if ($addWaypointMode) {
+      canvas.style.cursor = "crosshair";
+    } else if (!$editModeActive) {
+      canvas.style.cursor = "";
+    }
   });
 </script>
 
@@ -451,5 +507,14 @@
 
   .point-context-menu button:hover {
     background: var(--ctp-surface0);
+  }
+
+  :global(.waypoint-marker) {
+    width: 14px;
+    height: 14px;
+    background: var(--ctp-yellow, #e5c890);
+    border: 2px solid var(--ctp-crust, #232634);
+    border-radius: 50%;
+    cursor: pointer;
   }
 </style>

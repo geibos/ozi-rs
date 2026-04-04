@@ -219,6 +219,15 @@ export async function getTrackDetail(
   return invoke("get_track_detail", { layerId, trackId });
 }
 
+export async function addWaypoint(
+  layerId: bigint,
+  lat: number,
+  lon: number,
+  name: string,
+): Promise<void> {
+  return invoke("add_waypoint", { layerId, lat, lon, name });
+}
+
 export async function getWaypoints(layerId: bigint): Promise<WaypointData[]> {
   return invoke("get_waypoints", { layerId });
 }
