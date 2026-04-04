@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appState, status, activeMap, tracksPanelOpen, trackPointsPanelOpen, consoleOpen } from "../lib/stores";
+  import { appState, status, activeMap, tracksPanelOpen, trackPointsPanelOpen, waypointsPanelOpen, consoleOpen } from "../lib/stores";
   import { importGpx, importPlt, saveProject, loadProjectFile, undo, redo, revealBundle } from "../lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -70,6 +70,13 @@
     </button>
     <button class="full" onclick={() => trackPointsPanelOpen.update((v) => !v)}>
       {$trackPointsPanelOpen ? "Hide" : "Show"} Points Panel
+    </button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Waypoints</div>
+    <button class="full" onclick={() => waypointsPanelOpen.update(v => !v)}>
+      {$waypointsPanelOpen ? "Hide" : "Show"} Waypoints Panel
     </button>
   </div>
 
