@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::application::{CommandError, CommandStack, ProjectCommand};
 use crate::domain::{LayerId, Project};
 use crate::infrastructure::import::{
