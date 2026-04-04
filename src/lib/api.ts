@@ -228,6 +228,14 @@ export async function addWaypoint(
   return invoke("add_waypoint", { layerId, lat, lon, name });
 }
 
+export async function moveWaypoint(
+  layerId: bigint,
+  waypointId: bigint,
+  position: [number, number]
+): Promise<void> {
+  return invoke("move_waypoint", { layerId, waypointId, position });
+}
+
 export async function getWaypoints(layerId: bigint): Promise<WaypointData[]> {
   return invoke("get_waypoints", { layerId });
 }

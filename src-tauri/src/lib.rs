@@ -46,6 +46,7 @@ pub fn run() {
             commands::join_segments,
             commands::delete_track,
             commands::add_waypoint,
+            commands::move_waypoint,
             commands::delete_waypoint,
             commands::rename_waypoint,
             commands::set_waypoint_symbol,

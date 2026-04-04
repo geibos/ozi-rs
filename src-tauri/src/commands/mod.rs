@@ -742,6 +742,32 @@ pub fn rename_waypoint(
 
 #[tauri::command]
 #[allow(clippy::question_mark)]
+pub fn move_waypoint(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    waypoint_id: u64,
+    position: [f64; 2],
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_move_waypoint(
+            LayerId::new(layer_id),
+            WaypointId::new(waypoint_id),
+            position[0],
+            position[1],
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
 pub fn add_waypoint(
     state: State<SharedState>,
     app: AppHandle,

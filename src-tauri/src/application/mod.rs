@@ -799,6 +799,21 @@ impl AppState {
             })
     }
 
+    pub fn apply_move_waypoint(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        lat: f64,
+        lon: f64,
+    ) -> Result<(), ProjectLayerError> {
+        let cmd = commands::ProjectCommand::move_waypoint(layer_id, waypoint_id, lat, lon);
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
     pub fn apply_simplify_track(
         &mut self,
         layer_id: LayerId,
