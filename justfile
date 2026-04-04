@@ -24,6 +24,17 @@ watch:
 watch-test:
     cargo watch --manifest-path src-tauri/Cargo.toml -x test
 
+# ── Run ───────────────────────────────────────────────────────────────────────
+
+# Build and run the app in dev mode (Vite HMR + Rust)
+run:
+    npm run tauri dev
+
+# Build release (no bundle) and run the resulting binary
+run-release:
+    npm run tauri build -- --no-bundle
+    ./src-tauri/target/release/ozi-rs
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 
 # Build the full Tauri app (debug)
@@ -55,10 +66,6 @@ check:
 # Run cargo clippy on the Tauri backend
 clippy:
     cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-
-# Check the old egui crate (legacy, pre-migration)
-check-legacy:
-    cargo check
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 
