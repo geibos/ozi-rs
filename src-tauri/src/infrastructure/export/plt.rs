@@ -1,10 +1,36 @@
 use crate::domain::Track;
-use crate::infrastructure::export::ExportError;
 use chrono::{Datelike, NaiveDate, Timelike};
 use std::io::Write;
 
 const OLE_BASE_DATE: NaiveDate =
     NaiveDate::from_ymd_opt(1899, 12, 30).expect("valid OLE base date");
+
+#[derive(Debug)]
+pub enum ExportError {
+    Io(std::io::Error),
+}
+
+impl std::fmt::Display for ExportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(err) => write!(f, "export write failed: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for ExportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(err) => Some(err),
+        }
+    }
+}
+
+impl From<std::io::Error> for ExportError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(value)
+    }
+}
 
 pub fn export_plt(
     track: &Track,
