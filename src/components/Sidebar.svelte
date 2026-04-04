@@ -1,6 +1,28 @@
 <script lang="ts">
-  import { appState, status, activeMap, tracksPanelOpen, trackPointsPanelOpen, waypointsPanelOpen, addWaypointMode, consoleOpen } from "../lib/stores";
-  import { importGpx, importPlt, saveProject, loadProjectFile, undo, redo, revealBundle } from "../lib/api";
+  import {
+    appState,
+    status,
+    activeMap,
+    tracksPanelOpen,
+    trackPointsPanelOpen,
+    waypointsPanelOpen,
+    addWaypointMode,
+    drawingModeActive,
+    drawingTrackId,
+    drawingPointCount,
+    editModeActive,
+    consoleOpen,
+  } from "../lib/stores";
+  import {
+    importGpx,
+    importPlt,
+    saveProject,
+    loadProjectFile,
+    undo,
+    redo,
+    revealBundle,
+    createEmptyTrack,
+  } from "../lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { openBundleLoader } from "../lib/windows";
@@ -26,6 +48,26 @@
   async function handleOpen() {
     const path = await open({ multiple: false, filters: [{ name: "OZI Project", extensions: ["ozp"] }] });
     if (path) await loadProjectFile(path as string);
+  }
+
+  async function toggleTrackDrawingMode() {
+    if ($drawingModeActive) {
+      drawingModeActive.set(false);
+      drawingTrackId.set(null);
+      drawingPointCount.set(0);
+      return;
+    }
+
+    try {
+      editModeActive.set(false);
+      addWaypointMode.set(false);
+      const trackId = await createEmptyTrack(1n, "New Track");
+      drawingTrackId.set(trackId);
+      drawingPointCount.set(0);
+      drawingModeActive.set(true);
+    } catch (error) {
+      console.error("Failed to start track drawing mode", error);
+    }
   }
 </script>
 
@@ -65,6 +107,16 @@
       <button onclick={handleImportGpx}>Import GPX</button>
       <button onclick={handleImportPlt}>Import PLT</button>
     </div>
+    <button
+      class="full"
+      class:active={$drawingModeActive}
+      onclick={toggleTrackDrawingMode}
+      title={$drawingModeActive
+        ? "Finish drawing mode and keep the new track."
+        : "Create an empty track and click on the map to add points."}
+    >
+      {$drawingModeActive ? `✓ Done (${$drawingPointCount} points)` : "✏️ Create Track"}
+    </button>
     <button class="full" onclick={() => tracksPanelOpen.update((v) => !v)}>
       {$tracksPanelOpen ? "Hide" : "Show"} Tracks Panel
     </button>
@@ -81,6 +133,7 @@
     <button
       class="full"
       class:active={$addWaypointMode}
+      disabled={$drawingModeActive}
       onclick={() => addWaypointMode.update(v => !v)}
       title="Click on the map to place a waypoint. Press Escape to cancel."
     >

@@ -2,7 +2,18 @@
   import { onMount } from "svelte";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
-  import { appState, activeMap, editModeActive, selectedPointId, selectedTrack, addWaypointMode, simplifyState } from "../lib/stores";
+  import {
+    appState,
+    activeMap,
+    editModeActive,
+    selectedPointId,
+    selectedTrack,
+    addWaypointMode,
+    drawingModeActive,
+    drawingTrackId,
+    drawingPointCount,
+    simplifyState,
+  } from "../lib/stores";
   import {
     deleteTrackPoint,
     getTrackDetail,
@@ -13,6 +24,7 @@
     moveWaypoint,
     addWaypoint,
     getWaypoints,
+    undo,
   } from "../lib/api";
   import type { PointDetail, SegmentDetail, TrackDetail } from "../lib/types";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
@@ -26,6 +38,8 @@
   let pointMarkers: maplibregl.Marker[] = [];
   let markerElements = new Map<number, HTMLDivElement>();
   let waypointMarkers: maplibregl.Marker[] = [];
+  let drawingPreviewPoints: Array<{ lat: number; lon: number }> = [];
+  let pendingDrawingClickTimeout: number | null = null;
 
   type PointMenuTarget = {
     layerId: bigint;
@@ -74,9 +88,53 @@
 
     if (e.key === "Escape") {
       contextMenu = null;
+      if ($drawingModeActive) {
+        e.preventDefault();
+        void cancelDrawingMode();
+      }
       if ($addWaypointMode) {
         addWaypointMode.set(false);
       }
+    }
+
+    if (e.key === "Enter" && $drawingModeActive) {
+      e.preventDefault();
+      void finishDrawingMode();
+    }
+  }
+
+  async function finishDrawingMode() {
+    if (!$drawingModeActive) return;
+    drawingModeActive.set(false);
+    drawingTrackId.set(null);
+    drawingPointCount.set(0);
+    if (pendingDrawingClickTimeout !== null) {
+      window.clearTimeout(pendingDrawingClickTimeout);
+      pendingDrawingClickTimeout = null;
+    }
+    await refreshTrackGeometry();
+  }
+
+  async function cancelDrawingMode() {
+    if (!$drawingModeActive || $drawingTrackId === null) return;
+    const undoCount = drawingPreviewPoints.length + 1;
+
+    if (pendingDrawingClickTimeout !== null) {
+      window.clearTimeout(pendingDrawingClickTimeout);
+      pendingDrawingClickTimeout = null;
+    }
+
+    try {
+      for (let i = 0; i < undoCount; i += 1) {
+        await undo();
+      }
+    } catch (error) {
+      console.error("Failed to cancel drawing mode", error);
+    } finally {
+      drawingModeActive.set(false);
+      drawingTrackId.set(null);
+      drawingPointCount.set(0);
+      await refreshTrackGeometry();
     }
   }
 
@@ -264,12 +322,121 @@
   }
 
   async function handleMapClickForWaypoint(e: maplibregl.MapMouseEvent) {
+    if ($drawingModeActive) return;
     if (!$addWaypointMode) return;
     const { lat, lng } = e.lngLat;
     const currentWaypoints = await getWaypoints(1n); // TODO: multi-layer
     const nextIndex = currentWaypoints.length + 1;
     await addWaypoint(1n, lat, lng, `Waypoint ${nextIndex}`); // TODO: multi-layer
     addWaypointMode.set(false);
+  }
+
+  function clearDrawingPreview() {
+    if (!map) return;
+    try {
+      if (map.getLayer("drawing-preview-line")) {
+        map.removeLayer("drawing-preview-line");
+      }
+      if (map.getLayer("drawing-preview-points")) {
+        map.removeLayer("drawing-preview-points");
+      }
+      if (map.getSource("drawing-preview")) {
+        map.removeSource("drawing-preview");
+      }
+    } catch {
+      // source/layer may not exist
+    }
+  }
+
+  function updateDrawingPreview() {
+    if (!map || !map.isStyleLoaded()) return;
+
+    const lineFeature: GeoJSON.Feature<GeoJSON.LineString> = {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "LineString",
+        coordinates: drawingPreviewPoints.map((pt) => [pt.lon, pt.lat]),
+      },
+    };
+
+    const pointsFeature: GeoJSON.Feature<GeoJSON.MultiPoint> = {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "MultiPoint",
+        coordinates: drawingPreviewPoints.map((pt) => [pt.lon, pt.lat]),
+      },
+    };
+
+    const previewGeojson: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [lineFeature, pointsFeature],
+    };
+
+    if (!map.getSource("drawing-preview")) {
+      map.addSource("drawing-preview", {
+        type: "geojson",
+        data: previewGeojson,
+      });
+
+      map.addLayer({
+        id: "drawing-preview-line",
+        type: "line",
+        source: "drawing-preview",
+        filter: ["==", ["geometry-type"], "LineString"],
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#0066ff",
+          "line-width": 3,
+        },
+      });
+
+      map.addLayer({
+        id: "drawing-preview-points",
+        type: "circle",
+        source: "drawing-preview",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-radius": 4,
+          "circle-color": "#0066ff",
+          "circle-stroke-width": 1,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+      return;
+    }
+
+    const source = map.getSource("drawing-preview");
+    if (source && source.type === "geojson") {
+      source.setData(previewGeojson);
+    }
+  }
+
+  function handleMapClickForDrawing(e: maplibregl.MapMouseEvent) {
+    if (!$drawingModeActive || $drawingTrackId === null) return;
+    const trackId = $drawingTrackId;
+
+    if (pendingDrawingClickTimeout !== null) {
+      window.clearTimeout(pendingDrawingClickTimeout);
+      pendingDrawingClickTimeout = null;
+    }
+
+    const { lat, lng } = e.lngLat;
+    pendingDrawingClickTimeout = window.setTimeout(async () => {
+      pendingDrawingClickTimeout = null;
+      try {
+        await insertTrackPoint(1n, trackId, 1n, drawingPreviewPoints.length, [lat, lng]);
+        drawingPreviewPoints = [...drawingPreviewPoints, { lat, lon: lng }];
+        drawingPointCount.set(drawingPreviewPoints.length);
+        updateDrawingPreview();
+      } catch (error) {
+        console.error("Failed to add drawing point", error);
+      }
+    }, 220);
   }
 
   onMount(() => {
@@ -309,6 +476,17 @@
     map.on("click", (e) => {
       contextMenu = null;
       handleMapClickForWaypoint(e);
+      handleMapClickForDrawing(e);
+    });
+
+    map.on("dblclick", (e) => {
+      if (!$drawingModeActive) return;
+      e.preventDefault();
+      if (pendingDrawingClickTimeout !== null) {
+        window.clearTimeout(pendingDrawingClickTimeout);
+        pendingDrawingClickTimeout = null;
+      }
+      void finishDrawingMode();
     });
 
     return () => {
@@ -316,6 +494,11 @@
       stopFpsCounter();
       clearPointMarkers();
       clearWaypointMarkers();
+      clearDrawingPreview();
+      if (pendingDrawingClickTimeout !== null) {
+        window.clearTimeout(pendingDrawingClickTimeout);
+        pendingDrawingClickTimeout = null;
+      }
       map.remove();
     };
   });
@@ -414,6 +597,15 @@
 
   $effect(() => {
     if (!map) return;
+    if ($drawingModeActive) {
+      if ($editModeActive) {
+        editModeActive.set(false);
+      }
+      if ($addWaypointMode) {
+        addWaypointMode.set(false);
+      }
+      contextMenu = null;
+    }
     applyEditModeMapInteraction($editModeActive);
 
     if (!$editModeActive || !$selectedTrack) {
@@ -436,11 +628,37 @@
   $effect(() => {
     if (!map) return;
     const canvas = map.getCanvas();
-    if ($addWaypointMode) {
+    if ($drawingModeActive) {
+      canvas.style.cursor = "crosshair";
+    } else if ($addWaypointMode) {
       canvas.style.cursor = "crosshair";
     } else if (!$editModeActive) {
       canvas.style.cursor = "";
     }
+  });
+
+  $effect(() => {
+    if (!map) return;
+
+    const active = $drawingModeActive;
+    void $drawingTrackId;
+
+    if (active) {
+      map.dragPan.disable();
+      map.doubleClickZoom.disable();
+      drawingPreviewPoints = [];
+      drawingPointCount.set(0);
+      updateDrawingPreview();
+      return;
+    }
+
+    if (!$editModeActive) {
+      map.dragPan.enable();
+    }
+    map.doubleClickZoom.enable();
+    drawingPreviewPoints = [];
+    drawingPointCount.set(0);
+    clearDrawingPreview();
   });
 
   $effect(() => {
@@ -517,6 +735,11 @@
   {#if fpsVisible}
     <div class="fps-badge">{fps} fps</div>
   {/if}
+  {#if $drawingModeActive}
+    <div class="drawing-badge">
+      Drawing track · {$drawingPointCount} {$drawingPointCount === 1 ? "point" : "points"}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -540,6 +763,20 @@
     border-radius: 3px;
     pointer-events: none;
     font-variant-numeric: tabular-nums;
+  }
+
+  .drawing-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 10;
+    background: rgba(0, 102, 255, 0.2);
+    color: #dbe9ff;
+    border: 1px solid #0066ff;
+    border-radius: 4px;
+    font-size: 12px;
+    padding: 4px 8px;
+    pointer-events: none;
   }
 
   .track-point-marker {

@@ -89,3 +89,43 @@
 - OLE date encoding is implemented from UTC `DateTime` via CE-day delta from 1899-12-30 + fraction-of-day seconds.
 - Segment starts are encoded in the trailing data-field (`...,<segment_flag>`), with `1` for first point in each segment and `0` for subsequent points.
 - Round-trip verification currently compares flattened points (`lat/lon/elevation/timestamp`) because importer segment splitting uses field 3 while exporter writes segment markers in the trailing field required by Ozi format.
+
+### Track Simplification UI
+- `SimplifiedPreview` interface provided by the Tauri backend uses an array of `segments`, each containing `kept_points` (array of `PointDetail`). It does not use a flat array of `{lat, lon}` points directly on the preview root.
+- The UI properly uses Svelte 5 `$effect` to watch `$simplifyState` changes, debounce 300ms, and update a local GeoJSON source mapped to `simplify-preview` in MapLibre GL.
+- The `simplify-preview-line` uses the Catppuccin `#ff6600` (custom orange mapped color) over the normal track color to show real-time changes before committing them.
+
+## 2026-04-04 — Task 36: PLT export Tauri handler + frontend integration
+
+### Pattern: export_track_plt handler
+- The Tauri command `export_track_plt(layer_id, track_id, path, state)` does NOT need `AppHandle` since it emits no state-changed event (pure file write, no app state mutation).
+- Look up track from state, extract `style().color` ([u8;4] RGBA), compute RGB u32 as `(r<<16)|(g<<8)|b`, pass `style().line_width as f64` to `export_plt`.
+- Use `use crate::infrastructure::export::plt::export_plt` as inline import in the fn body (crate root re-export also works).
+- File creation: `std::fs::File::create(PathBuf::from(&path)).map_err(|e| format!(...))`.
+- Save dialog is opened in the Svelte frontend (`open({ save: true, defaultPath: "name.plt", filters: [...] })`), not in the Rust handler — consistent with GPX export pattern.
+- "Export as PLT" button is placed inside the `{#if $selectedTrack?.trackId === track.trackId}` block, so it only shows for the selected track.
+
+### Bonus fix: CreateEmptyTrack missing match arms
+- `ProjectCommand::CreateEmptyTrack` was added to the enum but `apply()` and `reverse()` match statements were missing arms, causing compile failure.
+- Fix: `apply` arm creates `Track::new(track_id, name)` and calls `project.add_track_to_layer(layer_id, track)`.
+- Fix: `reverse` arm produces `RemoveTrack { layer_id, track: Track::new(track_id, name) }`.
+- These fixes were required to unblock `cargo test --all`.
+
+## 2026-04-04 — Task 37: CreateEmptyTrack command
+
+### Pattern: creation command with pre-generated ID
+- AppState pre-generates the new ID before dispatch: `max(existing ids) + 1` (or 1 if empty).
+- The domain method `TrackLayer::create_empty_track(track_id, name)` takes an explicit `TrackId`, not self-generating — keeps domain pure and deterministic.
+- The command struct stores `{ layer_id, track_id, name }` — enough to both apply and produce a `RemoveTrack` reverse.
+- Undo is `RemoveTrack { layer_id, track: Track::new(track_id, name) }` — `RemoveTrack` stores the full `Track` object and removes by id; this handles the round-trip cleanly.
+- New empty segment always gets `TrackSegmentId::new(1)`.
+- Tauri handler returns `track_id.value()` as `u64` for the frontend; frontend wraps as `bigint`.
+- `create_empty_track` handler does NOT need `#[allow(clippy::question_mark)]` but other mutation handlers in the same file have it pre-existing — follow the file's existing pattern.
+
+## 2026-04-04 — Task 38: map drawing mode for new tracks
+
+- Drawing mode fits existing map interaction architecture by reusing one persistent `map.on("click")` handler and guarding behavior via a writable store (`drawingModeActive`), same as waypoint mode.
+- Because MapLibre emits `click` before `dblclick`, delaying point insertion by ~220ms and canceling the timeout in `dblclick` cleanly prevents an unwanted extra point when finishing with double-click.
+- A local GeoJSON source/layer pair (`drawing-preview`) is the most stable way to render in-progress lines + markers immediately, without waiting for backend `state-changed` refresh.
+- Cursor/interaction precedence needs explicit ordering: drawing mode should force `crosshair`, disable pan + double-click zoom, and proactively clear conflicting modes (`editModeActive`, `addWaypointMode`) while active.
+- Cancel flow is deterministic with command stack: Escape should call `undo()` exactly `insertedPointCount + 1` times (points plus `create_empty_track`) to remove all drawing artifacts.

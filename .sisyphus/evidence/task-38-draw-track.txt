@@ -1,0 +1,15 @@
+npm test (2026-04-04)
+
+> ozi-rs@0.1.0 test
+> vitest run
+
+RUN  v4.1.2 /Users/sobieg/Projects/ozi-rs
+
+Test Files  2 passed (2)
+Tests       7 passed (7)
+Duration    174ms
+
+LSP diagnostics:
+- src/components/MapView.svelte: clean
+- src/components/Sidebar.svelte: clean
+- src/lib/stores.ts: clean
