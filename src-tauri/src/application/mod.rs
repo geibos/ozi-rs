@@ -465,6 +465,10 @@ impl AppState {
         self.project.waypoint_layers().len()
     }
 
+    pub fn project_waypoint_layers(&self) -> &[crate::domain::WaypointLayer] {
+        self.project.waypoint_layers()
+    }
+
     // ── Mutations ──
 
     pub fn save_project_to(&mut self, path: PathBuf) {

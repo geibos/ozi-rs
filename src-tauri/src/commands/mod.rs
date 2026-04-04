@@ -819,6 +819,45 @@ pub fn get_track_detail(
     })
 }
 
+#[derive(serde::Serialize)]
+pub struct WaypointDto {
+    pub id: u64,
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub symbol: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_waypoints(
+    state: State<SharedState>,
+    layer_id: u64,
+) -> Result<Vec<WaypointDto>, String> {
+    use crate::domain::LayerId;
+    let app_state = lock_app_state(state.inner())?;
+    let lid = LayerId::new(layer_id);
+
+    let layer = app_state
+        .project_waypoint_layers()
+        .iter()
+        .find(|l| l.id() == lid)
+        .ok_or_else(|| format!("waypoint layer {layer_id} not found"))?;
+
+    let waypoints = layer
+        .waypoints()
+        .iter()
+        .map(|w| WaypointDto {
+            id: w.id().value(),
+            name: w.name().to_owned(),
+            lat: w.latitude(),
+            lon: w.longitude(),
+            symbol: w.symbol().map(str::to_owned),
+        })
+        .collect();
+
+    Ok(waypoints)
+}
+
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]
