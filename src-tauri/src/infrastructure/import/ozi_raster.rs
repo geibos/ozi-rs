@@ -379,7 +379,7 @@ fn visible_tile_extent(total_extent: u32, tile_extent: u32, tile_index: u32) -> 
 #[cfg(test)]
 mod tests {
     use super::{
-        crop_rgba_tile, indexed_tile_to_rgba, visible_tile_extent, OziRasterLevelMetadata,
+        OziRasterLevelMetadata, crop_rgba_tile, indexed_tile_to_rgba, visible_tile_extent,
     };
     use ozf2_rs::{DecodedTile, PaletteEntry};
 
@@ -422,7 +422,9 @@ mod tests {
         assert_eq!(rgba.len(), 2 * 2 * 4);
         assert_eq!(
             rgba,
-            vec![10, 20, 30, 255, 40, 50, 60, 255, 10, 20, 30, 255, 40, 50, 60, 255,]
+            vec![
+                10, 20, 30, 255, 40, 50, 60, 255, 10, 20, 30, 255, 40, 50, 60, 255,
+            ]
         );
     }
 
