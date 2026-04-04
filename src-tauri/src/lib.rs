@@ -59,6 +59,7 @@ pub fn run() {
             commands::get_simplified_preview,
             commands::reveal_bundle,
             commands::export_track_plt,
+            commands::create_empty_track,
             commands::tiles::get_sqlite_tile,
             commands::tiles::get_ozi_tile,
             commands::tiles::get_ozi_tile_projected,

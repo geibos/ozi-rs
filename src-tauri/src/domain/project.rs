@@ -221,6 +221,13 @@ impl TrackLayer {
             track.style_mut().visible = visible;
         }
     }
+
+    pub fn create_empty_track(&mut self, track_id: crate::domain::TrackId, name: String) {
+        let segment = crate::domain::TrackSegment::new(crate::domain::TrackSegmentId::new(1));
+        let mut track = crate::domain::Track::new(track_id, name);
+        track.add_segment(segment);
+        self.tracks.push(track);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -1099,5 +1106,28 @@ mod tests {
                 point_id: 11,
             }
         );
+    }
+
+    #[test]
+    fn track_layer_create_empty_track_adds_track_with_one_segment() {
+        let layer_id = LayerId::new(1);
+        let mut layer = TrackLayer::new(layer_id, "Tracks");
+
+        layer.create_empty_track(TrackId::new(1), "New Track".to_string());
+
+        assert_eq!(layer.tracks().len(), 1);
+        assert_eq!(layer.tracks()[0].segments().len(), 1);
+        assert_eq!(layer.tracks()[0].segments()[0].points().len(), 0);
+    }
+
+    #[test]
+    fn track_layer_create_empty_track_uses_explicit_track_id() {
+        let layer_id = LayerId::new(1);
+        let mut layer = TrackLayer::new(layer_id, "Tracks");
+
+        layer.create_empty_track(TrackId::new(42), "My Track".to_string());
+
+        assert_eq!(layer.tracks()[0].id(), TrackId::new(42));
+        assert_eq!(layer.tracks()[0].name(), "My Track");
     }
 }

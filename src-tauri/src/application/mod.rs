@@ -725,6 +725,37 @@ impl AppState {
             })
     }
 
+    /// Create a new empty track in a track layer and return its id.
+    pub fn apply_create_empty_track(
+        &mut self,
+        layer_id: LayerId,
+        name: String,
+    ) -> Result<TrackId, ProjectLayerError> {
+        let new_id = {
+            let max = self
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .map(|l| {
+                    l.tracks()
+                        .iter()
+                        .map(|t| t.id().value())
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+            TrackId::new(max + 1)
+        };
+        let cmd = commands::ProjectCommand::create_empty_track(layer_id, new_id, name);
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })?;
+        Ok(new_id)
+    }
+
     pub fn apply_delete_waypoint(
         &mut self,
         layer_id: LayerId,

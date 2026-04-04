@@ -2410,4 +2410,56 @@ mod tests {
             ),
         );
     }
+
+    #[test]
+    fn create_empty_track_apply_creates_track_with_one_empty_segment() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Recorded tracks"),
+            )
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::create_empty_track(layer_id, TrackId::new(1), "New Track"),
+            )
+            .unwrap();
+
+        let tracks = project.track_layers()[0].tracks();
+        assert_eq!(tracks.len(), 1);
+        assert_eq!(tracks[0].id(), TrackId::new(1));
+        assert_eq!(tracks[0].name(), "New Track");
+        assert_eq!(tracks[0].segments().len(), 1);
+        assert_eq!(tracks[0].segments()[0].points().len(), 0);
+    }
+
+    #[test]
+    fn create_empty_track_undo_removes_created_track() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Recorded tracks"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::create_empty_track(layer_id, TrackId::new(1), "New Track"),
+            )
+            .unwrap();
+
+        assert_eq!(project.track_layers()[0].tracks().len(), 1);
+
+        history.undo(&mut project);
+
+        assert_eq!(project.track_layers()[0].tracks().len(), 0);
+    }
 }

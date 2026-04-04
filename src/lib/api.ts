@@ -255,3 +255,10 @@ export async function getSimplifiedPreview(
 ): Promise<SimplifiedPreview> {
   return invoke("get_simplified_preview", { layerId, trackId, tolerance });
 }
+
+export async function createEmptyTrack(
+  layerId: bigint,
+  name: string
+): Promise<bigint> {
+  return invoke("create_empty_track", { layerId, name });
+}
