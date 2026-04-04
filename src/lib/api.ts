@@ -111,3 +111,13 @@ export async function getOziTile(
 ): Promise<ArrayBuffer> {
   return invoke("get_ozi_tile", { mapPath, level, tileX, tileY });
 }
+
+/** Return a 256×256 PNG for Web Mercator tile (tx, ty, tz) reprojected from OZF2. */
+export async function getOziTileProjected(
+  mapPath: string,
+  tx: number,
+  ty: number,
+  tz: number,
+): Promise<ArrayBuffer> {
+  return invoke("get_ozi_tile_projected", { mapPath, tx, ty, tz });
+}

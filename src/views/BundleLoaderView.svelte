@@ -4,6 +4,7 @@
   import {
     appState,
     busy,
+    status,
     projects,
     currentProject,
     downloadingMaps,
@@ -71,6 +72,7 @@
   }
 </script>
 
+<div class="root">
 <div class="loader">
   <!-- Projects column -->
   <div class="col">
@@ -166,11 +168,28 @@
     </div>
   </div>
 </div>
+</div>
+
+{#if $busy || $status}
+  <div class="status-bar" class:busy={$busy}>
+    {#if $busy}
+      <span class="spinner"></span>
+    {/if}
+    <span class="status-text">{$status}</span>
+  </div>
+{/if}
 
 <style>
+  .root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
   .loader {
     display: flex;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     background: var(--ctp-base);
     gap: 1px;
     background-color: var(--ctp-surface0);
@@ -376,5 +395,40 @@
     font-size: 12px;
     color: var(--ctp-overlay1);
     text-align: center;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--ctp-subtext0);
+    background: var(--ctp-crust);
+    border-top: 1px solid var(--ctp-surface0);
+    min-height: 24px;
+    overflow: hidden;
+  }
+
+  .status-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--ctp-surface2);
+    border-top-color: var(--ctp-blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
   }
 </style>

@@ -64,6 +64,9 @@ export interface OziMetadataDto {
   datum: string;
   calibration_points: string[];
   levels: OziLevelDto[];
+  bounds: [number, number, number, number] | null;
+  native_zoom: number;
+  min_zoom: number;
 }
 
 export interface DownloadProgressPayload {
