@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { appState, tracksPanelOpen } from "../lib/stores";
+  import { appState, tracksPanelOpen, selectedTrack } from "../lib/stores";
   import { getTracksGeojson, renameTrack, toggleTrackVisible, exportGpx } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
 
@@ -73,7 +73,14 @@
         <div class="empty">No tracks loaded</div>
       {:else}
         {#each tracks as track (track.trackId)}
-          <div class="track-row" class:hidden={!track.visible}>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div 
+            class="track-row" 
+            class:hidden={!track.visible}
+            class:selected={$selectedTrack?.trackId === track.trackId}
+            onclick={() => selectedTrack.set({ layerId: track.layerId, trackId: track.trackId })}
+          >
             <span
               class="color-dot"
               style="background: {track.color}"
@@ -173,10 +180,15 @@
     gap: 6px;
     padding: 4px 10px;
     transition: background 0.1s;
+    cursor: pointer;
   }
 
   .track-row:hover {
     background: var(--ctp-surface0);
+  }
+
+  .track-row.selected {
+    background: var(--ctp-surface1);
   }
 
   .track-row.hidden {
