@@ -752,6 +752,20 @@ impl AppState {
             })
     }
 
+    pub fn apply_simplify_track(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        tolerance_km: f64,
+    ) -> Result<(), ProjectLayerError> {
+        let cmd = commands::ProjectCommand::simplify_track(layer_id, track_id, tolerance_km);
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
     pub fn export_layer_to_gpx(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
         let Some(layer) = self
             .project

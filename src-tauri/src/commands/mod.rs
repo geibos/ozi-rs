@@ -721,6 +721,29 @@ pub fn rename_waypoint(
     Ok(())
 }
 
+// ── Track simplification ──────────────────────────────────────────────────────
+
+#[tauri::command]
+#[allow(clippy::question_mark)]
+pub fn simplify_track(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    tolerance: f64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId};
+    let mut app_state = match lock_app_state(state.inner()) {
+        Ok(s) => s,
+        Err(e) => return Err(e),
+    };
+    app_state
+        .apply_simplify_track(LayerId::new(layer_id), TrackId::new(track_id), tolerance)
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]

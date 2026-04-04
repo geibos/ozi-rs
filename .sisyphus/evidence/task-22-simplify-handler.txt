@@ -1,0 +1,12 @@
+Task 22: simplify_track handler
+
+Added to src-tauri/src/application/mod.rs:
+- apply_simplify_track(layer_id, track_id, tolerance_km) -> Result<(), ProjectLayerError>
+
+Added to src-tauri/src/commands/mod.rs:
+- simplify_track: Tauri command delegating to apply_simplify_track
+
+Registered in src-tauri/src/lib.rs:
+- commands::simplify_track
+
+Tests: 147 pass
