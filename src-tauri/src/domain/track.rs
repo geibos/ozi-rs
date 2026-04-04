@@ -145,6 +145,93 @@ impl TrackSegment {
     pub fn point_mut(&mut self, point_id: TrackPointId) -> Option<&mut TrackPoint> {
         self.points.iter_mut().find(|point| point.id() == point_id)
     }
+
+    pub fn points_mut(&mut self) -> &mut Vec<TrackPoint> {
+        &mut self.points
+    }
+
+    /// Move a point to new coordinates. Returns old `(lat, lon)` for undo.
+    pub fn move_point(
+        &mut self,
+        point_id: u64,
+        lat: f64,
+        lon: f64,
+    ) -> Result<(f64, f64), crate::domain::ProjectLayerError> {
+        let pid = TrackPointId::new(point_id);
+        let point = self.points.iter_mut().find(|p| p.id() == pid).ok_or(
+            crate::domain::ProjectLayerError::MissingTrackPoint {
+                layer_id: 0,
+                track_id: 0,
+                segment_id: self.id.value(),
+                point_id,
+            },
+        )?;
+        let old = (point.latitude, point.longitude);
+        point.latitude = lat;
+        point.longitude = lon;
+        Ok(old)
+    }
+
+    /// Remove a point by id. Returns `(index, point)` so undo can call `insert_point_at`.
+    pub fn remove_point(
+        &mut self,
+        point_id: u64,
+    ) -> Result<(usize, TrackPoint), crate::domain::ProjectLayerError> {
+        let pid = TrackPointId::new(point_id);
+        let index = self.points.iter().position(|p| p.id() == pid).ok_or(
+            crate::domain::ProjectLayerError::MissingTrackPoint {
+                layer_id: 0,
+                track_id: 0,
+                segment_id: self.id.value(),
+                point_id,
+            },
+        )?;
+        let removed = self.points.remove(index);
+        Ok((index, removed))
+    }
+
+    /// Insert a point at a given index. Errors if `index > len`.
+    pub fn insert_point_at(
+        &mut self,
+        index: usize,
+        point: TrackPoint,
+    ) -> Result<(), crate::domain::ProjectLayerError> {
+        if index > self.points.len() {
+            return Err(crate::domain::ProjectLayerError::MissingTrackPoint {
+                layer_id: 0,
+                track_id: 0,
+                segment_id: self.id.value(),
+                point_id: index as u64,
+            });
+        }
+        self.points.insert(index, point);
+        Ok(())
+    }
+
+    /// Split segment at the given point. Left segment retains original ID and points `0..=split`.
+    /// Returns the new right segment (new ID) containing points `split..end` (split point shared).
+    pub fn split_at_point(
+        &mut self,
+        point_id: u64,
+        new_segment_id: TrackSegmentId,
+    ) -> Result<TrackSegment, crate::domain::ProjectLayerError> {
+        let pid = TrackPointId::new(point_id);
+        let split_index = self.points.iter().position(|p| p.id() == pid).ok_or(
+            crate::domain::ProjectLayerError::MissingTrackPoint {
+                layer_id: 0,
+                track_id: 0,
+                segment_id: self.id.value(),
+                point_id,
+            },
+        )?;
+
+        let right_points = self.points[split_index..].to_vec();
+        self.points.truncate(split_index + 1);
+
+        let mut right = TrackSegment::new(new_segment_id);
+        right.points = right_points;
+        Ok(right)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -298,5 +385,112 @@ mod tests {
 
         assert!(style.visible);
         assert_eq!(style.color, [255, 0, 0, 255]);
+    }
+
+    fn make_segment_with_points() -> TrackSegment {
+        let mut seg = TrackSegment::new(TrackSegmentId::new(1));
+        seg.add_point(TrackPoint::new(TrackPointId::new(10), 55.0, 37.0));
+        seg.add_point(TrackPoint::new(TrackPointId::new(11), 55.1, 37.1));
+        seg.add_point(TrackPoint::new(TrackPointId::new(12), 55.2, 37.2));
+        seg
+    }
+
+    #[test]
+    fn move_point_returns_old_coords_on_success() {
+        let mut seg = make_segment_with_points();
+
+        let old = seg.move_point(11, 60.0, 40.0).unwrap();
+
+        assert_eq!(old, (55.1, 37.1));
+        assert_eq!(seg.points()[1].latitude(), 60.0);
+        assert_eq!(seg.points()[1].longitude(), 40.0);
+    }
+
+    #[test]
+    fn move_point_errors_on_missing_point_id() {
+        let mut seg = make_segment_with_points();
+
+        let err = seg.move_point(99, 0.0, 0.0).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::MissingTrackPoint { point_id: 99, .. }
+        ));
+    }
+
+    #[test]
+    fn remove_point_returns_index_and_point_on_success() {
+        let mut seg = make_segment_with_points();
+
+        let (index, point) = seg.remove_point(11).unwrap();
+
+        assert_eq!(index, 1);
+        assert_eq!(point.id(), TrackPointId::new(11));
+        assert_eq!(seg.points().len(), 2);
+    }
+
+    #[test]
+    fn remove_point_errors_on_missing_point_id() {
+        let mut seg = make_segment_with_points();
+
+        let err = seg.remove_point(99).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::MissingTrackPoint { point_id: 99, .. }
+        ));
+    }
+
+    #[test]
+    fn insert_point_at_places_point_at_correct_index() {
+        let mut seg = make_segment_with_points();
+        let new_point = TrackPoint::new(TrackPointId::new(20), 56.0, 38.0);
+
+        seg.insert_point_at(1, new_point).unwrap();
+
+        assert_eq!(seg.points().len(), 4);
+        assert_eq!(seg.points()[1].id(), TrackPointId::new(20));
+    }
+
+    #[test]
+    fn insert_point_at_errors_when_index_exceeds_length() {
+        let mut seg = make_segment_with_points();
+        let new_point = TrackPoint::new(TrackPointId::new(20), 56.0, 38.0);
+
+        let err = seg.insert_point_at(100, new_point).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::MissingTrackPoint { .. }
+        ));
+    }
+
+    #[test]
+    fn split_at_point_left_keeps_id_and_points_up_to_split() {
+        let mut seg = make_segment_with_points();
+        let original_id = seg.id();
+
+        let right = seg.split_at_point(11, TrackSegmentId::new(99)).unwrap();
+
+        assert_eq!(seg.id(), original_id);
+        assert_eq!(seg.points().len(), 2);
+        assert_eq!(seg.points()[0].id(), TrackPointId::new(10));
+        assert_eq!(seg.points()[1].id(), TrackPointId::new(11));
+        assert_eq!(right.id(), TrackSegmentId::new(99));
+        assert_eq!(right.points().len(), 2);
+        assert_eq!(right.points()[0].id(), TrackPointId::new(11));
+        assert_eq!(right.points()[1].id(), TrackPointId::new(12));
+    }
+
+    #[test]
+    fn split_at_point_errors_on_missing_point_id() {
+        let mut seg = make_segment_with_points();
+
+        let err = seg.split_at_point(99, TrackSegmentId::new(2)).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::MissingTrackPoint { point_id: 99, .. }
+        ));
     }
 }
