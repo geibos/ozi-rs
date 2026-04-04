@@ -50,6 +50,7 @@ pub fn run() {
             commands::simplify_track,
             commands::get_track_detail,
             commands::get_waypoints,
+            commands::get_simplified_preview,
             commands::reveal_bundle,
             commands::tiles::get_sqlite_tile,
             commands::tiles::get_ozi_tile,

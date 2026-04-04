@@ -1,0 +1,11 @@
+Task 25: get_simplified_preview endpoint with DTOs
+
+Added to src-tauri/src/commands/mod.rs:
+- SimplifiedSegmentDto { id, original_count, simplified_count, kept_points }
+- SimplifiedPreviewDto { original_count, simplified_count, segments }
+- get_simplified_preview(state, layer_id, track_id, tolerance) -> Result<SimplifiedPreviewDto, String>
+
+Registered in src-tauri/src/lib.rs:
+- commands::get_simplified_preview
+
+Tests: 148 pass
