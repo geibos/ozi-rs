@@ -188,6 +188,14 @@ export async function renameWaypoint(
   return invoke("rename_waypoint", { layerId, waypointId, newName });
 }
 
+export async function setWaypointSymbol(
+  layerId: bigint,
+  waypointId: bigint,
+  symbol: string | null
+): Promise<void> {
+  return invoke("set_waypoint_symbol", { layerId, waypointId, symbol });
+}
+
 export async function simplifyTrack(
   layerId: bigint,
   trackId: bigint,
