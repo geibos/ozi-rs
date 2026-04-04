@@ -1,0 +1,39 @@
+=== cargo test simplify (from src-tauri/) ===
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 8 tests
+test domain::track::tests::simplify_empty_slice_returns_empty ... ok
+test domain::track::tests::simplify_l_shaped_path_keeps_corner ... ok
+test domain::track::tests::simplify_collinear_points_reduces_to_endpoints ... ok
+test domain::track::tests::simplify_negative_tolerance_keeps_all_points ... ok
+test domain::track::tests::simplify_single_point_returns_index_zero ... ok
+test domain::track::tests::simplify_l_shaped_with_inner_collinear_removes_redundant_points ... ok
+test domain::track::tests::simplify_two_points_returns_both_indices ... ok
+test domain::track::tests::simplify_zero_tolerance_keeps_all_points ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 113 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+=== cargo test --all (from src-tauri/) ===
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.25s
+     Running unittests src/lib.rs
+
+running 121 tests
+[all 121 tests pass - including 8 new simplify_* tests]
+
+test result: ok. 121 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+=== cargo clippy --all-targets --all-features -- -D warnings (from src-tauri/) ===
+
+    Checking ozi-rs v0.1.0 (/Users/sobieg/Projects/ozi-rs/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.16s
+
+(no warnings, no errors)

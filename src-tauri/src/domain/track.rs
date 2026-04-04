@@ -401,9 +401,108 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     2.0 * R * a.sqrt().asin()
 }
 
+/// Perpendicular haversine distance (km) from point P to the line segment AB.
+///
+/// Uses a flat-Earth approximation to find the projection parameter `t`, then
+/// computes the haversine distance from P to the projected point on AB.
+fn perpendicular_distance_km(
+    p_lat: f64,
+    p_lon: f64,
+    a_lat: f64,
+    a_lon: f64,
+    b_lat: f64,
+    b_lon: f64,
+) -> f64 {
+    let dlat = b_lat - a_lat;
+    let dlon = b_lon - a_lon;
+    let len_sq = dlat * dlat + dlon * dlon;
+
+    if len_sq == 0.0 {
+        // A and B are the same point — return distance from A to P.
+        return haversine_km(a_lat, a_lon, p_lat, p_lon);
+    }
+
+    // Project P onto the line AB using flat-Earth (lat/lon as Euclidean).
+    let t = ((p_lat - a_lat) * dlat + (p_lon - a_lon) * dlon) / len_sq;
+    let t = t.clamp(0.0, 1.0);
+
+    let q_lat = a_lat + t * dlat;
+    let q_lon = a_lon + t * dlon;
+
+    haversine_km(p_lat, p_lon, q_lat, q_lon)
+}
+
+/// Simplify a slice of `TrackPoint`s using the Ramer-Douglas-Peucker algorithm.
+///
+/// Returns a **sorted** `Vec<usize>` of indices into `points` that should be
+/// **kept** after simplification.
+///
+/// * `tolerance` — maximum allowed perpendicular deviation in **kilometres**.
+///   Pass `0.0` (or any non-positive value) to keep all points.
+pub fn simplify_track_points(points: &[TrackPoint], tolerance: f64) -> Vec<usize> {
+    match points.len() {
+        0 => return vec![],
+        1 => return vec![0],
+        2 => return vec![0, 1],
+        _ => {}
+    }
+
+    if tolerance <= 0.0 {
+        return (0..points.len()).collect();
+    }
+
+    let mut kept = std::collections::BTreeSet::new();
+    rdp(points, 0, points.len() - 1, tolerance, &mut kept);
+    kept.into_iter().collect()
+}
+
+fn rdp(
+    points: &[TrackPoint],
+    start: usize,
+    end: usize,
+    tolerance: f64,
+    kept: &mut std::collections::BTreeSet<usize>,
+) {
+    kept.insert(start);
+    kept.insert(end);
+
+    if end <= start + 1 {
+        return;
+    }
+
+    let a = &points[start];
+    let b = &points[end];
+
+    let mut max_dist = 0.0_f64;
+    let mut max_idx = start;
+
+    for (i, p) in points.iter().enumerate().take(end).skip(start + 1) {
+        let d = perpendicular_distance_km(
+            p.latitude(),
+            p.longitude(),
+            a.latitude(),
+            a.longitude(),
+            b.latitude(),
+            b.longitude(),
+        );
+        if d > max_dist {
+            max_dist = d;
+            max_idx = i;
+        }
+    }
+
+    if max_dist > tolerance {
+        rdp(points, start, max_idx, tolerance, kept);
+        rdp(points, max_idx, end, tolerance, kept);
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+    use super::{
+        simplify_track_points, Track, TrackId, TrackPoint, TrackPointId, TrackSegment,
+        TrackSegmentId,
+    };
 
     #[test]
     fn track_segments_keep_inserted_points_in_order() {
@@ -624,5 +723,87 @@ mod tests {
             err,
             crate::domain::ProjectLayerError::MissingTrackSegment { segment_id: 30, .. }
         ));
+    }
+
+    fn pt(id: u64, lat: f64, lon: f64) -> TrackPoint {
+        TrackPoint::new(TrackPointId::new(id), lat, lon)
+    }
+
+    #[test]
+    fn simplify_empty_slice_returns_empty() {
+        assert_eq!(simplify_track_points(&[], 0.01), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn simplify_single_point_returns_index_zero() {
+        let points = [pt(1, 55.0, 37.0)];
+        assert_eq!(simplify_track_points(&points, 0.01), vec![0]);
+    }
+
+    #[test]
+    fn simplify_two_points_returns_both_indices() {
+        let points = [pt(1, 55.0, 37.0), pt(2, 55.1, 37.1)];
+        assert_eq!(simplify_track_points(&points, 0.01), vec![0, 1]);
+    }
+
+    #[test]
+    fn simplify_zero_tolerance_keeps_all_points() {
+        let points = [
+            pt(1, 55.0, 37.0),
+            pt(2, 55.05, 37.05),
+            pt(3, 55.1, 37.1),
+            pt(4, 55.15, 37.15),
+            pt(5, 55.2, 37.2),
+        ];
+        let result = simplify_track_points(&points, 0.0);
+        assert_eq!(result, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn simplify_negative_tolerance_keeps_all_points() {
+        let points = [pt(1, 55.0, 37.0), pt(2, 55.05, 37.05), pt(3, 55.1, 37.1)];
+        let result = simplify_track_points(&points, -1.0);
+        assert_eq!(result, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn simplify_collinear_points_reduces_to_endpoints() {
+        // Five points along the same diagonal — midpoints are on the line,
+        // so with any tolerance > 0 they should all be removed.
+        let points = [
+            pt(1, 55.0, 37.0),
+            pt(2, 55.025, 37.025),
+            pt(3, 55.05, 37.05),
+            pt(4, 55.075, 37.075),
+            pt(5, 55.1, 37.1),
+        ];
+        let result = simplify_track_points(&points, 0.001);
+        assert_eq!(result, vec![0, 4]);
+    }
+
+    #[test]
+    fn simplify_l_shaped_path_keeps_corner() {
+        // Segment goes north then turns east — the corner must be retained.
+        // Points: south-origin, corner (north), north-east end.
+        let points = [pt(1, 55.0, 37.0), pt(2, 55.1, 37.0), pt(3, 55.1, 37.1)];
+        // The perpendicular deviation of pt(2) from the line pt(1)→pt(3)
+        // is large (~7 km), so it must survive any tolerance < that.
+        let result = simplify_track_points(&points, 0.1);
+        assert_eq!(result, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn simplify_l_shaped_with_inner_collinear_removes_redundant_points() {
+        // 5 points: start, straight-north middle, corner, straight-east middle, end.
+        // The two "middle" points on each straight leg should be removed.
+        let points = [
+            pt(1, 55.0, 37.0),
+            pt(2, 55.05, 37.0),
+            pt(3, 55.1, 37.0),
+            pt(4, 55.1, 37.05),
+            pt(5, 55.1, 37.1),
+        ];
+        let result = simplify_track_points(&points, 0.001);
+        assert_eq!(result, vec![0, 2, 4]);
     }
 }
