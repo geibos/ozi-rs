@@ -92,6 +92,16 @@ struct DownloadProgressPayload {
     total_bytes: Option<u64>,
 }
 
+#[derive(serde::Serialize, Clone)]
+struct BundleProgressPayload {
+    message: String,
+    phase: &'static str,
+    completed: Option<u64>,
+    total: Option<u64>,
+    downloaded_bytes: Option<u64>,
+    total_bytes: Option<u64>,
+}
+
 // ── State snapshot ────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -186,6 +196,10 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
                 .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
                 .collect();
 
+            if coords.len() < 2 {
+                continue;
+            }
+
             features.push(serde_json::json!({
                 "type": "Feature",
                 "properties": {
@@ -258,6 +272,7 @@ pub fn load_project(slug: String, state: State<SharedState>, app: AppHandle) -> 
     let Some((summary, bundles_root)) = data else {
         return Ok(());
     };
+    let _ = app.emit("state-changed", ());
 
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
@@ -265,7 +280,17 @@ pub fn load_project(slug: String, state: State<SharedState>, app: AppHandle) -> 
             if let Ok(mut s) = lock_app_state(&state_arc) {
                 s.apply_progress(progress.message.clone());
             }
-            let _ = app.emit("state-changed", ());
+            let _ = app.emit(
+                "bundle-progress",
+                BundleProgressPayload {
+                    message: progress.message,
+                    phase: progress.phase.as_str(),
+                    completed: progress.completed,
+                    total: progress.total,
+                    downloaded_bytes: progress.downloaded_bytes,
+                    total_bytes: progress.total_bytes,
+                },
+            );
         });
         if let Ok(mut s) = lock_app_state(&state_arc) {
             s.apply_project_loaded(result);
@@ -302,6 +327,7 @@ pub fn open_selected_map(
             let _ = app.emit("state-changed", ());
         }
         OpenMapRequest::Download(selection) => {
+            let _ = app.emit("state-changed", ());
             let state_arc = Arc::clone(&state);
             let package_name = selection.package_name.clone();
             thread::spawn(move || {
@@ -337,6 +363,7 @@ pub fn open_local_bundle(
     let Some(dir_path) = data else {
         return Ok(());
     };
+    let _ = app.emit("state-changed", ());
 
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
@@ -344,7 +371,17 @@ pub fn open_local_bundle(
             if let Ok(mut s) = lock_app_state(&state_arc) {
                 s.apply_progress(progress.message.clone());
             }
-            let _ = app.emit("state-changed", ());
+            let _ = app.emit(
+                "bundle-progress",
+                BundleProgressPayload {
+                    message: progress.message,
+                    phase: progress.phase.as_str(),
+                    completed: progress.completed,
+                    total: progress.total,
+                    downloaded_bytes: progress.downloaded_bytes,
+                    total_bytes: progress.total_bytes,
+                },
+            );
         });
         if let Ok(mut s) = lock_app_state(&state_arc) {
             s.apply_project_loaded(result);
@@ -1078,5 +1115,36 @@ mod tests {
         assert_eq!(dto.segments[0].points[1].lat, 55.1);
         assert!(dto.segments[0].points[0].elevation.is_none());
         assert!(dto.segments[0].points[0].timestamp.is_none());
+    }
+
+    #[test]
+    fn get_tracks_geojson_skips_empty_tracks() {
+        use crate::domain::{
+            Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
+        };
+
+        // Empty track produces empty coords
+        let empty = Track::new(TrackId::new(1), "Empty");
+        let coords: Vec<serde_json::Value> = empty
+            .segments()
+            .iter()
+            .flat_map(|seg| seg.points())
+            .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
+            .collect();
+        assert!(coords.len() < 2);
+
+        // Track with 2 points produces valid coords
+        let mut valid = Track::new(TrackId::new(2), "Valid");
+        let mut seg = TrackSegment::new(TrackSegmentId::new(1));
+        seg.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
+        seg.add_point(TrackPoint::new(TrackPointId::new(2), 55.1, 37.1));
+        valid.add_segment(seg);
+        let coords2: Vec<serde_json::Value> = valid
+            .segments()
+            .iter()
+            .flat_map(|seg| seg.points())
+            .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
+            .collect();
+        assert!(coords2.len() >= 2);
     }
 }
