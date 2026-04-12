@@ -35,8 +35,52 @@ pub struct DownloadProgress {
     pub total_bytes: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectOpenPhase {
+    Scanning,
+    Downloading,
+    Extracting,
+    Indexing,
+}
+
+impl ProjectOpenPhase {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Scanning => "scanning",
+            Self::Downloading => "downloading",
+            Self::Extracting => "extracting",
+            Self::Indexing => "indexing",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ProjectOpenProgress {
     pub message: String,
+    pub phase: ProjectOpenPhase,
+    pub completed: Option<u64>,
+    pub total: Option<u64>,
+    pub downloaded_bytes: Option<u64>,
+    pub total_bytes: Option<u64>,
+}
+
+impl ProjectOpenProgress {
+    fn status(message: impl Into<String>, phase: ProjectOpenPhase) -> Self {
+        Self {
+            message: message.into(),
+            phase,
+            completed: None,
+            total: None,
+            downloaded_bytes: None,
+            total_bytes: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RemoteFileDownload {
+    url: String,
+    path: PathBuf,
 }
 
 pub fn fetch_project_summaries_streaming<F>(mut on_chunk: F) -> Result<Vec<LizaProjectSummary>, String>
@@ -142,24 +186,28 @@ where
     F: FnMut(ProjectOpenProgress),
 {
     if !is_project_cached(&summary.slug, root) {
-        on_progress(ProjectOpenProgress {
-            message: format!("Downloading project bundle: {}", summary.name),
-        });
+        on_progress(ProjectOpenProgress::status(
+            format!("Downloading project bundle: {}", summary.name),
+            ProjectOpenPhase::Downloading,
+        ));
         cache_project_at_root(&summary, root, &mut on_progress)?;
     } else {
-        on_progress(ProjectOpenProgress {
-            message: format!("Opening cached project bundle: {}", summary.name),
-        });
+        on_progress(ProjectOpenProgress::status(
+            format!("Opening cached project bundle: {}", summary.name),
+            ProjectOpenPhase::Downloading,
+        ));
     }
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Extracting cached OZI bundles: {}", summary.name),
-    });
+    on_progress(ProjectOpenProgress::status(
+        format!("Extracting cached OZI bundles: {}", summary.name),
+        ProjectOpenPhase::Extracting,
+    ));
     materialize_cached_ozi_archives(root, &summary.slug, &mut on_progress)?;
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Indexing cached project maps: {}", summary.name),
-    });
+    on_progress(ProjectOpenProgress::status(
+        format!("Indexing cached project maps: {}", summary.name),
+        ProjectOpenPhase::Indexing,
+    ));
     let project = load_cached_project_from_root(summary, root)?;
     ensure_tracks_dir(root, &project.summary.slug);
     Ok(project)
@@ -191,14 +239,16 @@ where
         url: String::new(),
     };
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Extracting OZI archives in: {name}"),
-    });
+    on_progress(ProjectOpenProgress::status(
+        format!("Extracting OZI archives in: {name}"),
+        ProjectOpenPhase::Extracting,
+    ));
     materialize_cached_ozi_archives(root, &slug, &mut on_progress)?;
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Indexing maps in: {name}"),
-    });
+    on_progress(ProjectOpenProgress::status(
+        format!("Indexing maps in: {name}"),
+        ProjectOpenPhase::Indexing,
+    ));
     let project = load_cached_project_from_root(summary, root)?;
     ensure_tracks_dir(root, &slug);
     Ok(project)
@@ -362,9 +412,73 @@ where
     F: FnMut(ProjectOpenProgress),
 {
     fs::create_dir_all(local_dir).map_err(|err| err.to_string())?;
+    on_progress(ProjectOpenProgress::status(
+        format!("Scanning {}", local_dir.display()),
+        ProjectOpenPhase::Scanning,
+    ));
+
+    let mut files = Vec::new();
+    collect_remote_files(url, local_dir, &mut files)?;
+    let total_files = files.len() as u64;
+
     on_progress(ProjectOpenProgress {
-        message: format!("Scanning {}", local_dir.display()),
+        message: format!("Downloading {} files in parallel", total_files),
+        phase: ProjectOpenPhase::Downloading,
+        completed: Some(0),
+        total: Some(total_files),
+        downloaded_bytes: None,
+        total_bytes: None,
     });
+
+    // Download all files concurrently; progress callback is not called from threads
+    // (it is not Send), so we collect errors and report them after joining.
+    let completed_count = std::sync::atomic::AtomicU64::new(0);
+    let mut first_error: Option<String> = None;
+    std::thread::scope(|s| {
+        let handles: Vec<_> = files
+            .iter()
+            .map(|file| {
+                let completed_count = &completed_count;
+                s.spawn(move || {
+                    let result = download_to_path(&file.url, &file.path, |_, _| {});
+                    if result.is_ok() {
+                        completed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    result
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            if let Ok(Err(e)) = handle.join()
+                && first_error.is_none()
+            {
+                first_error = Some(e);
+            }
+        }
+    });
+
+    if let Some(e) = first_error {
+        return Err(e);
+    }
+
+    on_progress(ProjectOpenProgress {
+        message: format!("Downloaded {} files", total_files),
+        phase: ProjectOpenPhase::Downloading,
+        completed: Some(total_files),
+        total: Some(total_files),
+        downloaded_bytes: None,
+        total_bytes: None,
+    });
+
+    Ok(())
+}
+
+fn collect_remote_files(
+    url: &str,
+    local_dir: &Path,
+    output: &mut Vec<RemoteFileDownload>,
+) -> Result<(), String> {
     let html = fetch_text(url)?;
 
     for entry in parse_directory_entries(&html)? {
@@ -372,19 +486,23 @@ where
         let child_path = local_dir.join(&entry.name);
 
         if entry.is_dir {
-            mirror_remote_directory(&child_url, &child_path, on_progress)?;
+            fs::create_dir_all(&child_path).map_err(|err| err.to_string())?;
+            collect_remote_files(&child_url, &child_path, output)?;
         } else {
-            on_progress(ProjectOpenProgress {
-                message: format!("Downloading {}", child_path.display()),
+            output.push(RemoteFileDownload {
+                url: child_url,
+                path: child_path,
             });
-            download_to_path(&child_url, &child_path)?;
         }
     }
 
     Ok(())
 }
 
-fn download_to_path(url: &str, path: &Path) -> Result<(), String> {
+fn download_to_path<F>(url: &str, path: &Path, mut on_progress: F) -> Result<(), String>
+where
+    F: FnMut(u64, Option<u64>),
+{
     let client = client()?;
     let mut response = client
         .get(url)
@@ -397,6 +515,8 @@ fn download_to_path(url: &str, path: &Path) -> Result<(), String> {
     }
 
     let mut file = File::create(path).map_err(|err| err.to_string())?;
+    let total_bytes = response.content_length();
+    let mut downloaded_bytes = 0u64;
     let mut buffer = [0u8; 16 * 1024];
 
     loop {
@@ -407,6 +527,8 @@ fn download_to_path(url: &str, path: &Path) -> Result<(), String> {
 
         file.write_all(&buffer[..read_bytes])
             .map_err(|err| err.to_string())?;
+        downloaded_bytes += read_bytes as u64;
+        on_progress(downloaded_bytes, total_bytes);
     }
 
     Ok(())
@@ -701,6 +823,11 @@ where
             to_extract.len(),
             names.join(", ")
         ),
+        phase: ProjectOpenPhase::Extracting,
+        completed: Some(0),
+        total: Some(to_extract.len() as u64),
+        downloaded_bytes: None,
+        total_bytes: None,
     });
 
     // Extract all archives concurrently; progress callback is not called from threads
@@ -724,6 +851,15 @@ where
     if let Some(e) = first_error {
         return Err(e);
     }
+
+    on_progress(ProjectOpenProgress {
+        message: format!("Extracted {} OZI archives", to_extract.len()),
+        phase: ProjectOpenPhase::Extracting,
+        completed: Some(to_extract.len() as u64),
+        total: Some(to_extract.len() as u64),
+        downloaded_bytes: None,
+        total_bytes: None,
+    });
 
     Ok(())
 }
