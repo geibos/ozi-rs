@@ -77,10 +77,15 @@
                   onclick={() => handlePointClick(point.id)}
                 >
                   <span class="bullet">•</span>
-                  <span class="coords">
-                    {point.lat.toFixed(5)}, {point.lon.toFixed(5)}
-                    {#if point.elevation !== undefined && point.elevation !== null}
-                      <span class="elevation">, ele={point.elevation.toFixed(1)}m</span>
+                  <span class="point-content">
+                    <span class="coords">
+                      {point.lat.toFixed(5)}, {point.lon.toFixed(5)}
+                      {#if point.elevation !== undefined && point.elevation !== null}
+                        <span class="elevation">, ele={point.elevation.toFixed(1)}m</span>
+                      {/if}
+                    </span>
+                    {#if point.timestamp}
+                      <span class="timestamp">{point.timestamp}</span>
                     {/if}
                   </span>
                 </div>
@@ -225,6 +230,13 @@
     color: var(--ctp-surface2);
   }
 
+  .point-content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+  }
+
   .coords {
     font-family: monospace;
     white-space: pre;
@@ -232,6 +244,13 @@
 
   .elevation {
     color: var(--ctp-subtext0);
+  }
+
+  .timestamp {
+    color: var(--ctp-overlay1);
+    font-family: monospace;
+    font-size: 10px;
+    line-height: 1.2;
   }
 
   .show-more {
