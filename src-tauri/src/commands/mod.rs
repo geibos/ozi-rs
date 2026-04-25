@@ -571,7 +571,9 @@ pub fn set_waypoint_symbol(
 ) -> Result<(), String> {
     use crate::domain::{LayerId, WaypointId};
     let mut app_state = lock_app_state(state.inner())?;
-    app_state.set_waypoint_symbol(LayerId::new(layer_id), WaypointId::new(waypoint_id), symbol);
+    app_state
+        .apply_set_waypoint_symbol(LayerId::new(layer_id), WaypointId::new(waypoint_id), symbol)
+        .map_err(|e| e.to_string())?;
     let _ = app.emit("state-changed", ());
     Ok(())
 }
