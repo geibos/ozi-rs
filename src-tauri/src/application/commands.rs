@@ -104,6 +104,12 @@ pub enum ProjectCommand {
         old_name: String,
         new_name: String,
     },
+    SetWaypointSymbol {
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_symbol: Option<String>,
+        new_symbol: Option<String>,
+    },
     SimplifyTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -325,6 +331,20 @@ impl ProjectCommand {
         }
     }
 
+    pub fn set_waypoint_symbol(
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_symbol: Option<String>,
+        new_symbol: Option<String>,
+    ) -> Self {
+        Self::SetWaypointSymbol {
+            layer_id,
+            waypoint_id,
+            old_symbol,
+            new_symbol,
+        }
+    }
+
     pub fn simplify_track(layer_id: LayerId, track_id: TrackId, tolerance_km: f64) -> Self {
         Self::SimplifyTrack {
             layer_id,
@@ -503,6 +523,15 @@ impl ProjectCommand {
                 ..
             } => {
                 project.rename_waypoint_in_layer(*layer_id, *waypoint_id, new_name.clone())?;
+                Ok(())
+            }
+            Self::SetWaypointSymbol {
+                layer_id,
+                waypoint_id,
+                new_symbol,
+                ..
+            } => {
+                project.set_waypoint_symbol_in_layer(*layer_id, *waypoint_id, new_symbol.clone())?;
                 Ok(())
             }
             Self::SimplifyTrack {
@@ -813,6 +842,17 @@ impl ProjectCommand {
                 old_name: new_name.clone(),
                 new_name: old_name.clone(),
             },
+            Self::SetWaypointSymbol {
+                layer_id,
+                waypoint_id,
+                old_symbol,
+                new_symbol,
+            } => Self::SetWaypointSymbol {
+                layer_id: *layer_id,
+                waypoint_id: *waypoint_id,
+                old_symbol: new_symbol.clone(),
+                new_symbol: old_symbol.clone(),
+            },
             Self::SimplifyTrack {
                 layer_id,
                 track_id,
@@ -901,10 +941,16 @@ impl ProjectCommand {
                 layer_id,
                 track_id,
                 name,
-            } => Self::RemoveTrack {
-                layer_id: *layer_id,
-                track: crate::domain::Track::new(*track_id, name.clone()),
-            },
+            } => {
+                let mut track = crate::domain::Track::new(*track_id, name.clone());
+                track.add_segment(crate::domain::TrackSegment::new(
+                    crate::domain::TrackSegmentId::new(1),
+                ));
+                Self::RemoveTrack {
+                    layer_id: *layer_id,
+                    track,
+                }
+            }
         }
     }
 
@@ -2518,7 +2564,7 @@ mod tests {
     }
 
     #[test]
-    fn create_empty_track_duplicate_id_or_missing_layer_returns_error() {
+    fn create_empty_track_missing_layer_returns_error() {
         let mut project = Project::untitled();
         let mut history = CommandStack::default();
         let result = history.apply(

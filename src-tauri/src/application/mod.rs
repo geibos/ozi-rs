@@ -142,6 +142,8 @@ struct LizaAlertState {
     downloading: HashSet<String>,
 }
 
+const MAX_DIAGNOSTICS: usize = 200;
+
 impl Default for AppState {
     fn default() -> Self {
         Self::new()
@@ -150,9 +152,13 @@ impl Default for AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        let mut project = Project::default();
+        // Ensure default layers exist so the UI can use layerId=1 immediately
+        project.add_track_layer(crate::domain::TrackLayer::new(LayerId::new(1), "Tracks"));
+        project.add_waypoint_layer(crate::domain::WaypointLayer::new(LayerId::new(1), "Waypoints"));
         Self {
             history: CommandStack::default(),
-            project: Project::default(),
+            project,
             project_path: None,
             bundles_root: default_bundles_root(),
             lizaalert: LizaAlertState {
@@ -305,6 +311,14 @@ impl AppState {
         self.lizaalert.downloading.remove(package_name);
         match result {
             Ok(selection) => {
+                if let Some(project) = self.lizaalert.selected_project.as_mut()
+                    && let Some(map) = project
+                        .maps
+                        .iter_mut()
+                        .find(|map| map.name == selection.package_name)
+                {
+                    map.local_path = Some(selection.local_path.clone());
+                }
                 let status = match self.register_active_map_layer(&selection) {
                     Ok(true) => format!(
                         "Opened map: {} / {}",
@@ -514,15 +528,36 @@ impl AppState {
         import::import_plt_file_into_project(&mut self.project, &mut self.history, &path)
     }
 
-    pub fn set_waypoint_symbol(
+    pub fn apply_set_waypoint_symbol(
         &mut self,
         layer_id: LayerId,
         waypoint_id: WaypointId,
-        symbol: Option<String>,
-    ) {
-        let _ = self
+        new_symbol: Option<String>,
+    ) -> Result<(), ProjectLayerError> {
+        let old_symbol = self
             .project
-            .set_waypoint_symbol_in_layer(layer_id, waypoint_id, symbol);
+            .waypoint_layers()
+            .iter()
+            .find(|layer| layer.id() == layer_id)
+            .ok_or(ProjectLayerError::WaypointLayerUnavailable(layer_id))?
+            .waypoints()
+            .iter()
+            .find(|waypoint| waypoint.id() == waypoint_id)
+            .ok_or(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))?
+            .symbol()
+            .map(str::to_owned);
+
+        let cmd = commands::ProjectCommand::set_waypoint_symbol(
+            layer_id,
+            waypoint_id,
+            old_symbol,
+            new_symbol,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
     }
 
     pub fn set_track_color(&mut self, layer_id: LayerId, track_id: TrackId, color: [u8; 4]) {
@@ -977,6 +1012,9 @@ impl AppState {
             DiagnosticLevel::Error => tracing::error!("{message}"),
             DiagnosticLevel::Info => tracing::info!("{message}"),
         }
+        while self.lizaalert.diagnostics.len() >= MAX_DIAGNOSTICS {
+            self.lizaalert.diagnostics.pop_front();
+        }
         self.lizaalert
             .diagnostics
             .push_back(DiagnosticEntry::new(level, message));
@@ -1010,5 +1048,149 @@ fn reveal_in_file_manager(path: &std::path::Path) {
     #[cfg(target_os = "windows")]
     {
         let _ = std::process::Command::new("explorer").arg(path).spawn();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_project_with_remote_map() -> LizaProject {
+        LizaProject {
+            summary: LizaProjectSummary {
+                slug: "demo-project".to_owned(),
+                name: "Demo Project".to_owned(),
+                url: "https://example.invalid/project".to_owned(),
+            },
+            center: MapCenter { lat: 55.0, lon: 37.0 },
+            maps: vec![LizaMapPackage {
+                name: "demo-map".to_owned(),
+                file_name: "demo-map.sqlitedb".to_owned(),
+                url: "https://example.invalid/demo-map.sqlitedb".to_owned(),
+                base_zoom: 12,
+                local_path: None,
+            }],
+        }
+    }
+
+    #[test]
+    fn apply_map_downloaded_marks_selected_project_map_as_cached() {
+        let mut state = AppState::new();
+        let project = sample_project_with_remote_map();
+        let selection = ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: project.summary.name.clone(),
+            package_name: project.maps[0].name.clone(),
+            remote_url: project.maps[0].url.clone(),
+            local_path: PathBuf::from("/tmp/demo-map.sqlitedb"),
+            center: project.center,
+            base_zoom: project.maps[0].base_zoom,
+        };
+
+        state.lizaalert.selected_project = Some(project);
+        state
+            .lizaalert
+            .downloading
+            .insert(selection.package_name.clone());
+
+        state.apply_map_downloaded(&selection.package_name, Ok(selection.clone()));
+
+        let selected_project = state.lizaalert.selected_project.as_ref().expect("project");
+        assert_eq!(
+            selected_project.maps[0].local_path.as_deref(),
+            Some(selection.local_path.as_path())
+        );
+        assert!(!state.lizaalert.downloading.contains(&selection.package_name));
+        assert_eq!(state.lizaalert.active_map.as_ref(), Some(&selection));
+    }
+
+    #[test]
+    fn begin_open_map_returns_local_request_after_download_is_applied() {
+        let mut state = AppState::new();
+        let project = sample_project_with_remote_map();
+        let selection = ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: project.summary.name.clone(),
+            package_name: project.maps[0].name.clone(),
+            remote_url: project.maps[0].url.clone(),
+            local_path: PathBuf::from("/tmp/demo-map.sqlitedb"),
+            center: project.center,
+            base_zoom: project.maps[0].base_zoom,
+        };
+
+        state.lizaalert.selected_project = Some(project);
+        let first_request = state.begin_open_map(&selection.package_name);
+        assert!(matches!(first_request, Some(OpenMapRequest::Download(_))));
+
+        state
+            .lizaalert
+            .downloading
+            .insert(selection.package_name.clone());
+        state.apply_map_downloaded(&selection.package_name, Ok(selection.clone()));
+
+        let second_request = state.begin_open_map(&selection.package_name);
+        assert!(matches!(second_request, Some(OpenMapRequest::Local(_))));
+    }
+
+    #[test]
+    fn waypoint_symbol_undo_restores_previous_symbol_and_redo_reapplies_new_symbol() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let waypoint_id = WaypointId::new(1);
+
+        state
+            .project
+            .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667))
+            .unwrap();
+        state
+            .project
+            .set_waypoint_symbol_in_layer(layer_id, waypoint_id, Some("flag".to_owned()))
+            .unwrap();
+
+        state
+            .apply_set_waypoint_symbol(layer_id, waypoint_id, Some("camp".to_owned()))
+            .unwrap();
+
+        let waypoint = &state.project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.symbol(), Some("camp"));
+
+        state.undo();
+        let waypoint = &state.project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.symbol(), Some("flag"));
+
+        state.redo();
+        let waypoint = &state.project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.symbol(), Some("camp"));
+    }
+
+    #[test]
+    fn waypoint_symbol_missing_returns_error_without_mutating_state() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let waypoint_id = WaypointId::new(1);
+
+        state
+            .project
+            .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667))
+            .unwrap();
+        let before = state.project.clone();
+
+        let missing_waypoint_error = state
+            .apply_set_waypoint_symbol(layer_id, WaypointId::new(99), Some("camp".to_owned()))
+            .unwrap_err();
+        assert_eq!(
+            missing_waypoint_error,
+            ProjectLayerError::WaypointNotFound(layer_id, WaypointId::new(99))
+        );
+        assert_eq!(state.project, before);
+
+        let missing_layer_error = state
+            .apply_set_waypoint_symbol(LayerId::new(99), waypoint_id, Some("camp".to_owned()))
+            .unwrap_err();
+        assert_eq!(
+            missing_layer_error,
+            ProjectLayerError::WaypointLayerUnavailable(LayerId::new(99))
+        );
+        assert_eq!(state.project, before);
     }
 }
