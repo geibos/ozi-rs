@@ -1,6 +1,14 @@
 <script lang="ts">
   import { appState, tracksPanelOpen, selectedTrack, simplifyState } from "../lib/stores";
-  import { getTracksGeojson, renameTrack, toggleTrackVisible, exportGpx, exportTrackPlt } from "../lib/api";
+  import {
+    getTracksGeojson,
+    renameTrack,
+    toggleTrackVisible,
+    exportGpx,
+    exportTrackPlt,
+    setTrackColor,
+    setTrackLineWidth,
+  } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import SimplifyPanel from "./SimplifyPanel.svelte";
 
@@ -9,6 +17,7 @@
     trackId: bigint;
     name: string;
     color: string;
+    lineWidth: number;
     visible: boolean;
   }
 
@@ -31,8 +40,48 @@
         trackId: BigInt(f.properties!.track_id as number),
         name: f.properties!.name as string,
         color: f.properties!.color as string,
+        lineWidth: Number(f.properties!.line_width ?? 3),
         visible: f.properties!.visible as boolean,
       }));
+  }
+
+  function colorToHex(color: string) {
+    if (/^#[0-9a-f]{6}$/i.test(color)) {
+      return color;
+    }
+
+    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (!match) {
+      return "#000000";
+    }
+
+    return [match[1], match[2], match[3]]
+      .map((channel) => Number(channel).toString(16).padStart(2, "0"))
+      .join("")
+      .replace(/^/, "#");
+  }
+
+  function hexToRgba(hex: string): [number, number, number, number] {
+    const normalized = hex.replace("#", "");
+    return [
+      parseInt(normalized.slice(0, 2), 16),
+      parseInt(normalized.slice(2, 4), 16),
+      parseInt(normalized.slice(4, 6), 16),
+      255,
+    ];
+  }
+
+  async function handleColorChange(track: TrackFeature, event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    await setTrackColor(track.layerId, track.trackId, hexToRgba(input.value));
+    track.color = input.value;
+  }
+
+  async function handleLineWidthChange(track: TrackFeature, event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const width = Number(input.value);
+    await setTrackLineWidth(track.layerId, track.trackId, width);
+    track.lineWidth = width;
   }
 
   function startRename(track: TrackFeature) {
@@ -97,6 +146,33 @@
               class="color-dot"
               style="background: {track.color}"
             ></span>
+
+            <div
+              class="style-controls"
+              onclick={(event) => event.stopPropagation()}
+              onmousedown={(event) => event.stopPropagation()}
+            >
+              <input
+                class="color-input"
+                type="color"
+                value={colorToHex(track.color)}
+                title="Track color"
+                aria-label="Track color"
+                onchange={(event) => handleColorChange(track, event)}
+              />
+              <input
+                class="width-input"
+                type="range"
+                min="1"
+                max="12"
+                step="1"
+                value={track.lineWidth}
+                title={`Track width: ${track.lineWidth}px`}
+                aria-label="Track line width"
+                onchange={(event) => handleLineWidthChange(track, event)}
+              />
+              <span class="width-value">{track.lineWidth}px</span>
+            </div>
 
             {#if editingTrack === track.trackId}
               <input
@@ -233,6 +309,33 @@
     height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
+  }
+
+  .style-controls {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .color-input {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--ctp-surface1);
+    border-radius: 3px;
+  }
+
+  .width-input {
+    width: 42px;
+    accent-color: var(--ctp-blue);
+  }
+
+  .width-value {
+    min-width: 24px;
+    color: var(--ctp-overlay1);
+    font-size: 10px;
   }
 
   .track-name {
