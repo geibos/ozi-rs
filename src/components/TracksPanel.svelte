@@ -10,6 +10,7 @@
     setTrackLineWidth,
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { isOkStandardTrackName } from "../lib/track-names";
   import SimplifyPanel from "./SimplifyPanel.svelte";
 
   interface TrackFeature {
@@ -174,21 +175,29 @@
               <span class="width-value">{track.lineWidth}px</span>
             </div>
 
-            {#if editingTrack === track.trackId}
-              <input
-                class="name-input"
-                bind:value={editName}
-                onblur={() => commitRename(track)}
-                onkeydown={(e) => e.key === "Enter" && commitRename(track)}
-                autofocus
-              />
-            {:else}
-              <span
-                class="track-name"
-                ondblclick={() => startRename(track)}
-                title="Double-click to rename"
-              >{track.name}</span>
-            {/if}
+            <div class="name-block">
+              {#if editingTrack === track.trackId}
+                <input
+                  class="name-input"
+                  bind:value={editName}
+                  onblur={() => commitRename(track)}
+                  onkeydown={(e) => e.key === "Enter" && commitRename(track)}
+                  autofocus
+                />
+                {#if !isOkStandardTrackName(editName)}
+                  <span class="ok-name-warning">Use YYYYMMDD_Callsign</span>
+                {/if}
+              {:else}
+                <span
+                  class="track-name"
+                  ondblclick={() => startRename(track)}
+                  title="Double-click to rename"
+                >{track.name}</span>
+                {#if !isOkStandardTrackName(track.name)}
+                  <span class="ok-name-warning">Use YYYYMMDD_Callsign</span>
+                {/if}
+              {/if}
+            </div>
 
             <div class="actions">
               {#if $selectedTrack?.trackId === track.trackId}
@@ -338,8 +347,15 @@
     font-size: 10px;
   }
 
-  .track-name {
+  .name-block {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .track-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -348,9 +364,16 @@
   }
 
   .name-input {
-    flex: 1;
+    width: 100%;
+    box-sizing: border-box;
     font-size: 12px;
     padding: 1px 4px;
+  }
+
+  .ok-name-warning {
+    color: var(--ctp-yellow);
+    font-size: 10px;
+    line-height: 1.1;
   }
 
   .actions {
