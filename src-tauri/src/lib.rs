@@ -15,7 +15,9 @@ pub fn run() {
         )
         .init();
 
-    let state: SharedState = Arc::new(Mutex::new(application::AppState::new()));
+    let state: SharedState = Arc::new(Mutex::new(application::AppState::new_with_session_path(
+        infrastructure::persistence::default_app_session_path(),
+    )));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())

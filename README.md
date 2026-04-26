@@ -1,68 +1,99 @@
 # ozi-rs
 
-`ozi-rs` is a Rust desktop map editor for raster maps, tracks, and waypoints, built for
+`ozi-rs` is a Tauri 2 desktop map editor for raster maps, tracks, and waypoints, built for
 [LizaAlert](https://lizaalert.org) search-and-rescue volunteers.
 
 The goal is a modern, predictable, offline-first replacement for the useful core of
 OziExplorer — without copying legacy UX or legacy data-model constraints.
 
+**Stack:** Rust (Tauri 2) + Svelte 5 + MapLibre GL 4
+
 ## Quick Start
 
-```bash
-cargo run
-```
-
-Set the log level via the standard `RUST_LOG` environment variable (default: `info`):
+Requires: Rust (2024 edition), Node.js, [`just`](https://github.com/casey/just) task runner.
 
 ```bash
-RUST_LOG=debug cargo run
-RUST_LOG=ozi_rs=trace cargo run
+npm install
+just dev
 ```
 
-Press `` ` `` (backtick / tilde) to open the in-app developer console.
+Set the log level via `RUST_LOG` (default: `info`):
+
+```bash
+RUST_LOG=debug just dev
+RUST_LOG=ozi_rs=trace just dev
+```
+
+Run `just` to see all available recipes. Key commands:
+
+| Task | Command |
+|------|---------|
+| Dev server (full) | `just dev` |
+| Frontend only | `just dev-ui` |
+| All tests | `just test` |
+| Clippy (strict) | `just clippy` |
+
+Press `` ` `` (backtick) to open the in-app developer console.
 
 ## Current State
 
-The following is working:
-
-**Maps**
+### Maps
 - SQLite tile maps downloaded from maps.lizaalert.ru
 - OziExplorer OZF2 raster maps (`.map` + `.ozf2`)
 - OpenStreetMap as an online fallback
+- Custom tile protocols: `sqlite://` for MBTiles, `ozi://` for OZF2 raster
 
-**LizaAlert integration**
-- browse and download projects from maps.lizaalert.ru
-- configurable local map bundle storage directory
-- open local map bundles (offline, from a picked folder)
-- reveal active bundle in Finder / Explorer
+### LizaAlert Integration
+- Browse and download projects from maps.lizaalert.ru
+- Configurable local map bundle storage directory
+- Open local map bundles (offline, from a picked folder)
+- Reveal active bundle in Finder / Explorer
 
-**Tracks**
-- import GPX and PLT files
-- display tracks on all map types
-- per-track visibility, color picker, line width
-- track name editing with LizaAlert OK-standard validation hint (`YYYYMMDD_Callsign`)
-- track statistics: distance (km), duration, point count
-- export track layer to GPX (with Garmin color extension)
-- automatic `10-Tracks/` subfolder suggestion on export
+### Tracks
+- Import GPX and PLT files (including ZIP archives)
+- Display tracks on all map types
+- Per-track visibility, color picker, line width
+- Track name editing with LizaAlert OK-standard validation (`YYYYMMDD_Callsign`)
+- Track statistics: distance (km), duration, point count
+- Export track layer to GPX (with Garmin color extension)
+- Export individual tracks to PLT (OziExplorer format)
+- Automatic `10-Tracks/` subfolder suggestion on export
 
-**Project**
-- project save / load (JSON)
-- undo / redo via command stack
-- last open project and map restored on startup
+### Track Editing
+- Track point list panel with segment hierarchy
+- Move track points by drag on map (edit mode)
+- Delete and insert track points (right-click context menu)
+- Split segment at point, join adjacent segments
+- Create new tracks by drawing on map (click to add points, double-click to finish)
+- Douglas-Peucker track simplification with live preview and tolerance slider
 
-**UI**
-- Catppuccin theme (Auto / Latte / Frappé / Macchiato / Mocha), persisted across restarts
-- floating, resizable Tracks window
-- developer console toggled with `` ` ``
+### Waypoints
+- Add waypoints by clicking on map
+- Move waypoints by drag on map
+- Rename and delete waypoints
+- Symbol picker (flag, camp, danger, water, shelter, etc.)
+- Waypoint markers with emoji icons
+
+### Project
+- Project save / load (JSON `.ozp` format)
+- Undo / redo via delta-based command stack with drag coalescing
+- Last saved/loaded project path and active map restored on startup when referenced files still exist
+- Viewport, selected entities, panels, undo history, theme, and unsaved edits are not restored by the Rust session file
+
+### UI
+- Catppuccin theme (Auto / Latte / Frappé / Macchiato / Mocha), persisted
+- Sidebar with project controls, import/export, drawing/waypoint mode toggles
+- Panels: Tracks, Track Points, Waypoints, Simplify
+- Developer console toggled with `` ` ``
+- FPS counter (F3)
+- Keyboard shortcuts: Ctrl+Z/Y (undo/redo), Enter/Esc (drawing mode)
 
 ## Map Bundle vs Project
 
-These are two distinct concepts:
-
 | Concept | What it is |
 |---------|-----------|
-| **Map bundle** | A directory with one or more maps for a geographic area. Downloaded from LizaAlert or opened locally. Stored wherever you configure. |
-| **Project** | One SAR search operation. References tracks and waypoints. Saved as a `.json` file. Tracks are stored in a `10-Tracks/` subfolder per LizaAlert cartographer standard. |
+| **Map bundle** | A directory with one or more maps for a geographic area. Downloaded from LizaAlert or opened locally. |
+| **Project** | One SAR search operation. Contains tracks and waypoints. Saved as `.ozp`. Exports go to `10-Tracks/` per LizaAlert standard. |
 
 One bundle can be referenced by multiple projects.
 
@@ -71,31 +102,33 @@ One bundle can be referenced by multiple projects.
 Track names must follow `YYYYMMDD_Callsign` (e.g. `20240601_Иванов`). The UI shows a
 warning on tracks whose names do not match this pattern.
 
-## Planned MVP
+## Remaining Work
 
-- track point editing (move, delete, insert)
-- split and join track segments
-- waypoint editing UI
-- Douglas-Peucker track simplification
-- PLT export
-- print map with tracks
+- Print map with tracks and waypoints to PDF or image
+- Sort track points by timestamp
+- KML import/export
 
-## Explicit Non-Goals For MVP
+## Explicit Non-Goals
 
-- datum management
-- advanced geodesy and projection features beyond immediate needs
+- Datum management
+- Advanced geodesy and projection features beyond immediate needs
 - GPS device sync and live telemetry
-- routes and events
-- privileged legacy concepts such as a special `Track 1`
+- Routes and events
+- Privileged legacy concepts such as a special `Track 1`
+- Polygon / search sector drawing (post-MVP)
 
 ## Architecture
 
 Four explicit layers:
 
-- `domain` — business entities and invariants, no GUI dependencies
-- `application` — commands, use-cases, undo/redo orchestration
-- `infrastructure` — persistence, import/export, file format adapters
-- `ui` — rendering, interaction, transient view state
+```
+UI (Svelte 5 + MapLibre GL 4)
+  ↕ Tauri IPC
+Commands layer  ── Tauri #[command] handlers, thin wrappers
+Application     ── AppState, ProjectCommand enum, delta-based undo/redo
+Infrastructure  ── File I/O: GPX/PLT import-export, LizaAlert API, tile serving
+Domain          ── Pure entities: Project, Track, Waypoint, LayerId (no IO)
+```
 
 All non-trivial edits flow through explicit commands. Domain logic stays serializable
 and testable without the UI runtime.
@@ -104,6 +137,8 @@ and testable without the UI runtime.
 
 - `docs/requirements.md` — product requirements and user workflows
 - `docs/architecture.md` — layer responsibilities and editing model
+- `docs/frontend-architecture.md` — UI stack, components, state management
+- `docs/commands-reference.md` — ProjectCommand and Tauri IPC reference
 - `docs/testing-strategy.md` — test layers and quality gates
-- `docs/roadmap.md` — phases, backlog, and triage
-- `docs/adr/` — architectural decision records
+- `docs/roadmap.md` — phases and status
+- `docs/adr/` — architecture decision records (18 ADRs)
