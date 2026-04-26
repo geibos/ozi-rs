@@ -17,7 +17,8 @@ file path and the active map reference/path needed to reopen that map if the fil
 - Viewport/camera position.
 - Selected tracks, waypoints, or points.
 - Panel open/closed state.
-- Bundle-loader window visibility or other window layout state.
+- Bundle-loader window visibility/open state or other window layout state; session restore never
+  reopens the hidden or focused `bundles` webview.
 - Unsaved project edits outside an explicit project save.
 - Undo/redo history.
 - Theme selection inside the Rust session file or inside `.ozp` project files.
