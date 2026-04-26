@@ -93,7 +93,7 @@ Press `` ` `` (backtick) to open the in-app developer console.
 | Concept | What it is |
 |---------|-----------|
 | **Map bundle** | A directory with one or more maps for a geographic area. Downloaded from LizaAlert or opened locally. |
-| **Project** | One SAR search operation. Contains tracks and waypoints. Saved as `.ozp`. Exports go to `10-Tracks/` per LizaAlert standard. |
+| **Project** | One SAR search operation. Contains tracks and waypoints. Saved as `.ozp`. GPX/PLT export dialogs suggest the active bundle's `10-Tracks/` subfolder when available; users may choose another path. |
 
 One bundle can be referenced by multiple projects.
 
