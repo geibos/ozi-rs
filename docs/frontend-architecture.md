@@ -18,7 +18,7 @@ All components are in `src/components/`.
 | Component | Purpose |
 |-----------|---------|
 | `MapView.svelte` | Main map canvas. Handles MapLibre init, track/waypoint rendering, drawing mode, drag editing, FPS counter, context menus |
-| `Sidebar.svelte` | Left sidebar (200px). Project controls, import/export buttons, undo/redo, mode toggles, theme picker |
+| `Sidebar.svelte` | Left sidebar (200px). Project controls, active track/waypoint layer selectors, import/export buttons, undo/redo, mode toggles, theme picker |
 | `TracksPanel.svelte` | Track list. Visibility toggle, rename, color, width, export, simplify action |
 | `TrackPointsPanel.svelte` | Read-only point list with segment hierarchy. "Edit Mode" toggle for map drag |
 | `WaypointsPanel.svelte` | Waypoint list. Delete, rename, symbol picker |
@@ -63,6 +63,9 @@ All stores are in `src/lib/stores.ts`.
 | `projectsStore` | `Writable<LizaProjectSummaryDto[]>` | Streaming `projects-chunk` events |
 | `downloadProgress` | `Writable<Map>` | `download-progress` events |
 
+`AppStateDto` also exposes `track_layers` and `waypoint_layers` summaries so the UI can
+select the active layer for existing workflows without implementing full layer management.
+
 ### UI-Only State (not persisted to backend)
 
 | Store | Type | Purpose |
@@ -74,7 +77,8 @@ All stores are in `src/lib/stores.ts`.
 | `editModeActive` | `Writable<boolean>` | Map point drag editing |
 | `addWaypointMode` | `Writable<boolean>` | Click-to-add waypoint mode |
 | `drawingModeActive` | `Writable<boolean>` | Track drawing mode |
-| `drawingTrackId`, `drawingSegmentId`, `drawingPointCount` | Writable | Drawing session state |
+| `activeTrackLayerId`, `activeWaypointLayerId` | `Writable<bigint \| null>` | Active-layer selection for current track and waypoint workflows; synchronized from backend layer summaries |
+| `drawingTrackId`, `drawingSegmentId`, `drawingTrackLayerId`, `drawingPointCount` | Writable | Drawing session state; drawing captures the active track layer at creation time |
 | `selectedTrack` | `Writable<{layerId, trackId}>` | Currently selected track |
 | `selectedWaypointId` | `Writable<bigint \| null>` | Selected waypoint |
 | `simplifyState` | `Writable<{active, layerId, trackId, tolerance, preview}>` | Simplification session |
@@ -87,9 +91,9 @@ All stores are in `src/lib/stores.ts`.
 Categories:
 - **App state**: `getAppState()`, `loadProjects()`, `loadProject(slug)`
 - **File I/O**: `saveProject(path)`, `loadProjectFile(path)`, `importGpx(path)`, `importPlt(path)`
-- **Track mutations**: `renameTrack()`, `setTrackColor()`, `moveTrackPoint()`, `deleteTrackPoint()`, `insertTrackPoint()`, `splitSegment()`, `joinSegments()`, `deleteTrack()`, `createEmptyTrack()`, `simplifyTrack()`
+- **Track mutations**: `renameTrack()`, `setTrackColor()`, `setTrackLineWidth()`, `moveTrackPoint()`, `deleteTrackPoint()`, `insertTrackPoint()`, `splitSegment()`, `joinSegments()`, `deleteTrack()`, `createEmptyTrack()`, `simplifyTrack()`
 - **Waypoint mutations**: `addWaypoint()`, `moveWaypoint()`, `deleteWaypoint()`, `renameWaypoint()`, `setWaypointSymbol()`
-- **Export**: `exportGpx(layerId, path)`, `exportTrackPlt(layerId, trackId, path)`
+- **Export**: `getTrackExportDefaultPath(trackName, extension)`, `exportGpx(layerId, path)`, `exportTrackPlt(layerId, trackId, path)`
 - **History**: `undo()`, `redo()`
 - **Maps**: `openSelectedMap()`, `openLocalBundle()`, `getOziMetadata()`
 
@@ -142,7 +146,7 @@ All components use `--ctp-*` variables for colors. Key tokens:
 
 ### Drawing Mode
 
-1. User clicks "Create Track" → `createEmptyTrack()` → sets `drawingModeActive`
+1. User chooses an active track layer, then clicks "Create Track" → `createEmptyTrack()` → sets `drawingModeActive` and captures `drawingTrackLayerId`
 2. Map pan and double-click zoom disabled
 3. Each click → `insertTrackPoint()` → blue preview line updates
 4. Double-click or Enter → finish drawing
@@ -163,9 +167,9 @@ All components use `--ctp-*` variables for colors. Key tokens:
 
 ### Waypoint Placement
 
-1. Toggle "Add Waypoint" → `addWaypointMode = true`
-2. Click map → `addWaypoint(lat, lon, defaultName)`
-3. Drag marker → `moveWaypoint()`
+1. User chooses an active waypoint layer, then toggles "Add Waypoint" → `addWaypointMode = true`
+2. Click map → `addWaypoint(activeLayerId, lat, lon, defaultName)`
+3. Drag marker → `moveWaypoint(activeLayerId, waypointId, lat, lon)`
 4. Symbol picker in WaypointsPanel → `setWaypointSymbol()`
 
 ## Event-Driven Updates

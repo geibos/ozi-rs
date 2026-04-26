@@ -53,11 +53,11 @@ Press `` ` `` (backtick) to open the in-app developer console.
 - Import GPX and PLT files (including ZIP archives)
 - Display tracks on all map types
 - Per-track visibility, color picker, line width
-- Track name editing with LizaAlert OK-standard validation (`YYYYMMDD_Callsign`)
+- Track name editing with warning-only LizaAlert OK-standard validation (`YYYYMMDD_Callsign`)
 - Track statistics: distance (km), duration, point count
 - Export track layer to GPX (with Garmin color extension)
 - Export individual tracks to PLT (OziExplorer format)
-- Automatic `10-Tracks/` subfolder suggestion on export
+- `10-Tracks/` subfolder suggestion on GPX/PLT export when an active bundle is known
 
 ### Track Editing
 - Track point list panel with segment hierarchy
@@ -77,12 +77,12 @@ Press `` ` `` (backtick) to open the in-app developer console.
 ### Project
 - Project save / load (JSON `.ozp` format)
 - Undo / redo via delta-based command stack with drag coalescing
-- Last saved/loaded project path and active map restored on startup when referenced files still exist
+- Last project path and active map restored on startup when referenced files still exist
 - Viewport, selected entities, panels, undo history, theme, and unsaved edits are not restored by the Rust session file
 
 ### UI
 - Catppuccin theme (Auto / Latte / Frappé / Macchiato / Mocha), persisted
-- Sidebar with project controls, import/export, drawing/waypoint mode toggles
+- Sidebar with project controls, active-layer selection, import/export, drawing/waypoint mode toggles
 - Panels: Tracks, Track Points, Waypoints, Simplify
 - Developer console toggled with `` ` ``
 - FPS counter (F3)
@@ -107,6 +107,7 @@ warning on tracks whose names do not match this pattern.
 - Print map with tracks and waypoints to PDF or image
 - Sort track points by timestamp
 - KML import/export
+- Full layer management UI for create/rename/delete/reorder; current UI surfaces active-layer selection only
 
 ## Explicit Non-Goals
 
@@ -141,4 +142,4 @@ and testable without the UI runtime.
 - `docs/commands-reference.md` — ProjectCommand and Tauri IPC reference
 - `docs/testing-strategy.md` — test layers and quality gates
 - `docs/roadmap.md` — phases and status
-- `docs/adr/` — architecture decision records (18 ADRs)
+- `docs/adr/` — architecture decision records (19 ADRs)
