@@ -942,18 +942,32 @@ impl AppState {
     }
 
     pub fn active_bundle_dir(&self) -> Option<PathBuf> {
-        let map = self.lizaalert.active_map.as_ref()?;
-        let slug = self
-            .lizaalert
-            .selected_project
-            .as_ref()
-            .map(|p| p.summary.slug.as_str())
-            .or_else(|| map.local_path.ancestors().nth(2).map(|_| ""))?;
+        if let Some(project) = self.lizaalert.selected_project.as_ref() {
+            return Some(lizaalert::bundle_directory(
+                &self.bundles_root,
+                &project.summary.slug,
+            ));
+        }
 
-        if slug.is_empty() {
+        let map = self.lizaalert.active_map.as_ref()?;
+        infer_bundle_dir_from_map_path(&map.local_path, &self.bundles_root)
+    }
+
+    pub fn export_default_tracks_dir_path(
+        &self,
+        track_name: &str,
+        extension: &str,
+    ) -> Option<PathBuf> {
+        let extension = extension.trim_start_matches('.');
+        if extension.is_empty() {
             return None;
         }
-        Some(lizaalert::bundle_directory(&self.bundles_root, slug))
+
+        Some(
+            self.active_bundle_dir()?
+                .join("10-Tracks")
+                .join(format!("{track_name}.{extension}")),
+        )
     }
 
     pub fn reveal_active_bundle(&self) {
@@ -1034,6 +1048,24 @@ fn default_bundles_root() -> PathBuf {
         return PathBuf::from(home).join("Documents").join("LizaAlert Maps");
     }
     PathBuf::from("bundles")
+}
+
+fn infer_bundle_dir_from_map_path(
+    map_path: &std::path::Path,
+    bundles_root: &std::path::Path,
+) -> Option<PathBuf> {
+    for ancestor in map_path.ancestors() {
+        if ancestor.parent() == Some(bundles_root) {
+            return Some(ancestor.to_path_buf());
+        }
+    }
+
+    let parent = map_path.parent()?;
+    if parent.file_name().and_then(|name| name.to_str()) == Some("8-Android&iOS") {
+        return parent.parent().map(std::path::Path::to_path_buf);
+    }
+
+    Some(parent.to_path_buf())
 }
 
 fn reveal_in_file_manager(path: &std::path::Path) {
@@ -1192,5 +1224,90 @@ mod tests {
             ProjectLayerError::WaypointLayerUnavailable(LayerId::new(99))
         );
         assert_eq!(state.project, before);
+    }
+
+    #[test]
+    fn export_default_tracks_dir_uses_active_bundle_for_gpx() {
+        let mut state = AppState::new();
+        let project = sample_project_with_remote_map();
+        state.lizaalert.selected_project = Some(project.clone());
+        state.lizaalert.active_map = Some(ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: project.summary.name.clone(),
+            package_name: project.maps[0].name.clone(),
+            remote_url: project.maps[0].url.clone(),
+            local_path: PathBuf::from("/tmp/demo-map.sqlitedb"),
+            center: project.center,
+            base_zoom: project.maps[0].base_zoom,
+        });
+
+        let path = state
+            .export_default_tracks_dir_path("20240601_Иванов", "gpx")
+            .expect("active bundle default path");
+        let components: Vec<_> = path
+            .components()
+            .map(|component| component.as_os_str().to_owned())
+            .collect();
+
+        assert!(components.ends_with(&[
+            "demo-project".into(),
+            "10-Tracks".into(),
+            "20240601_Иванов.gpx".into(),
+        ]));
+    }
+
+    #[test]
+    fn export_default_tracks_dir_uses_active_bundle_for_plt() {
+        let mut state = AppState::new();
+        let project = sample_project_with_remote_map();
+        state.lizaalert.selected_project = Some(project.clone());
+        state.lizaalert.active_map = Some(ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: project.summary.name.clone(),
+            package_name: project.maps[0].name.clone(),
+            remote_url: project.maps[0].url.clone(),
+            local_path: PathBuf::from("/tmp/demo-map.sqlitedb"),
+            center: project.center,
+            base_zoom: project.maps[0].base_zoom,
+        });
+
+        let path = state
+            .export_default_tracks_dir_path("20240601_Иванов", ".plt")
+            .expect("active bundle default path");
+        let file_name = path.file_name().and_then(|name| name.to_str());
+
+        assert_eq!(file_name, Some("20240601_Иванов.plt"));
+        assert_eq!(path.parent().and_then(|dir| dir.file_name()), Some("10-Tracks".as_ref()));
+    }
+
+    #[test]
+    fn export_default_tracks_dir_is_none_without_active_bundle() {
+        let state = AppState::new();
+
+        assert_eq!(state.export_default_tracks_dir_path("Track 1", "gpx"), None);
+    }
+
+    #[test]
+    fn export_default_tracks_dir_recovers_bundle_from_restored_mobile_map_path() {
+        let mut state = AppState::new();
+        state.lizaalert.active_map = Some(ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: "Restored Project".to_owned(),
+            package_name: "Restored Map".to_owned(),
+            remote_url: "https://example.invalid/restored.sqlitedb".to_owned(),
+            local_path: state
+                .bundles_root
+                .join("restored-project")
+                .join("8-Android&iOS")
+                .join("restored.sqlitedb"),
+            center: MapCenter { lat: 55.0, lon: 37.0 },
+            base_zoom: 12,
+        });
+
+        let path = state
+            .export_default_tracks_dir_path("20240601_Test", "gpx")
+            .expect("restored active map default path");
+
+        assert!(path.ends_with(PathBuf::from("restored-project").join("10-Tracks").join("20240601_Test.gpx")));
     }
 }

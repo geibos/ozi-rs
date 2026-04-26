@@ -5,6 +5,7 @@
     renameTrack,
     toggleTrackVisible,
     exportGpx,
+    getTrackExportDefaultPath,
     exportTrackPlt,
     setTrackColor,
     setTrackLineWidth,
@@ -102,9 +103,10 @@
   }
 
   async function handleExport(track: TrackFeature) {
+    const defaultPath = await getTrackExportDefaultPath(track.name, "gpx");
     const path = await open({
       save: true,
-      defaultPath: `${track.name}.gpx`,
+      defaultPath: defaultPath ?? `${track.name}.gpx`,
       filters: [{ name: "GPX", extensions: ["gpx"] }],
     } as Parameters<typeof open>[0]);
     if (path) {
@@ -113,9 +115,10 @@
   }
 
   async function handleExportPlt(track: TrackFeature) {
+    const defaultPath = await getTrackExportDefaultPath(track.name, "plt");
     const path = await open({
       save: true,
-      defaultPath: `${track.name}.plt`,
+      defaultPath: defaultPath ?? `${track.name}.plt`,
       filters: [{ name: "PLT", extensions: ["plt"] }],
     } as Parameters<typeof open>[0]);
     if (path) {
