@@ -1,11 +1,29 @@
 use crate::domain::Project;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub enum PersistenceError {
     Io(std::io::Error),
     Json(serde_json::Error),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PersistedAppSession {
+    pub last_project_path: Option<PathBuf>,
+    pub active_map: Option<PersistedActiveMap>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PersistedActiveMap {
+    pub kind: String,
+    pub project_name: String,
+    pub package_name: String,
+    pub remote_url: String,
+    pub local_path: PathBuf,
+    pub center_lat: f64,
+    pub center_lon: f64,
+    pub base_zoom: u8,
 }
 
 impl fmt::Display for PersistenceError {
@@ -34,6 +52,36 @@ pub fn save_project(project: &Project, path: &Path) -> Result<(), PersistenceErr
 pub fn load_project(path: &Path) -> Result<Project, PersistenceError> {
     let json = std::fs::read_to_string(path).map_err(PersistenceError::Io)?;
     serde_json::from_str(&json).map_err(PersistenceError::Json)
+}
+
+pub fn save_app_session(
+    session: &PersistedAppSession,
+    path: &Path,
+) -> Result<(), PersistenceError> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(PersistenceError::Io)?;
+    }
+    let json = serde_json::to_string_pretty(session).map_err(PersistenceError::Json)?;
+    std::fs::write(path, json).map_err(PersistenceError::Io)
+}
+
+pub fn load_app_session(path: &Path) -> Result<Option<PersistedAppSession>, PersistenceError> {
+    match std::fs::read_to_string(path) {
+        Ok(json) => serde_json::from_str(&json).map(Some).map_err(PersistenceError::Json),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(PersistenceError::Io(error)),
+    }
+}
+
+pub fn default_app_session_path() -> PathBuf {
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join("ozi-rs")
+            .join("session.json");
+    }
+    PathBuf::from("session.json")
 }
 
 #[cfg(test)]

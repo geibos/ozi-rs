@@ -10,7 +10,7 @@ use crate::infrastructure::import::{
     OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
 use crate::infrastructure::lizaalert;
-use crate::infrastructure::persistence;
+use crate::infrastructure::persistence::{self, PersistedActiveMap, PersistedAppSession};
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
 use std::path::PathBuf;
@@ -124,6 +124,7 @@ pub struct AppState {
     history: CommandStack,
     project: Project,
     project_path: Option<PathBuf>,
+    session_path: Option<PathBuf>,
     bundles_root: PathBuf,
     lizaalert: LizaAlertState,
 }
@@ -160,6 +161,7 @@ impl AppState {
             history: CommandStack::default(),
             project,
             project_path: None,
+            session_path: None,
             bundles_root: default_bundles_root(),
             lizaalert: LizaAlertState {
                 projects: Vec::new(),
@@ -175,6 +177,13 @@ impl AppState {
                 downloading: HashSet::new(),
             },
         }
+    }
+
+    pub fn new_with_session_path(session_path: PathBuf) -> Self {
+        let mut state = Self::new();
+        state.session_path = Some(session_path);
+        state.restore_session();
+        state
     }
 
     // ── Background-task handoff: "begin" sets busy and returns what the thread needs ──
@@ -335,6 +344,7 @@ impl AppState {
                 };
                 self.lizaalert.active_map = Some(selection);
                 self.update_status(DiagnosticLevel::Info, status);
+                self.persist_session_snapshot();
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, error);
@@ -365,6 +375,7 @@ impl AppState {
         };
         self.lizaalert.active_map = Some(selection);
         self.update_status(DiagnosticLevel::Info, status);
+        self.persist_session_snapshot();
     }
 
     pub fn open_local_ozi_map(
@@ -413,6 +424,7 @@ impl AppState {
                 );
                 self.lizaalert.active_map = Some(selection);
                 self.update_status(DiagnosticLevel::Info, status);
+                self.persist_session_snapshot();
                 Ok(())
             }
             Err(error) => Err(OpenLocalMapError::Register(error)),
@@ -491,6 +503,7 @@ impl AppState {
                 let display = path.display().to_string();
                 self.project_path = Some(path);
                 self.update_status(DiagnosticLevel::Info, format!("Saved: {display}"));
+                self.persist_session_snapshot();
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, format!("Save failed: {error}"));
@@ -507,6 +520,7 @@ impl AppState {
                 self.history = CommandStack::default();
                 self.lizaalert.active_map = None;
                 self.update_status(DiagnosticLevel::Info, format!("Opened: {display}"));
+                self.persist_session_snapshot();
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, format!("Open failed: {error}"));
@@ -988,6 +1002,106 @@ impl AppState {
 
     // ── Private helpers ──
 
+    fn restore_session(&mut self) {
+        let Some(session_path) = self.session_path.as_deref() else {
+            return;
+        };
+
+        let session = match persistence::load_app_session(session_path) {
+            Ok(Some(session)) => session,
+            Ok(None) => return,
+            Err(error) => {
+                self.update_status(
+                    DiagnosticLevel::Error,
+                    format!("Session restore skipped: {error}"),
+                );
+                return;
+            }
+        };
+
+        if let Some(project_path) = session.last_project_path {
+            if !project_path.exists() {
+                self.update_status(
+                    DiagnosticLevel::Error,
+                    format!(
+                        "Session restore skipped missing project: {}",
+                        project_path.display()
+                    ),
+                );
+                return;
+            }
+
+            match persistence::load_project(&project_path) {
+                Ok(project) => {
+                    self.project = project;
+                    self.project_path = Some(project_path.clone());
+                    self.history = CommandStack::default();
+                    self.update_status(
+                        DiagnosticLevel::Info,
+                        format!("Restored project: {}", project_path.display()),
+                    );
+                }
+                Err(error) => {
+                    self.update_status(
+                        DiagnosticLevel::Error,
+                        format!(
+                            "Session restore skipped project {}: {error}",
+                            project_path.display()
+                        ),
+                    );
+                    return;
+                }
+            }
+        }
+
+        let Some(active_map) = session.active_map else {
+            return;
+        };
+        let Some(selection) = active_map_selection_from_persisted(active_map) else {
+            self.update_status(DiagnosticLevel::Error, "Session restore skipped invalid active map kind");
+            return;
+        };
+        if !selection.local_path.exists() {
+            self.update_status(
+                DiagnosticLevel::Error,
+                format!(
+                    "Session restore skipped missing active map: {}",
+                    selection.local_path.display()
+                ),
+            );
+            return;
+        }
+
+        self.lizaalert.active_map = Some(selection.clone());
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!(
+                "Restored active map: {} / {}",
+                selection.project_name, selection.package_name
+            ),
+        );
+    }
+
+    fn persist_session_snapshot(&mut self) {
+        let Some(session_path) = self.session_path.as_deref() else {
+            return;
+        };
+        let session = PersistedAppSession {
+            last_project_path: self.project_path.clone(),
+            active_map: self
+                .lizaalert
+                .active_map
+                .as_ref()
+                .map(persisted_active_map_from_selection),
+        };
+        if let Err(error) = persistence::save_app_session(&session, session_path) {
+            self.push_diagnostic(
+                DiagnosticLevel::Error,
+                format!("Session save failed: {error}"),
+            );
+        }
+    }
+
     fn register_active_map_layer(
         &mut self,
         selection: &ActiveMapSelection,
@@ -1050,6 +1164,43 @@ fn default_bundles_root() -> PathBuf {
     PathBuf::from("bundles")
 }
 
+fn persisted_active_map_from_selection(selection: &ActiveMapSelection) -> PersistedActiveMap {
+    PersistedActiveMap {
+        kind: match selection.kind {
+            ActiveMapKind::SqliteTiles => "sqlite".to_owned(),
+            ActiveMapKind::OziRaster => "ozi".to_owned(),
+        },
+        project_name: selection.project_name.clone(),
+        package_name: selection.package_name.clone(),
+        remote_url: selection.remote_url.clone(),
+        local_path: selection.local_path.clone(),
+        center_lat: selection.center.lat,
+        center_lon: selection.center.lon,
+        base_zoom: selection.base_zoom,
+    }
+}
+
+fn active_map_selection_from_persisted(active_map: PersistedActiveMap) -> Option<ActiveMapSelection> {
+    let kind = match active_map.kind.as_str() {
+        "sqlite" => ActiveMapKind::SqliteTiles,
+        "ozi" => ActiveMapKind::OziRaster,
+        _ => return None,
+    };
+
+    Some(ActiveMapSelection {
+        kind,
+        project_name: active_map.project_name,
+        package_name: active_map.package_name,
+        remote_url: active_map.remote_url,
+        local_path: active_map.local_path,
+        center: MapCenter {
+            lat: active_map.center_lat,
+            lon: active_map.center_lon,
+        },
+        base_zoom: active_map.base_zoom,
+    })
+}
+
 fn infer_bundle_dir_from_map_path(
     map_path: &std::path::Path,
     bundles_root: &std::path::Path,
@@ -1086,6 +1237,21 @@ fn reveal_in_file_manager(path: &std::path::Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infrastructure::persistence::{PersistedActiveMap, PersistedAppSession};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_session_dir(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "ozi-rs-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create temp session dir");
+        dir
+    }
 
     fn sample_project_with_remote_map() -> LizaProject {
         LizaProject {
@@ -1103,6 +1269,75 @@ mod tests {
                 local_path: None,
             }],
         }
+    }
+
+    #[test]
+    fn session_restore_valid_restores_project_path_and_active_map() {
+        let dir = temp_session_dir("session-restore-valid");
+        let project_path = dir.join("search.ozp");
+        let map_path = dir.join("demo-map.sqlitedb");
+        let session_path = dir.join("session.json");
+        persistence::save_project(&Project::untitled(), &project_path).expect("save project");
+        std::fs::write(&map_path, b"sqlite placeholder").expect("save map placeholder");
+        persistence::save_app_session(
+            &PersistedAppSession {
+                last_project_path: Some(project_path.clone()),
+                active_map: Some(PersistedActiveMap {
+                    kind: "sqlite".to_owned(),
+                    project_name: "Demo Project".to_owned(),
+                    package_name: "demo-map".to_owned(),
+                    remote_url: "https://example.invalid/demo-map.sqlitedb".to_owned(),
+                    local_path: map_path.clone(),
+                    center_lat: 55.0,
+                    center_lon: 37.0,
+                    base_zoom: 12,
+                }),
+            },
+            &session_path,
+        )
+        .expect("save session");
+
+        let state = AppState::new_with_session_path(session_path);
+
+        assert_eq!(state.project_file_path(), Some(project_path.as_path()));
+        let active_map = state.active_map().expect("active map restored");
+        assert_eq!(active_map.local_path, map_path);
+        assert_eq!(active_map.package_name, "demo-map");
+    }
+
+    #[test]
+    fn session_restore_missing_degrades_to_fresh_state_with_warning() {
+        let dir = temp_session_dir("session-restore-missing");
+        let session_path = dir.join("session.json");
+        persistence::save_app_session(
+            &PersistedAppSession {
+                last_project_path: Some(dir.join("missing.ozp")),
+                active_map: Some(PersistedActiveMap {
+                    kind: "sqlite".to_owned(),
+                    project_name: "Missing Project".to_owned(),
+                    package_name: "missing-map".to_owned(),
+                    remote_url: "https://example.invalid/missing-map.sqlitedb".to_owned(),
+                    local_path: dir.join("missing-map.sqlitedb"),
+                    center_lat: 55.0,
+                    center_lon: 37.0,
+                    base_zoom: 12,
+                }),
+            },
+            &session_path,
+        )
+        .expect("save session");
+
+        let state = AppState::new_with_session_path(session_path);
+
+        assert_eq!(state.project_file_path(), None);
+        assert_eq!(state.active_map(), None);
+        assert!(
+            state
+                .recent_diagnostics()
+                .any(|entry| entry.level() == DiagnosticLevel::Error
+                    && entry.message().contains("Session restore skipped missing project")),
+            "expected missing-project diagnostic"
+        );
     }
 
     #[test]
