@@ -32,6 +32,17 @@ export const activeMap = derived(appState, ($s) => $s?.active_map ?? null);
 export const trackLayerCount = derived(appState, ($s) => $s?.track_layer_count ?? 0);
 export const downloadingMaps = derived(appState, ($s) => new Set($s?.downloading_maps ?? []));
 
+function syncActiveLayer(
+  current: bigint | null,
+  layers: Array<{ id: number }>
+): bigint | null {
+  if (layers.length === 0) return null;
+  if (current !== null && layers.some((layer) => BigInt(layer.id) === current)) {
+    return current;
+  }
+  return BigInt(layers[0].id);
+}
+
 export function appendProjectsChunk(chunk: LizaProjectSummaryDto[]) {
   projectsStore.update((current) => {
     const known = new Set(current.map((project) => project.slug));
@@ -64,9 +75,14 @@ export const consoleOpen = writable(false);
 export const tracksPanelOpen = writable(true);
 export const waypointsPanelOpen = writable(false);
 export const addWaypointMode = writable(false);
+export const activeTrackLayerId = writable<bigint | null>(null);
+export const activeWaypointLayerId = writable<bigint | null>(null);
 export const drawingModeActive = writable(false);
+export const drawingTrackLayerId = writable<bigint | null>(null);
 export const drawingTrackId = writable<bigint | null>(null);
 export const drawingPointCount = writable(0);
+export const drawingFinishRequested = writable(false);
+export const drawingSegmentId = writable<bigint | null>(null);
 export const trackPointsPanelOpen = writable(false);
 export const editModeActive = writable(false);
 export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | null>(null);
@@ -91,3 +107,8 @@ export const selectedTheme = writable<string>(
 );
 
 selectedTheme.subscribe((v) => localStorage.setItem("theme", v));
+
+appState.subscribe((state) => {
+  activeTrackLayerId.update((current) => syncActiveLayer(current, state?.track_layers ?? []));
+  activeWaypointLayerId.update((current) => syncActiveLayer(current, state?.waypoint_layers ?? []));
+});

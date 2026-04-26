@@ -8,8 +8,13 @@
     waypointsPanelOpen,
     addWaypointMode,
     drawingModeActive,
+    activeTrackLayerId,
+    activeWaypointLayerId,
+    drawingTrackLayerId,
     drawingTrackId,
     drawingPointCount,
+    drawingFinishRequested,
+    drawingSegmentId,
     editModeActive,
     consoleOpen,
   } from "../lib/stores";
@@ -22,6 +27,7 @@
     redo,
     revealBundle,
     createEmptyTrack,
+    getTrackDetail,
   } from "../lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -52,22 +58,36 @@
 
   async function toggleTrackDrawingMode() {
     if ($drawingModeActive) {
-      drawingModeActive.set(false);
-      drawingTrackId.set(null);
-      drawingPointCount.set(0);
+      drawingFinishRequested.set(true);
       return;
     }
+
+    const layerId = $activeTrackLayerId;
+    if (layerId === null) return;
 
     try {
       editModeActive.set(false);
       addWaypointMode.set(false);
-      const trackId = await createEmptyTrack(1n, "New Track");
+      const trackId = await createEmptyTrack(layerId, "New Track");
+      const detail = await getTrackDetail(layerId, trackId);
+      drawingTrackLayerId.set(layerId);
       drawingTrackId.set(trackId);
+      drawingSegmentId.set(BigInt(detail.segments[0].id));
       drawingPointCount.set(0);
       drawingModeActive.set(true);
     } catch (error) {
       console.error("Failed to start track drawing mode", error);
     }
+  }
+
+  function handleActiveTrackLayerChange(event: Event) {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    activeTrackLayerId.set(BigInt(value));
+  }
+
+  function handleActiveWaypointLayerChange(event: Event) {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    activeWaypointLayerId.set(BigInt(value));
   }
 </script>
 
@@ -103,6 +123,20 @@
 
   <div class="section">
     <div class="section-title">Tracks</div>
+    {#if ($appState?.track_layers ?? []).length > 0}
+      <label class="layer-picker">
+        <span>Track layer</span>
+        <select
+          value={$activeTrackLayerId?.toString() ?? ""}
+          onchange={handleActiveTrackLayerChange}
+          disabled={$drawingModeActive}
+        >
+          {#each $appState?.track_layers ?? [] as layer (layer.id)}
+            <option value={String(layer.id)}>{layer.name}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
     <div class="btn-row">
       <button onclick={handleImportGpx}>Import GPX</button>
       <button onclick={handleImportPlt}>Import PLT</button>
@@ -115,7 +149,7 @@
         ? "Finish drawing mode and keep the new track."
         : "Create an empty track and click on the map to add points."}
     >
-      {$drawingModeActive ? `✓ Done (${$drawingPointCount} points)` : "✏️ Create Track"}
+      {$drawingModeActive ? `Done (${$drawingPointCount} points)` : "Create Track"}
     </button>
     <button class="full" onclick={() => tracksPanelOpen.update((v) => !v)}>
       {$tracksPanelOpen ? "Hide" : "Show"} Tracks Panel
@@ -127,6 +161,19 @@
 
   <div class="section">
     <div class="section-title">Waypoints</div>
+    {#if ($appState?.waypoint_layers ?? []).length > 0}
+      <label class="layer-picker">
+        <span>Waypoint layer</span>
+        <select
+          value={$activeWaypointLayerId?.toString() ?? ""}
+          onchange={handleActiveWaypointLayerChange}
+        >
+          {#each $appState?.waypoint_layers ?? [] as layer (layer.id)}
+            <option value={String(layer.id)}>{layer.name}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
     <button class="full" onclick={() => waypointsPanelOpen.update(v => !v)}>
       {$waypointsPanelOpen ? "Hide" : "Show"} Waypoints Panel
     </button>
@@ -207,6 +254,20 @@
   button.full {
     width: 100%;
     text-align: left;
+  }
+
+  .layer-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--ctp-overlay1);
+  }
+
+  .layer-picker select {
+    width: 100%;
+    min-width: 0;
+    font-size: 11px;
   }
 
   button.primary {

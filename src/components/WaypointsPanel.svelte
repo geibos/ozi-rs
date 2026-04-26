@@ -1,27 +1,32 @@
 <script lang="ts">
-  import { appState, waypointsPanelOpen, selectedWaypointId } from "../lib/stores";
+  import {
+    appState,
+    activeWaypointLayerId,
+    waypointsPanelOpen,
+    selectedWaypointId,
+  } from "../lib/stores";
   import { getWaypoints, deleteWaypoint, renameWaypoint, setWaypointSymbol } from "../lib/api";
   import type { WaypointData } from "../lib/types";
   import SymbolPicker from "./SymbolPicker.svelte";
-
-  // Note: MVP single-layer assumption.
-  // We'll hardcode layerId 1n until backend fully provides layer ID list.
-  const currentLayerId = 1n; // TODO: multi-layer
 
   let waypoints: WaypointData[] = $state([]);
   let editingWaypoint: number | null = $state(null);
   let editName = $state("");
 
   $effect(() => {
-    if ($appState) {
+    const layerId = $activeWaypointLayerId;
+    if ($appState && layerId !== null) {
       loadWaypoints();
+    } else {
+      waypoints = [];
     }
   });
 
   async function loadWaypoints() {
     try {
-      if ($appState && $appState.waypoint_layer_count > 0) {
-        waypoints = await getWaypoints(currentLayerId);
+      const layerId = $activeWaypointLayerId;
+      if ($appState && $appState.waypoint_layer_count > 0 && layerId !== null) {
+        waypoints = await getWaypoints(layerId);
       } else {
         waypoints = [];
       }
@@ -37,14 +42,18 @@
   }
 
   async function commitRename(wp: WaypointData) {
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null) return;
     if (editName.trim() && editName !== wp.name) {
-      await renameWaypoint(currentLayerId, BigInt(wp.id), editName.trim());
+      await renameWaypoint(layerId, BigInt(wp.id), editName.trim());
     }
     editingWaypoint = null;
   }
 
   async function handleDelete(wp: WaypointData) {
-    await deleteWaypoint(currentLayerId, BigInt(wp.id));
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null) return;
+    await deleteWaypoint(layerId, BigInt(wp.id));
   }
 
   function selectWaypoint(wp: WaypointData) {
@@ -52,7 +61,9 @@
   }
 
   async function handleSetSymbol(wp: WaypointData, symbol: string | null) {
-    await setWaypointSymbol(currentLayerId, BigInt(wp.id), symbol);
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null) return;
+    await setWaypointSymbol(layerId, BigInt(wp.id), symbol);
   }
 </script>
 

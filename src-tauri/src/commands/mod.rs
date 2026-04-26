@@ -38,8 +38,16 @@ pub struct AppStateDto {
     pub current_project: Option<LizaProjectDto>,
     pub active_map: Option<ActiveMapDto>,
     pub diagnostics: Vec<DiagnosticDto>,
+    pub track_layers: Vec<LayerSummaryDto>,
+    pub waypoint_layers: Vec<LayerSummaryDto>,
     pub track_layer_count: usize,
     pub waypoint_layer_count: usize,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct LayerSummaryDto {
+    pub id: u64,
+    pub name: String,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -156,6 +164,24 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         })
         .collect();
 
+    let track_layers = s
+        .track_layers()
+        .iter()
+        .map(|layer| LayerSummaryDto {
+            id: layer.id().value(),
+            name: layer.name().to_owned(),
+        })
+        .collect();
+
+    let waypoint_layers = s
+        .project_waypoint_layers()
+        .iter()
+        .map(|layer| LayerSummaryDto {
+            id: layer.id().value(),
+            name: layer.name().to_owned(),
+        })
+        .collect();
+
     Ok(AppStateDto {
         project_name: s.project_name().to_owned(),
         project_saved: s.project_file_path().is_some(),
@@ -166,6 +192,8 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         current_project,
         active_map,
         diagnostics,
+        track_layers,
+        waypoint_layers,
         track_layer_count: s.track_layer_count(),
         waypoint_layer_count: s.waypoint_layer_count(),
     })

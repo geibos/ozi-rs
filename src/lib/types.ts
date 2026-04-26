@@ -33,6 +33,11 @@ export interface ActiveMapDto {
   base_zoom: number;
 }
 
+export interface LayerSummaryDto {
+  id: number;
+  name: string;
+}
+
 export interface AppStateDto {
   project_name: string;
   project_saved: boolean;
@@ -43,6 +48,8 @@ export interface AppStateDto {
   current_project: LizaProjectDto | null;
   active_map: ActiveMapDto | null;
   diagnostics: DiagnosticDto[];
+  track_layers: LayerSummaryDto[];
+  waypoint_layers: LayerSummaryDto[];
   track_layer_count: number;
   waypoint_layer_count: number;
 }
@@ -72,6 +79,15 @@ export interface OziMetadataDto {
 export interface DownloadProgressPayload {
   package_name: string;
   downloaded_bytes: number;
+  total_bytes?: number;
+}
+
+export interface BundleProgressPayload {
+  message: string;
+  phase: "scanning" | "downloading" | "extracting" | "indexing";
+  completed?: number;
+  total?: number;
+  downloaded_bytes?: number;
   total_bytes?: number;
 }
 

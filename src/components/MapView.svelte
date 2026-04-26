@@ -9,9 +9,13 @@
     selectedPointId,
     selectedTrack,
     addWaypointMode,
+    activeWaypointLayerId,
     drawingModeActive,
+    drawingTrackLayerId,
     drawingTrackId,
     drawingPointCount,
+    drawingFinishRequested,
+    drawingSegmentId,
     simplifyState,
   } from "../lib/stores";
   import {
@@ -39,6 +43,7 @@
   let markerElements = new Map<number, HTMLDivElement>();
   let waypointMarkers: maplibregl.Marker[] = [];
   let drawingPreviewPoints: Array<{ lat: number; lon: number }> = [];
+  let drawingCommandCount = 0;
   let pendingDrawingClickTimeout: number | null = null;
 
   type PointMenuTarget = {
@@ -106,7 +111,9 @@
   async function finishDrawingMode() {
     if (!$drawingModeActive) return;
     drawingModeActive.set(false);
+    drawingTrackLayerId.set(null);
     drawingTrackId.set(null);
+    drawingSegmentId.set(null);
     drawingPointCount.set(0);
     if (pendingDrawingClickTimeout !== null) {
       window.clearTimeout(pendingDrawingClickTimeout);
@@ -117,7 +124,7 @@
 
   async function cancelDrawingMode() {
     if (!$drawingModeActive || $drawingTrackId === null) return;
-    const undoCount = drawingPreviewPoints.length + 1;
+    const undoCount = drawingCommandCount + 1; // +1 for CreateEmptyTrack
 
     if (pendingDrawingClickTimeout !== null) {
       window.clearTimeout(pendingDrawingClickTimeout);
@@ -132,7 +139,9 @@
       console.error("Failed to cancel drawing mode", error);
     } finally {
       drawingModeActive.set(false);
+      drawingTrackLayerId.set(null);
       drawingTrackId.set(null);
+      drawingSegmentId.set(null);
       drawingPointCount.set(0);
       await refreshTrackGeometry();
     }
@@ -287,9 +296,10 @@
   async function refreshWaypointMarkers() {
     if (!map) return;
     clearWaypointMarkers();
-    if (!$appState || $appState.waypoint_layer_count === 0) return;
+    const layerId = $activeWaypointLayerId;
+    if (!$appState || $appState.waypoint_layer_count === 0 || layerId === null) return;
     try {
-      const waypoints = await getWaypoints(1n); // TODO: multi-layer
+      const waypoints = await getWaypoints(layerId);
       for (const wp of waypoints) {
         const el = document.createElement("div");
         el.className = "waypoint-marker";
@@ -308,9 +318,10 @@
           el.style.cursor = "grab";
           const lngLat = marker.getLngLat();
           try {
-            await moveWaypoint(1n, BigInt(wpId), [lngLat.lat, lngLat.lng]); // TODO: multi-layer
+            await moveWaypoint(layerId, BigInt(wpId), [lngLat.lat, lngLat.lng]);
           } catch (error) {
             console.error("Failed to move waypoint", error);
+            marker.setLngLat([wp.lon, wp.lat]);
           }
         });
 
@@ -324,11 +335,19 @@
   async function handleMapClickForWaypoint(e: maplibregl.MapMouseEvent) {
     if ($drawingModeActive) return;
     if (!$addWaypointMode) return;
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null) return;
     const { lat, lng } = e.lngLat;
-    const currentWaypoints = await getWaypoints(1n); // TODO: multi-layer
-    const nextIndex = currentWaypoints.length + 1;
-    await addWaypoint(1n, lat, lng, `Waypoint ${nextIndex}`); // TODO: multi-layer
-    addWaypointMode.set(false);
+    try {
+      const currentWaypoints = await getWaypoints(layerId);
+      const nextIndex = currentWaypoints.length + 1;
+      await addWaypoint(layerId, lat, lng, `Waypoint ${nextIndex}`);
+      await refreshWaypointMarkers();
+    } catch (error) {
+      console.error("Failed to add waypoint:", error);
+    } finally {
+      addWaypointMode.set(false);
+    }
   }
 
   function clearDrawingPreview() {
@@ -417,8 +436,15 @@
   }
 
   function handleMapClickForDrawing(e: maplibregl.MapMouseEvent) {
-    if (!$drawingModeActive || $drawingTrackId === null) return;
+    if (
+      !$drawingModeActive
+      || $drawingTrackLayerId === null
+      || $drawingTrackId === null
+      || $drawingSegmentId === null
+    ) return;
+    const layerId = $drawingTrackLayerId;
     const trackId = $drawingTrackId;
+    const segmentId = $drawingSegmentId;
 
     if (pendingDrawingClickTimeout !== null) {
       window.clearTimeout(pendingDrawingClickTimeout);
@@ -429,7 +455,8 @@
     pendingDrawingClickTimeout = window.setTimeout(async () => {
       pendingDrawingClickTimeout = null;
       try {
-        await insertTrackPoint(1n, trackId, 1n, drawingPreviewPoints.length, [lat, lng]);
+        await insertTrackPoint(layerId, trackId, segmentId, drawingPreviewPoints.length, [lat, lng]);
+        drawingCommandCount += 1;
         drawingPreviewPoints = [...drawingPreviewPoints, { lat, lon: lng }];
         drawingPointCount.set(drawingPreviewPoints.length);
         updateDrawingPreview();
@@ -460,7 +487,7 @@
     map.addControl(new maplibregl.NavigationControl(), "top-left");
     map.addControl(new maplibregl.ScaleControl(), "bottom-left");
 
-    map.on("load", () => {
+    map.on("load", async () => {
       map.addSource("osm", {
         type: "raster",
         tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
@@ -471,6 +498,16 @@
       map.addLayer({ id: "osm-tiles", type: "raster", source: "osm" });
 
       initTracksLayer(map);
+
+      // Explicitly refresh tracks and waypoints once map is ready,
+      // since $effect may have run before map was initialized
+      try {
+        const geojson = await getTracksGeojson();
+        updateTracksLayer(map, geojson);
+      } catch {
+        // state may not be ready yet
+      }
+      refreshWaypointMarkers();
     });
 
     map.on("click", (e) => {
@@ -580,6 +617,7 @@
   // When app state changes (tracks added, etc.) refresh tracks GeoJSON
   $effect(() => {
     if (!map || !$appState) return;
+    void $activeWaypointLayerId;
 
     // Run after map is loaded
     if (!map.isStyleLoaded()) {
@@ -641,12 +679,14 @@
     if (!map) return;
 
     const active = $drawingModeActive;
+    void $drawingTrackLayerId;
     void $drawingTrackId;
 
     if (active) {
       map.dragPan.disable();
       map.doubleClickZoom.disable();
       drawingPreviewPoints = [];
+      drawingCommandCount = 0;
       drawingPointCount.set(0);
       updateDrawingPreview();
       return;
@@ -657,8 +697,16 @@
     }
     map.doubleClickZoom.enable();
     drawingPreviewPoints = [];
+    drawingCommandCount = 0;
     drawingPointCount.set(0);
     clearDrawingPreview();
+  });
+
+  $effect(() => {
+    if ($drawingFinishRequested) {
+      drawingFinishRequested.set(false);
+      void finishDrawingMode();
+    }
   });
 
   $effect(() => {
