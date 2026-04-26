@@ -24,7 +24,7 @@ Status: **complete**
 Status: **complete**
 
 - JSON project save/load (`.ozp` format)
-- Last saved/loaded project path restored on startup when the `.ozp` file still exists
+- Last project path and active map restored on startup when referenced files still exist
 - Persistence boundaries separated from UI state; viewport, selections, panels, undo history, theme,
   and unsaved edits are not part of Rust session restore
 
@@ -56,9 +56,9 @@ Status: **complete**
 - Configurable bundle storage directory
 - Open local bundle from folder
 - Reveal active bundle in Finder/Explorer
-- Automatic `10-Tracks/` subfolder on export
-- LizaAlert OK-standard track name validation (`YYYYMMDD_Callsign`)
-- Last active map restored on startup when its local map path still exists
+- Active-bundle `10-Tracks/` subfolder suggestion for GPX/PLT export dialogs
+- Warning-only LizaAlert OK-standard track name validation (`YYYYMMDD_Callsign`)
+- Active-layer selection for existing track and waypoint workflows; full layer management is not implemented
 
 ## Phase 6 — UI Polish and Stack Migration
 
@@ -121,7 +121,7 @@ Remaining work before 1.0:
 - Print/export map view to PDF or image (configurable scale, paper size)
 - Sort track points by timestamp (fix out-of-order GPS recordings)
 - KML import/export (low priority, no current user demand)
-- Multi-layer UI (backend supports it, UI currently hardcodes layer 1)
+- Full layer management UI (create, rename, delete, reorder); backend supports multiple layers and the UI currently surfaces active-layer selection only
 
 ## Deferred (post-1.0)
 
