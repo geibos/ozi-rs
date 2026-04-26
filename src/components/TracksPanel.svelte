@@ -24,7 +24,7 @@
   }
 
   let tracks: TrackFeature[] = $state([]);
-  let editingTrack: bigint | null = $state(null);
+  let editingTrack: string | null = $state(null);
   let editName = $state("");
 
   $effect(() => {
@@ -73,6 +73,17 @@
     ];
   }
 
+  function trackIdentity(track: TrackFeature) {
+    return `${track.layerId}:${track.trackId}`;
+  }
+
+  function isSelectedTrack(track: TrackFeature) {
+    return (
+      $selectedTrack?.layerId === track.layerId &&
+      $selectedTrack?.trackId === track.trackId
+    );
+  }
+
   async function handleColorChange(track: TrackFeature, event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     await setTrackColor(track.layerId, track.trackId, hexToRgba(input.value));
@@ -87,7 +98,7 @@
   }
 
   function startRename(track: TrackFeature) {
-    editingTrack = track.trackId;
+    editingTrack = trackIdentity(track);
     editName = track.name;
   }
 
@@ -137,13 +148,13 @@
       {#if tracks.length === 0}
         <div class="empty">No tracks loaded</div>
       {:else}
-        {#each tracks as track (track.trackId)}
+        {#each tracks as track (trackIdentity(track))}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div 
             class="track-row" 
             class:hidden={!track.visible}
-            class:selected={$selectedTrack?.trackId === track.trackId}
+            class:selected={isSelectedTrack(track)}
             onclick={() => selectedTrack.set({ layerId: track.layerId, trackId: track.trackId })}
           >
             <span
@@ -179,7 +190,7 @@
             </div>
 
             <div class="name-block">
-              {#if editingTrack === track.trackId}
+              {#if editingTrack === trackIdentity(track)}
                 <input
                   class="name-input"
                   bind:value={editName}
@@ -203,7 +214,7 @@
             </div>
 
             <div class="actions">
-              {#if $selectedTrack?.trackId === track.trackId}
+              {#if isSelectedTrack(track)}
                 <button
                   class="icon-btn"
                   title="Simplify Track"

@@ -19,6 +19,18 @@ describe("TracksPanel style controls", () => {
     expect(source).not.toContain("invoke(");
   });
 
+  it("keys and selects tracks by layer and track identity", () => {
+    expect(source).toContain("trackIdentity(track)");
+    expect(source).toContain("isSelectedTrack(track)");
+    expect(source).toContain("{#each tracks as track (trackIdentity(track))}");
+    expect(source).toContain("class:selected={isSelectedTrack(track)}");
+    expect(source).toContain("{#if isSelectedTrack(track)}");
+    expect(source).not.toContain(
+      "class:selected={$selectedTrack?.trackId === track.trackId}"
+    );
+    expect(source).not.toContain("{#if $selectedTrack?.trackId === track.trackId}");
+  });
+
   it("renders compact bounded controls without row selection interference", () => {
     expect(source).toContain('type="color"');
     expect(source).toContain('type="range"');
