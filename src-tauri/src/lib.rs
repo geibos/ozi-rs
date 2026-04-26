@@ -3,8 +3,6 @@ mod commands;
 mod domain;
 mod infrastructure;
 
-pub use infrastructure::export::plt::{ExportError as PltExportError, export_plt as export_track_plt};
-
 use commands::SharedState;
 use std::sync::{Arc, Mutex};
 
@@ -36,6 +34,7 @@ pub fn run() {
             commands::import_gpx,
             commands::import_plt,
             commands::export_gpx,
+            commands::get_track_export_default_path,
             commands::undo,
             commands::redo,
             commands::rename_track,

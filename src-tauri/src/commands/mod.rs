@@ -475,6 +475,17 @@ pub fn export_gpx(
 }
 
 #[tauri::command]
+pub fn get_track_export_default_path(
+    track_name: String,
+    extension: String,
+    state: State<SharedState>,
+) -> Result<Option<String>, String> {
+    Ok(lock_app_state(state.inner())?
+        .export_default_tracks_dir_path(&track_name, &extension)
+        .map(|path| path.display().to_string()))
+}
+
+#[tauri::command]
 pub fn export_track_plt(
     layer_id: u64,
     track_id: u64,
