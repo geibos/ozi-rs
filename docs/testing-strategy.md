@@ -11,85 +11,90 @@ The strategy favors deterministic tests that make architectural violations obvio
 ### Unit Tests
 
 Focus on domain invariants and pure behavior:
-- entity creation and validation;
-- track and waypoint mutation rules;
-- split/join behavior;
-- geometry-like helper logic.
+- Entity creation and validation
+- Track and waypoint mutation rules (move, delete, insert, split, join)
+- TrackStyle defaults and bounds
+- Identifier uniqueness
 
 Expected qualities:
-- fast;
-- deterministic;
-- no UI runtime required.
+- Fast, deterministic
+- No UI runtime required
+- Inline `#[cfg(test)]` modules alongside source
 
 ### Application Workflow Tests
 
 Focus on command/use-case orchestration:
-- explicit edit commands;
-- undo/redo behavior;
-- selection-driven operations where application state matters;
-- cross-entity workflow correctness.
-
-These tests should verify that the application layer preserves domain boundaries while still supporting realistic editing flows.
+- ProjectCommand apply and reverse for all variants
+- Undo/redo behavior (apply → undo → verify state restored)
+- Command merging via `apply_or_merge()` for drag sequences
+- Error cases (invalid IDs, out-of-bounds operations)
+- Cross-entity workflow correctness
 
 ### Integration Tests
 
 Focus on boundaries:
-- import/export;
-- project save/load;
-- round-trip correctness;
-- failure handling for malformed or unsupported input.
+- Import/export round-trips (GPX, PLT)
+- Project save/load (JSON)
+- Format-specific edge cases (Windows-1251 encoding, OLE dates, COLORREF BGR)
+- Failure handling for malformed or unsupported input
 
 ### Regression Tests
 
-Every fixed bug should add a focused regression test.
+Every fixed bug should add a focused regression test capturing:
+- The triggering input or sequence
+- The expected safe behavior
+- The exact invariant that previously failed
 
-The regression should capture:
-- the triggering input or sequence;
-- the expected safe behavior;
-- the exact invariant that previously failed.
+### Native Desktop QA
 
-### Property-Based Tests
+For desktop behavior in the Tauri app, use the project-local `ozi-rs-mcp` native MCP tools by default. Tier 1 native QA covers app build, native launch/stop, log capture, screenshot capture, and combined observation without requiring Appium. Appium Mac2 checks are optional and dependency-gated; unavailable Appium is an acceptable degraded path when Tier 1 native QA passes.
 
-Use property-based tests where parsers or geometry-like transforms benefit from broader coverage, especially for:
-- coordinate conversions or normalization logic;
-- parser robustness;
-- reversible transformations;
-- import/export round-trips with constrained generators.
+Playwright/browser testing is not the default for native desktop QA. It may still be used later for intentional isolated web/frontend experiments, but it should not replace native MCP verification for app behavior.
+
+## Verification Commands
+
+```bash
+# Full verification (Rust + frontend)
+just test
+
+# Rust tests only
+just test-rust
+
+# Specific test by name
+just test-filter <name>
+
+# Frontend tests (Vitest)
+just test-ui
+
+# Strict clippy (all warnings are errors)
+just clippy
+
+# Type checking
+just check
+```
+
+Underlying commands:
+- `cargo test --manifest-path src-tauri/Cargo.toml`
+- `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings`
+- `npm test` (Vitest)
 
 ## Test Design Rules
 
-- prefer deterministic tests;
-- keep fixtures readable and reviewable;
-- mock external boundaries only where that improves clarity;
-- avoid UI-heavy tests for domain behavior that should stay below the UI layer.
+- Prefer deterministic tests
+- Keep fixtures readable and reviewable
+- Mock external boundaries only where that improves clarity
+- Avoid UI-heavy tests for domain behavior that should stay below the UI layer
+- Rust tests live inline (`#[cfg(test)]` modules), not in separate test files
+- Frontend tests in `src/test/` using Vitest
 
 ## Quality Gates
 
 Before considering work done:
-- code compiles;
-- relevant tests pass;
-- architecture boundaries remain intact;
-- docs are updated when behavior changes.
-
-## Proposed Command Set
-
-When the Rust project scaffolding exists, the standard verification path should be:
-- `cargo fmt --check`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-- `cargo test --all`
-
-Add `cargo nextest` when the suite becomes large enough to benefit from it.
-
-## Early Priorities
-
-The first implemented features should get tests in this order:
-1. domain entities and invariants;
-2. command-driven edits and undo/redo;
-3. save/load and format boundaries;
-4. regression coverage for discovered editing bugs.
-
-## Known Gaps At Kickoff
-
-- no production code exists yet, so there is no executable test harness;
-- no file-format matrix has been selected yet;
-- external workflow-heavy OziExplorer add-on references still need structured extraction into concrete acceptance tests.
+- Code compiles (`just check`)
+- Clippy passes with zero warnings (`just clippy`)
+- All Rust tests pass (`just test-rust`)
+- Frontend tests pass (`just test-ui`)
+- Full deterministic suite passes when applicable (`just test`)
+- Native desktop QA uses `ozi-rs-mcp` Tier 1 tools for app behavior; Appium Mac2 runs only when its dependencies and permissions are available
+- Architecture boundaries remain intact
+- Docs are updated when behavior changes

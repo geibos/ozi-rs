@@ -23,6 +23,17 @@ file path and the active map reference/path needed to reopen that map if the fil
 - Undo/redo history.
 - Theme selection inside the Rust session file or inside `.ozp` project files.
 
+## Session File Location
+
+`infrastructure::persistence::default_app_session_path()` resolves the session file path:
+
+| Platform | Path |
+|----------|------|
+| macOS | `$HOME/Library/Application Support/ozi-rs/session.json` |
+| Other (no `HOME`) | `session.json` in the current working directory (fallback) |
+
+The path is set once at startup via `AppState::new_with_session_path`. Tests inject a temporary path to avoid touching the user-level location.
+
 ## Restore Flow
 
 On startup, the Rust application creates a fresh `AppState`, then loads the session file before

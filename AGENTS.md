@@ -2,6 +2,20 @@
 
 Project instructions for AI coding agents. Read this file first when working on this repository.
 
+## Session startup context
+
+For maximum context in every new session:
+
+1. Read this `AGENTS.md` first.
+2. Read `docs/project-map.md` for the file/responsibility navigator and onboarding read order.
+3. Read `docs/feature-status.md` to understand what is implemented in backend, surfaced in UI, documented, or still planned.
+4. Read `docs/adr/adr-0019-doc-audit-reconciliation.md` for the latest audit decisions and non-goals.
+5. For architecture-sensitive work, also read `docs/architecture.md`, `docs/frontend-architecture.md`, `docs/commands-reference.md`, and `docs/conventions.md` (coordinate order, IDs, encodings) before changing code.
+6. For session/project/map behavior, read `docs/persistence-session.md`.
+7. For native desktop QA, read `docs/native-qa-mcp.md` (the project-local MCP server replaces Playwright as the default) and `docs/agent-verification.md` (binding verification protocol — read before claiming any desktop fix or feature works).
+8. Check the current git state before editing because this repository may contain unrelated dirty files from prior work.
+9. Prefer evidence over assumptions: search existing code patterns, keep frontend IPC calls in `src/lib/api.ts`, and run targeted tests plus `just test` / `just clippy` before completion.
+
 ## What this project is
 
 **ozi-rs** is a Tauri 2 desktop application for [LizaAlert](https://lizaalert.org) search-and-rescue volunteers — an offline-first map editor replacing OziExplorer. We don't need all OziExplorer features, only those actually used by SAR volunteers.
@@ -101,7 +115,7 @@ Both protocols registered via `addProtocol()` in `src/lib/maplibre/`.
 
 ## LizaAlert OK standard
 
-Track names must follow `YYYYMMDD_Callsign` (e.g. `20240601_Иванов`). The UI validates this. GPX/PLT export dialogs default to the active bundle's `10-Tracks/` directory when available; users may choose another path.
+Track names must follow `YYYYMMDD_Callsign` (e.g. `20240601_Иванов`). The UI shows warning-only validation for this pattern. GPX/PLT export dialogs default to the active bundle's `10-Tracks/` directory when available; users may choose another path.
 
 ## Frontend conventions
 
@@ -120,15 +134,23 @@ Details: `docs/frontend-architecture.md`.
 - Application layer: command tests (apply, undo, error cases)
 - Infrastructure: format adapter tests (GPX, PLT round-trips)
 - Frontend: Vitest in `src/test/`
+- Desktop QA for native Tauri behavior should use the project-local `ozi-rs-mcp` native MCP tools by default. Use Tier 1 native tools for build/launch/log/screenshot/stop checks without requiring Appium. Appium Mac2 checks are optional and dependency-gated; unavailable Appium is a valid degraded path when Tier 1 passes.
+- Playwright/browser testing is not the default for native desktop QA. It may still be added later for intentional isolated web/frontend experiments.
 
 Verification: `just test` (all), `just clippy` (strict linting).
 
 ## Documentation
 
+- `docs/project-map.md` — single-page navigator: where things live, common-task entry points, onboarding read order
 - `docs/architecture.md` — layer design, module layout, dependencies
 - `docs/frontend-architecture.md` — components, stores, tile protocols, theme
-- `docs/commands-reference.md` — ProjectCommand and Tauri IPC command tables
+- `docs/commands-reference.md` — `ProjectCommand` and Tauri IPC command tables, plus the "Adding a new `ProjectCommand`" checklist
+- `docs/conventions.md` — coordinate order, tile URL formats, color encodings, naming, concurrency
+- `docs/glossary.md` — domain (LizaAlert, OK-standard, bundles) and code terms
+- `docs/feature-status.md` — backend / UI / docs / status / evidence matrix
+- `docs/persistence-session.md` — what is and isn't restored at startup
+- `docs/native-qa-mcp.md` — `tools/ozi-rs-mcp` reference for native desktop QA
 - `docs/requirements.md` — product goals, user workflows, MVP scope
 - `docs/roadmap.md` — phase status and remaining work
 - `docs/testing-strategy.md` — test layers and quality gates
-- `docs/adr/` — 18 architecture decision records
+- `docs/adr/` — 19 architecture decision records

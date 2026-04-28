@@ -136,10 +136,16 @@ and testable without the UI runtime.
 
 ## Documentation
 
+- `docs/project-map.md` — file/responsibility navigator (start here)
 - `docs/requirements.md` — product requirements and user workflows
 - `docs/architecture.md` — layer responsibilities and editing model
 - `docs/frontend-architecture.md` — UI stack, components, state management
 - `docs/commands-reference.md` — ProjectCommand and Tauri IPC reference
+- `docs/conventions.md` — coordinate order, tile URLs, color encodings, naming
+- `docs/glossary.md` — domain and code terminology
+- `docs/feature-status.md` — backend/UI/docs status matrix
+- `docs/persistence-session.md` — startup restore scope
+- `docs/native-qa-mcp.md` — native desktop QA via the project-local MCP
 - `docs/testing-strategy.md` — test layers and quality gates
 - `docs/roadmap.md` — phases and status
 - `docs/adr/` — architecture decision records (19 ADRs)

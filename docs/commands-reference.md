@@ -124,6 +124,34 @@ Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
 | `get_ozi_tile_projected` | Return OZF2 tile reprojected to Web Mercator |
 | `get_ozi_metadata` | Return OZI map metadata (levels, bounds, calibration) |
 
+## Adding a New `ProjectCommand`
+
+Concrete checklist when introducing a new undoable edit. Each step has tests inline; do not skip them.
+
+1. **Domain mutation method** (if missing). Add the smallest possible mutation on the relevant domain entity in `src-tauri/src/domain/`. Return values needed for the inverse (e.g. previous coordinates, removed index + entity for undo). Cover with `#[cfg(test)]` tests.
+
+2. **`ProjectCommand` variant.** Add the variant to `application/commands.rs` with all data needed for both directions. Inverses must be computable; for "remove" commands, store the removed entity in the variant itself so undo can re-insert it. Add a constructor (`ProjectCommand::your_command(...)`).
+
+3. **`apply()` and `reverse()`.** Wire the new variant into `apply_to_project` (forward) and `reverse_for_project` (computes the reverse `ProjectCommand` from the pre-mutation state). For drag-style commands, also implement `targets_same_entity()` so coalescing works.
+
+4. **Tests in `commands.rs`.** At minimum: apply mutates, undo restores exactly, redo reapplies, error variants surface as `CommandError::ProjectLayer(_)`. For coalescing commands, test that two consecutive operations on the same target collapse into one undo step.
+
+5. **`AppState` adapter** in `application/mod.rs`. Add an `apply_<your_command>` method that fetches any pre-state needed for the inverse and calls `self.history.apply(...)` (or `apply_or_merge` for drag commands). Map errors to `ProjectLayerError`.
+
+6. **Tauri handler** in `src-tauri/src/commands/mod.rs`. Add `#[tauri::command] pub fn your_command(...)` that locks state, calls the AppState adapter, emits `state-changed`, and converts errors to `String`.
+
+7. **Register** in `src-tauri/src/lib.rs::generate_handler!`. The build fails fast if you forget — but the failure is far from the change, so save yourself the round-trip.
+
+8. **Typed wrapper** in `src/lib/api.ts`. Mirror the parameter list using `bigint` for IDs, named arguments matching Rust `snake_case` → TypeScript `camelCase` (Tauri auto-converts).
+
+9. **DTO sync** if the command returns or accepts a struct. Update `src/lib/types.ts` and the Rust DTO in `commands/mod.rs` together. There is no codegen.
+
+10. **UI hookup.** Call the wrapper from the relevant component or store. Never call `invoke()` directly. Update Svelte stores if state shape changes.
+
+11. **Update this file.** Add the variant to the table above and the IPC command to the relevant subsection. Update `docs/feature-status.md` if user-visible behavior changes.
+
+If the command is **non-undoable style only** (track color, line width, visibility), skip steps 2-4 and route directly through an `AppState` setter that mutates without going through `CommandStack`. Document the skip in the Style table above and reference ADR-0017.
+
 ## Backend Events (backend → frontend)
 
 | Event | Payload | Purpose |
