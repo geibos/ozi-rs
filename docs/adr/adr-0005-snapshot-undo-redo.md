@@ -1,6 +1,6 @@
 # ADR-0005: Snapshot-Based Undo/Redo
 
-- Status: accepted
+- Status: superseded by ADR-0017
 - Date: 2026-03-23
 
 ## Context
