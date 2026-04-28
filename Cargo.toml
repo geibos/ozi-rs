@@ -1,0 +1,3 @@
+[workspace]
+members = ["src-tauri", "tools/ozi-rs-mcp"]
+resolver = "3"
