@@ -23,33 +23,75 @@
     setBundlesRoot,
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
-  import type { DownloadProgressPayload, LizaProjectSummaryDto } from "../lib/types";
+  import type {
+    BundleProgressPayload,
+    DownloadProgressPayload,
+    LizaProjectSummaryDto,
+  } from "../lib/types";
 
   let projectFilter = $state("");
   let selectedSlug = $state("");
+  let bundleProgress = $state<BundleProgressPayload | null>(null);
+  let refreshTimer: number | null = null;
+
+  async function refreshState() {
+    await appState.refresh();
+    const latest = get(appState);
+    syncProjectsFromAppState(latest);
+    if (latest && !latest.busy) {
+      projectsLoading.set(false);
+      bundleProgress = null;
+    }
+  }
+
+  function scheduleRefresh() {
+    if (refreshTimer !== null) return;
+    refreshTimer = window.setTimeout(async () => {
+      refreshTimer = null;
+      await refreshState();
+    }, 120);
+  }
 
   onMount(async () => {
-    await appState.refresh();
-    syncProjectsFromAppState(get(appState));
-
-    const unlisten = await listen<void>("state-changed", async () => {
-      await appState.refresh();
-      const latest = get(appState);
-      syncProjectsFromAppState(latest);
-      if (latest && !latest.busy) {
-        projectsLoading.set(false);
-      }
+    // Hide instead of close so the window can be re-shown instantly
+    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    const currentWindow = getCurrentWebviewWindow();
+    const unlistenClose = await currentWindow.onCloseRequested(async (event) => {
+      event.preventDefault();
+      await currentWindow.hide();
     });
+
+    // Set up listeners BEFORE any async work so we don't miss events
+    const unlisten = await listen<void>("state-changed", scheduleRefresh);
     const unlistenProgress = await listen<DownloadProgressPayload>(
       "download-progress",
       (e) => updateDownloadProgress(e.payload)
+    );
+    const unlistenBundleProgress = await listen<BundleProgressPayload>(
+      "bundle-progress",
+      (e) => {
+        bundleProgress = e.payload;
+      }
     );
     const unlistenProjectsChunk = await listen<LizaProjectSummaryDto[]>(
       "projects-chunk",
       (e) => appendProjectsChunk(e.payload)
     );
 
-    return () => { unlisten(); unlistenProgress(); unlistenProjectsChunk(); };
+    // Show cached state immediately, then trigger a fresh load
+    await refreshState();
+    loadProjects().catch(() => {});
+
+    return () => {
+      if (refreshTimer !== null) {
+        window.clearTimeout(refreshTimer);
+      }
+      unlisten();
+      unlistenProgress();
+      unlistenBundleProgress();
+      unlistenProjectsChunk();
+      unlistenClose();
+    };
   });
 
   const filtered = $derived(
@@ -87,6 +129,12 @@
     if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
     return `${bytes} B`;
   }
+
+  const bundlePercent = $derived(
+    bundleProgress?.total
+      ? Math.round(((bundleProgress.completed ?? 0) / bundleProgress.total) * 100)
+      : null
+  );
 </script>
 
 <div class="root">
@@ -200,7 +248,27 @@
     {#if $busy}
       <span class="spinner"></span>
     {/if}
-    <span class="status-text">{$status}</span>
+    <div class="status-main">
+      <span class="status-text">{bundleProgress?.message ?? $status}</span>
+      {#if bundleProgress}
+        <div class="bundle-meta">
+          {#if bundleProgress.total != null}
+            <span>{bundleProgress.completed ?? 0}/{bundleProgress.total}</span>
+          {/if}
+          {#if bundleProgress.downloaded_bytes != null}
+            <span>
+              {formatBytes(bundleProgress.downloaded_bytes)}
+              {bundleProgress.total_bytes ? `/ ${formatBytes(bundleProgress.total_bytes)}` : ""}
+            </span>
+          {/if}
+        </div>
+        {#if bundlePercent != null}
+          <div class="bundle-track">
+            <div class="bundle-fill" style={`width: ${bundlePercent}%`}></div>
+          </div>
+        {/if}
+      {/if}
+    </div>
   </div>
 {/if}
 
@@ -450,11 +518,41 @@
     overflow: hidden;
   }
 
+  .status-main {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .status-text {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .bundle-meta {
+    display: flex;
+    gap: 10px;
+    font-size: 10px;
+    color: var(--ctp-overlay1);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bundle-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--ctp-surface0);
+  }
+
+  .bundle-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--ctp-blue), var(--ctp-teal));
+    transition: width 0.2s ease;
   }
 
   @keyframes spin {

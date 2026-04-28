@@ -27,6 +27,10 @@
   let editingTrack: string | null = $state(null);
   let editName = $state("");
 
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+  }
+
   $effect(() => {
     if ($appState) {
       loadTracks();
@@ -196,7 +200,7 @@
                   bind:value={editName}
                   onblur={() => commitRename(track)}
                   onkeydown={(e) => e.key === "Enter" && commitRename(track)}
-                  autofocus
+                  use:focusOnMount
                 />
                 {#if !isOkStandardTrackName(editName)}
                   <span class="ok-name-warning">Use YYYYMMDD_Callsign</span>

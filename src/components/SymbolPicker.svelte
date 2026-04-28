@@ -74,7 +74,7 @@
   </button>
 
   {#if open}
-    <div class="popover" onclick={(e) => e.stopPropagation()}>
+    <div class="popover">
       <div class="grid">
         <button 
           class="grid-item" 

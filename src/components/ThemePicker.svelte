@@ -1,8 +1,6 @@
 <script lang="ts">
   import { selectedTheme } from "../lib/stores";
-  import { flavors } from "@catppuccin/palette";
-
-  type ThemeName = "auto" | "latte" | "frappe" | "macchiato" | "mocha";
+  import { applyTheme, type ThemeName } from "../lib/theme";
 
   const themes: { value: ThemeName; label: string }[] = [
     { value: "auto", label: "Auto" },
@@ -11,22 +9,6 @@
     { value: "macchiato", label: "Macchiato" },
     { value: "mocha", label: "Mocha" },
   ];
-
-  function applyTheme(name: ThemeName) {
-    const resolved =
-      name === "auto"
-        ? window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "mocha"
-          : "latte"
-        : name;
-
-    const palette = flavors[resolved].colors;
-    const root = document.documentElement;
-
-    for (const [key, color] of Object.entries(palette)) {
-      root.style.setProperty(`--ctp-${key}`, color.hex);
-    }
-  }
 
   // Apply on mount and on change
   $effect(() => {

@@ -827,7 +827,7 @@
     pointer-events: none;
   }
 
-  .track-point-marker {
+  :global(.track-point-marker) {
     width: 10px;
     height: 10px;
     border-radius: 50%;
@@ -837,12 +837,12 @@
     cursor: grab;
   }
 
-  .track-point-marker.selected {
+  :global(.track-point-marker.selected) {
     background: var(--ctp-yellow);
     box-shadow: 0 0 0 1px var(--ctp-peach);
   }
 
-  .track-point-marker:active {
+  :global(.track-point-marker:active) {
     cursor: grabbing;
   }
 
