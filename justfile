@@ -67,6 +67,10 @@ check:
 clippy:
     cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
+# Run local release warning hygiene gate
+check-release-warnings:
+    ./scripts/check-release-warnings.sh
+
 # ── Test ──────────────────────────────────────────────────────────────────────
 
 # Run all tests (Rust + frontend)
