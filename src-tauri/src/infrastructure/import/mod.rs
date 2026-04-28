@@ -12,9 +12,9 @@ pub use archive::{
 pub use gpx::{
     ArchivedGpxImport, ArchivedGpxImportError, import_gpx_entries_from_archive, import_gpx_file,
 };
-pub use ozi_georeference::parse_ozi_georeference;
+pub use ozi_georeference::{OziGeoreference, parse_ozi_georeference};
 pub use ozi_map::{
     OziMapMetadata, OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
-pub use ozi_raster::open_ozi_raster_tile_source;
+pub use ozi_raster::{OziRasterTileSource, open_ozi_raster_tile_source};
 pub use plt::{PltImportError, import_plt_file};

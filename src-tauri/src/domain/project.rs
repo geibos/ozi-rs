@@ -223,6 +223,10 @@ impl TrackLayer {
     }
 
     pub fn create_empty_track(&mut self, track_id: crate::domain::TrackId, name: String) {
+        debug_assert!(
+            !self.tracks.iter().any(|t| t.id() == track_id),
+            "duplicate track id: {track_id:?}"
+        );
         let segment = crate::domain::TrackSegment::new(crate::domain::TrackSegmentId::new(1));
         let mut track = crate::domain::Track::new(track_id, name);
         track.add_segment(segment);

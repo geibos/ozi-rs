@@ -162,7 +162,8 @@ fn is_new_segment(line: &str) -> bool {
 
 /// Parse a single track point line.
 ///
-/// Format: `lat, lon, new_segment, altitude_ft, ole_date, valid_date, altitude_m`
+/// Standard OziExplorer format:
+/// `lat, lon, code, altitude_ft, ole_date, date_text, time_text`
 fn parse_plt_point(line: &str, point_id: u64) -> Option<TrackPoint> {
     let fields: Vec<&str> = line.split(',').map(str::trim).collect();
     if fields.len() < 2 {
@@ -179,28 +180,17 @@ fn parse_plt_point(line: &str, point_id: u64) -> Option<TrackPoint> {
 
     let mut point = TrackPoint::new(TrackPointId::new(point_id), lat, lon);
 
-    // Altitude in meters (field index 6, optional) or feet (field index 3)
-    if let Some(alt_m) = fields.get(6).and_then(|s| s.parse::<f64>().ok()) {
-        if alt_m > -777.0 {
-            point = point.with_elevation(alt_m);
-        }
-    } else if let Some(alt_ft) = fields.get(3).and_then(|s| s.parse::<f64>().ok())
+    // Altitude in feet (field index 3)
+    if let Some(alt_ft) = fields.get(3).and_then(|s| s.parse::<f64>().ok())
         && alt_ft > -777.0
     {
         point = point.with_elevation(alt_ft * 0.3048);
     }
 
-    // Timestamp from OLE Automation date (field index 4), only if valid flag (field 5) == 1
-    let date_valid = fields
-        .get(5)
-        .and_then(|s| s.parse::<u8>().ok())
-        .unwrap_or(0)
-        == 1;
-    if date_valid
-        && let Some(ts) = fields
-            .get(4)
-            .and_then(|s| s.parse::<f64>().ok())
-            .and_then(ole_date_to_chrono)
+    // Timestamp from OLE Automation date (field index 4), if non-zero
+    if let Some(ole) = fields.get(4).and_then(|s| s.parse::<f64>().ok())
+        && ole > 0.0
+        && let Some(ts) = ole_date_to_chrono(ole)
     {
         point = point.with_timestamp(ts);
     }
@@ -282,11 +272,12 @@ mod tests {
     }
 
     #[test]
-    fn import_plt_text_captures_elevation_from_altitude_meters_field() {
-        let text = sample_plt(255, "60.0,30.0,0,0,44000.0,1,150.5\n");
+    fn import_plt_text_captures_elevation_from_altitude_feet_field() {
+        // 494 feet ≈ 150.57 meters
+        let text = sample_plt(255, "60.0,30.0,0,494,44000.0,01-01-2020,12:00:00\n");
         let import = import_plt_text("t.plt".to_owned(), &text).expect("import");
         let elev = import.track.segments()[0].points()[0].elevation();
-        assert!((elev.unwrap() - 150.5).abs() < 0.01);
+        assert!((elev.unwrap() - 150.57).abs() < 0.1);
     }
 
     #[test]
