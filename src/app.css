@@ -87,7 +87,9 @@ select:focus, input:focus {
   outline-offset: -1px;
 }
 
-scrollbar-color: var(--ctp-surface2) transparent;
+* {
+  scrollbar-color: var(--ctp-surface2) transparent;
+}
 
 ::-webkit-scrollbar {
   width: 6px;

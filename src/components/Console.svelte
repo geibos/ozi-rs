@@ -1,7 +1,7 @@
 <script lang="ts">
   import { diagnostics, consoleOpen } from "../lib/stores";
 
-  let scrollEl: HTMLDivElement;
+  let scrollEl = $state<HTMLDivElement>();
 
   // Scroll to bottom when new diagnostics arrive
   $effect(() => {

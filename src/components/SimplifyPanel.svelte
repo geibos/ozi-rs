@@ -75,7 +75,11 @@
 
     <div class="footer">
       <button class="btn btn-secondary" onclick={closePanel}>Cancel</button>
-      <button class="btn btn-primary" onclick={handleConfirm}>Confirm</button>
+      <button
+        class="btn btn-primary"
+        disabled={!$simplifyState.preview || $simplifyState.preview.simplified_count === 0}
+        onclick={handleConfirm}
+      >Confirm</button>
     </div>
   </div>
 {/if}
