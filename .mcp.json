@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "ozi-rs-mcp": {
-      "command": "/Users/sobieg/Projects/ozi-rs/tools/ozi-rs-mcp/target/release/ozi-rs-mcp",
+      "command": "/Users/sobieg/Projects/ozi-rs/target/release/ozi-rs-mcp",
       "env": {
         "OZI_RS_PROJECT_ROOT": "/Users/sobieg/Projects/ozi-rs"
       }
