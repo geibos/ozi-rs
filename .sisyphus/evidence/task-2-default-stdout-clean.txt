@@ -1,0 +1,1 @@
+PASS: default stdio mode emitted no diagnostic stdout when stdin closed.

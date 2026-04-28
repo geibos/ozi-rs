@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "tool": "qa_environment",
+  "error_kind": null,
+  "message": null,
+  "environment": {
+    "platform": "macos",
+    "repo_root": "/Users/sobieg/Projects/ozi-rs",
+    "evidence_root": "/Users/sobieg/Projects/ozi-rs/.sisyphus/evidence/native-qa",
+    "just_available": true,
+    "open_available": true,
+    "log_available": true,
+    "screencapture_available": true,
+    "appium_available": false
+  },
+  "evidence": null,
+  "session": null,
+  "artifact_paths": []
+}

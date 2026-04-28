@@ -1,0 +1,2 @@
+Extra data: line 33 column 2 (char 1187)
+smoke_report_json_parse_exit=1

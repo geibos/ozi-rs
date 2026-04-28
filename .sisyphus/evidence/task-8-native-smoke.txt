@@ -1,0 +1,11 @@
+   Compiling ozi-rs-mcp v0.1.0 (/Users/sobieg/Projects/ozi-rs/tools/ozi-rs-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.52s
+     Running tests/smoke_workflow.rs (target/debug/deps/smoke_workflow-d7b1fa1001c206f7)
+
+running 3 tests
+test native_smoke_workflow_reports_build_failure_evidence ... ok
+test native_smoke_workflow_reports_launch_exited_early_and_logs ... ok
+test native_smoke_workflow_writes_tier1_and_appium_gate_evidence ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

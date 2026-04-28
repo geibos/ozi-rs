@@ -1,0 +1,193 @@
+    Checking ozi-rs v0.1.0 (/Users/sobieg/Projects/ozi-rs/src-tauri)
+error: all variants have the same prefix: `Missing`
+  --> src/domain/project.rs:7:1
+   |
+ 7 | / pub enum ProjectLayerError {
+ 8 | |     MissingTrackLayer(LayerId),
+ 9 | |     MissingWaypointLayer(LayerId),
+10 | |     MissingWaypoint(LayerId, WaypointId),
+11 | | }
+   | |_^
+   |
+   = help: remove the prefixes and use full paths to the variants instead of glob imports
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#enum_variant_names
+   = note: `-D clippy::enum-variant-names` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::enum_variant_names)]`
+
+error: called `Iterator::last` on a `DoubleEndedIterator`; this will needlessly iterate the entire iterator
+   --> src/domain/track.rs:205:20
+    |
+205 |           let last = self
+    |  ____________________^
+206 | |             .segments
+207 | |             .iter()
+208 | |             .flat_map(|s| s.points())
+209 | |             .filter_map(|p| p.timestamp())
+210 | |             .last()?;
+    | |______________-----^
+    |                |
+    |                help: try: `next_back()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#double_ended_iterator_last
+    = note: `-D clippy::double-ended-iterator-last` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::double_ended_iterator_last)]`
+
+error: using `write!()` with a format string that ends in a single newline
+  --> src/infrastructure/export/gpx.rs:38:13
+   |
+38 |       let _ = write!(
+   |  _____________^
+39 | |         out,
+40 | |         "        <gpxx:DisplayColor>{color_name}</gpxx:DisplayColor>\n"
+41 | |     );
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#write_with_newline
+   = note: `-D clippy::write-with-newline` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::write_with_newline)]`
+help: use `writeln!` instead
+   |
+38 ~     let _ = writeln!(
+39 |         out,
+40 ~         "        <gpxx:DisplayColor>{color_name}</gpxx:DisplayColor>"
+   |
+
+error: using `write!()` with a format string that ends in a single newline
+  --> src/infrastructure/export/gpx.rs:48:21
+   |
+48 |               let _ = write!(
+   |  _____________________^
+49 | |                 out,
+50 | |                 "      <trkpt lat=\"{:.6}\" lon=\"{:.6}\">\n",
+51 | |                 point.latitude(),
+52 | |                 point.longitude()
+53 | |             );
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#write_with_newline
+help: use `writeln!` instead
+   |
+48 ~             let _ = writeln!(
+49 |                 out,
+50 ~                 "      <trkpt lat=\"{:.6}\" lon=\"{:.6}\">",
+   |
+
+error: using `write!()` with a format string that ends in a single newline
+  --> src/infrastructure/export/gpx.rs:55:25
+   |
+55 |                 let _ = write!(out, "        <ele>{:.1}</ele>\n", elev);
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#write_with_newline
+help: use `writeln!` instead
+   |
+55 -                 let _ = write!(out, "        <ele>{:.1}</ele>\n", elev);
+55 +                 let _ = writeln!(out, "        <ele>{:.1}</ele>", elev);
+   |
+
+error: using `write!()` with a format string that ends in a single newline
+  --> src/infrastructure/export/gpx.rs:58:25
+   |
+58 |                 let _ = write!(out, "        <time>{}</time>\n", ts.format("%+"));
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#write_with_newline
+help: use `writeln!` instead
+   |
+58 -                 let _ = write!(out, "        <time>{}</time>\n", ts.format("%+"));
+58 +                 let _ = writeln!(out, "        <time>{}</time>", ts.format("%+"));
+   |
+
+error: useless conversion to the same type: `std::path::PathBuf`
+   --> src/infrastructure/import/archive.rs:177:56
+    |
+177 |         let Some(relative_path) = entry.enclosed_name().map(PathBuf::from) else {
+    |                                                        ^^^^^^^^^^^^^^^^^^^-
+    |                                                        |
+    |                                                        help: consider removing
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#useless_conversion
+    = note: `-D clippy::useless-conversion` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::useless_conversion)]`
+
+error: all variants have the same prefix: `Missing`
+  --> src/infrastructure/import/ozi_map.rs:73:1
+   |
+73 | / pub enum OziMapParseError {
+74 | |     MissingHeader,
+75 | |     MissingTitle,
+76 | |     MissingRasterReference,
+77 | |     MissingProjectionName,
+78 | |     MissingDatumName,
+79 | | }
+   | |_^
+   |
+   = help: remove the prefixes and use full paths to the variants instead of glob imports
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#enum_variant_names
+
+error: this `if` statement can be collapsed
+   --> src/infrastructure/import/plt.rs:187:12
+    |
+187 |       } else if let Some(alt_ft) = fields.get(3).and_then(|s| s.parse::<f64>().ok()) {
+    |  ____________^
+188 | |         if alt_ft > -777.0 {
+189 | |             point = point.with_elevation(alt_ft * 0.3048);
+190 | |         }
+191 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+187 ~     } else if let Some(alt_ft) = fields.get(3).and_then(|s| s.parse::<f64>().ok())
+188 ~         && alt_ft > -777.0 {
+189 |             point = point.with_elevation(alt_ft * 0.3048);
+190 ~         }
+    |
+
+error: this `if` statement can be collapsed
+   --> src/infrastructure/import/plt.rs:199:5
+    |
+199 | /     if date_valid {
+200 | |         if let Some(ts) = fields
+201 | |             .get(4)
+202 | |             .and_then(|s| s.parse::<f64>().ok())
+...   |
+207 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+199 ~     if date_valid
+200 ~         && let Some(ts) = fields
+201 |             .get(4)
+...
+205 |             point = point.with_timestamp(ts);
+206 ~         }
+    |
+
+error: this `if` statement can be collapsed
+   --> src/infrastructure/lizaalert.rs:624:13
+    |
+624 | /             if let Ok(Err(e)) = handle.join() {
+625 | |                 if first_error.is_none() {
+626 | |                     first_error = Some(e);
+627 | |                 }
+628 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+624 ~             if let Ok(Err(e)) = handle.join()
+625 ~                 && first_error.is_none() {
+626 |                     first_error = Some(e);
+627 ~                 }
+    |
+
+error: could not compile `ozi-rs` (lib) due to 11 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `ozi-rs` (lib test) due to 11 previous errors

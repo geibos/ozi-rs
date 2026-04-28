@@ -1,0 +1,13 @@
+Task 11 static audit
+
+[PASS] no direct invoke() in Svelte components
+no matches
+
+[PASS] no hardcoded layer-1 workflow calls in app source
+no app-source matches
+
+[PASS] feature-status includes all 10 coverage terms
+all terms present
+
+[PASS] public docs avoid stale overbroad restore/layer claims
+claims are qualified/non-goals

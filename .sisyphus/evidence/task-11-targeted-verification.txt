@@ -1,0 +1,99 @@
+
+===== session_restore_valid =====
+$ cargo test --manifest-path src-tauri/Cargo.toml session_restore_valid -- --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.78s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 1 test
+test application::tests::session_restore_valid_restores_project_path_and_active_map ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+[exit code: 0]
+
+===== session_restore_missing =====
+$ cargo test --manifest-path src-tauri/Cargo.toml session_restore_missing -- --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 1 test
+test application::tests::session_restore_missing_degrades_to_fresh_state_with_warning ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 172 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+[exit code: 0]
+
+===== waypoint_symbol =====
+$ cargo test --manifest-path src-tauri/Cargo.toml waypoint_symbol -- --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 3 tests
+test application::tests::waypoint_symbol_undo_restores_previous_symbol_and_redo_reapplies_new_symbol ... ok
+test application::tests::waypoint_symbol_missing_returns_error_without_mutating_state ... ok
+test infrastructure::import::gpx::tests::import_gpx_file_reads_waypoint_symbol ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+[exit code: 0]
+
+===== export_default_tracks_dir =====
+$ cargo test --manifest-path src-tauri/Cargo.toml export_default_tracks_dir -- --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 4 tests
+test application::tests::export_default_tracks_dir_is_none_without_active_bundle ... ok
+test application::tests::export_default_tracks_dir_recovers_bundle_from_restored_mobile_map_path ... ok
+test application::tests::export_default_tracks_dir_uses_active_bundle_for_plt ... ok
+test application::tests::export_default_tracks_dir_uses_active_bundle_for_gpx ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+[exit code: 0]
+
+===== targeted_ui =====
+$ npm run test -- --run src/test/track-points-panel.test.ts src/test/tracks-panel-style.test.ts src/test/track-name-validation.test.ts src/test/export-default-path.test.ts src/test/active-layer-ui.test.ts
+
+> ozi-rs@0.1.0 test
+> vitest run --run src/test/track-points-panel.test.ts src/test/tracks-panel-style.test.ts src/test/track-name-validation.test.ts src/test/export-default-path.test.ts src/test/active-layer-ui.test.ts
+
+
+ RUN  v4.1.2 /Users/sobieg/Projects/ozi-rs
+
+
+ Test Files  5 passed (5)
+      Tests  20 passed (20)
+   Start at  22:42:05
+   Duration  208ms (transform 134ms, setup 0ms, import 196ms, tests 14ms, environment 0ms)
+
+
+[exit code: 0]

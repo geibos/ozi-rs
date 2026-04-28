@@ -1,0 +1,51 @@
+   Compiling ozi-rs-mcp v0.1.0 (/Users/sobieg/Projects/ozi-rs/tools/ozi-rs-mcp)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
+     Running unittests src/lib.rs (target/debug/deps/ozi_rs_mcp-95b78490a667e694)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/ozi_rs_mcp-89d306808aa20df1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/appium.rs (target/debug/deps/appium-f6d66eac93a18944)
+
+running 12 tests
+test appium_absent_is_graceful ... ok
+test appium_click_requires_session ... ok
+test appium_action_helpers_require_session ... ok
+test appium_action_helpers_accept_existing_session ... ok
+test appium_fake_doctor_states_are_structured ... ok
+test appium_doctor_probe_distinguishes_driver_and_permissions ... ok
+test appium_launch_session_absent_is_graceful ... ok
+test appium_launch_session_available_attempts_webdriver_and_reports_server_unavailable ... ok
+test appium_launch_session_reports_unreachable_server ... ok
+test appium_actions_call_session_scoped_webdriver_endpoints ... ok
+test appium_launch_session_posts_to_webdriver_server ... ok
+test appium_screenshot_writes_fake_evidence ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/evidence.rs (target/debug/deps/evidence-f5d2b615d6ecc43c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/native.rs (target/debug/deps/native-76e13e91e5108fdd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/smoke_workflow.rs (target/debug/deps/smoke_workflow-d7b1fa1001c206f7)
+
+running 1 test
+test native_smoke_workflow_writes_tier1_and_appium_gate_evidence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+

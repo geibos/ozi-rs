@@ -129,3 +129,19 @@
 - A local GeoJSON source/layer pair (`drawing-preview`) is the most stable way to render in-progress lines + markers immediately, without waiting for backend `state-changed` refresh.
 - Cursor/interaction precedence needs explicit ordering: drawing mode should force `crosshair`, disable pan + double-click zoom, and proactively clear conflicting modes (`editModeActive`, `addWaypointMode`) while active.
 - Cancel flow is deterministic with command stack: Escape should call `undo()` exactly `insertedPointCount + 1` times (points plus `create_empty_track`) to remove all drawing artifacts.
+
+## 2026-04-04 — Clippy question_mark cleanup
+
+- New mutation handlers in `commands/mod.rs` should use `let mut app_state = lock_app_state(state.inner())?;` directly; the `match` form is only needed where the code intentionally keeps a suppression for legacy handlers.
+- After cleanup, `grep -c "allow(clippy::question_mark)" src-tauri/src/commands/mod.rs` returned `0` and `cargo test -q` passed with 160 tests.
+
+## [2026-04-04] F3 QA Review Patterns
+
+### Drawing mode exclusivity pattern
+- MapView.svelte uses a `$effect` that watches `$drawingModeActive` and immediately sets both `editModeActive` and `addWaypointMode` to false when drawing starts. This is the correct exclusive mode pattern.
+
+### Context menu dismissal pattern
+- `contextMenu = null` is set: on map click (line 477), on dragstart of markers (line 210), inside `handleDeletePoint` and `handleInsertPointAfter` before any await, and on Escape keydown. Comprehensive coverage.
+
+### Waypoint drag cursor pattern
+- `el.style.cursor = "grab"` is set at creation time (line 296), changes to "grabbing" on dragstart (line 304), returns to "grab" on dragend (line 308). Correct grab/grabbing pattern.

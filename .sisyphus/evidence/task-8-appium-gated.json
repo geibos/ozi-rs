@@ -1,0 +1,18 @@
+{
+  "ok": false,
+  "tool": "appium_doctor",
+  "available": false,
+  "error_kind": "dependency_missing",
+  "missing": [
+    "appium"
+  ],
+  "message": "Appium is not available on PATH; Appium Mac2 tools are disabled",
+  "session_id": null,
+  "install_hints": [
+    "Install Appium 2 and ensure the appium executable is on PATH",
+    "Install the Appium Mac2 driver before enabling native UI actions"
+  ],
+  "artifact_paths": [],
+  "blocked": false,
+  "reason": "Appium is not available on PATH; Appium Mac2 tools are disabled"
+}

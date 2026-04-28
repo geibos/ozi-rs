@@ -1,0 +1,8 @@
+
+running 3 tests
+test native_smoke_workflow_reports_build_failure_evidence ... ok
+test native_smoke_workflow_reports_launch_exited_early_and_logs ... ok
+test native_smoke_workflow_writes_tier1_and_appium_gate_evidence ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

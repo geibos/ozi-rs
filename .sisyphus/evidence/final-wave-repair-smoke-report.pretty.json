@@ -1,0 +1,33 @@
+{
+    "tier1_ok": true,
+    "appium_available": false,
+    "appium_blocked": false,
+    "failed_phase": null,
+    "error_kind": null,
+    "exit_code": null,
+    "phase_order": [
+        "qa_environment",
+        "build_app",
+        "launch_app",
+        "capture_screenshot",
+        "capture_logs",
+        "stop_app",
+        "appium_doctor"
+    ],
+    "evidence_files": [
+        ".sisyphus/evidence/native-qa/qa_environment/result.json",
+        ".sisyphus/evidence/native-qa/build_app/stdout.txt",
+        ".sisyphus/evidence/native-qa/build_app/stderr.txt",
+        ".sisyphus/evidence/native-qa/launch_app/stdout.txt",
+        ".sisyphus/evidence/native-qa/launch_app/stderr.txt",
+        ".sisyphus/evidence/native-qa/capture_screenshot/stdout.txt",
+        ".sisyphus/evidence/native-qa/capture_screenshot/stderr.txt",
+        ".sisyphus/evidence/native-qa/capture_screenshot/screenshot.png",
+        ".sisyphus/evidence/native-qa/capture_logs/stdout.txt",
+        ".sisyphus/evidence/native-qa/capture_logs/stderr.txt",
+        ".sisyphus/evidence/native-qa/stop_app/stdout.txt",
+        ".sisyphus/evidence/native-qa/stop_app/stderr.txt",
+        ".sisyphus/evidence/native-qa/appium_doctor/result.json",
+        ".sisyphus/evidence/task-8-appium-gated.json"
+    ]
+}

@@ -1,0 +1,4 @@
+Search evidence for: Playwright policy
+Expected: Playwright/browser testing is not default for native desktop QA.
+AGENTS.md:136: - Playwright/browser testing is not the default for native desktop QA. It may still be added later for intentional isolated web/frontend experiments.
+docs/testing-strategy.md:52: Playwright/browser testing is not the default for native desktop QA. It may still be used later for intentional isolated web/frontend experiments, but it should not replace native MCP verification for app behavior.

@@ -1,0 +1,22 @@
+[0m
+┌  MCP Servers
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+│
+●  ✓ ozi_rs [90mconnected
+│      [90mcargo run --quiet -p ozi-rs-mcp --
+│
+└  1 server(s)
+

@@ -1,0 +1,3 @@
+cargo test -p ozi-rs-mcp exit=0
+self-check exit=0
+self-check json parse exit=0

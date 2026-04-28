@@ -1,0 +1,16 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running tests/native.rs (target/debug/deps/native-76e13e91e5108fdd)
+
+running 9 tests
+test command_construction_preserves_paths_with_spaces_as_args ... ok
+test task3_qa_environment_evidence_is_parseable_json ... ok
+test repo_root_detects_repo_root_directory ... ok
+test stop_app_is_idempotent ... ok
+test repo_root_detects_ancestor_from_subdirectory ... ok
+test repo_root_prefers_env_var_over_current_directory ... ok
+test build_failure_returns_command_exit_duration_and_stream_paths ... ok
+test launch_app_missing_artifact_returns_structured_error ... ok
+test task3_missing_artifact_evidence_is_parseable_json ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

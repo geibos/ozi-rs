@@ -1,0 +1,21 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "ozi_rs": {
+            "type": "local",
+            "command": [
+                "cargo",
+                "run",
+                "--quiet",
+                "-p",
+                "ozi-rs-mcp",
+                "--"
+            ],
+            "enabled": true,
+            "timeout": 10000,
+            "environment": {
+                "OZI_RS_PROJECT_ROOT": "."
+            }
+        }
+    }
+}

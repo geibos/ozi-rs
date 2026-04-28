@@ -1,0 +1,437 @@
+
+===== just test-rust =====
+$ just test-rust
+cargo test --manifest-path src-tauri/Cargo.toml
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 173 tests
+test application::commands::tests::applying_add_map_layer_with_source_stores_local_path ... ok
+test application::commands::tests::applying_add_track_command_updates_matching_layer ... ok
+test application::commands::tests::applying_move_waypoint_command_requires_existing_waypoint ... ok
+test application::commands::tests::apply_or_merge_coalesces_sequential_waypoint_moves_into_single_undo_step ... ok
+test application::commands::tests::applying_add_waypoint_command_requires_existing_layer ... ok
+test application::commands::tests::applying_move_waypoint_command_updates_coordinates ... ok
+test application::commands::tests::coalesce_move_track_point_merges_sequential_moves ... ok
+test application::commands::tests::create_empty_track_apply_creates_track_with_one_empty_segment ... ok
+test application::commands::tests::create_empty_track_missing_layer_returns_error ... ok
+test application::commands::tests::create_empty_track_undo_removes_created_track ... ok
+test application::commands::tests::delete_track_apply_removes_track ... ok
+test application::commands::tests::delete_track_missing_track_returns_error ... ok
+test application::commands::tests::command_stack_drops_oldest_entries_when_max_depth_exceeded ... ok
+test application::commands::tests::delete_track_point_apply_removes_point ... ok
+test application::commands::tests::delete_track_point_missing_point_returns_error ... ok
+test application::commands::tests::delete_track_point_undo_restores_at_same_index ... ok
+test application::commands::tests::delete_track_undo_restores_track ... ok
+test application::commands::tests::delete_waypoint_apply_removes_waypoint ... ok
+test application::commands::tests::delete_waypoint_missing_waypoint_returns_error ... ok
+test application::commands::tests::delete_waypoint_undo_restores_with_all_fields ... ok
+test application::commands::tests::insert_track_point_apply_adds_point_at_index ... ok
+test application::commands::tests::insert_track_point_out_of_bounds_returns_error ... ok
+test application::commands::tests::insert_track_point_undo_removes_inserted_point ... ok
+test application::commands::tests::join_segments_apply_combines_into_one ... ok
+test application::commands::tests::join_segments_error_on_missing_segment ... ok
+test application::commands::tests::join_segments_undo_restores_both ... ok
+test application::commands::tests::move_track_point_apply_changes_coordinates ... ok
+test application::commands::tests::move_track_point_missing_layer_returns_error ... ok
+test application::commands::tests::move_track_point_undo_restores_coordinates ... ok
+test application::commands::tests::rename_waypoint_apply_changes_name ... ok
+test application::commands::tests::rename_waypoint_missing_layer_returns_error ... ok
+test application::commands::tests::rename_waypoint_undo_restores_old_name ... ok
+test application::commands::tests::simplify_track_missing_track_returns_error ... ok
+test application::commands::tests::split_segment_apply_creates_two_segments ... ok
+test application::commands::tests::split_segment_missing_point_returns_error ... ok
+test application::commands::tests::split_segment_undo_merges_back_to_one ... ok
+test application::commands::tests::undo_and_redo_move_waypoint_round_trip_coordinates ... ok
+test application::commands::tests::undo_restores_state_for_all_existing_command_variants ... ok
+test application::tests::export_default_tracks_dir_is_none_without_active_bundle ... ok
+test application::tests::export_default_tracks_dir_recovers_bundle_from_restored_mobile_map_path ... ok
+test application::tests::export_default_tracks_dir_uses_active_bundle_for_gpx ... ok
+test application::tests::export_default_tracks_dir_uses_active_bundle_for_plt ... ok
+test application::tests::waypoint_symbol_missing_returns_error_without_mutating_state ... ok
+test application::tests::waypoint_symbol_undo_restores_previous_symbol_and_redo_reapplies_new_symbol ... ok
+test commands::tests::get_tracks_geojson_skips_empty_tracks ... ok
+test commands::tests::test_get_track_detail ... ok
+test commands::tiles::tests::base_zoom_maps_to_db_min ... ok
+test commands::tiles::tests::mid_zoom_maps_correctly ... ok
+test commands::tiles::tests::min_web_zoom_maps_to_db_max ... ok
+test commands::tiles::tests::single_zoom_level_bundle ... ok
+test commands::tiles::tests::zoom_above_base_is_none ... ok
+test commands::tiles::tests::zoom_below_range_is_none ... ok
+test domain::project::tests::adding_layers_keeps_each_collection_separate ... ok
+test domain::project::tests::map_layer_can_store_source_path_metadata ... ok
+test domain::project::tests::project_adds_track_to_matching_track_layer ... ok
+test application::tests::session_restore_missing_degrades_to_fresh_state_with_warning ... ok
+test domain::project::tests::project_adds_waypoint_to_matching_waypoint_layer ... ok
+test domain::project::tests::project_moves_waypoint_in_matching_waypoint_layer ... ok
+test domain::project::tests::project_removes_track_from_matching_track_layer ... ok
+test domain::project::tests::project_renames_and_symbols_waypoints_in_matching_layer ... ok
+test domain::project::tests::project_reports_missing_nested_track_entities ... ok
+test application::tests::session_restore_valid_restores_project_path_and_active_map ... ok
+test domain::project::tests::project_reports_missing_track_layer_when_adding_track ... ok
+test domain::project::tests::project_reports_missing_waypoint_when_moving_unknown_waypoint ... ok
+test domain::project::tests::project_reports_missing_track_when_removing_unknown_track ... ok
+test domain::project::tests::project_layer_error_formats_new_track_variants ... ok
+test domain::project::tests::project_reports_missing_waypoint_when_renaming_or_removing ... ok
+test domain::project::tests::track_layer_create_empty_track_adds_track_with_one_segment ... ok
+test domain::project::tests::track_layer_create_empty_track_uses_explicit_track_id ... ok
+test domain::project::tests::track_layer_remove_track_reports_missing_track ... ok
+test domain::project::tests::track_layer_remove_track_returns_index_and_track_for_undo ... ok
+test domain::project::tests::track_layers_store_tracks_with_explicit_segments_and_points ... ok
+test domain::project::tests::untitled_project_starts_with_independent_empty_layer_collections ... ok
+test domain::project::tests::waypoint_layer_remove_waypoint_reports_missing_waypoint ... ok
+test domain::project::tests::waypoint_layer_remove_waypoint_returns_index_and_waypoint_for_undo ... ok
+test domain::project::tests::waypoint_layers_store_independent_waypoint_collections ... ok
+test domain::track::tests::default_track_style_is_visible_red ... ok
+test domain::track::tests::insert_point_at_errors_when_index_exceeds_length ... ok
+test domain::track::tests::insert_point_at_places_point_at_correct_index ... ok
+test application::commands::tests::simplify_track_undo_restores_all_points ... ok
+test domain::track::tests::join_segments_appends_b_points_into_a_and_removes_b ... ok
+test application::commands::tests::simplify_track_zero_tolerance_keeps_all ... ok
+test domain::track::tests::join_segments_errors_on_non_adjacent_segments ... ok
+test application::commands::tests::simplify_track_apply_reduces_point_count ... ok
+test domain::track::tests::move_point_errors_on_missing_point_id ... ok
+test domain::track::tests::move_point_returns_old_coords_on_success ... ok
+test domain::track::tests::remove_point_errors_on_missing_point_id ... ok
+test domain::track::tests::remove_point_returns_index_and_point_on_success ... ok
+test domain::track::tests::remove_segment_errors_on_missing_segment_id ... ok
+test domain::track::tests::remove_segment_returns_correct_index_and_segment ... ok
+test domain::track::tests::simplify_collinear_points_reduces_to_endpoints ... ok
+test domain::track::tests::simplify_negative_tolerance_keeps_all_points ... ok
+test domain::track::tests::simplify_single_point_returns_index_zero ... ok
+test domain::track::tests::simplify_two_points_returns_both_indices ... ok
+test domain::track::tests::simplify_zero_tolerance_keeps_all_points ... ok
+test domain::track::tests::simplify_empty_slice_returns_empty ... ok
+test domain::track::tests::split_at_point_errors_on_missing_point_id ... ok
+test domain::track::tests::split_at_point_left_keeps_id_and_points_up_to_split ... ok
+test domain::track::tests::track_segments_keep_inserted_points_in_order ... ok
+test domain::track::tests::tracks_keep_segments_as_explicit_collections ... ok
+test domain::track::tests::simplify_l_shaped_with_inner_collinear_removes_redundant_points ... ok
+test domain::track::tests::simplify_l_shaped_path_keeps_corner ... ok
+test application::tests::apply_map_downloaded_marks_selected_project_map_as_cached ... ok
+test application::tests::begin_open_map_returns_local_request_after_download_is_applied ... ok
+test domain::waypoint::tests::waypoint_move_updates_coordinates ... ok
+test domain::waypoint::tests::waypoint_preserves_name_and_coordinates ... ok
+test domain::track::tests::track_point_builder_methods_set_optional_fields ... ok
+test domain::waypoint::tests::waypoint_setters_return_previous_values_for_undo ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_escapes_special_characters_in_name ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_includes_track_name_and_garmin_color ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_produces_valid_header_and_footer ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_writes_elevation_and_timestamp ... ok
+test infrastructure::export::gpx::tests::build_waypoint_gpx_xml_skips_symbol_when_absent ... ok
+test infrastructure::export::gpx::tests::build_waypoint_gpx_xml_writes_symbol_when_present ... ok
+test infrastructure::export::gpx::tests::rgba_to_garmin_color_maps_black ... ok
+test infrastructure::export::gpx::tests::rgba_to_garmin_color_maps_pure_blue ... ok
+test infrastructure::export::gpx::tests::rgba_to_garmin_color_maps_pure_red ... ok
+test infrastructure::export::gpx::tests::track_duration_is_none_for_track_without_timestamps ... ok
+test infrastructure::export::gpx::tests::track_total_distance_km_computes_haversine_sum ... ok
+test infrastructure::export::plt::tests::export_plt_uses_zero_date_when_timestamp_missing ... ok
+test infrastructure::export::plt::tests::export_plt_marks_first_point_of_each_segment ... ok
+test infrastructure::export::plt::tests::export_plt_writes_exact_header_and_first_data_lines ... ok
+test infrastructure::import::archive::tests::archive_file_name_returns_last_path_segment ... ok
+test infrastructure::import::archive::tests::classify_archive_path_marks_raster_and_unknown_payloads_as_unsupported ... ok
+test infrastructure::export::plt::tests::export_plt_round_trip_import_export_import_preserves_points ... ok
+test infrastructure::import::archive::tests::classify_archive_path_matches_supported_extensions_case_insensitively ... ok
+test infrastructure::import::gpx::tests::archive_file_stem_uses_last_path_segment_without_extension ... ok
+test infrastructure::import::ozi_georeference::tests::affine_fit_handles_cross_axis_terms ... ok
+test infrastructure::import::ozi_georeference::tests::linear_fit_recovers_exact_slope_and_intercept ... ok
+test infrastructure::import::ozi_georeference::tests::linear_fit_returns_none_for_degenerate_same_x ... ok
+test infrastructure::import::ozi_georeference::tests::ozi_georeference_lat_lon_to_pixel_is_affine ... ok
+test infrastructure::import::ozi_georeference::tests::parse_calibration_point_extracts_pixel_and_latlon ... ok
+test infrastructure::import::ozi_georeference::tests::parse_calibration_point_handles_southern_western_hemisphere ... ok
+test infrastructure::import::ozi_georeference::tests::parse_calibration_point_returns_none_for_short_line ... ok
+test infrastructure::import::ozi_georeference::tests::parse_ozi_georeference_produces_correct_pixel_coordinates ... ok
+test infrastructure::import::ozi_georeference::tests::parse_ozi_georeference_returns_none_for_single_point ... ok
+test infrastructure::import::ozi_georeference::tests::parse_ozi_georeference_with_three_points_round_trips_rotated_fit ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_marks_ozf_payloads_as_deferred ... ok
+test infrastructure::import::gpx::tests::import_gpx_file_reads_waypoint_symbol ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_marks_ozfx3_payloads_separately ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_reads_minimal_supported_image_reference ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_rejects_missing_header ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_requires_raster_reference ... ok
+test infrastructure::import::ozi_map::tests::resolve_raster_path_falls_back_to_map_directory_file_name ... ok
+test infrastructure::import::ozi_raster::tests::level_metadata_rejects_out_of_bounds_tile_size_queries ... ok
+test infrastructure::import::ozi_raster::tests::level_metadata_reports_partial_edge_tile_size ... ok
+test infrastructure::import::ozi_raster::tests::visible_tile_extent_clamps_to_remaining_pixels ... ok
+test infrastructure::import::plt::tests::colorref_to_rgba_maps_low_byte_to_red ... ok
+test infrastructure::import::ozi_map::tests::read_ozi_map_text_decodes_lossy_non_utf8_bytes ... ok
+test infrastructure::import::plt::tests::import_plt_text_captures_elevation_from_altitude_feet_field ... ok
+test infrastructure::import::plt::tests::import_plt_text_parses_basic_track ... ok
+test infrastructure::import::plt::tests::import_plt_text_reads_track_color_from_colorref ... ok
+test infrastructure::import::ozi_raster::tests::crop_rgba_tile_trims_to_visible_edge_size ... ok
+test infrastructure::import::plt::tests::import_plt_text_reads_track_name ... ok
+test infrastructure::import::ozi_raster::tests::indexed_tile_to_rgba_expands_palette_indexes ... ok
+test infrastructure::import::plt::tests::import_plt_text_rejects_missing_header ... ok
+test infrastructure::import::plt::tests::import_plt_text_splits_on_segment_break_flag ... ok
+test infrastructure::import::plt::tests::ole_date_to_chrono_converts_known_date ... ok
+test infrastructure::import::plt::tests::ole_date_to_chrono_handles_fractional_day ... ok
+test infrastructure::lizaalert::tests::decode_text_bytes_falls_back_lossy_for_non_utf8 ... ok
+test infrastructure::lizaalert::tests::read_text_file_lossy_reads_non_utf8_coordinates_file ... ok
+test infrastructure::persistence::tests::load_project_fails_gracefully_on_missing_file ... ok
+test infrastructure::persistence::tests::empty_project_round_trips_all_layer_types ... ok
+test infrastructure::persistence::tests::project_survives_save_and_load_round_trip ... ok
+test infrastructure::persistence::tests::saved_file_is_valid_json ... ok
+test infrastructure::import::archive::tests::extract_zip_entries_to_directory_writes_nested_files ... ok
+test commands::tiles::tests::missing_tile_returns_none_not_error ... ok
+test commands::tiles::tests::sqlite_schema_uses_x_y_z_image_columns ... ok
+test infrastructure::lizaalert::tests::parse_directory_entries_skips_parent_links_and_marks_directories ... ok
+test infrastructure::lizaalert::tests::parse_center_reads_decimal_coordinates ... ok
+test infrastructure::lizaalert::tests::parse_map_packages_reads_sqlite_entries ... ok
+test infrastructure::lizaalert::tests::load_cached_project_from_root_reads_local_coordinates_and_ozi_maps ... ok
+test infrastructure::lizaalert::tests::materialize_cached_ozi_archives_extracts_zip_for_cached_project_indexing ... ok
+
+test result: ok. 173 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ozi_rs_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+[exit code: 0]
+
+===== just test-ui =====
+$ just test-ui
+npm test
+
+> ozi-rs@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.2 /Users/sobieg/Projects/ozi-rs
+
+
+ Test Files  7 passed (7)
+      Tests  27 passed (27)
+   Start at  22:42:20
+   Duration  220ms (transform 190ms, setup 0ms, import 298ms, tests 20ms, environment 0ms)
+
+
+[exit code: 0]
+
+===== just clippy =====
+$ just clippy
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+    Checking ozi-rs v0.1.0 (/Users/sobieg/Projects/ozi-rs/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.89s
+
+[exit code: 0]
+
+===== just test =====
+$ just test
+cargo test --manifest-path src-tauri/Cargo.toml
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/ozi_rs_lib-e98e636970672d6d)
+
+running 173 tests
+test application::commands::tests::applying_add_map_layer_with_source_stores_local_path ... ok
+test application::commands::tests::applying_add_waypoint_command_requires_existing_layer ... ok
+test application::commands::tests::apply_or_merge_coalesces_sequential_waypoint_moves_into_single_undo_step ... ok
+test application::commands::tests::applying_add_track_command_updates_matching_layer ... ok
+test application::commands::tests::applying_move_waypoint_command_requires_existing_waypoint ... ok
+test application::commands::tests::applying_move_waypoint_command_updates_coordinates ... ok
+test application::commands::tests::coalesce_move_track_point_merges_sequential_moves ... ok
+test application::commands::tests::create_empty_track_apply_creates_track_with_one_empty_segment ... ok
+test application::commands::tests::create_empty_track_missing_layer_returns_error ... ok
+test application::commands::tests::create_empty_track_undo_removes_created_track ... ok
+test application::commands::tests::delete_track_apply_removes_track ... ok
+test application::commands::tests::delete_track_missing_track_returns_error ... ok
+test application::commands::tests::command_stack_drops_oldest_entries_when_max_depth_exceeded ... ok
+test application::commands::tests::delete_track_point_apply_removes_point ... ok
+test application::commands::tests::delete_track_point_missing_point_returns_error ... ok
+test application::commands::tests::delete_track_point_undo_restores_at_same_index ... ok
+test application::commands::tests::delete_track_undo_restores_track ... ok
+test application::commands::tests::delete_waypoint_apply_removes_waypoint ... ok
+test application::commands::tests::delete_waypoint_missing_waypoint_returns_error ... ok
+test application::commands::tests::delete_waypoint_undo_restores_with_all_fields ... ok
+test application::commands::tests::insert_track_point_apply_adds_point_at_index ... ok
+test application::commands::tests::insert_track_point_out_of_bounds_returns_error ... ok
+test application::commands::tests::insert_track_point_undo_removes_inserted_point ... ok
+test application::commands::tests::join_segments_error_on_missing_segment ... ok
+test application::commands::tests::join_segments_apply_combines_into_one ... ok
+test application::commands::tests::join_segments_undo_restores_both ... ok
+test application::commands::tests::move_track_point_apply_changes_coordinates ... ok
+test application::commands::tests::move_track_point_missing_layer_returns_error ... ok
+test application::commands::tests::move_track_point_undo_restores_coordinates ... ok
+test application::commands::tests::rename_waypoint_apply_changes_name ... ok
+test application::commands::tests::rename_waypoint_missing_layer_returns_error ... ok
+test application::commands::tests::rename_waypoint_undo_restores_old_name ... ok
+test application::commands::tests::simplify_track_missing_track_returns_error ... ok
+test application::commands::tests::simplify_track_apply_reduces_point_count ... ok
+test application::commands::tests::simplify_track_undo_restores_all_points ... ok
+test application::commands::tests::simplify_track_zero_tolerance_keeps_all ... ok
+test application::commands::tests::split_segment_apply_creates_two_segments ... ok
+test application::commands::tests::split_segment_missing_point_returns_error ... ok
+test application::commands::tests::split_segment_undo_merges_back_to_one ... ok
+test application::commands::tests::undo_and_redo_move_waypoint_round_trip_coordinates ... ok
+test application::commands::tests::undo_restores_state_for_all_existing_command_variants ... ok
+test application::tests::export_default_tracks_dir_is_none_without_active_bundle ... ok
+test application::tests::apply_map_downloaded_marks_selected_project_map_as_cached ... ok
+test application::tests::begin_open_map_returns_local_request_after_download_is_applied ... ok
+test application::tests::export_default_tracks_dir_uses_active_bundle_for_gpx ... ok
+test application::tests::export_default_tracks_dir_recovers_bundle_from_restored_mobile_map_path ... ok
+test application::tests::export_default_tracks_dir_uses_active_bundle_for_plt ... ok
+test application::tests::waypoint_symbol_missing_returns_error_without_mutating_state ... ok
+test application::tests::waypoint_symbol_undo_restores_previous_symbol_and_redo_reapplies_new_symbol ... ok
+test commands::tests::test_get_track_detail ... ok
+test commands::tests::get_tracks_geojson_skips_empty_tracks ... ok
+test commands::tiles::tests::base_zoom_maps_to_db_min ... ok
+test commands::tiles::tests::mid_zoom_maps_correctly ... ok
+test commands::tiles::tests::min_web_zoom_maps_to_db_max ... ok
+test commands::tiles::tests::single_zoom_level_bundle ... ok
+test commands::tiles::tests::zoom_above_base_is_none ... ok
+test commands::tiles::tests::zoom_below_range_is_none ... ok
+test domain::project::tests::adding_layers_keeps_each_collection_separate ... ok
+test domain::project::tests::map_layer_can_store_source_path_metadata ... ok
+test domain::project::tests::project_adds_track_to_matching_track_layer ... ok
+test domain::project::tests::project_adds_waypoint_to_matching_waypoint_layer ... ok
+test domain::project::tests::project_layer_error_formats_new_track_variants ... ok
+test domain::project::tests::project_moves_waypoint_in_matching_waypoint_layer ... ok
+test domain::project::tests::project_removes_track_from_matching_track_layer ... ok
+test domain::project::tests::project_renames_and_symbols_waypoints_in_matching_layer ... ok
+test domain::project::tests::project_reports_missing_nested_track_entities ... ok
+test domain::project::tests::project_reports_missing_track_layer_when_adding_track ... ok
+test domain::project::tests::project_reports_missing_track_when_removing_unknown_track ... ok
+test application::tests::session_restore_missing_degrades_to_fresh_state_with_warning ... ok
+test domain::project::tests::project_reports_missing_waypoint_when_moving_unknown_waypoint ... ok
+test domain::project::tests::project_reports_missing_waypoint_when_renaming_or_removing ... ok
+test domain::project::tests::track_layer_create_empty_track_adds_track_with_one_segment ... ok
+test domain::project::tests::track_layer_create_empty_track_uses_explicit_track_id ... ok
+test commands::tiles::tests::sqlite_schema_uses_x_y_z_image_columns ... ok
+test domain::project::tests::track_layer_remove_track_reports_missing_track ... ok
+test domain::project::tests::track_layer_remove_track_returns_index_and_track_for_undo ... ok
+test domain::project::tests::track_layers_store_tracks_with_explicit_segments_and_points ... ok
+test domain::project::tests::untitled_project_starts_with_independent_empty_layer_collections ... ok
+test domain::project::tests::waypoint_layer_remove_waypoint_reports_missing_waypoint ... ok
+test commands::tiles::tests::missing_tile_returns_none_not_error ... ok
+test application::tests::session_restore_valid_restores_project_path_and_active_map ... ok
+test domain::project::tests::waypoint_layer_remove_waypoint_returns_index_and_waypoint_for_undo ... ok
+test domain::project::tests::waypoint_layers_store_independent_waypoint_collections ... ok
+test domain::track::tests::default_track_style_is_visible_red ... ok
+test domain::track::tests::insert_point_at_places_point_at_correct_index ... ok
+test domain::track::tests::join_segments_appends_b_points_into_a_and_removes_b ... ok
+test domain::track::tests::insert_point_at_errors_when_index_exceeds_length ... ok
+test domain::track::tests::move_point_errors_on_missing_point_id ... ok
+test domain::track::tests::move_point_returns_old_coords_on_success ... ok
+test domain::track::tests::join_segments_errors_on_non_adjacent_segments ... ok
+test domain::track::tests::remove_point_errors_on_missing_point_id ... ok
+test domain::track::tests::remove_segment_returns_correct_index_and_segment ... ok
+test domain::track::tests::remove_segment_errors_on_missing_segment_id ... ok
+test domain::track::tests::simplify_collinear_points_reduces_to_endpoints ... ok
+test domain::track::tests::remove_point_returns_index_and_point_on_success ... ok
+test domain::track::tests::simplify_empty_slice_returns_empty ... ok
+test domain::track::tests::simplify_l_shaped_path_keeps_corner ... ok
+test domain::track::tests::simplify_negative_tolerance_keeps_all_points ... ok
+test domain::track::tests::simplify_l_shaped_with_inner_collinear_removes_redundant_points ... ok
+test domain::track::tests::simplify_single_point_returns_index_zero ... ok
+test domain::track::tests::simplify_two_points_returns_both_indices ... ok
+test domain::track::tests::simplify_zero_tolerance_keeps_all_points ... ok
+test domain::track::tests::split_at_point_errors_on_missing_point_id ... ok
+test domain::track::tests::split_at_point_left_keeps_id_and_points_up_to_split ... ok
+test domain::track::tests::track_point_builder_methods_set_optional_fields ... ok
+test domain::track::tests::tracks_keep_segments_as_explicit_collections ... ok
+test domain::track::tests::track_segments_keep_inserted_points_in_order ... ok
+test domain::waypoint::tests::waypoint_move_updates_coordinates ... ok
+test domain::waypoint::tests::waypoint_preserves_name_and_coordinates ... ok
+test domain::waypoint::tests::waypoint_setters_return_previous_values_for_undo ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_escapes_special_characters_in_name ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_includes_track_name_and_garmin_color ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_produces_valid_header_and_footer ... ok
+test infrastructure::export::gpx::tests::build_gpx_xml_writes_elevation_and_timestamp ... ok
+test infrastructure::export::gpx::tests::build_waypoint_gpx_xml_skips_symbol_when_absent ... ok
+test infrastructure::export::gpx::tests::build_waypoint_gpx_xml_writes_symbol_when_present ... ok
+test infrastructure::export::gpx::tests::rgba_to_garmin_color_maps_black ... ok
+test infrastructure::export::gpx::tests::rgba_to_garmin_color_maps_pure_blue ... ok
+test infrastructure::export::gpx::tests::rgba_to_garmin_color_maps_pure_red ... ok
+test infrastructure::export::gpx::tests::track_duration_is_none_for_track_without_timestamps ... ok
+test infrastructure::export::gpx::tests::track_total_distance_km_computes_haversine_sum ... ok
+test infrastructure::export::plt::tests::export_plt_marks_first_point_of_each_segment ... ok
+test infrastructure::export::plt::tests::export_plt_uses_zero_date_when_timestamp_missing ... ok
+test infrastructure::export::plt::tests::export_plt_writes_exact_header_and_first_data_lines ... ok
+test infrastructure::import::archive::tests::archive_file_name_returns_last_path_segment ... ok
+test infrastructure::import::archive::tests::classify_archive_path_marks_raster_and_unknown_payloads_as_unsupported ... ok
+test infrastructure::export::plt::tests::export_plt_round_trip_import_export_import_preserves_points ... ok
+test infrastructure::import::archive::tests::classify_archive_path_matches_supported_extensions_case_insensitively ... ok
+test infrastructure::import::gpx::tests::archive_file_stem_uses_last_path_segment_without_extension ... ok
+test infrastructure::import::ozi_georeference::tests::affine_fit_handles_cross_axis_terms ... ok
+test infrastructure::import::ozi_georeference::tests::linear_fit_recovers_exact_slope_and_intercept ... ok
+test infrastructure::import::ozi_georeference::tests::linear_fit_returns_none_for_degenerate_same_x ... ok
+test infrastructure::import::ozi_georeference::tests::ozi_georeference_lat_lon_to_pixel_is_affine ... ok
+test infrastructure::import::ozi_georeference::tests::parse_calibration_point_extracts_pixel_and_latlon ... ok
+test infrastructure::import::ozi_georeference::tests::parse_calibration_point_handles_southern_western_hemisphere ... ok
+test infrastructure::import::ozi_georeference::tests::parse_calibration_point_returns_none_for_short_line ... ok
+test infrastructure::import::ozi_georeference::tests::parse_ozi_georeference_produces_correct_pixel_coordinates ... ok
+test infrastructure::import::ozi_georeference::tests::parse_ozi_georeference_returns_none_for_single_point ... ok
+test infrastructure::import::ozi_georeference::tests::parse_ozi_georeference_with_three_points_round_trips_rotated_fit ... ok
+test infrastructure::import::gpx::tests::import_gpx_file_reads_waypoint_symbol ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_marks_ozf_payloads_as_deferred ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_reads_minimal_supported_image_reference ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_marks_ozfx3_payloads_separately ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_rejects_missing_header ... ok
+test infrastructure::import::archive::tests::extract_zip_entries_to_directory_writes_nested_files ... ok
+test infrastructure::import::ozi_map::tests::parse_ozi_map_metadata_requires_raster_reference ... ok
+test infrastructure::import::ozi_map::tests::resolve_raster_path_falls_back_to_map_directory_file_name ... ok
+test infrastructure::import::ozi_raster::tests::visible_tile_extent_clamps_to_remaining_pixels ... ok
+test infrastructure::import::ozi_map::tests::read_ozi_map_text_decodes_lossy_non_utf8_bytes ... ok
+test infrastructure::import::ozi_raster::tests::level_metadata_rejects_out_of_bounds_tile_size_queries ... ok
+test infrastructure::import::plt::tests::colorref_to_rgba_maps_low_byte_to_red ... ok
+test infrastructure::import::plt::tests::import_plt_text_captures_elevation_from_altitude_feet_field ... ok
+test infrastructure::import::ozi_raster::tests::indexed_tile_to_rgba_expands_palette_indexes ... ok
+test infrastructure::import::plt::tests::import_plt_text_parses_basic_track ... ok
+test infrastructure::import::ozi_raster::tests::level_metadata_reports_partial_edge_tile_size ... ok
+test infrastructure::import::plt::tests::import_plt_text_reads_track_color_from_colorref ... ok
+test infrastructure::import::ozi_raster::tests::crop_rgba_tile_trims_to_visible_edge_size ... ok
+test infrastructure::import::plt::tests::import_plt_text_reads_track_name ... ok
+test infrastructure::import::plt::tests::import_plt_text_rejects_missing_header ... ok
+test infrastructure::import::plt::tests::import_plt_text_splits_on_segment_break_flag ... ok
+test infrastructure::import::plt::tests::ole_date_to_chrono_handles_fractional_day ... ok
+test infrastructure::import::plt::tests::ole_date_to_chrono_converts_known_date ... ok
+test infrastructure::lizaalert::tests::decode_text_bytes_falls_back_lossy_for_non_utf8 ... ok
+test infrastructure::persistence::tests::load_project_fails_gracefully_on_missing_file ... ok
+test infrastructure::lizaalert::tests::read_text_file_lossy_reads_non_utf8_coordinates_file ... ok
+test infrastructure::persistence::tests::empty_project_round_trips_all_layer_types ... ok
+test infrastructure::persistence::tests::saved_file_is_valid_json ... ok
+test infrastructure::persistence::tests::project_survives_save_and_load_round_trip ... ok
+test infrastructure::lizaalert::tests::parse_center_reads_decimal_coordinates ... ok
+test infrastructure::lizaalert::tests::parse_directory_entries_skips_parent_links_and_marks_directories ... ok
+test infrastructure::lizaalert::tests::parse_map_packages_reads_sqlite_entries ... ok
+test infrastructure::lizaalert::tests::load_cached_project_from_root_reads_local_coordinates_and_ozi_maps ... ok
+test infrastructure::lizaalert::tests::materialize_cached_ozi_archives_extracts_zip_for_cached_project_indexing ... ok
+
+test result: ok. 173 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/ozi_rs-924bafff3b1ef775)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ozi_rs_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+npm test
+
+> ozi-rs@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.2 /Users/sobieg/Projects/ozi-rs
+
+
+ Test Files  7 passed (7)
+      Tests  27 passed (27)
+   Start at  22:42:25
+   Duration  232ms (transform 242ms, setup 0ms, import 338ms, tests 22ms, environment 0ms)
+
+
+[exit code: 0]

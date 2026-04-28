@@ -1,0 +1,21 @@
+Task 9 full validation summary
+server_name=ozi-rs-mcp
+stdio_safe=True
+tool_count=13
+tools_exact_13=True
+required_tools_present=['appium_doctor', 'qa_environment', 'qa_observe']
+required_tools_missing=[]
+native_required_missing=[]
+cargo_test_ozi_rs_mcp: exists=True bytes=3269 path=.sisyphus/evidence/task-9-cargo-test-ozi-rs-mcp.txt
+self_check_json: exists=True bytes=407 path=.sisyphus/evidence/task-9-self-check.json
+self_check_pretty_json: exists=True bytes=854 path=.sisyphus/evidence/task-9-self-check.pretty.json
+self_check_stderr: exists=True bytes=0 path=.sisyphus/evidence/task-9-self-check.stderr.txt
+just_test: exists=True bytes=17468 path=.sisyphus/evidence/task-9-just-test.txt
+just_clippy: exists=True bytes=137 path=.sisyphus/evidence/task-9-just-clippy.txt
+just_build: exists=True bytes=4502 path=.sisyphus/evidence/task-9-just-build.txt
+opencode_mcp_tools: exists=True bytes=1280 path=.sisyphus/evidence/task-9-opencode-mcp-tools.txt
+native_smoke_evidence: exists=True bytes=1526 path=.sisyphus/evidence/task-9-native-smoke-evidence.txt
+oh_my_opencode_preserved: exists=True bytes=0 path=.sisyphus/evidence/task-9-oh-my-opencode-preserved.txt
+schema_drift_check: exists=True bytes=0 path=.sisyphus/evidence/task-9-schema-drift-check.txt
+opencode_diff_empty=True
+schema_diff_empty=True
