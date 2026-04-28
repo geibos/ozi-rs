@@ -19,3 +19,9 @@ src-tauri/gen/apple/
 
 # Brainstorming session artifacts
 .superpowers/
+
+# Local fixture bundles (large, environment-specific)
+example_data/
+
+# Playwright MCP working directory
+.playwright-mcp/
