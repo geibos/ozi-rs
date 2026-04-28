@@ -1,0 +1,37 @@
+[0m
+[90m┌[39m  MCP Servers
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+unknown format "uint128" ignored in schema at path "#/properties/duration_ms"
+[90m│[39m
+[34m●[39m  ✓ ozi_rs [90mconnected
+[90m│[39m      [90mcargo run --quiet -p ozi-rs-mcp --
+[90m│[39m
+[90m└[39m  1 server(s)
+
+
+Self-check tool inventory fallback (OpenCode list does not print per-tool names):
+ozi_rs_qa_environment
+ozi_rs_build_app
+ozi_rs_launch_app
+ozi_rs_stop_app
+ozi_rs_capture_logs
+ozi_rs_capture_screenshot
+ozi_rs_qa_observe
+ozi_rs_appium_doctor
+ozi_rs_appium_launch_session
+ozi_rs_appium_click
+ozi_rs_appium_type_text
+ozi_rs_appium_screenshot
+ozi_rs_appium_stop_session

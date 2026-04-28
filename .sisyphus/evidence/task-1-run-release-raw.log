@@ -1,0 +1,167 @@
+===== git status before capture =====
+ M .sisyphus/notepads/phases-7-10-features/decisions.md
+ M .sisyphus/notepads/phases-7-10-features/issues.md
+ M .sisyphus/notepads/phases-7-10-features/learnings.md
+ M AGENTS.md
+ M docs/adr/adr-0005-snapshot-undo-redo.md
+ M docs/testing-strategy.md
+ M src-tauri/src/commands/tiles.rs
+ M src-tauri/src/domain/project.rs
+ M src-tauri/src/infrastructure/export/plt.rs
+ M src-tauri/src/infrastructure/import/mod.rs
+ M src-tauri/src/infrastructure/import/ozi_georeference.rs
+ M src-tauri/src/infrastructure/import/plt.rs
+ M src/components/SimplifyPanel.svelte
+ M src/components/ThemePicker.svelte
+ M src/lib/windows.ts
+ M src/main.ts
+ M src/views/BundleLoaderView.svelte
+?? .opencode/
+?? .playwright-mcp/
+?? .sisyphus/boulder.json
+?? .sisyphus/drafts/
+?? .sisyphus/evidence/task-1-clippy-before.txt
+?? .sisyphus/evidence/task-1-clippy-clean.txt
+?? .sisyphus/evidence/task-1-run-release-raw.log
+?? .sisyphus/evidence/task-1-tests-pass.txt
+?? .sisyphus/evidence/task-11-full-verification.txt
+?? .sisyphus/evidence/task-11-static-audit.txt
+?? .sisyphus/evidence/task-11-targeted-verification.txt
+?? .sisyphus/evidence/task-2-no-unwrap.txt
+?? .sisyphus/evidence/task-2-tests-pass.txt
+?? .sisyphus/evidence/task-36-tests-pass.txt
+?? .sisyphus/evidence/task-4-error-variants.txt
+?? .sisyphus/notepads/doc-audit-fixes/
+?? .sisyphus/notepads/phases-7-10-features/problems.md
+?? .sisyphus/notepads/run-release-warnings/
+?? .sisyphus/plans/
+?? CLAUDE.md
+?? docs/adr/adr-0017-delta-based-undo.md
+?? docs/adr/adr-0018-waypoint-symbols-as-strings.md
+?? docs/superpowers/
+?? src-tauri/.sisyphus/
+?? src/lib/theme.ts
+===== build: npm run tauri build -- --no-bundle =====
+
+> ozi-rs@0.1.0 tauri
+> tauri build --no-bundle
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> ozi-rs@0.1.0 build
+> vite build
+
+[36mvite v6.4.1 [32mbuilding for production...[36m[39m
+transforming...
+8:55:10 AM [vite-plugin-svelte] src/components/TracksPanel.svelte:199:18 Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus
+197:                   onblur={() => commitRename(track)}
+198:                   onkeydown={(e) => e.key === "Enter" && commitRename(track)}
+199:                   autofocus
+                                ^
+200:                 />
+201:                 {#if !isOkStandardTrackName(editName)}
+8:55:10 AM [vite-plugin-svelte] src/components/Console.svelte:4:6 `scrollEl` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update
+2:   import { diagnostics, consoleOpen } from "../lib/stores";
+3: 
+4:   let scrollEl: HTMLDivElement;
+                                 ^
+5: 
+6:   // Scroll to bottom when new diagnostics arrive
+8:55:10 AM [vite-plugin-svelte] src/components/MapView.svelte:830:2 Unused CSS selector ".track-point-marker"
+https://svelte.dev/e/css_unused_selector
+828:   }
+829: 
+830:   .track-point-marker {
+                          ^
+831:     width: 10px;
+832:     height: 10px;
+8:55:10 AM [vite-plugin-svelte] src/components/MapView.svelte:840:2 Unused CSS selector ".track-point-marker.selected"
+https://svelte.dev/e/css_unused_selector
+838:   }
+839: 
+840:   .track-point-marker.selected {
+                                   ^
+841:     background: var(--ctp-yellow);
+842:     box-shadow: 0 0 0 1px var(--ctp-peach);
+8:55:10 AM [vite-plugin-svelte] src/components/MapView.svelte:845:2 Unused CSS selector ".track-point-marker:active"
+https://svelte.dev/e/css_unused_selector
+843:   }
+844: 
+845:   .track-point-marker:active {
+                                 ^
+846:     cursor: grabbing;
+847:   }
+8:55:10 AM [vite-plugin-svelte] src/components/WaypointsPanel.svelte:93:16 Avoid using autofocus
+https://svelte.dev/e/a11y_autofocus
+91:                 onblur={() => commitRename(wp)}
+92:                 onkeydown={(e) => e.key === "Enter" && commitRename(wp)}
+93:                 autofocus
+                             ^
+94:               />
+95:             {:else}
+8:55:10 AM [vite-plugin-svelte] src/components/SymbolPicker.svelte:77:4 Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+75: 
+76:   {#if open}
+77:     <div class="popover" onclick={(e) => e.stopPropagation()}>
+              ^
+78:       <div class="grid">
+79:         <button 
+8:55:10 AM [vite-plugin-svelte] src/components/SymbolPicker.svelte:77:4 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+75: 
+76:   {#if open}
+77:     <div class="popover" onclick={(e) => e.stopPropagation()}>
+              ^
+78:       <div class="grid">
+79:         <button 
+[32m✓[39m 156 modules transformed.
+rendering chunks...
+[33m[esbuild css minify]
+▲ [WARNING] Expected identifier but found whitespace [css-syntax-error]
+
+    <stdin>:90:16:
+      90 │ scrollbar-color: var(--ctp-surface2) transparent;
+         ╵                 ^
+
+
+▲ [WARNING] Unexpected "var(" [css-syntax-error]
+
+    <stdin>:90:17:
+      90 │ scrollbar-color: var(--ctp-surface2) transparent;
+         ╵                  ~~~~
+
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                            [39m[1m[2m  0.63 kB[22m[1m[22m[2m │ gzip:   0.32 kB[22m
+[2mdist/[22m[2massets/[22m[35mindex-Df2PlpzZ.css             [39m[1m[2m  1.67 kB[22m[1m[22m[2m │ gzip:   0.69 kB[22m
+[2mdist/[22m[2massets/[22m[35mBundleLoaderView-Bu4UASdg.css  [39m[1m[2m  4.85 kB[22m[1m[22m[2m │ gzip:   1.24 kB[22m
+[2mdist/[22m[2massets/[22m[35mApp-DqUom5-6.css               [39m[1m[2m 79.61 kB[22m[1m[22m[2m │ gzip:  11.69 kB[22m
+[2mdist/[22m[2massets/[22m[36mwindows-DyIN_1dj.js            [39m[1m[2m  0.56 kB[22m[1m[22m[2m │ gzip:   0.31 kB[22m
+[2mdist/[22m[2massets/[22m[36mpreload-helper-BlTxHScW.js     [39m[1m[2m  1.11 kB[22m[1m[22m[2m │ gzip:   0.65 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-DiZK5uLv.js              [39m[1m[2m  1.91 kB[22m[1m[22m[2m │ gzip:   0.87 kB[22m
+[2mdist/[22m[2massets/[22m[36mevent-CCX6AFym.js              [39m[1m[2m  2.01 kB[22m[1m[22m[2m │ gzip:   0.93 kB[22m
+[2mdist/[22m[2massets/[22m[36mBundleLoaderView-Bo20i7N-.js   [39m[1m[2m  6.84 kB[22m[1m[22m[2m │ gzip:   2.66 kB[22m
+[2mdist/[22m[2massets/[22m[36mindex-CTzJFZOi.js              [39m[1m[2m 13.05 kB[22m[1m[22m[2m │ gzip:   5.14 kB[22m
+[2mdist/[22m[2massets/[22m[36mwebviewWindow-DSY2Er1p.js      [39m[1m[2m 17.50 kB[22m[1m[22m[2m │ gzip:   3.70 kB[22m
+[2mdist/[22m[2massets/[22m[36mrender-BY0N2te2.js             [39m[1m[2m 29.16 kB[22m[1m[22m[2m │ gzip:  11.41 kB[22m
+[2mdist/[22m[2massets/[22m[36mtheme-CgnXjqOO.js              [39m[1m[2m 37.01 kB[22m[1m[22m[2m │ gzip:  10.03 kB[22m
+[2mdist/[22m[2massets/[22m[36mApp-BwVPn97T.js                [39m[1m[33m841.95 kB[39m[22m[2m │ gzip: 230.13 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 2.13s[39m
+   Compiling ozi-rs v0.1.0 (/Users/sobieg/Projects/ozi-rs/src-tauri)
+    Finished `release` profile [optimized] target(s) in 23.30s
+       Built application at: /Users/sobieg/Projects/ozi-rs/src-tauri/target/release/ozi-rs
+===== build exit: 0 =====
+===== startup: ./src-tauri/target/release/ozi-rs =====
+[2m2026-04-27T05:55:37.348907Z[0m [32m INFO[0m [2mozi_rs_lib::application[0m[2m:[0m Loading project list...
+[2m2026-04-27T05:55:39.449675Z[0m [32m INFO[0m [2mozi_rs_lib::application[0m[2m:[0m Loaded 12742 projects
+===== startup termination: TERM after 15 seconds, KILL fallback after 2 seconds =====
+===== startup capture complete =====

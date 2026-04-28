@@ -1,0 +1,2 @@
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.60s

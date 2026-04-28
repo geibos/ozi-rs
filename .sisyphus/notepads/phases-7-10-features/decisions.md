@@ -27,3 +27,10 @@
 - Added `ProjectCommand::reverse(&self, project: &Project) -> ProjectCommand` and used it to derive inverse commands from current project state before applying forward commands.
 - Added `apply_or_merge(command, project)` to coalesce same-entity command streams by replacing only the latest `forward` command while preserving the original `reverse`.
 - Kept redo semantics linear: any newly applied command clears redo history (no branching).
+
+## [2026-04-04] History rewrite cleanup
+- Used `git filter-repo` with a message callback instead of interactive rebase so commit order/content stayed intact while only commit messages were rewritten.
+- Used `--force-with-lease` (after fetching remote ref) for final push to preserve safer force-push semantics.
+
+## [2026-04-04] Clippy question_mark cleanup
+- Removed all remaining `#[allow(clippy::question_mark)]` from `src-tauri/src/commands/mod.rs` and standardized the mutation handlers on `lock_app_state(state.inner())?`.

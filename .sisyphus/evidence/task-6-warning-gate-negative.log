@@ -1,0 +1,8 @@
+command: ./scripts/check-release-warnings.sh --synthetic-warning-check
+
+Release warning gate failed; unclassified warning-like lines remain. See .sisyphus/evidence/task-6-final-warning-gate.log
+
+--- synthetic gate file excerpt: .sisyphus/evidence/task-6-final-warning-gate.log ---
+1:WARNING: synthetic release warning
+
+exit status: 1

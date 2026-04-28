@@ -1,0 +1,9 @@
+[0m
+[90m┌[39m  MCP Servers
+[90m│[39m
+[34m●[39m  ✗ ozi_rs [90mfailed
+[90m│[39m      Failed to get tools
+[90m│[39m      [90mcargo run --quiet -p ozi-rs-mcp --
+[90m│[39m
+[90m└[39m  1 server(s)
+

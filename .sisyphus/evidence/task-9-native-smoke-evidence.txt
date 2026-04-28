@@ -1,0 +1,24 @@
+native_qa_root=.sisyphus/evidence/native-qa
+root_exists=True
+environment: exists=True actual_path=.sisyphus/evidence/native-qa/qa_environment
+  file=.sisyphus/evidence/native-qa/qa_environment/result.json
+build: exists=True actual_path=.sisyphus/evidence/native-qa/build_app
+  file=.sisyphus/evidence/native-qa/build_app/stderr.txt
+  file=.sisyphus/evidence/native-qa/build_app/stdout.txt
+launch: exists=True actual_path=.sisyphus/evidence/native-qa/launch_app
+  file=.sisyphus/evidence/native-qa/launch_app/stderr.txt
+  file=.sisyphus/evidence/native-qa/launch_app/stdout.txt
+screenshot: exists=True actual_path=.sisyphus/evidence/native-qa/capture_screenshot
+  file=.sisyphus/evidence/native-qa/capture_screenshot/screenshot.png
+  file=.sisyphus/evidence/native-qa/capture_screenshot/stderr.txt
+  file=.sisyphus/evidence/native-qa/capture_screenshot/stdout.txt
+logs: exists=True actual_path=.sisyphus/evidence/native-qa/capture_logs
+  file=.sisyphus/evidence/native-qa/capture_logs/stderr.txt
+  file=.sisyphus/evidence/native-qa/capture_logs/stdout.txt
+stop: exists=True actual_path=.sisyphus/evidence/native-qa/stop_app
+  file=.sisyphus/evidence/native-qa/stop_app/stderr.txt
+  file=.sisyphus/evidence/native-qa/stop_app/stdout.txt
+appium_doctor: exists=True actual_path=.sisyphus/evidence/native-qa/appium_doctor
+  file=.sisyphus/evidence/native-qa/appium_doctor/result.json
+smoke_workflow: exists=True actual_path=.sisyphus/evidence/native-qa/smoke_workflow
+  file=.sisyphus/evidence/native-qa/smoke_workflow/report.json

@@ -1,0 +1,46 @@
+{
+    "server_name": "ozi-rs-mcp",
+    "stdio_safe": true,
+    "tool_count": 13,
+    "tools": [
+        {
+            "name": "qa_environment"
+        },
+        {
+            "name": "build_app"
+        },
+        {
+            "name": "launch_app"
+        },
+        {
+            "name": "stop_app"
+        },
+        {
+            "name": "capture_logs"
+        },
+        {
+            "name": "capture_screenshot"
+        },
+        {
+            "name": "qa_observe"
+        },
+        {
+            "name": "appium_doctor"
+        },
+        {
+            "name": "appium_launch_session"
+        },
+        {
+            "name": "appium_click"
+        },
+        {
+            "name": "appium_type_text"
+        },
+        {
+            "name": "appium_screenshot"
+        },
+        {
+            "name": "appium_stop_session"
+        }
+    ]
+}

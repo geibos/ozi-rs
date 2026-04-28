@@ -1,0 +1,74 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running unittests src/lib.rs (target/debug/deps/ozi_rs_mcp-95b78490a667e694)
+
+running 2 tests
+test evidence::tests::rejects_absolute_evidence_components ... ok
+test server::tests::tool_input_schemas_are_objects_for_opencode_discovery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/ozi_rs_mcp-89d306808aa20df1)
+
+running 3 tests
+test tests::startup_sanity_identifies_stdio_safe_binary ... ok
+test tests::tool_inventory_self_check_reports_stdio_safe_exact_count ... ok
+test tests::tool_inventory_has_exact_required_names_in_order ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/appium.rs (target/debug/deps/appium-f6d66eac93a18944)
+
+running 8 tests
+test appium_absent_is_graceful ... ok
+test appium_action_helpers_accept_existing_session ... ok
+test appium_action_helpers_require_session ... ok
+test appium_launch_session_absent_is_graceful ... ok
+test appium_launch_session_available_is_degraded_without_webdriver ... ok
+test appium_click_requires_session ... ok
+test appium_fake_doctor_states_are_structured ... ok
+test appium_screenshot_writes_fake_evidence ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/evidence.rs (target/debug/deps/evidence-f5d2b615d6ecc43c)
+
+running 4 tests
+test evidence_metadata_schema_contains_required_fields ... ok
+test evidence_path_confinement_rejects_traversal ... ok
+test evidence_writes_reject_symlink_redirects ... ok
+test fake_command_captures_streams_to_distinct_evidence_files ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/native.rs (target/debug/deps/native-76e13e91e5108fdd)
+
+running 11 tests
+test stop_command_targets_launched_app_name_not_broad_repo_pattern ... ok
+test command_construction_preserves_paths_with_spaces_as_args ... ok
+test task3_qa_environment_evidence_is_parseable_json ... ok
+test stop_app_is_idempotent ... ok
+test repo_root_detects_repo_root_directory ... ok
+test repo_root_detects_ancestor_from_subdirectory ... ok
+test repo_root_prefers_env_var_over_current_directory ... ok
+test build_failure_returns_command_exit_duration_and_stream_paths ... ok
+test task3_missing_artifact_evidence_is_parseable_json ... ok
+test capture_screenshot_creates_artifact_parent_before_command_runs ... ok
+test launch_app_missing_artifact_returns_structured_error ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/smoke_workflow.rs (target/debug/deps/smoke_workflow-d7b1fa1001c206f7)
+
+running 3 tests
+test native_smoke_workflow_writes_tier1_and_appium_gate_evidence ... ok
+test native_smoke_workflow_reports_build_failure_evidence ... ok
+test native_smoke_workflow_reports_launch_exited_early_and_logs ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests ozi_rs_mcp
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

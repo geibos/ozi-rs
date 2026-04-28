@@ -1,0 +1,4 @@
+Synthetic warning scan result: FAIL as expected
+line 1: WARNING: synthetic frontend warning
+
+scanner exit: 1

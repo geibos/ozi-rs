@@ -1,0 +1,5 @@
+server_name=ozi-rs-mcp
+stdio_safe=True
+tool_count=13
+missing=[]
+tools=qa_environment,build_app,launch_app,stop_app,capture_logs,capture_screenshot,qa_observe,appium_doctor,appium_launch_session,appium_click,appium_type_text,appium_screenshot,appium_stop_session

@@ -1,0 +1,1 @@
+PASS: task-2-self-check.json is one clean JSON document; top-level keys=['server_name', 'stdio_safe', 'tool_count', 'tools']; tool_count=13.

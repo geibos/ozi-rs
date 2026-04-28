@@ -1,0 +1,79 @@
+Task 9 Appium implementation refresh scan
+grep pattern: not_implemented("appium_
+RESULT: CLEAN - no Appium not_implemented source stubs remain
+
+## tools/ozi-rs-mcp/src/appium.rs
+exists
+11: pub struct AppiumToolResult {
+30: pub fn appium_doctor() -> AppiumToolResult {
+31:     appium_doctor_with_availability(command_available("appium"))
+34: pub fn appium_doctor_with_availability(appium_available: bool) -> AppiumToolResult {
+35:     if appium_available {
+36:         return AppiumToolResult {
+38:             tool: "appium_doctor".to_owned(),
+50:     appium_doctor_for_state(AppiumDoctorState::AppiumMissing)
+53: pub fn appium_doctor_for_state(state: AppiumDoctorState) -> AppiumToolResult {
+55:         AppiumDoctorState::AppiumMissing => AppiumToolResult {
+57:             tool: "appium_doctor".to_owned(),
+70:         AppiumDoctorState::Mac2DriverMissing => AppiumToolResult {
+72:             tool: "appium_doctor".to_owned(),
+82:         AppiumDoctorState::PermissionsMissing => AppiumToolResult {
+84:             tool: "appium_doctor".to_owned(),
+97:         AppiumDoctorState::Ready => AppiumToolResult {
+99:             tool: "appium_doctor".to_owned(),
+112: pub fn appium_launch_session() -> AppiumToolResult {
+113:     appium_launch_session_with_availability(command_available("appium"))
+116: pub fn appium_launch_session_with_availability(appium_available: bool) -> AppiumToolResult {
+117:     if appium_available {
+118:         return AppiumToolResult {
+120:             tool: "appium_launch_session".to_owned(),
+132:     AppiumToolResult {
+134:         tool: "appium_launch_session".to_owned(),
+149: pub fn appium_click() -> AppiumToolResult {
+150:     appium_click_with_session(false)
+153: pub fn appium_click_with_session(session_running: bool) -> AppiumToolResult {
+154:     appium_action_with_session("appium_click", "click actions", session_running)
+157: pub fn appium_type_text() -> AppiumToolResult {
+158:     appium_type_text_with_session(false)
+161: pub fn appium_type_text_with_session(session_running: bool) -> AppiumToolResult {
+162:     appium_action_with_session("appium_type_text", "text input actions", session_running)
+165: pub fn appium_screenshot() -> AppiumToolResult {
+166:     appium_screenshot_with_session(false)
+169: pub fn appium_screenshot_with_session(session_running: bool) -> AppiumToolResult {
+170:     appium_action_with_session("appium_screenshot", "screenshot capture", session_running)
+173: pub fn appium_screenshot_with_fake_image(
+176: ) -> anyhow::Result<AppiumToolResult> {
+178:     let path = paths.path_for("appium_screenshot", "screenshot.png")?;
+183:     Ok(AppiumToolResult {
+185:         tool: "appium_screenshot".to_owned(),
+195: pub fn appium_stop_session() -> AppiumToolResult {
+196:     appium_stop_session_with_session(false)
+199: pub fn appium_stop_session_with_session(session_running: bool) -> AppiumToolResult {
+200:     appium_action_with_session("appium_stop_session", "session shutdown", session_running)
+203: fn appium_action_with_session(
+207: ) -> AppiumToolResult {
+209:         return AppiumToolResult {
+223:     AppiumToolResult {
+
+## tools/ozi-rs-mcp/src/server.rs
+exists
+19:     "appium_doctor",
+20:     "appium_launch_session",
+21:     "appium_click",
+22:     "appium_type_text",
+23:     "appium_screenshot",
+24:     "appium_stop_session",
+78:     fn appium_doctor(&self) -> Json<crate::appium::AppiumToolResult> {
+79:         Json(appium::appium_doctor())
+83:     fn appium_launch_session(&self) -> Json<crate::appium::AppiumToolResult> {
+84:         Json(appium::appium_launch_session())
+88:     fn appium_click(
+91:     ) -> Json<crate::appium::AppiumToolResult> {
+92:         Json(appium::appium_click())
+96:     fn appium_type_text(
+99:     ) -> Json<crate::appium::AppiumToolResult> {
+100:         Json(appium::appium_type_text())
+104:     fn appium_screenshot(&self) -> Json<crate::appium::AppiumToolResult> {
+105:         Json(appium::appium_screenshot())
+109:     fn appium_stop_session(&self) -> Json<crate::appium::AppiumToolResult> {
+110:         Json(appium::appium_stop_session())

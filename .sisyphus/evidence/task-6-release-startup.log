@@ -1,0 +1,5 @@
+[task-6 startup] begin bounded capture: 15s
+[2m2026-04-27T11:41:48.645074Z[0m [32m INFO[0m [2mozi_rs_lib::application[0m[2m:[0m Loading project list...
+[2m2026-04-27T11:41:50.274840Z[0m [32m INFO[0m [2mozi_rs_lib::application[0m[2m:[0m Loaded 12743 projects
+[task-6 startup] stop status: 1
+[task-6 startup] end bounded capture

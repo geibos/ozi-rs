@@ -1,0 +1,18 @@
+BEFORE FIX (git show HEAD grep):
+89:    let s = state.lock().unwrap();
+158:    let s = state.lock().unwrap();
+207:    let started = state.lock().unwrap().begin_load_projects();
+215:        state_arc.lock().unwrap().apply_projects_loaded(result);
+222:    let data = state.lock().unwrap().begin_load_project(&slug);
+236:        state_arc.lock().unwrap().apply_project_loaded(result);
+243:    let request = state.lock().unwrap().begin_open_map(&map_name);
+253:                match state.lock().unwrap().open_local_ozi_map(path) {
+261:                state.lock().unwrap().open_local_map_selection(selection);
+280:                state_arc.lock().unwrap().apply_map_downloaded(&package_name, result);
+306:        state_arc.lock().unwrap().apply_project_loaded(result);
+391:    state.lock().unwrap().undo();
+397:    state.lock().unwrap().redo();
+454:    state.lock().unwrap().reveal_active_bundle();
+
+AFTER FIX (current tree grep):
+

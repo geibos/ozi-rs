@@ -1,0 +1,1 @@
+PASS: default MCP stdio mode emitted no diagnostic stdout with closed stdin

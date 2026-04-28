@@ -1,0 +1,23 @@
+Search evidence for: ozi-rs-mcp, native, Playwright, just test, just clippy
+Files: AGENTS.md, docs/testing-strategy.md
+AGENTS.md:15: 7. Prefer evidence over assumptions: search existing code patterns, keep frontend IPC calls in `src/lib/api.ts`, and run targeted tests plus `just test` / `just clippy` before completion.
+AGENTS.md:32: | All tests | `just test` |
+AGENTS.md:33: | Rust tests only | `just test-rust` |
+AGENTS.md:34: | Specific Rust test | `just test-filter <name>` |
+AGENTS.md:35: | Frontend tests | `just test-ui` |
+AGENTS.md:36: | Clippy | `just clippy` |
+AGENTS.md:135: - Desktop QA for native Tauri behavior should use the project-local `ozi-rs-mcp` native MCP tools by default. Use Tier 1 native tools for build/launch/log/screenshot/stop checks without requiring Appium. Appium Mac2 checks are optional and dependency-gated; unavailable Appium is a valid degraded path when Tier 1 passes.
+AGENTS.md:136: - Playwright/browser testing is not the default for native desktop QA. It may still be added later for intentional isolated web/frontend experiments.
+AGENTS.md:138: Verification: `just test` (all), `just clippy` (strict linting).
+docs/testing-strategy.md:50: For desktop behavior in the Tauri app, use the project-local `ozi-rs-mcp` native MCP tools by default. Tier 1 native QA covers app build, native launch/stop, log capture, screenshot capture, and combined observation without requiring Appium. Appium Mac2 checks are optional and dependency-gated; unavailable Appium is an acceptable degraded path when Tier 1 native QA passes.
+docs/testing-strategy.md:52: Playwright/browser testing is not the default for native desktop QA. It may still be used later for intentional isolated web/frontend experiments, but it should not replace native MCP verification for app behavior.
+docs/testing-strategy.md:58: just test
+docs/testing-strategy.md:61: just test-rust
+docs/testing-strategy.md:64: just test-filter <name>
+docs/testing-strategy.md:67: just test-ui
+docs/testing-strategy.md:70: just clippy
+docs/testing-strategy.md:94: - Clippy passes with zero warnings (`just clippy`)
+docs/testing-strategy.md:95: - All Rust tests pass (`just test-rust`)
+docs/testing-strategy.md:96: - Frontend tests pass (`just test-ui`)
+docs/testing-strategy.md:97: - Full deterministic suite passes when applicable (`just test`)
+docs/testing-strategy.md:98: - Native desktop QA uses `ozi-rs-mcp` Tier 1 tools for app behavior; Appium Mac2 runs only when its dependencies and permissions are available
