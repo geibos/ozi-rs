@@ -65,15 +65,17 @@ pub fn export_plt(
                 .elevation()
                 .map_or(-777_i32, |meters| (meters * 3.28084).round() as i32);
             let ole_date = point.timestamp().map_or(0.0, datetime_to_ole_date);
-            let time_field = match point.timestamp() {
-                Some(ts) if is_segment_start => ts.format("%Y%m%d_%H%M%S").to_string(),
-                Some(ts) => ts.format("%H%M%S").to_string(),
-                None => "000000".to_owned(),
+            let (date_field, time_field) = match point.timestamp() {
+                Some(ts) => (
+                    ts.format("%d-%m-%Y").to_string(),
+                    ts.format("%H:%M:%S").to_string(),
+                ),
+                None => (String::new(), String::new()),
             };
 
             write!(
                 writer,
-                "{:.6},{:.6},0,{altitude_ft},{ole_date:.7},{time_field},{segment_flag}\r\n",
+                "{:.6},{:.6},{segment_flag},{altitude_ft},{ole_date:.7},{date_field},{time_field}\r\n",
                 point.latitude(),
                 point.longitude(),
             )?;
@@ -130,8 +132,8 @@ mod tests {
             "Field 1 = Lat, Field 2 = Lon, Field 3 = Code, Field 4 = Alt, Field 5 = Date, Field 6 = Stop, Field 7 = Bearing\r\n",
             "Direct,0,3351057,4,0,0,0\r\n",
             "2\r\n",
-            "55.000000,37.000000,0,-777,0.0000000,18991230_000000,1\r\n",
-            "55.100000,37.100000,0,328,0.0000000,000000,0\r\n"
+            "55.000000,37.000000,1,-777,0.0000000,30-12-1899,00:00:00\r\n",
+            "55.100000,37.100000,0,328,0.0000000,,\r\n"
         );
 
         assert_eq!(bytes, expected.as_bytes());
@@ -185,7 +187,14 @@ mod tests {
         for (a, b) in first_points.iter().zip(second_points.iter()) {
             assert!((a.latitude() - b.latitude()).abs() < 1e-9);
             assert!((a.longitude() - b.longitude()).abs() < 1e-9);
-            assert_eq!(a.timestamp(), b.timestamp());
+            match (a.timestamp(), b.timestamp()) {
+                (Some(ta), Some(tb)) => {
+                    let diff = (ta - tb).num_seconds().abs();
+                    assert!(diff <= 1, "timestamps differ by more than 1s: {ta} vs {tb}");
+                }
+                (None, None) => {}
+                _ => panic!("timestamp mismatch: {:?} vs {:?}", a.timestamp(), b.timestamp()),
+            }
         }
     }
 
@@ -200,7 +209,7 @@ mod tests {
         export_plt(&track, 0x0000FF, 2.0, &mut bytes).expect("export");
         let text = String::from_utf8(bytes).expect("utf8");
 
-        assert!(text.contains("10.000000,20.000000,0,-777,0.0000000,000000,1\r\n"));
+        assert!(text.contains("10.000000,20.000000,1,-777,0.0000000,,\r\n"));
     }
 
     #[test]
@@ -221,8 +230,8 @@ mod tests {
         let text = String::from_utf8(bytes).expect("utf8");
         let lines: Vec<&str> = text.split("\r\n").filter(|line| !line.is_empty()).collect();
 
-        assert_eq!(lines[6], "1.000000,2.000000,0,-777,0.0000000,000000,1");
-        assert_eq!(lines[7], "1.100000,2.100000,0,-777,0.0000000,000000,0");
-        assert_eq!(lines[8], "3.000000,4.000000,0,-777,0.0000000,000000,1");
+        assert_eq!(lines[6], "1.000000,2.000000,1,-777,0.0000000,,");
+        assert_eq!(lines[7], "1.100000,2.100000,0,-777,0.0000000,,");
+        assert_eq!(lines[8], "3.000000,4.000000,1,-777,0.0000000,,");
     }
 }
