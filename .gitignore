@@ -16,3 +16,6 @@ src-tauri/gen/apple/
 # macOS
 .DS_Store
 **/.DS_Store
+
+# Brainstorming session artifacts
+.superpowers/
