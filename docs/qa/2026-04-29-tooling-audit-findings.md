@@ -13,6 +13,10 @@ in a documented way) before re-running the plan.
 ## F1 — `mcp__ozi-rs-mcp__appium_launch_session` omits `appium:bundleId`
 
 Severity: **P0 — blocks Tier-2 verification.**
+Status: **Resolved by commit `c25c2a9` (2026-04-29).** Verified by unit test
+`appium_launch_session_includes_bundle_id_capability` and by direct curl POST
+to `/session` with the same capability shape. Live MCP re-verification
+deferred to next session — see F7 below.
 
 The Mac2 driver requires `appium:bundleId` (or an `app` capability) to know which
 application to attach to. The MCP currently sends only:
@@ -43,6 +47,11 @@ not protocol-compliant.
 ## F2 — `mcp__ozi-rs-mcp__capture_screenshot` fails silently when Screen Recording is denied
 
 Severity: **P0 — blocks Tier-1 baseline evidence.**
+Status: **Resolved by commit `1337926` (2026-04-29).** Verified by unit tests
+`capture_screenshot_surfaces_tcc_denial_as_screen_recording_denied` (TCC
+substring → `screen_recording_denied` + Screen Recording hint) and
+`capture_screenshot_keeps_exit_code_error_kind_for_unrelated_failures`
+(unrelated stderr keeps the original `exit_code` semantics).
 
 Calling `capture_screenshot` invokes `screencapture -x` from inside the MCP
 server process. macOS denies screen access with "could not create image from
@@ -95,6 +104,54 @@ Direct `curl http://127.0.0.1:4723/status` succeeds in the same window. The
 MCP's `webdriver_request` may be resolving 127.0.0.1 differently or hitting a
 brief race after `brew services restart`. Needs a focused repro.
 
+## F6 — `webdriver_request` read timeout was 5s, too short for Mac2 session create
+
+Severity: **P0 — discovered while attempting live verification of F1 fix.**
+Status: **Resolved by commit `998bc13` (2026-04-29).** Mac2 session creation
+routinely takes 15-30s while the driver attaches to the target app and probes
+Accessibility. The previous 5s read timeout returned `EAGAIN` (`Resource
+temporarily unavailable`, os error 35) before the driver could respond,
+masquerading as `server_unavailable` while the Appium server was actually
+live and reachable via curl. Bumped to 60s read / 10s write.
+
+A drive-by test fix in the same commit replaces a hardcoded
+`DEFAULT_APPIUM_SERVER_URL` reference in
+`appium_launch_session_available_attempts_webdriver_and_reports_server_unavailable`
+with a known-unreachable URL (127.0.0.1:9), so the suite stays fast and
+deterministic on developer machines that happen to have Appium running.
+
+## F7 — Mac2 driver does not respond to `/session` after extended use
+
+Severity: P1 — observed during F1 live re-verification.
+Status: **Open. Live MCP verification of F1/F6 deferred until reproduced or
+cleared by `brew services restart appium`.**
+
+After commits `c25c2a9` and `998bc13` landed and the MCP was reconnected,
+`appium_launch_session` still returned `server_unavailable` (now correctly
+hitting the 60s read budget instead of 5s). A direct curl POST to
+`/session` with the exact capability shape the MCP now sends — including
+`appium:bundleId: ru.lizaalert.ozi-rs` — also hung past 90s and returned
+zero bytes. `/status` keeps reporting "ready" while `/session` accepts the
+upload but never replies.
+
+Vs. earlier in the same day: an identical curl POST during the original
+F1 diagnostics (commit `2fc915b` window) returned a sessionId in ~5s. The
+difference is duration: the session was created, never explicitly deleted
+(or partially cleaned up after `brew services restart appium`), and the
+driver appears to have entered a state where it cannot service new
+sessions.
+
+Hypotheses to test in a fresh session:
+1. `brew services restart appium` clears it (most likely).
+2. Killing leftover orphan sessions via the WebDriver protocol clears it.
+3. The Mac2 driver has a reproducible deadlock when the target app is
+   already running before session creation.
+
+Until F7 is reproduced or cleared, F1/F6 fixes stand on:
+- unit-test evidence (capability shape, timeout constant)
+- the same-day curl evidence that proved bundleId was the missing key
+- successful MCP `appium_doctor` confirming the install path works
+
 ## F5 — `mcp__computer-use__*` requires Accessibility + Screen Recording grants for its host process
 
 Severity: P2 — alternate channel; not part of the verification protocol but
@@ -107,15 +164,30 @@ Fix sketch:
   host, computer-use helper) in `docs/native-qa-mcp.md` so a fresh install
   knows what to enable up front.
 
-## Recommended remediation order
+## Status summary (2026-04-29)
 
-1. F1 — patch `appium_launch_session` (smallest, unblocks the largest fraction
-   of the feature audit).
-2. F2 — surface TCC errors clearly so further failures auto-diagnose.
-3. F3 + F5 — documentation in `docs/native-qa-mcp.md`.
-4. F4 — repro and fix.
+| ID | Severity | Status |
+|----|----------|--------|
+| F1 | P0 | Resolved (commit `c25c2a9`) — unit-tested |
+| F2 | P0 | Resolved (commit `1337926`) — unit-tested |
+| F3 | P1 | Open — needs doc note in `docs/native-qa-mcp.md` |
+| F4 | P1 | Open — needs focused repro |
+| F5 | P2 | Open — needs doc note for the three independent TCC grants |
+| F6 | P0 | Resolved (commit `998bc13`) — unit-tested + drive-by test fix |
+| F7 | P1 | Open — driver unresponsive; try `brew services restart appium` next session |
+
+## Remaining remediation order
+
+1. Fresh session: `brew services restart appium`, reconnect MCP, run live
+   verification of F1/F6 (Step 3.3 of
+   `docs/superpowers/plans/2026-04-29-mcp-tooling-fixes.md`).
+2. If F7 reproduces, file a focused investigation under a new plan.
+3. F3 + F5 — short documentation pass in `docs/native-qa-mcp.md`.
+4. F4 — repro alongside F7 (likely the same root cause class).
 5. Re-run `docs/superpowers/plans/2026-04-28-mvp-audit.md` from Task 1.
 
-Until F1 and F2 are fixed, the feature audit cannot honestly produce
-verification artefacts. Continuing with curl + manual screencapture would
-mean abandoning the protocol — exactly the failure mode it exists to prevent.
+The application audit can resume as soon as the live verification gate of
+F1/F6 passes once. F3/F4/F5/F7 do not block it because the verification
+protocol's one-shot anti-loop rule already covers transient driver
+weirdness — agents will record `broken/hidden/missing` and move on rather
+than retry.
