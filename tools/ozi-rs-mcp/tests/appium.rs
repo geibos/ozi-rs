@@ -4,9 +4,9 @@ use ozi_rs_mcp::appium::{
     appium_doctor_with_availability, appium_doctor_with_probe,
     appium_launch_session_with_availability, appium_launch_session_with_options,
     appium_launch_session_with_server, appium_screenshot_with_fake_image,
-    appium_screenshot_with_session, appium_stop_session_with_session,
-    appium_stop_session_with_session_id, appium_type_text_with_session,
-    appium_type_text_with_session_id,
+    appium_screenshot_with_session, appium_screenshot_with_session_id,
+    appium_stop_session_with_session, appium_stop_session_with_session_id,
+    appium_type_text_with_session, appium_type_text_with_session_id,
 };
 use std::{
     io::{Read, Write},
@@ -157,11 +157,8 @@ fn appium_launch_session_includes_bundle_id_capability() {
         r#"{"value":{"sessionId":"session-bundle","capabilities":{}}}"#,
     )]);
 
-    let result = appium_launch_session_with_options(
-        true,
-        &server.url(),
-        Some("ru.lizaalert.ozi-rs"),
-    );
+    let result =
+        appium_launch_session_with_options(true, &server.url(), Some("ru.lizaalert.ozi-rs"));
 
     assert!(result.ok, "{result:?}");
     let bodies = server.bodies();
@@ -199,6 +196,40 @@ fn appium_launch_session_reports_unreachable_server() {
             .as_deref()
             .unwrap_or_default()
             .contains("minimal adapter")
+    );
+}
+
+#[test]
+fn appium_launch_session_reports_unresponsive_webdriver() {
+    let server = FakeWebDriverServer::new(vec![FakeResponse::empty()]);
+
+    let result = appium_launch_session_with_server(true, &server.url());
+
+    assert!(!result.ok);
+    assert!(result.available);
+    assert_eq!(result.error_kind.as_deref(), Some("webdriver_unresponsive"));
+    assert!(
+        result
+            .message
+            .as_deref()
+            .is_some_and(|message| message.contains("accepted the connection but did not return")),
+        "unexpected message: {result:?}",
+    );
+    assert_eq!(server.requests(), vec!["POST /session"]);
+}
+
+#[test]
+fn appium_screenshot_reports_unresponsive_webdriver() {
+    let server = FakeWebDriverServer::new(vec![FakeResponse::empty()]);
+
+    let result = appium_screenshot_with_session_id(&server.url(), "session-stale");
+
+    assert!(!result.ok);
+    assert!(result.available);
+    assert_eq!(result.error_kind.as_deref(), Some("webdriver_unresponsive"));
+    assert_eq!(
+        server.requests(),
+        vec!["GET /session/session-stale/screenshot"]
     );
 }
 
@@ -284,14 +315,21 @@ fn appium_screenshot_writes_fake_evidence() {
 
 struct FakeResponse {
     status: u16,
-    body: String,
+    body: Option<String>,
 }
 
 impl FakeResponse {
     fn json(status: u16, body: &str) -> Self {
         Self {
             status,
-            body: body.to_owned(),
+            body: Some(body.to_owned()),
+        }
+    }
+
+    fn empty() -> Self {
+        Self {
+            status: 200,
+            body: None,
         }
     }
 }
@@ -336,16 +374,18 @@ impl FakeWebDriverServer {
                 } else {
                     "ERROR"
                 };
-                let response_text = format!(
-                    "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                    response.status,
-                    status_text,
-                    response.body.len(),
-                    response.body
-                );
-                stream
-                    .write_all(response_text.as_bytes())
-                    .expect("write response");
+                if let Some(body) = response.body {
+                    let response_text = format!(
+                        "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        response.status,
+                        status_text,
+                        body.len(),
+                        body
+                    );
+                    stream
+                        .write_all(response_text.as_bytes())
+                        .expect("write response");
+                }
             }
         });
 
