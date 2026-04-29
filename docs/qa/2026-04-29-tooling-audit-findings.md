@@ -14,9 +14,11 @@ in a documented way) before re-running the plan.
 
 Severity: **P0 — blocks Tier-2 verification.**
 Status: **Resolved by commit `c25c2a9` (2026-04-29).** Verified by unit test
-`appium_launch_session_includes_bundle_id_capability` and by direct curl POST
-to `/session` with the same capability shape. Live MCP re-verification
-deferred to next session — see F7 below.
+`appium_launch_session_includes_bundle_id_capability`, by direct curl POST to
+`/session` with the same capability shape, and by live MCP re-verification on
+2026-04-29: `appium_launch_session` created session
+`d84a01b9-62e7-46af-9139-2f5b4600a0c7` for bundle
+`ru.lizaalert.ozi-rs`.
 
 The Mac2 driver requires `appium:bundleId` (or an `app` capability) to know which
 application to attach to. The MCP currently sends only:
@@ -76,6 +78,8 @@ Fix sketch (`tools/ozi-rs-mcp/src/native.rs`):
 
 Severity: P1 — startup ordering issue.
 
+Status: **Open — documented degraded-path/troubleshooting requirement.**
+
 Homebrew starts Appium as a background service after first install. If the
 Mac2 driver is installed *after* the server is up, the running Appium does not
 re-scan and continues to report "Could not find a driver for automationName
@@ -90,6 +94,12 @@ Fix sketch:
 ## F4 — `mcp__ozi-rs-mcp__appium_screenshot` reported "Connection refused" with persisted session
 
 Severity: P1 — needs reproduction.
+
+Status: **Not reproduced in 2026-04-29 live re-check.** After a fresh live MCP
+`appium_launch_session`, `appium_screenshot` captured WebDriver screenshot
+evidence successfully for session `d84a01b9-62e7-46af-9139-2f5b4600a0c7`, then
+`appium_stop_session` removed the live session. Keep the finding open only for
+the stale-session repro path below.
 
 After persisting a session JSON manually (workaround for F1), calling
 `appium_screenshot` returned:
@@ -107,12 +117,14 @@ brief race after `brew services restart`. Needs a focused repro.
 ## F6 — `webdriver_request` read timeout was 5s, too short for Mac2 session create
 
 Severity: **P0 — discovered while attempting live verification of F1 fix.**
-Status: **Resolved by commit `998bc13` (2026-04-29).** Mac2 session creation
-routinely takes 15-30s while the driver attaches to the target app and probes
-Accessibility. The previous 5s read timeout returned `EAGAIN` (`Resource
-temporarily unavailable`, os error 35) before the driver could respond,
-masquerading as `server_unavailable` while the Appium server was actually
-live and reachable via curl. Bumped to 60s read / 10s write.
+Status: **Resolved by commit `998bc13` (2026-04-29), live MCP re-verified on
+2026-04-29.** Mac2 session creation routinely takes 15-30s while the driver
+attaches to the target app and probes Accessibility. The previous 5s read
+timeout returned `EAGAIN` (`Resource temporarily unavailable`, os error 35)
+before the driver could respond, masquerading as `server_unavailable` while the
+Appium server was actually live and reachable via curl. Bumped to 60s read /
+10s write. The live MCP re-check created session
+`d84a01b9-62e7-46af-9139-2f5b4600a0c7` without hitting the timeout.
 
 A drive-by test fix in the same commit replaces a hardcoded
 `DEFAULT_APPIUM_SERVER_URL` reference in
@@ -123,8 +135,12 @@ deterministic on developer machines that happen to have Appium running.
 ## F7 — Mac2 driver does not respond to `/session` after extended use
 
 Severity: P1 — observed during F1 live re-verification.
-Status: **Open. Live MCP verification of F1/F6 deferred until reproduced or
-cleared by `brew services restart appium`.**
+Status: **Partially resolved / needs focused stale-session follow-up.** Live
+MCP verification of F1/F6 passed on 2026-04-29 after clearing a competing direct
+WebDriver session. A new regression test covers the “connection accepted but no
+HTTP/WebDriver response” failure class and surfaces it as
+`webdriver_unresponsive` instead of `server_unavailable`, with a restart/stale
+session hint.
 
 After commits `c25c2a9` and `998bc13` landed and the MCP was reconnected,
 `appium_launch_session` still returned `server_unavailable` (now correctly
@@ -159,6 +175,8 @@ useful as a fallback when Appium is unhappy. Currently both grants are missing
 for the helper process behind computer-use; `request_access` reports the panel
 was shown but state stays denied.
 
+Status: **Documented in `docs/native-qa-mcp.md` (2026-04-29).**
+
 Fix sketch:
 - Document the three independent macOS TCC grants (Terminal, Claude Code MCP
   host, computer-use helper) in `docs/native-qa-mcp.md` so a fresh install
@@ -168,23 +186,20 @@ Fix sketch:
 
 | ID | Severity | Status |
 |----|----------|--------|
-| F1 | P0 | Resolved (commit `c25c2a9`) — unit-tested |
+| F1 | P0 | Resolved (commit `c25c2a9`) — unit-tested + live MCP re-verified |
 | F2 | P0 | Resolved (commit `1337926`) — unit-tested |
-| F3 | P1 | Open — needs doc note in `docs/native-qa-mcp.md` |
-| F4 | P1 | Open — needs focused repro |
-| F5 | P2 | Open — needs doc note for the three independent TCC grants |
-| F6 | P0 | Resolved (commit `998bc13`) — unit-tested + drive-by test fix |
-| F7 | P1 | Open — driver unresponsive; try `brew services restart appium` next session |
+| F3 | P1 | Documented degraded path in `docs/native-qa-mcp.md` |
+| F4 | P1 | Open — not reproduced in live re-check; stale-session repro remains |
+| F5 | P2 | Documented TCC grant boundaries in `docs/native-qa-mcp.md` |
+| F6 | P0 | Resolved (commit `998bc13`) — unit-tested + live MCP re-verified |
+| F7 | P1 | Partially resolved — live gate cleared; unresponsive WebDriver now classified |
 
 ## Remaining remediation order
 
-1. Fresh session: `brew services restart appium`, reconnect MCP, run live
-   verification of F1/F6 (Step 3.3 of
-   `docs/superpowers/plans/2026-04-29-mcp-tooling-fixes.md`).
-2. If F7 reproduces, file a focused investigation under a new plan.
-3. F3 + F5 — short documentation pass in `docs/native-qa-mcp.md`.
-4. F4 — repro alongside F7 (likely the same root cause class).
-5. Re-run `docs/superpowers/plans/2026-04-28-mvp-audit.md` from Task 1.
+1. F4/F7 — keep one focused stale-session repro task: create a session, leave or
+   invalidate it, then verify follow-up tools report `webdriver_unresponsive` or
+   cleanly require a new session instead of misreporting `server_unavailable`.
+2. Re-run `docs/superpowers/plans/2026-04-28-mvp-audit.md` from Task 1.
 
 The application audit can resume as soon as the live verification gate of
 F1/F6 passes once. F3/F4/F5/F7 do not block it because the verification

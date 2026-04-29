@@ -53,6 +53,39 @@ Tier order matters: Tier 1 (native) must always be runnable; Tier 2 (Appium) is 
 
 If Appium dependencies are missing, the Tier 2 tools return a structured error with `error_kind` set instead of failing loudly. Treat that as an acceptable degraded path.
 
+### Appium Mac2 troubleshooting
+
+- Install Appium 2 and the Mac2 driver before relying on Tier 2:
+  `appium driver install mac2`.
+- If Appium was already running when the Mac2 driver was installed, restart the
+  service before creating a session. `/status` can report ready while the
+  running server has not reloaded the newly installed driver yet. With Homebrew,
+  use `brew services restart appium`, then reconnect the MCP client.
+- `appium_launch_session` attaches to bundle id `ru.lizaalert.ozi-rs` by
+  default. Override it with the `bundle_id` tool parameter or
+  `OZI_RS_APPIUM_BUNDLE_ID` only when intentionally testing a different app.
+- The Tier 2 tools persist the active WebDriver session at
+  `.sisyphus/evidence/native-qa/appium/session.json`. If Appium was restarted,
+  a previous session was created manually, or a direct WebDriver experiment left
+  a competing session open, stop that session before retrying MCP actions.
+- `server_unavailable` means the Appium socket could not be reached.
+  `webdriver_unresponsive` means the socket accepted the connection but did not
+  return a valid WebDriver HTTP response; restart Appium and clear stale Mac2
+  sessions before retrying once.
+
+### macOS privacy grants
+
+macOS TCC permissions are granted per host process, not globally. A fresh QA
+machine may need independent grants for:
+
+1. the terminal used for manual `cargo`/`just`/`screencapture` checks;
+2. the MCP client host process that runs `ozi-rs-mcp` (for example Claude Code
+   or opencode) for Screen Recording and Accessibility-backed Appium actions;
+3. any alternate computer-use helper process used outside this protocol.
+
+Grant Screen Recording for Tier 1 screenshots and Accessibility for Appium Mac2
+UI actions, then restart the affected host process so macOS applies the grant.
+
 ## Repo-root resolution
 
 `config::repo_root()` finds the ozi-rs repository:
