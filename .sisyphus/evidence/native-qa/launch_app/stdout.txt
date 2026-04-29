@@ -1,1 +1,0 @@
-fake native smoke launch succeeded
