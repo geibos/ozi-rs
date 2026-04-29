@@ -56,7 +56,9 @@ fn appium_launch_session_absent_is_graceful() {
 
 #[test]
 fn appium_launch_session_available_attempts_webdriver_and_reports_server_unavailable() {
-    let result = appium_launch_session_with_availability(true);
+    // Use a known-unreachable URL so the test is independent of whether a real
+    // Appium server happens to be running on this developer machine.
+    let result = appium_launch_session_with_server(true, "http://127.0.0.1:9");
 
     assert!(!result.ok);
     assert_eq!(result.tool, "appium_launch_session");
@@ -66,7 +68,7 @@ fn appium_launch_session_available_attempts_webdriver_and_reports_server_unavail
         result
             .message
             .as_deref()
-            .is_some_and(|message| message.contains(DEFAULT_APPIUM_SERVER_URL))
+            .is_some_and(|message| message.contains("127.0.0.1:9"))
     );
     assert!(
         !result
@@ -75,6 +77,8 @@ fn appium_launch_session_available_attempts_webdriver_and_reports_server_unavail
             .unwrap_or_default()
             .contains("minimal adapter")
     );
+    // Reference to keep DEFAULT_APPIUM_SERVER_URL imported by the test module.
+    assert!(DEFAULT_APPIUM_SERVER_URL.starts_with("http://"));
 }
 
 #[test]
