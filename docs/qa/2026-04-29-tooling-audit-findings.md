@@ -15,9 +15,14 @@ in a documented way) before re-running the plan.
 Severity: **P0 — blocks Tier-2 verification.**
 Status: **Resolved by commit `c25c2a9` (2026-04-29).** Verified by unit test
 `appium_launch_session_includes_bundle_id_capability`, by direct curl POST to
-`/session` with the same capability shape, and by live MCP re-verification on
-2026-04-29: `appium_launch_session` created session
-`d84a01b9-62e7-46af-9139-2f5b4600a0c7` for bundle
+`/session` with the same capability shape, and by two independent live MCP
+re-verifications on 2026-04-29:
+- session `d84a01b9-62e7-46af-9139-2f5b4600a0c7` (initial Sisyphus run);
+- session `b343d2cc-6417-4da3-a49b-393e5087de40` (independent user-driven
+  re-check after `brew services restart appium` and killing a stale running
+  `ozi-rs` instance — see F7 below).
+
+Both sessions returned `ok: true` with `message` mentioning
 `ru.lizaalert.ozi-rs`.
 
 The Mac2 driver requires `appium:bundleId` (or an `app` capability) to know which
@@ -118,13 +123,15 @@ brief race after `brew services restart`. Needs a focused repro.
 
 Severity: **P0 — discovered while attempting live verification of F1 fix.**
 Status: **Resolved by commit `998bc13` (2026-04-29), live MCP re-verified on
-2026-04-29.** Mac2 session creation routinely takes 15-30s while the driver
-attaches to the target app and probes Accessibility. The previous 5s read
-timeout returned `EAGAIN` (`Resource temporarily unavailable`, os error 35)
-before the driver could respond, masquerading as `server_unavailable` while the
-Appium server was actually live and reachable via curl. Bumped to 60s read /
-10s write. The live MCP re-check created session
-`d84a01b9-62e7-46af-9139-2f5b4600a0c7` without hitting the timeout.
+2026-04-29 across two independent sessions.** Mac2 session creation routinely
+takes 15-30s while the driver attaches to the target app and probes
+Accessibility. The previous 5s read timeout returned `EAGAIN` (`Resource
+temporarily unavailable`, os error 35) before the driver could respond,
+masquerading as `server_unavailable` while the Appium server was actually live
+and reachable via curl. Bumped to 60s read / 10s write. Re-verified by sessions
+`d84a01b9-62e7-46af-9139-2f5b4600a0c7` (Sisyphus run) and
+`b343d2cc-6417-4da3-a49b-393e5087de40` (independent user-driven re-check) —
+both completed inside the 60s budget without timeout.
 
 A drive-by test fix in the same commit replaces a hardcoded
 `DEFAULT_APPIUM_SERVER_URL` reference in
@@ -141,6 +148,22 @@ WebDriver session. A new regression test covers the “connection accepted but n
 HTTP/WebDriver response” failure class and surfaces it as
 `webdriver_unresponsive` instead of `server_unavailable`, with a restart/stale
 session hint.
+
+**2026-04-29 follow-up (independent re-check):** F7 reproduced once more in the
+same day after `brew services restart appium`. The first
+`appium_launch_session` call returned `error_kind: webdriver_unresponsive`
+while a previous `ozi-rs` instance (PID 49128, started manually outside the
+MCP) was still running. After the user terminated that instance and
+`brew services restart appium` was issued, the next
+`appium_launch_session` succeeded immediately (session
+`b343d2cc-6417-4da3-a49b-393e5087de40`).
+
+This is direct evidence for hypothesis 3 in this finding: **the Mac2 driver
+deadlocks `/session` when the target bundle is already running before session
+creation.** Practical workaround for the audit: ensure no manually-launched
+`ozi-rs` instance is alive before calling `appium_launch_session`. The
+`launch_app` MCP tool is the only sanctioned way to start the binary, and it
+already serializes against existing `qa_observe`/`stop_app` lifecycles.
 
 After commits `c25c2a9` and `998bc13` landed and the MCP was reconnected,
 `appium_launch_session` still returned `server_unavailable` (now correctly
@@ -192,7 +215,7 @@ Fix sketch:
 | F4 | P1 | Open — not reproduced in live re-check; stale-session repro remains |
 | F5 | P2 | Documented TCC grant boundaries in `docs/native-qa-mcp.md` |
 | F6 | P0 | Resolved (commit `998bc13`) — unit-tested + live MCP re-verified |
-| F7 | P1 | Partially resolved — live gate cleared; unresponsive WebDriver now classified |
+| F7 | P1 | Partially resolved — live gate cleared twice; deadlock-on-running-app hypothesis confirmed |
 
 ## Remaining remediation order
 

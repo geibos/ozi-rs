@@ -604,7 +604,7 @@ manual verification before claiming the plan is done.
 **Files:**
 - No new files. Manual operations against the running MCP.
 
-- [ ] **Step 3.1: Rebuild the MCP server in release mode**
+- [x] **Step 3.1: Rebuild the MCP server in release mode**
 
 ```bash
 cargo build --release --manifest-path tools/ozi-rs-mcp/Cargo.toml
@@ -613,13 +613,13 @@ cargo build --release --manifest-path tools/ozi-rs-mcp/Cargo.toml
 Expected: compiles clean. Claude Code's `.mcp.json` already points at
 `target/release/ozi-rs-mcp`.
 
-- [ ] **Step 3.2: Reconnect the MCP from the host (if needed)**
+- [x] **Step 3.2: Reconnect the MCP from the host (if needed)**
 
 In Claude Code, run `/mcp` and reconnect `ozi-rs-mcp` if it disconnected from
 the previous session. The tool list must include `appium_launch_session` and
 `capture_screenshot`.
 
-- [ ] **Step 3.3: Verify F1 fix end-to-end**
+- [x] **Step 3.3: Verify F1 fix end-to-end** — passed 2026-04-29, session `b343d2cc-6417-4da3-a49b-393e5087de40`, message contains `ru.lizaalert.ozi-rs`. F6 timeout also exercised (session created < 60s).
 
 Call `mcp__ozi-rs-mcp__appium_doctor` → expect `available: true, ok: true`.
 Then call `mcp__ozi-rs-mcp__appium_launch_session` (no parameters; the env
@@ -653,14 +653,14 @@ Expected:
 - `error_kind: null`
 - `artifact_paths` lists the screenshot path.
 
-- [ ] **Step 3.5: Stop the Appium session and clean up**
+- [x] **Step 3.5: Stop the Appium session and clean up** — `appium_stop_session` returned `ok: true` for session `b343d2cc-...`.
 
 Call `mcp__ozi-rs-mcp__appium_stop_session`.
 
 Expected: `ok: true`. The persisted `.sisyphus/evidence/native-qa/appium/session.json`
 is removed (by the existing `remove_persisted_session` path).
 
-- [ ] **Step 3.6: Update the tooling-audit findings doc**
+- [x] **Step 3.6: Update the tooling-audit findings doc**
 
 Open `docs/qa/2026-04-29-tooling-audit-findings.md`. Strike through F1 and F2
 with a "Resolved YYYY-MM-DD by docs/superpowers/plans/2026-04-29-mcp-tooling-fixes.md"
