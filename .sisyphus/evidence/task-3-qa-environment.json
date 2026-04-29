@@ -11,9 +11,14 @@
     "open_available": true,
     "log_available": true,
     "screencapture_available": true,
-    "appium_available": false
+    "appium_available": true
   },
   "evidence": null,
-  "session": null,
+  "session": {
+    "running": false,
+    "app_path": "target/debug/bundle/macos/ozi-rs.app",
+    "launched_at": "unix_ms:1777464015131",
+    "stopped_at": "unix_ms:1777464079265"
+  },
   "artifact_paths": []
 }
