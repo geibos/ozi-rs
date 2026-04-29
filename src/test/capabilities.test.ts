@@ -14,6 +14,10 @@ const caps = JSON.parse(
 const REQUIRED_PERMISSIONS = [
   // Window and webview creation from JS
   "core:window:allow-create",
+  "core:window:allow-get-all-windows", // needed by `WebviewWindow.getByLabel(...)`
+  "core:window:allow-hide", // needed by the bundle loader close handler
+  "core:window:allow-set-focus", // needed when bringing the bundle loader forward
+  "core:window:allow-show", // needed when opening the pre-created bundle loader
   "core:webview:allow-create-webview-window", // needed by `new WebviewWindow(...)`
   // Dialogs
   "dialog:allow-open",
