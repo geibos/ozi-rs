@@ -1,5 +1,7 @@
 use std::{
-    env, fs,
+    env,
+    error::Error,
+    fmt, fs,
     io::{Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
@@ -211,11 +213,7 @@ pub fn appium_launch_session_with_caller_options(
 ) -> AppiumToolResult {
     let env_bundle = bundle_id_override();
     let resolved = caller_bundle_id.or(env_bundle);
-    appium_launch_session_with_options(
-        command_available("appium"),
-        &appium_server_url(),
-        resolved,
-    )
+    appium_launch_session_with_options(command_available("appium"), &appium_server_url(), resolved)
 }
 
 pub fn appium_launch_session_with_options(
@@ -276,11 +274,7 @@ pub fn appium_launch_session_with_options(
                 truncate(&response.body, 400),
             ),
         ),
-        Err(error) => appium_failure_result(
-            "appium_launch_session",
-            "server_unavailable",
-            format!("Appium server at {server_url} is unreachable: {error}"),
-        ),
+        Err(error) => webdriver_request_error_result("appium_launch_session", server_url, &error),
     }
 }
 
@@ -515,11 +509,7 @@ pub fn appium_screenshot_with_session_id(server_url: &str, session_id: &str) -> 
                 response.status_code
             ),
         ),
-        Err(error) => appium_failure_result(
-            "appium_screenshot",
-            "server_unavailable",
-            format!("Appium server is unreachable: {error}"),
-        ),
+        Err(error) => webdriver_request_error_result("appium_screenshot", server_url, &error),
     }
 }
 
@@ -568,13 +558,61 @@ fn webdriver_action(
                 response.status_code
             ),
         ),
-        Err(error) => appium_failure_result(
-            tool,
-            "server_unavailable",
-            format!("Appium server at {server_url} is unreachable: {error}"),
-        ),
+        Err(error) => webdriver_request_error_result(tool, server_url, &error),
     }
 }
+
+fn webdriver_request_error_result(
+    tool: &str,
+    server_url: &str,
+    error: &WebDriverRequestError,
+) -> AppiumToolResult {
+    if error.is_unresponsive() {
+        return appium_failure_result(
+            tool,
+            "webdriver_unresponsive",
+            format!(
+                "Appium server at {server_url} accepted the connection but did not return a valid WebDriver response: {error}. Restart Appium and clear stale Mac2 sessions before retrying."
+            ),
+        );
+    }
+
+    appium_failure_result(
+        tool,
+        "server_unavailable",
+        format!("Appium server at {server_url} is unreachable: {error}"),
+    )
+}
+
+#[derive(Debug)]
+enum WebDriverRequestError {
+    Unavailable(anyhow::Error),
+    Unresponsive(anyhow::Error),
+}
+
+impl WebDriverRequestError {
+    fn unavailable(error: impl Into<anyhow::Error>) -> Self {
+        Self::Unavailable(error.into())
+    }
+
+    fn unresponsive(error: impl Into<anyhow::Error>) -> Self {
+        Self::Unresponsive(error.into())
+    }
+
+    fn is_unresponsive(&self) -> bool {
+        matches!(self, Self::Unresponsive(_))
+    }
+}
+
+impl fmt::Display for WebDriverRequestError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unavailable(error) | Self::Unresponsive(error) => write!(formatter, "{error}"),
+        }
+    }
+}
+
+impl Error for WebDriverRequestError {}
 
 fn appium_failure_result(tool: &str, error_kind: &str, message: String) -> AppiumToolResult {
     AppiumToolResult {
@@ -600,32 +638,43 @@ fn webdriver_request(
     server_url: &str,
     path: &str,
     body: Option<&serde_json::Value>,
-) -> anyhow::Result<HttpResponse> {
-    let (host, port) = parse_http_url(server_url)?;
-    let mut stream = TcpStream::connect((host.as_str(), port))?;
+) -> Result<HttpResponse, WebDriverRequestError> {
+    let (host, port) = parse_http_url(server_url).map_err(WebDriverRequestError::unavailable)?;
+    let mut stream =
+        TcpStream::connect((host.as_str(), port)).map_err(WebDriverRequestError::unavailable)?;
     // Mac2 session creation can take 15-30s while the driver attaches to the
     // app and probes Accessibility; quick endpoints return instantly, so a
     // generous read budget is safe.
-    stream.set_read_timeout(Some(Duration::from_secs(60)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(60)))
+        .map_err(WebDriverRequestError::unresponsive)?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(10)))
+        .map_err(WebDriverRequestError::unresponsive)?;
     let body_text = body.map(serde_json::Value::to_string).unwrap_or_default();
     let request = format!(
         "{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body_text}",
         body_text.len()
     );
-    stream.write_all(request.as_bytes())?;
+    stream
+        .write_all(request.as_bytes())
+        .map_err(WebDriverRequestError::unresponsive)?;
 
     let mut response = String::new();
-    stream.read_to_string(&mut response)?;
-    let (head, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or_else(|| anyhow::anyhow!("malformed HTTP response"))?;
+    stream
+        .read_to_string(&mut response)
+        .map_err(WebDriverRequestError::unresponsive)?;
+    let (head, body) = response.split_once("\r\n\r\n").ok_or_else(|| {
+        WebDriverRequestError::unresponsive(anyhow::anyhow!("malformed HTTP response"))
+    })?;
     let status_code = head
         .lines()
         .next()
         .and_then(|line| line.split_whitespace().nth(1))
         .and_then(|value| value.parse::<u16>().ok())
-        .ok_or_else(|| anyhow::anyhow!("missing HTTP status"))?;
+        .ok_or_else(|| {
+            WebDriverRequestError::unresponsive(anyhow::anyhow!("missing HTTP status"))
+        })?;
 
     Ok(HttpResponse {
         status_code,

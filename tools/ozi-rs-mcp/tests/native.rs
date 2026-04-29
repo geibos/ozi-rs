@@ -164,8 +164,7 @@ fn capture_screenshot_surfaces_tcc_denial_as_screen_recording_denied() {
         .stderr("could not create image from display\n")
         .exit_code(1);
 
-    let result =
-        capture_screenshot_with_command(repo.path(), &command).expect("screenshot result");
+    let result = capture_screenshot_with_command(repo.path(), &command).expect("screenshot result");
 
     assert!(!result.ok);
     assert_eq!(
@@ -189,8 +188,7 @@ fn capture_screenshot_keeps_exit_code_error_kind_for_unrelated_failures() {
         .stderr("disk full or some unrelated error\n")
         .exit_code(2);
 
-    let result =
-        capture_screenshot_with_command(repo.path(), &command).expect("screenshot result");
+    let result = capture_screenshot_with_command(repo.path(), &command).expect("screenshot result");
 
     assert!(!result.ok);
     assert_eq!(result.error_kind.as_deref(), Some("exit_code"));
