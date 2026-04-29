@@ -6,6 +6,10 @@
   "permissions": [
     "core:default",
     "core:window:allow-create",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-show",
     "core:webview:allow-create-webview",
     "core:webview:allow-create-webview-window",
     "dialog:allow-open",
