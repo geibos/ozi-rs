@@ -14,6 +14,7 @@ use serde_json::json;
 use crate::{config, evidence::EvidencePaths};
 
 pub const DEFAULT_APPIUM_SERVER_URL: &str = "http://127.0.0.1:4723";
+pub const DEFAULT_APPIUM_BUNDLE_ID: &str = "ru.lizaalert.ozi-rs";
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema, PartialEq, Eq)]
 pub struct AppiumToolResult {
@@ -187,16 +188,40 @@ pub fn appium_doctor_for_state(state: AppiumDoctorState) -> AppiumToolResult {
 }
 
 pub fn appium_launch_session() -> AppiumToolResult {
-    appium_launch_session_with_server(command_available("appium"), &appium_server_url())
+    appium_launch_session_with_options(
+        command_available("appium"),
+        &appium_server_url(),
+        bundle_id_override(),
+    )
 }
 
 pub fn appium_launch_session_with_availability(appium_available: bool) -> AppiumToolResult {
-    appium_launch_session_with_server(appium_available, DEFAULT_APPIUM_SERVER_URL)
+    appium_launch_session_with_options(appium_available, DEFAULT_APPIUM_SERVER_URL, None)
 }
 
 pub fn appium_launch_session_with_server(
     appium_available: bool,
     server_url: &str,
+) -> AppiumToolResult {
+    appium_launch_session_with_options(appium_available, server_url, None)
+}
+
+pub fn appium_launch_session_with_caller_options(
+    caller_bundle_id: Option<&str>,
+) -> AppiumToolResult {
+    let env_bundle = bundle_id_override();
+    let resolved = caller_bundle_id.or(env_bundle);
+    appium_launch_session_with_options(
+        command_available("appium"),
+        &appium_server_url(),
+        resolved,
+    )
+}
+
+pub fn appium_launch_session_with_options(
+    appium_available: bool,
+    server_url: &str,
+    bundle_id: Option<&str>,
 ) -> AppiumToolResult {
     if !appium_available {
         return appium_missing_result(
@@ -205,11 +230,13 @@ pub fn appium_launch_session_with_server(
         );
     }
 
+    let resolved_bundle = bundle_id.unwrap_or(DEFAULT_APPIUM_BUNDLE_ID);
     let body = json!({
         "capabilities": {
             "alwaysMatch": {
                 "platformName": "Mac",
-                "appium:automationName": "Mac2"
+                "appium:automationName": "Mac2",
+                "appium:bundleId": resolved_bundle
             }
         }
     });
@@ -226,7 +253,7 @@ pub fn appium_launch_session_with_server(
                     error_kind: None,
                     missing: Vec::new(),
                     message: Some(format!(
-                        "Started Appium Mac2 WebDriver session at {server_url}"
+                        "Started Appium Mac2 WebDriver session at {server_url} for {resolved_bundle}"
                     )),
                     session_id: Some(session_id),
                     install_hints: Vec::new(),
@@ -244,8 +271,9 @@ pub fn appium_launch_session_with_server(
             "appium_launch_session",
             "session_error",
             format!(
-                "Appium server at {server_url} rejected session creation with HTTP {}",
-                response.status_code
+                "Appium server at {server_url} rejected session creation with HTTP {} (body: {})",
+                response.status_code,
+                truncate(&response.body, 400),
             ),
         ),
         Err(error) => appium_failure_result(
@@ -253,6 +281,23 @@ pub fn appium_launch_session_with_server(
             "server_unavailable",
             format!("Appium server at {server_url} is unreachable: {error}"),
         ),
+    }
+}
+
+fn bundle_id_override() -> Option<&'static str> {
+    static OVERRIDE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    OVERRIDE
+        .get_or_init(|| env::var("OZI_RS_APPIUM_BUNDLE_ID").ok())
+        .as_deref()
+}
+
+fn truncate(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        text.to_owned()
+    } else {
+        let mut trimmed = text[..max].to_owned();
+        trimmed.push_str("...");
+        trimmed
     }
 }
 

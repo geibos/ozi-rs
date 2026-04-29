@@ -32,21 +32,11 @@ struct SmokeWorkflowReport {
     evidence_files: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct FakeSmokeScenario {
     build_exit_code: i32,
     launch_exit_code: i32,
     launch_exited_early: bool,
-}
-
-impl Default for FakeSmokeScenario {
-    fn default() -> Self {
-        Self {
-            build_exit_code: 0,
-            launch_exit_code: 0,
-            launch_exited_early: false,
-        }
-    }
 }
 
 #[derive(Debug, Serialize)]

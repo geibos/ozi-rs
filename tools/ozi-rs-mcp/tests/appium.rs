@@ -2,10 +2,11 @@ use ozi_rs_mcp::appium::{
     AppiumCommandOutput, AppiumDoctorState, AppiumProbe, DEFAULT_APPIUM_SERVER_URL,
     appium_click_with_session, appium_click_with_session_id, appium_doctor_for_state,
     appium_doctor_with_availability, appium_doctor_with_probe,
-    appium_launch_session_with_availability, appium_launch_session_with_server,
-    appium_screenshot_with_fake_image, appium_screenshot_with_session,
-    appium_stop_session_with_session, appium_stop_session_with_session_id,
-    appium_type_text_with_session, appium_type_text_with_session_id,
+    appium_launch_session_with_availability, appium_launch_session_with_options,
+    appium_launch_session_with_server, appium_screenshot_with_fake_image,
+    appium_screenshot_with_session, appium_stop_session_with_session,
+    appium_stop_session_with_session_id, appium_type_text_with_session,
+    appium_type_text_with_session_id,
 };
 use std::{
     io::{Read, Write},
@@ -20,7 +21,7 @@ fn appium_absent_is_graceful() {
 
     assert!(!result.ok);
     assert_eq!(result.tool, "appium_doctor");
-    assert_eq!(result.available, false);
+    assert!(!result.available);
     assert_eq!(result.error_kind.as_deref(), Some("dependency_missing"));
     assert!(result.missing.iter().any(|missing| missing == "appium"));
     assert!(!result.install_hints.is_empty());
@@ -32,7 +33,7 @@ fn appium_click_requires_session() {
 
     assert!(!result.ok);
     assert_eq!(result.tool, "appium_click");
-    assert_eq!(result.available, false);
+    assert!(!result.available);
     assert_eq!(result.error_kind.as_deref(), Some("session_missing"));
 }
 
@@ -143,6 +144,28 @@ fn appium_doctor_probe_distinguishes_driver_and_permissions() {
     });
     assert!(ready.ok);
     assert_eq!(ready.error_kind, None);
+}
+
+#[test]
+fn appium_launch_session_includes_bundle_id_capability() {
+    let server = FakeWebDriverServer::with_bodies(vec![FakeResponse::json(
+        200,
+        r#"{"value":{"sessionId":"session-bundle","capabilities":{}}}"#,
+    )]);
+
+    let result = appium_launch_session_with_options(
+        true,
+        &server.url(),
+        Some("ru.lizaalert.ozi-rs"),
+    );
+
+    assert!(result.ok, "{result:?}");
+    let bodies = server.bodies();
+    let posted = bodies.first().expect("at least one POST body");
+    assert!(
+        posted.contains("\"appium:bundleId\":\"ru.lizaalert.ozi-rs\""),
+        "POST body missing bundleId capability: {posted}",
+    );
 }
 
 #[test]
@@ -272,14 +295,20 @@ impl FakeResponse {
 struct FakeWebDriverServer {
     url: String,
     request_rx: mpsc::Receiver<String>,
+    body_rx: mpsc::Receiver<String>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
 impl FakeWebDriverServer {
     fn new(responses: Vec<FakeResponse>) -> Self {
+        Self::with_bodies(responses)
+    }
+
+    fn with_bodies(responses: Vec<FakeResponse>) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("fake webdriver listener");
         let url = format!("http://{}", listener.local_addr().expect("local addr"));
         let (request_tx, request_rx) = mpsc::channel();
+        let (body_tx, body_rx) = mpsc::channel();
         let handle = thread::spawn(move || {
             for response in responses {
                 let (mut stream, _) = listener.accept().expect("webdriver connection");
@@ -293,6 +322,11 @@ impl FakeWebDriverServer {
                 request_tx
                     .send(format!("{method} {path}"))
                     .expect("record request");
+                let body = request
+                    .split_once("\r\n\r\n")
+                    .map(|(_, body)| body.to_owned())
+                    .unwrap_or_default();
+                body_tx.send(body).expect("record body");
                 let status_text = if response.status == 200 {
                     "OK"
                 } else {
@@ -314,6 +348,7 @@ impl FakeWebDriverServer {
         Self {
             url,
             request_rx,
+            body_rx,
             handle: Some(handle),
         }
     }
@@ -327,5 +362,9 @@ impl FakeWebDriverServer {
             handle.join().expect("fake webdriver finished");
         }
         self.request_rx.try_iter().collect()
+    }
+
+    fn bodies(&self) -> Vec<String> {
+        self.body_rx.try_iter().collect()
     }
 }

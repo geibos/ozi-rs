@@ -15,6 +15,11 @@ struct AppiumClickParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct AppiumLaunchSessionParams {
+    bundle_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 struct AppiumTypeTextParams {
     selector: Option<String>,
     text: Option<String>,
@@ -92,8 +97,15 @@ impl OziRsMcpServer {
     }
 
     #[tool(description = "Launch an Appium automation session")]
-    fn appium_launch_session(&self) -> Json<crate::appium::AppiumToolResult> {
-        Json(appium::appium_launch_session())
+    fn appium_launch_session(
+        &self,
+        params: Parameters<AppiumLaunchSessionParams>,
+    ) -> Json<crate::appium::AppiumToolResult> {
+        let Parameters(params) = params;
+
+        Json(appium::appium_launch_session_with_caller_options(
+            params.bundle_id.as_deref(),
+        ))
     }
 
     #[tool(description = "Click through an Appium automation session")]
