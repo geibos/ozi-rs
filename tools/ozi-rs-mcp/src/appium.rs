@@ -603,8 +603,11 @@ fn webdriver_request(
 ) -> anyhow::Result<HttpResponse> {
     let (host, port) = parse_http_url(server_url)?;
     let mut stream = TcpStream::connect((host.as_str(), port))?;
-    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+    // Mac2 session creation can take 15-30s while the driver attaches to the
+    // app and probes Accessibility; quick endpoints return instantly, so a
+    // generous read budget is safe.
+    stream.set_read_timeout(Some(Duration::from_secs(60)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(10)))?;
     let body_text = body.map(serde_json::Value::to_string).unwrap_or_default();
     let request = format!(
         "{method} {path} HTTP/1.1\r\nHost: {host}:{port}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body_text}",
