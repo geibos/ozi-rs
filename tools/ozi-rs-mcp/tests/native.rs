@@ -157,6 +157,47 @@ fn capture_screenshot_creates_artifact_parent_before_command_runs() {
 }
 
 #[test]
+fn capture_screenshot_surfaces_tcc_denial_as_screen_recording_denied() {
+    let repo = tempfile::tempdir().expect("repo fixture");
+    create_repo_fixture(repo.path());
+    let command = FakeCommand::new("screencapture")
+        .stderr("could not create image from display\n")
+        .exit_code(1);
+
+    let result =
+        capture_screenshot_with_command(repo.path(), &command).expect("screenshot result");
+
+    assert!(!result.ok);
+    assert_eq!(
+        result.error_kind.as_deref(),
+        Some("screen_recording_denied"),
+        "expected TCC-specific error_kind; got {:?}",
+        result.error_kind,
+    );
+    let message = result.message.as_deref().unwrap_or_default();
+    assert!(
+        message.contains("Screen Recording"),
+        "expected install hint to mention Screen Recording; got: {message}",
+    );
+}
+
+#[test]
+fn capture_screenshot_keeps_exit_code_error_kind_for_unrelated_failures() {
+    let repo = tempfile::tempdir().expect("repo fixture");
+    create_repo_fixture(repo.path());
+    let command = FakeCommand::new("screencapture")
+        .stderr("disk full or some unrelated error\n")
+        .exit_code(2);
+
+    let result =
+        capture_screenshot_with_command(repo.path(), &command).expect("screenshot result");
+
+    assert!(!result.ok);
+    assert_eq!(result.error_kind.as_deref(), Some("exit_code"));
+    assert!(result.message.is_none());
+}
+
+#[test]
 fn task3_qa_environment_evidence_is_parseable_json() {
     let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()

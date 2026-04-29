@@ -198,12 +198,32 @@ pub fn capture_screenshot_with_command(
     let paths = EvidencePaths::new(repo_root);
     let screenshot_path = paths.path_for("capture_screenshot", "screenshot.png")?;
     paths.prepare_file(&screenshot_path)?;
-    run_native_command(
+    let mut result = run_native_command(
         "capture_screenshot",
         repo_root,
         command,
         vec![paths.relative_display(&screenshot_path)?],
-    )
+    )?;
+
+    if !result.ok
+        && result.error_kind.as_deref() == Some("exit_code")
+        && let Some(evidence) = result.evidence.as_ref()
+    {
+        let stderr_text = fs::read_to_string(repo_root.join(&evidence.stderr_path))
+            .unwrap_or_default()
+            .to_lowercase();
+        if stderr_text.contains("could not create image from display") {
+            result.error_kind = Some("screen_recording_denied".to_owned());
+            result.message = Some(
+                "screencapture failed: macOS denied Screen Recording for the MCP host. \
+                 Grant access in System Settings → Privacy & Security → Screen Recording, \
+                 then restart the MCP client."
+                    .to_owned(),
+            );
+        }
+    }
+
+    Ok(result)
 }
 
 pub fn launch_app_from_root(repo_root: &Path) -> anyhow::Result<NativeToolResult> {
