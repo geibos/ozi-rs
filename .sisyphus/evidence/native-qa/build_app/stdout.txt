@@ -27,4 +27,4 @@ dist/assets/App-D_OTSAuD.js                   83.94 kB │ gzip:  17.97 kB │ m
 dist/assets/theme-BypjjcM2.js                 84.53 kB │ gzip:  13.39 kB │ map:   181.99 kB
 dist/assets/render-DlWPgTBF.js                93.54 kB │ gzip:  21.35 kB │ map:   314.95 kB
 dist/assets/maplibre-Y-GC4UFU.js           1,176.39 kB │ gzip: 247.76 kB │ map: 1,755.77 kB
-✓ built in 2.31s
+✓ built in 2.23s

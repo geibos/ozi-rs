@@ -1,6 +1,6 @@
 {
   "running": false,
   "app_path": "target/debug/bundle/macos/ozi-rs.app",
-  "launched_at": "unix_ms:1777465776459",
-  "stopped_at": "unix_ms:1777465837499"
+  "launched_at": "unix_ms:1777492984558",
+  "stopped_at": "unix_ms:1777493118504"
 }
