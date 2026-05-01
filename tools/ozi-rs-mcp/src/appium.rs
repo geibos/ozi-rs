@@ -434,20 +434,152 @@ fn appium_action_with_session(
     }
 }
 
+/// Parse a selector string into a WebDriver (using, value) pair.
+///
+/// Precedence (first match wins):
+/// - Starts with `~`      → `accessibility id` / rest of string
+/// - Starts with `//` or `(/` → `xpath` / full string
+/// - Starts with `**/`   → `-ios class chain` / full string
+/// - Starts with `name=` → `name` / rest of string after `name=`
+/// - Otherwise            → `name` / full string  (convenience default)
+fn parse_selector(s: &str) -> (&'static str, String) {
+    if let Some(rest) = s.strip_prefix('~') {
+        return ("accessibility id", rest.to_owned());
+    }
+    if s.starts_with("//") || s.starts_with("(/") {
+        return ("xpath", s.to_owned());
+    }
+    if s.starts_with("**/") {
+        return ("-ios class chain", s.to_owned());
+    }
+    if let Some(rest) = s.strip_prefix("name=") {
+        return ("name", rest.to_owned());
+    }
+    ("name", s.to_owned())
+}
+
+/// POST `/session/{sid}/element` and return the element id string on success.
+///
+/// Returns `Err(AppiumToolResult)` on any failure (not-found or HTTP error).
+/// `tool` is used to brand the error result (e.g. `"appium_click"` or `"appium_type_text"`).
+#[allow(clippy::result_large_err)]
+fn find_wd_element(
+    tool: &str,
+    server_url: &str,
+    session_id: &str,
+    using: &str,
+    value: &str,
+    original_selector: &str,
+) -> Result<String, AppiumToolResult> {
+    let body = json!({ "using": using, "value": value });
+    match webdriver_request(
+        "POST",
+        server_url,
+        &format!("/session/{session_id}/element"),
+        Some(&body),
+    ) {
+        Ok(response) if response.status_code < 400 => {
+            // Try legacy ELEMENT key first, then W3C key.
+            let eid = serde_json::from_str::<serde_json::Value>(&response.body)
+                .ok()
+                .and_then(|v| {
+                    let obj = v.get("value")?;
+                    obj.get("ELEMENT")
+                        .or_else(|| obj.get("element-6066-11e4-a52e-4f735466cecf"))
+                        .and_then(|id| id.as_str())
+                        .map(str::to_owned)
+                });
+            eid.ok_or_else(|| {
+                appium_failure_result(
+                    tool,
+                    "webdriver_error",
+                    format!(
+                        "find_element response missing element id: {}",
+                        truncate(&response.body, 400)
+                    ),
+                )
+            })
+        }
+        Ok(response)
+            if response.status_code == 404
+                && (response.body.contains("NoSuchElement")
+                    || response.body.contains("no such element")) =>
+        {
+            Err(appium_failure_result(
+                tool,
+                "element_not_found",
+                format!(
+                    "No element found matching selector \"{original_selector}\": {}",
+                    truncate(&response.body, 400)
+                ),
+            ))
+        }
+        Ok(response) => Err(appium_failure_result(
+            tool,
+            "webdriver_error",
+            format!(
+                "find_element failed with HTTP {}: {}",
+                response.status_code,
+                truncate(&response.body, 400)
+            ),
+        )),
+        Err(error) => Err(webdriver_request_error_result(tool, server_url, &error)),
+    }
+}
+
 pub fn appium_click_with_session_id(
     server_url: &str,
     session_id: &str,
     selector: Option<&str>,
 ) -> AppiumToolResult {
-    let body = json!({ "selector": selector });
-    webdriver_action(
-        "appium_click",
-        server_url,
-        session_id,
+    let sel = match selector.filter(|s| !s.is_empty()) {
+        Some(s) => s,
+        None => {
+            return appium_failure_result(
+                "appium_click",
+                "selector_required",
+                "appium_click requires a selector".to_owned(),
+            )
+        }
+    };
+
+    let (using, value) = parse_selector(sel);
+
+    let eid = match find_wd_element("appium_click", server_url, session_id, using, &value, sel) {
+        Ok(id) => id,
+        Err(result) => return result,
+    };
+
+    match webdriver_request(
         "POST",
-        &format!("/session/{session_id}/appium/mac2/click"),
-        Some(&body),
-    )
+        server_url,
+        &format!("/session/{session_id}/element/{eid}/click"),
+        Some(&json!({})),
+    ) {
+        Ok(response) if response.status_code < 400 => AppiumToolResult {
+            ok: true,
+            tool: "appium_click".to_owned(),
+            available: true,
+            error_kind: None,
+            missing: Vec::new(),
+            message: Some(format!(
+                "Clicked element matching \"{sel}\" in session {session_id}"
+            )),
+            session_id: Some(session_id.to_owned()),
+            install_hints: Vec::new(),
+            artifact_paths: Vec::new(),
+        },
+        Ok(response) => appium_failure_result(
+            "appium_click",
+            "webdriver_error",
+            format!(
+                "Element click failed with HTTP {}: {}",
+                response.status_code,
+                truncate(&response.body, 400)
+            ),
+        ),
+        Err(error) => webdriver_request_error_result("appium_click", server_url, &error),
+    }
 }
 
 pub fn appium_type_text_with_session_id(
@@ -456,15 +588,56 @@ pub fn appium_type_text_with_session_id(
     selector: Option<&str>,
     text: &str,
 ) -> AppiumToolResult {
-    let body = json!({ "selector": selector, "text": text });
-    webdriver_action(
-        "appium_type_text",
-        server_url,
-        session_id,
+    let sel = match selector.filter(|s| !s.is_empty()) {
+        Some(s) => s,
+        None => {
+            return appium_failure_result(
+                "appium_type_text",
+                "selector_required",
+                "appium_type_text requires a selector".to_owned(),
+            )
+        }
+    };
+
+    let (using, value) = parse_selector(sel);
+
+    let eid =
+        match find_wd_element("appium_type_text", server_url, session_id, using, &value, sel) {
+            Ok(id) => id,
+            Err(result) => return result,
+        };
+
+    let body = json!({ "text": text });
+    match webdriver_request(
         "POST",
-        &format!("/session/{session_id}/appium/mac2/keys"),
+        server_url,
+        &format!("/session/{session_id}/element/{eid}/value"),
         Some(&body),
-    )
+    ) {
+        Ok(response) if response.status_code < 400 => AppiumToolResult {
+            ok: true,
+            tool: "appium_type_text".to_owned(),
+            available: true,
+            error_kind: None,
+            missing: Vec::new(),
+            message: Some(format!(
+                "Typed text into element matching \"{sel}\" in session {session_id}"
+            )),
+            session_id: Some(session_id.to_owned()),
+            install_hints: Vec::new(),
+            artifact_paths: Vec::new(),
+        },
+        Ok(response) => appium_failure_result(
+            "appium_type_text",
+            "webdriver_error",
+            format!(
+                "Element value failed with HTTP {}: {}",
+                response.status_code,
+                truncate(&response.body, 400)
+            ),
+        ),
+        Err(error) => webdriver_request_error_result("appium_type_text", server_url, &error),
+    }
 }
 
 pub fn appium_screenshot_with_session_id(server_url: &str, session_id: &str) -> AppiumToolResult {
