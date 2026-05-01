@@ -1,1 +1,13 @@
-fake native smoke build failed deterministically
+npm run tauri build -- --debug
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+   Compiling ozi-rs v0.1.0 (/Users/sobieg/Projects/ozi-rs/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.42s
+       Built application at: /Users/sobieg/Projects/ozi-rs/target/debug/ozi-rs
+    Bundling ozi-rs.app (/Users/sobieg/Projects/ozi-rs/target/debug/bundle/macos/ozi-rs.app)
+    Bundling ozi-rs_0.1.0_aarch64.dmg (/Users/sobieg/Projects/ozi-rs/target/debug/bundle/dmg/ozi-rs_0.1.0_aarch64.dmg)
+     Running bundle_dmg.sh
+    Finished 2 bundles at:
+        /Users/sobieg/Projects/ozi-rs/target/debug/bundle/macos/ozi-rs.app
+        /Users/sobieg/Projects/ozi-rs/target/debug/bundle/dmg/ozi-rs_0.1.0_aarch64.dmg
+
