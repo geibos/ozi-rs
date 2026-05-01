@@ -1,262 +1,142 @@
 # MVP Audit Summary — 2026-04-28
 
-**33 of 59 MVP features partially verified or working; 9 critical gaps in essential SAR workflows.**
+**5 of 40 audited features were driven through to a verdict on this run; 3 were confirmed missing; 4 are hidden by design or fixture limit; the remaining 28 have smoke documents but were not driven through Appium and stay as `pending`. Direction A (UX) should treat `pending` rows as "test plan ready, not result."**
+
+The audit's deliverable was **the smoke harness, the triage, and the F8 fix that unblocks future runs** — not a fully driven Appium pass over the MVP. Treat the numbers below accordingly.
 
 ---
 
-## Critical gaps (P0)
+## What was actually verified on this run
 
-No P0 critical blockers found (infrastructure issues from prior audit resolved). The MCP `appium_click` infra fix (commit 191fd39) unblocked downstream UI-driven verification.
+These five rows have evidence beyond the smoke document itself.
 
----
+| Feature | Verdict | Evidence |
+|---------|---------|----------|
+| MCP `appium_click` infrastructure (F8) | **works** | Unit tests + live MCP re-verification; commit `191fd39`. The Maps… button now clicks end-to-end (AX tree grew 57 KB → 304 KB, two windows). |
+| Bundle open — local folder | **partial** | AX tree shows `Loaded 12761 projects`, active map = `2018-09-26_Nizovskaya_Satell_z17_ozf.map`. Bundle persistence and project enumeration confirmed. The user-facing click flow itself is *not* yet driven. |
+| OZF2 satellite raster loading | **partial** | Same AX tree evidence — OZF2 pipeline is rendering on startup. The pipeline is alive; switching between OZF2 entries was not driven. |
+| Map switch (Topo ↔ Satellite) | **partial** | At least one tile pipeline (OZF2) is alive. The actual switch gesture (click an alternate map row) was not driven; bundle list AX-tree structure is unclear and needs a follow-up pass now that F8 is fixed. |
+| MBTiles Topo tile loading | **partial** | Maps button + window open verified. Bundle list rows for `.sqlitedb` entries not yet identified in the AX tree. |
 
-## Missing from critical SAR workflows (P1)
-
-These features are listed in ADR-0020 as MVP-must but not yet verified working. Most are awaiting Appium-driven smoke runs. Two are confirmed missing UI.
-
-### Editing & workflow critical
-
-- **Track point delete** — Evidence: [smoke-track-point-delete.md](smoke-track-point-delete.md)
-  Essential editing operation. Awaiting Appium run to verify point removal via context menu or keyboard.
-
-- **Sort track by timestamp** — Evidence: [smoke-track-sort-by-time.md](smoke-track-sort-by-time.md)
-  ADR-0020 MVP-must feature. UI entry point discovery critical — if missing from UI, this is an MVP gap.
-
-- **Waypoint delete** — Evidence: [smoke-waypoint-delete.md](smoke-waypoint-delete.md)
-  Essential editing operation. Awaiting Appium run to verify deletion accessibility and undo restoration.
-
-- **Waypoint export WPT** — Evidence: [smoke-waypoint-export-wpt.md](smoke-waypoint-export-wpt.md)
-  **CRITICAL MVP GAP (ADR-0022):** Native OziExplorer format required for field compatibility. If UI not found, this blocks SAR interoperability.
-
-- **Save/Load project (.ozp)** — Evidence: [smoke-project-save-load.md](smoke-project-save-load.md)
-  Core persistence feature. Awaiting Appium run to verify full state restoration (tracks, waypoints, visibility, zoom, colors).
-
-- **Recent projects list** — Evidence: [smoke-project-recent.md](smoke-project-recent.md)
-  ADR-0020 MVP-must. High probability missing — current `docs/persistence-session.md` documents only last-project auto-restore. User flow assumes File → Open Recent is available.
-
-- **Undo/Redo** — Evidence: [smoke-undo-redo.md](smoke-undo-redo.md)
-  Essential editing usability. Awaiting Appium run to verify Cmd+Z, Cmd+Shift+Z work for move, delete, and point-delete actions with proper drag-event coalescing.
+Five rows. Four of them are `partial — verified-by-AX-tree`; only the F8 infra fix has a full pass.
 
 ---
 
-## Hidden features (backend present, UI unreachable)
+## Confirmed missing on this run (3)
 
-UI entry points not discovered despite backend implementation or fixture availability.
+These three were searched for in the AX tree across toolbar, sidebar, on-map controls, and context menus — and not found. ADR-0020 lists each as MVP-must.
 
-### Maps & bundle
+- **On-map distance measurement** — [smoke-tool-distance.md](smoke-tool-distance.md). No "measure" button, no distance panel, no context-menu item.
+- **Circle with explicit radius** — [smoke-tool-circle.md](smoke-tool-circle.md). No circle tool, no radius input.
+- **Waypoint projection** — [smoke-tool-projection.md](smoke-tool-projection.md). No "project from waypoint" menu item, no dedicated tool.
 
-- **Bundle open — URL (LizaAlert)** — Evidence: [smoke-bundle-open.md](smoke-bundle-open.md) §URL
-  Hypothesis: URL fixture not provided; LizaAlert integration deferred to post-MVP. Backend support unknown.
-
-- **OSM online fallback** — Evidence: [smoke-osm-fallback.md](smoke-osm-fallback.md)
-  Hypothesis: Backend rendering works (OSM attribution visible). No UI to unload bundles or trigger fallback explicitly. Feature cannot be driven via Appium.
-
-### Tracks
-
-- **Track points panel** — Evidence: [smoke-track-points-panel.md](smoke-track-points-panel.md)
-  Hypothesis: User cannot locate panel UI. Backend endpoint and DTO exist; entry point (button, menu item, double-click) is hidden or non-obvious.
-
-- **ZIP archive track import** — Evidence: [smoke-track-import-zip.md](smoke-track-import-zip.md)
-  Hypothesis: ZIP support not confirmed in requirements; backend implementation status unknown. Fixture will be created from GPX + PLT if backend supports it.
-
-- **Large-track load performance (>10k points)** — Evidence: [smoke-track-large.md](smoke-track-large.md)
-  Hypothesis: No >10k-point fixture provided. Test cannot run without real or synthetic large-mission data. Performance target <2 s import + responsive pan/zoom.
-
-### Waypoints & themes
-
-- **Waypoint style (color + symbol)** — Evidence: [smoke-waypoint-style.md](smoke-waypoint-style.md)
-  Hypothesis: May have partial UI; awaiting discovery of color picker and symbol selector accessibility.
-
-- **Theme selection (Catppuccin)** — Evidence: [smoke-themes.md](smoke-themes.md)
-  Hypothesis: Likely not implemented; no theme picker button found in initial AX-tree scan. ADR-0020 lists as UI feature.
-
-- **Dev console + FPS counter** — Evidence: [smoke-devtools.md](smoke-devtools.md)
-  Hypothesis: Likely not implemented; no backtick or F3 key handlers found. Both are diagnostic/debugging aids, not core workflows.
+The On-map Tools section of ADR-0020 is, in practice, unimplemented today. This is the cleanest finding in the audit and the clearest backlog item.
 
 ---
 
-## Verified working (P0–P2)
+## Hidden by design or fixture (4)
 
-Features confirmed working or partially working during audit.
+Backend may exist, but the audit cannot reach it.
 
-### Infrastructure
-
-- **MCP `appium_click` — F8 fix** ([findings doc](2026-04-29-tooling-audit-findings.md) F8; commit 191fd39)
-  Works. Maps button click now succeeds; standard WebDriver `find_element` + click flow.
-
-### Maps (partial verification)
-
-- **Bundle open — local folder** ([smoke-bundle-open.md](smoke-bundle-open.md))
-  Partial. Persistence + project enumeration confirmed via AX tree ("Loaded 12761 projects"); active map verified. Click flow verified by F8 fix.
-
-- **Map switch (Topo ↔ Satellite)** ([smoke-map-switch.md](smoke-map-switch.md))
-  Partial. At least one OZF2 raster tile pipeline confirmed rendering. Click to switch unblocked by F8 fix; full flow pending Appium run.
-
-- **MBTiles Topo tile loading** ([smoke-mbtiles-tiles.md](smoke-mbtiles-tiles.md))
-  Partial. Maps button click works; bundle list navigation. Structure in AX tree requires further inspection.
-
-- **OZF2 satellite raster loading** ([smoke-ozf2-tiles.md](smoke-ozf2-tiles.md))
-  Partial. OZF2 pipeline confirmed working (active map = Satellite OZF2); maps window opens and renders tiles.
-
-### Tracks (pending Appium runs)
-
-- **GPX track import** ([smoke-track-import-gpx.md](smoke-track-import-gpx.md))
-  Backend & UI ready. Awaiting Appium run to verify file picker + import dialog flow and polyline rendering.
-
-- **PLT track import** ([smoke-track-import-plt.md](smoke-track-import-plt.md))
-  Backend & UI ready. Awaiting Appium run to confirm OziExplorer format compatibility.
-
-- **Multi-track display + visibility toggle** ([smoke-track-display.md](smoke-track-display.md))
-  Awaiting Appium run to verify visibility eye icon and polyline hide/show.
-
-- **Track color and line-width styling** ([smoke-track-style.md](smoke-track-style.md))
-  Awaiting Appium run to verify color picker and width slider accessibility and persistence.
-
-- **Track point walkthrough (next/previous)** ([smoke-track-walkthrough.md](smoke-track-walkthrough.md))
-  Awaiting discovery of buttons/keyboard nav in points panel.
-
-- **Track segment break (split)** ([smoke-track-segment-break.md](smoke-track-segment-break.md))
-  Awaiting Appium run to verify context menu or dialog access and polyline gap rendering.
-
-- **Douglas–Peucker simplify** ([smoke-track-simplify.md](smoke-track-simplify.md))
-  Awaiting Appium run to verify tolerance slider, preview, and point-count reduction.
-
-- **Crop track (extent, time, selection)** ([smoke-track-crop.md](smoke-track-crop.md))
-  Awaiting Appium run to verify ≥1 crop mode works.
-
-- **GPX track export** ([smoke-track-export-gpx.md](smoke-track-export-gpx.md))
-  Awaiting Appium run to verify export menu, file creation, and `10-Tracks/` default path.
-
-- **PLT track export** ([smoke-track-export-plt.md](smoke-track-export-plt.md))
-  Awaiting Appium run to verify PLT format export.
-
-- **Track drawing (create on map)** ([smoke-track-draw.md](smoke-track-draw.md))
-  Awaiting Appium run to verify drawing mode toggle and map-click polyline creation.
-
-### Waypoints (pending Appium runs)
-
-- **Waypoint add** ([smoke-waypoint-add.md](smoke-waypoint-add.md))
-  Awaiting discovery of Add Waypoint button and map-click marker creation.
-
-- **Waypoint move** ([smoke-waypoint-move.md](smoke-waypoint-move.md))
-  Awaiting Appium run to verify drag interaction and undo coalescing.
-
-- **Waypoint rename** ([smoke-waypoint-rename.md](smoke-waypoint-rename.md))
-  Awaiting Appium run to verify name field edit via double-click and map label update.
-
-- **Waypoint multi-display** ([smoke-waypoint-multi.md](smoke-waypoint-multi.md))
-  Awaiting Appium run to verify 5+ waypoint rendering and visibility toggle.
-
-- **Waypoint export GPX** ([smoke-waypoint-export-gpx.md](smoke-waypoint-export-gpx.md))
-  Awaiting Appium run to verify export menu and file creation.
-
-- **Waypoint export PLT** ([smoke-waypoint-export-plt.md](smoke-waypoint-export-plt.md))
-  Awaiting Appium run to verify PLT export.
-
-### Project & validation
-
-- **OK-standard track name validation** ([smoke-ok-standard.md](smoke-ok-standard.md))
-  Awaiting Appium run to verify ⚠️ warning icon and format specification display.
+- **Bundle open by URL (LizaAlert)** — [smoke-bundle-open.md](smoke-bundle-open.md) §URL. No URL fixture provided this run; ADR-0020 schedules LizaAlert integration as out-of-MVP.
+- **OSM online fallback** — [smoke-osm-fallback.md](smoke-osm-fallback.md). OSM attribution is visible in the rendered map, but there is no UI to deactivate the active bundle and trigger fallback, so the path cannot be driven via Appium.
+- **ZIP archive track import** — [smoke-track-import-zip.md](smoke-track-import-zip.md). Backend support not confirmed; fixture creation deferred.
+- **Large-track (>10k points) load** — [smoke-track-large.md](smoke-track-large.md). No fixture in `example_data` exceeds ~80 points. Performance target of <2 s import + responsive pan is untested.
 
 ---
 
-## Confirmed missing (no UI, no backend)
+## Not driven this run — pending Appium (28)
 
-On-map tools not implemented in current MVP.
+These have smoke documents in `docs/qa/smoke-*.md`, but the actions inside (clicks, drags, exports, keyboard shortcuts) **were not executed** during this audit. Each is "test plan ready, result unknown."
 
-- **Distance measurement tool** — Evidence: [smoke-tool-distance.md](smoke-tool-distance.md)
-  No distance button, panel, or context menu found in AX tree. ADR-0020 lists as MVP-must.
+A run that drives these will move them to one of `works / partial / broken / missing`. Until then, the rows in `triage.md` are *predictions* informed by the AX tree and code reading, not findings.
 
-- **Circle with explicit radius** — Evidence: [smoke-tool-circle.md](smoke-tool-circle.md)
-  No circle drawing tool or radius input UI found. ADR-0020 lists as MVP-must.
+| Area | Pending rows |
+|------|--------------|
+| Maps & bundles | (none — covered by partials above) |
+| Tracks — import / display / style | GPX import, PLT import, multi-track display + visibility, track color & line-width styling |
+| Tracks — editing | points panel discovery, walkthrough, point delete, segment break, sort by timestamp, Douglas–Peucker simplify, crop (extent/time/selection), drawing |
+| Tracks — export | GPX export, PLT export |
+| Waypoints | add, move, rename, delete, style (color + symbol), multi-display + toggle, GPX export, PLT export, **WPT export** |
+| Project & UI | save/load `.ozp`, recent projects, undo/redo, OK-standard validation, theme selection, dev console + FPS |
 
-- **Waypoint projection tool** — Evidence: [smoke-tool-projection.md](smoke-tool-projection.md)
-  No projection context menu option found. ADR-0020 lists as MVP-must.
-
----
-
-## What changed in the QA process
-
-This audit followed **`docs/agent-verification.md`** verification protocol, which enforces two critical rules:
-
-1. **Appium-only for desktop:** No Playwright verification for native integration (ADR-0024). Every claim of "works" requires Tier 1 + Tier 2 evidence (Rust logs + Appium-driven screenshots).
-
-2. **Anti-loop rule:** Each feature gets maximum 2 failure attempts before stopping. No third retry. Diagnosis and fixes are the user's responsibility, not the audit's.
-
-The audit produced **35+ smoke documents** under `docs/qa/smoke-*.md`, each with preconditions, UI entry point selectors, step-by-step actions, expected outcomes, and failure-mode hypotheses. Two critical features (bundle open + map switch) were **promoted to automated Appium test** at `tools/ozi-rs-mcp/tests/smoke_bundle_and_maps.rs` to demonstrate the smoke→test promotion path defined in `docs/superpowers/specs/2026-04-28-qa-debug-process-design.md`.
-
-Appium session data and logs are preserved in `.sisyphus/evidence/` for post-audit analysis.
+**WPT export is the highest-stakes pending item.** Per ADR-0022 it is MVP-critical for OziExplorer field-device interoperability. The audit could neither confirm nor deny the UI exists, because the export menu was never opened.
 
 ---
 
-## Recommended next steps
+## P0 / P1 status — what to fix once smokes are driven
 
-The following 5 items are the highest-impact fixes. Complete these in order to unblock dependent workflows.
+The current `triage.md` priority assignments reflect predicted risk. Once Appium runs land, each row will move to a verified verdict and either drop down (works/partial) or stay (missing).
 
-### 1. **Waypoint export WPT** (Priority: P1)
-**Why:** Blocks SAR field interoperability. ADR-0022 marks this as MVP-critical.
-- **Blocker:** Export dialog and format not implemented or not reachable.
-- **Fix:** Add WPT export command handler; surface in waypoint context menu or export dialog dropdown.
-- **Evidence:** [smoke-waypoint-export-wpt.md](smoke-waypoint-export-wpt.md) (triage P1)
-- **Test:** Run smoke on Appium once UI is added; promote to automated test.
+- **P0 (broken on critical path):** 0 rows. The infrastructure that previously gated the audit (F8) has been fixed.
+- **P1 (missing on critical path) — predicted, not yet verified:** 7 rows. WPT export, save/load `.ozp`, recent projects, undo/redo, track point delete, waypoint delete, sort by timestamp.
+- **P2 (partial / pending on any feature):** 25 rows.
+- **P3 (hidden / missing off critical path):** 7 rows including all three on-map tools (confirmed missing) and theme/devtools (predicted missing).
 
-### 2. **Save/Load project (.ozp)** (Priority: P1)
-**Why:** Blocks user ability to persist missions between sessions. Core workflow.
-- **Blocker:** File dialog or save/load flow not fully implemented or not accessible.
-- **Fix:** Verify Cmd+S opens file picker and saves to .ozp; verify Cmd+O restores all state (zoom, colors, visibility, undo history).
-- **Evidence:** [smoke-project-save-load.md](smoke-project-save-load.md) (triage P1)
-- **Test:** Appium run to drive full save→close→load cycle; assert state identity.
-
-### 3. **Recent projects list** (Priority: P1)
-**Why:** Blocks rapid access to prior missions. ADR-0020 MVP-must feature.
-- **Blocker:** File → Open Recent UI likely missing; only last-project auto-restore currently documented.
-- **Fix:** Implement File → Open Recent or sidebar "Recent" button; list ≥3 recent projects in reverse chronological order; click opens correct project.
-- **Evidence:** [smoke-project-recent.md](smoke-project-recent.md) (triage P1)
-- **Test:** Create 3+ projects, close/reopen app, verify list and click-to-open.
-
-### 4. **Undo/Redo** (Priority: P1)
-**Why:** Blocks editing usability. Users expect Cmd+Z to work on every action.
-- **Blocker:** Undo stack may not be fully wired; drag-event coalescing may not work.
-- **Fix:** Verify `ProjectCommand` stack is active for waypoint move, waypoint delete, and track point delete. Verify drag events are coalesced into single undo step.
-- **Evidence:** [smoke-undo-redo.md](smoke-undo-redo.md) (triage P1)
-- **Test:** Appium: move waypoint, Cmd+Z (verify reversed), Cmd+Shift+Z (verify reapplied); repeat for delete.
-
-### 5. **Sort track points by timestamp** (Priority: P1)
-**Why:** Blocks SAR chronology verification. ADR-0020 MVP-must for mission analysis.
-- **Blocker:** UI entry point (button, menu item) likely missing. Backend sort command exists but unreachable.
-- **Fix:** Add "Sort by Timestamp" button or menu item in track-points panel or context menu; wire to `sort_track_points` command.
-- **Evidence:** [smoke-track-sort-by-time.md](smoke-track-sort-by-time.md) (triage P1)
-- **Test:** Import track with shuffled timestamps, sort, verify points reorder by time ascending.
+The seven P1 predictions should be the *first* targets of the next driven run, because each one's verdict materially changes the MVP gap list.
 
 ---
 
-## Triage statistics
+## What this audit produced
 
-| Category | Count |
-|----------|-------|
-| Total MVP features (ADR-0020) | 59 |
-| Works (fully verified) | 1 |
-| Partial (verified some aspects) | 4 |
-| Pending (Appium runs not yet driven) | 45 |
-| Missing (no UI, no backend) | 3 |
-| Hidden (UI not discoverable) | 6 |
-| **P0 blockers** | 0 |
-| **P1 gaps (missing on critical workflow)** | 7 |
-| **P2 partials** | 25+ |
-| **P3 enhancements** | 22+ |
+- **40 smoke documents** under `docs/qa/smoke-*.md`. Each one has preconditions, an entry-point candidate (selector or AX path), step-by-step actions, and a classification rubric.
+- **A prioritized triage** at `docs/qa/triage.md` (sorted P0 → P3, then by task number).
+- **An audit-verified column** in `docs/feature-status.md` linking each ADR-0020 row to its smoke.
+- **One promoted automated test** at `tools/ozi-rs-mcp/tests/smoke_bundle_and_maps.rs`. The test currently runs the launch + screenshot + log-capture skeleton on the bundle-open / map-switch path; it does not yet drive the clicks (the smoke docs are the spec for adding those assertions). The promoted-test slot exists; the assertions inside need filling out as the click-driven smokes are run.
+- **Tooling fixes** that unblock everything else:
+  - F8 (`191fd39`) — `appium_click` and `appium_type_text` now use the standard W3C WebDriver `find_element` + element-action flow instead of the Mac2-specific endpoint that didn't accept selectors.
+  - F1 / F6 / F7 fixes from the prior tooling audit (`c25c2a9`, `998bc13`, `d206239`) — Mac2 session creation now succeeds reliably with `appium:bundleId` and a 60 s session-create budget.
+
+---
+
+## QA process changes anchored by this run
+
+- **Verification protocol** at `docs/agent-verification.md` is now the canonical "what counts as evidence" rule. Two failed attempts on a single feature → stop, classify, hand back; no third try.
+- **ADR-0024** (Appium-only desktop verification, no Playwright) is now load-bearing: every smoke in this batch assumes Mac2 driver evidence, and the promoted test asserts the same.
+- **The smoke → automated test promotion path** is demonstrated end-to-end (smoke doc → Rust test under `tools/ozi-rs-mcp/tests/`). This is the pattern the next round of driven smokes should follow as they pass.
+
+---
+
+## Recommended next steps (in order)
+
+1. **Drive the seven predicted-P1 smokes through Appium.** WPT export, save/load `.ozp`, recent projects, undo/redo, track point delete, waypoint delete, sort by timestamp. Each verdict here is high-leverage: a `missing` verdict is a real MVP gap; a `works` verdict closes 7 / 28 of the pending list. Budget: one driven run per smoke, anti-loop rule honored.
+2. **Drive the four Maps partials forward.** Now that F8 is fixed, the Map Bundles bundle-list rows should be reachable. Goal: upgrade `partial → works/broken` for bundle-open (local), map switch, MBTiles, OZF2. Identify the per-row XPath inside the bundle list and update both smoke docs and the promoted test.
+3. **Fill out the assertions inside `smoke_bundle_and_maps.rs`.** The skeleton currently captures evidence but does not yet click and assert. As step 2 produces stable selectors, lift them into the test as constants (already stubbed) and add: click Maps…, assert bundle list non-empty, click an alternate row, assert tile-source-changed log line.
+4. **Decide WPT scope.** If 7.9 (`smoke-waypoint-export-wpt.md`) verifies as `missing`, schedule the implementation explicitly — ADR-0022 makes it MVP-must, and this is the largest known interoperability gap.
+5. **Schedule the on-map tools backlog item.** All three (distance, circle, projection) are confirmed missing; they need to be planned as a coherent toolbar, not three separate one-off features.
+
+---
+
+## Triage statistics — verified-only view
+
+| Category | Count | Comment |
+|----------|------:|---------|
+| Smoke documents created | 40 | Each one is a runnable test plan. |
+| Driven through to a verdict on this run | 5 | F8 (works) + 4 partials. |
+| Confirmed missing on this run | 3 | All three on-map tools. |
+| Hidden by design or fixture | 4 | Bundle URL, OSM fallback, ZIP import, large-track. |
+| Pending (smoke ready, not yet driven) | 28 | Need a follow-up Appium pass. |
+| **P0 blockers** | 0 | F8 closed the only known infra blocker. |
+| **P1 — predicted critical gaps** | 7 | Verdicts pending the next driven run. |
+| **P2 — partials & non-critical pending** | 25 | |
+| **P3 — hidden / off-critical missing** | 7 | Includes the three confirmed-missing on-map tools. |
 
 ---
 
 ## References
 
-- **Plan:** `docs/superpowers/plans/2026-04-28-mvp-audit.md`
-- **Verification protocol:** `docs/agent-verification.md`
+- **Plan:** [`docs/superpowers/plans/2026-04-28-mvp-audit.md`](../superpowers/plans/2026-04-28-mvp-audit.md)
+- **Verification protocol:** [`docs/agent-verification.md`](../agent-verification.md)
 - **MVP scope:** ADR-0020
 - **WPT priority:** ADR-0022
 - **Desktop QA approach:** ADR-0024
-- **Smoke template:** `docs/qa/_template.md`
-- **Promoted test:** `tools/ozi-rs-mcp/tests/smoke_bundle_and_maps.rs`
+- **Tooling-fixes findings:** [`docs/qa/2026-04-29-tooling-audit-findings.md`](2026-04-29-tooling-audit-findings.md)
+- **Triage:** [`docs/qa/triage.md`](triage.md)
+- **Feature status (audit-verified column):** [`docs/feature-status.md`](../feature-status.md)
+- **Smoke template:** [`docs/qa/_template.md`](_template.md)
+- **Promoted test:** [`tools/ozi-rs-mcp/tests/smoke_bundle_and_maps.rs`](../../tools/ozi-rs-mcp/tests/smoke_bundle_and_maps.rs)
 
 ---
 
-**Audit complete:** 2026-05-01. Direction A (UX) can now build on verified feature status and prioritized gap list.
+**Audit run complete:** 2026-05-01.
+**Honest framing:** the harness, the triage, and the F8 unblock are the deliverables of this run. The next run, driving the 28 pending smokes through Appium, is what turns the harness into actual MVP coverage.
