@@ -235,9 +235,19 @@ fn appium_screenshot_reports_unresponsive_webdriver() {
 
 #[test]
 fn appium_actions_call_session_scoped_webdriver_endpoints() {
+    // click: find_element + click = 2 requests
+    // type_text: find_element + value = 2 requests
+    // stop: DELETE = 1 request
     let server = FakeWebDriverServer::new(vec![
+        // appium_click: find_element response
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"eid-click"}}"#),
+        // appium_click: element click response
         FakeResponse::json(200, r#"{"value":null}"#),
+        // appium_type_text: find_element response
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"eid-type"}}"#),
+        // appium_type_text: element value response
         FakeResponse::json(200, r#"{"value":null}"#),
+        // appium_stop_session
         FakeResponse::json(200, r#"{"value":null}"#),
     ]);
 
@@ -252,8 +262,10 @@ fn appium_actions_call_session_scoped_webdriver_endpoints() {
     assert_eq!(
         server.requests(),
         vec![
-            "POST /session/session-123/appium/mac2/click",
-            "POST /session/session-123/appium/mac2/keys",
+            "POST /session/session-123/element",
+            "POST /session/session-123/element/eid-click/click",
+            "POST /session/session-123/element",
+            "POST /session/session-123/element/eid-type/value",
             "DELETE /session/session-123",
         ]
     );
@@ -311,6 +323,220 @@ fn appium_screenshot_writes_fake_evidence() {
         std::fs::read(temp.path().join(&result.artifact_paths[0])).expect("screenshot bytes"),
         b"fake png bytes"
     );
+}
+
+// ── F8 new tests ────────────────────────────────────────────────────────────
+
+#[test]
+fn appium_click_resolves_selector_via_find_element_then_clicks() {
+    let server = FakeWebDriverServer::new(vec![
+        // find_element returns legacy ELEMENT key
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"abc123"}}"#),
+        // element/click
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+
+    let result = appium_click_with_session_id(&server.url(), "sid-1", Some("name=Maps…"));
+
+    assert!(result.ok, "{result:?}");
+
+    let bodies = server.bodies();
+    let find_body = bodies.first().expect("find_element body");
+    assert!(
+        find_body.contains("\"using\":\"name\""),
+        "expected using=name in find body: {find_body}"
+    );
+    assert!(
+        find_body.contains("\"value\":\"Maps\u{2026}\""),
+        "expected value=Maps… in find body: {find_body}"
+    );
+
+    let requests = server.requests();
+    assert_eq!(requests[0], "POST /session/sid-1/element");
+    assert_eq!(requests[1], "POST /session/sid-1/element/abc123/click");
+}
+
+#[test]
+fn appium_click_translates_xpath_selector() {
+    let server = FakeWebDriverServer::new(vec![
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"xpath-eid"}}"#),
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+    let xpath = "//XCUIElementTypeButton[@title=\"Maps\u{2026}\"]";
+    let result = appium_click_with_session_id(&server.url(), "sid-2", Some(xpath));
+
+    assert!(result.ok, "{result:?}");
+
+    let bodies = server.bodies();
+    let find_body = bodies.first().expect("find_element body");
+    assert!(
+        find_body.contains("\"using\":\"xpath\""),
+        "expected using=xpath in find body: {find_body}"
+    );
+    assert!(
+        find_body.contains("XCUIElementTypeButton"),
+        "expected xpath value in find body: {find_body}"
+    );
+}
+
+#[test]
+fn appium_click_translates_accessibility_id_selector() {
+    let server = FakeWebDriverServer::new(vec![
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"acc-eid"}}"#),
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+
+    let result =
+        appium_click_with_session_id(&server.url(), "sid-3", Some("~bundle-loader-button"));
+
+    assert!(result.ok, "{result:?}");
+
+    let bodies = server.bodies();
+    let find_body = bodies.first().expect("find_element body");
+    assert!(
+        find_body.contains("\"using\":\"accessibility id\""),
+        "expected using=accessibility id in find body: {find_body}"
+    );
+    assert!(
+        find_body.contains("\"value\":\"bundle-loader-button\""),
+        "expected value=bundle-loader-button (without ~) in find body: {find_body}"
+    );
+}
+
+#[test]
+fn appium_click_translates_class_chain_selector() {
+    let server = FakeWebDriverServer::new(vec![
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"cc-eid"}}"#),
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+    let sel = "**/XCUIElementTypeButton[`title == \"Maps\u{2026}\"`]";
+
+    let result = appium_click_with_session_id(&server.url(), "sid-4", Some(sel));
+
+    assert!(result.ok, "{result:?}");
+
+    let bodies = server.bodies();
+    let find_body = bodies.first().expect("find_element body");
+    assert!(
+        find_body.contains("\"-ios class chain\""),
+        "expected using=-ios class chain in find body: {find_body}"
+    );
+    assert!(
+        find_body.contains("XCUIElementTypeButton"),
+        "expected full class chain value in find body: {find_body}"
+    );
+}
+
+#[test]
+fn appium_click_returns_element_not_found_on_no_such_element() {
+    let server = FakeWebDriverServer::new(vec![FakeResponse::json(
+        404,
+        r#"{"value":{"error":"no such element","message":"Element not found"}}"#,
+    )]);
+
+    let selector = "name=NonExistentButton";
+    let result = appium_click_with_session_id(&server.url(), "sid-5", Some(selector));
+
+    assert!(!result.ok, "{result:?}");
+    assert_eq!(
+        result.error_kind.as_deref(),
+        Some("element_not_found"),
+        "expected element_not_found error_kind, got: {result:?}"
+    );
+    assert!(
+        result
+            .message
+            .as_deref()
+            .is_some_and(|m| m.contains("NonExistentButton")),
+        "expected original selector in message: {result:?}"
+    );
+}
+
+#[test]
+fn appium_click_requires_a_selector() {
+    // None selector
+    let result_none = appium_click_with_session_id("http://127.0.0.1:9", "sid-6", None);
+    assert!(!result_none.ok, "{result_none:?}");
+    assert_eq!(
+        result_none.error_kind.as_deref(),
+        Some("selector_required"),
+        "{result_none:?}"
+    );
+
+    // Empty string selector
+    let result_empty = appium_click_with_session_id("http://127.0.0.1:9", "sid-6", Some(""));
+    assert!(!result_empty.ok, "{result_empty:?}");
+    assert_eq!(
+        result_empty.error_kind.as_deref(),
+        Some("selector_required"),
+        "{result_empty:?}"
+    );
+}
+
+#[test]
+fn appium_click_supports_w3c_element_key() {
+    let w3c_key = "element-6066-11e4-a52e-4f735466cecf";
+    let body = format!(r#"{{"value":{{"{w3c_key}":"w3c-eid"}}}}"#);
+    let server = FakeWebDriverServer::new(vec![
+        FakeResponse::json(200, &body),
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+
+    let result = appium_click_with_session_id(&server.url(), "sid-7", Some("~submit"));
+
+    assert!(result.ok, "{result:?}");
+
+    let requests = server.requests();
+    assert_eq!(requests[1], "POST /session/sid-7/element/w3c-eid/click");
+}
+
+#[test]
+fn appium_type_text_resolves_then_types() {
+    let server = FakeWebDriverServer::new(vec![
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"abc123"}}"#),
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+
+    let result =
+        appium_type_text_with_session_id(&server.url(), "sid-8", Some("name=SearchBox"), "hello");
+
+    assert!(result.ok, "{result:?}");
+
+    let bodies = server.bodies();
+    let value_body = bodies.get(1).expect("element value body");
+    assert!(
+        value_body.contains("\"text\":\"hello\""),
+        "expected text=hello in value body: {value_body}"
+    );
+
+    let requests = server.requests();
+    assert_eq!(requests[0], "POST /session/sid-8/element");
+    assert_eq!(requests[1], "POST /session/sid-8/element/abc123/value");
+}
+
+#[test]
+fn appium_type_text_requires_a_selector() {
+    // None selector
+    let result_none =
+        appium_type_text_with_session_id("http://127.0.0.1:9", "sid-9", None, "text");
+    assert!(!result_none.ok, "{result_none:?}");
+    assert_eq!(
+        result_none.error_kind.as_deref(),
+        Some("selector_required"),
+        "{result_none:?}"
+    );
+    assert_eq!(result_none.tool, "appium_type_text");
+
+    // Empty string selector
+    let result_empty =
+        appium_type_text_with_session_id("http://127.0.0.1:9", "sid-9", Some(""), "text");
+    assert!(!result_empty.ok, "{result_empty:?}");
+    assert_eq!(
+        result_empty.error_kind.as_deref(),
+        Some("selector_required"),
+        "{result_empty:?}"
+    );
+    assert_eq!(result_empty.tool, "appium_type_text");
 }
 
 struct FakeResponse {
