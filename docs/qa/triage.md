@@ -39,6 +39,9 @@ Authoritative scope: ADR-0020
 | P2 | **Task 7g: Waypoint export GPX** | pending | [smoke-waypoint-export-gpx.md](smoke-waypoint-export-gpx.md) | Verify GPX export to file with correct default location. Success: export menu accessible, file dialog opens, exported file valid GPX, waypoint count preserved. |
 | P2 | **Task 7h: Waypoint export PLT** | pending | [smoke-waypoint-export-plt.md](smoke-waypoint-export-plt.md) | Verify PLT export (OziExplorer format). Success: export menu accessible, file dialog opens, exported file valid PLT, waypoint count preserved. May be partial if PLT format selector hidden in generic export. |
 | P1 | **Task 7i: Waypoint export WPT** | **pending (critical MVP gap if missing)** | [smoke-waypoint-export-wpt.md](smoke-waypoint-export-wpt.md) | Verify WPT export (native OziExplorer waypoint format). **CRITICAL: If WPT export UI not found, classify as `missing` and flag as MVP blocker per ADR-0022.** Success: WPT export accessible, exported file valid, waypoint count preserved. |
+| P2 | **Task 8a: Distance measurement tool** | **missing** | [smoke-tool-distance.md](smoke-tool-distance.md) | No distance measurement button, panel, or context menu found in AX tree. ADR-0020 on-map measurement tool not implemented in current MVP. |
+| P2 | **Task 8b: Circle with explicit radius** | **missing** | [smoke-tool-circle.md](smoke-tool-circle.md) | No circle drawing tool or radius input UI found in toolbar/sidebar/menus. ADR-0020 on-map construction tool not implemented in current MVP. |
+| P2 | **Task 8c: Waypoint projection** | **missing** | [smoke-tool-projection.md](smoke-tool-projection.md) | No projection context menu option or dedicated projection button found. ADR-0020 waypoint projection feature not implemented in current MVP. |
 
 ## Notes
 
