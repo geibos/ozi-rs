@@ -6,11 +6,14 @@ Authoritative scope: ADR-0020
 
 | Priority | Feature | Status | Evidence | Hypothesis |
 |---------:|---------|--------|----------|------------|
-| P0 | **MCP `appium_click` infra (F8)** | broken | [findings doc](2026-04-29-tooling-audit-findings.md) F8 | MCP wrapper posts `{selector}` to `/appium/mac2/click` which only accepts `{x,y}` or `{elementId}`; needs a switch to `POST /element` + `POST /element/{eid}/click`. Fix unblocks every Tier-2 smoke. |
+| P0 | **MCP `appium_click` infra (F8)** | **works** | [findings doc](2026-04-29-tooling-audit-findings.md) F8; commit 191fd39 | F8 fix confirmed: MCP now uses standard WebDriver `find_element` + element click flow. Maps… button click succeeds. |
 | P2 | Bundle open — local folder | partial (verified-by-AX-tree) | [smoke-bundle-open.md](smoke-bundle-open.md) | Persistence + project enumeration confirmed via AX tree (active map = `…Satell_z17_ozf.map`, "Loaded 12761 projects"). Click flow not driven due to F8. |
 | P3 | Bundle open — URL (LizaAlert) | hidden — fixture missing | [smoke-bundle-open.md](smoke-bundle-open.md) §URL | URL fixture not provided in this run. |
 | P2 | Map switch (Topo ↔ Satellite, MBTiles + OZF2) | partial (verified-by-AX-tree) | [smoke-map-switch.md](smoke-map-switch.md) | At least one tile pipeline (OZF2 raster) renders; switching not driven (F8). User-reported "Maps unresponsive" not differentiated yet. |
-| —  | Maps window / Maps… button | covered by prior smoke | [smoke-maps-window.md](smoke-maps-window.md) | Tauri `plugin:window` capability fix landed (commit `53cf15f`); resolution still pending Tier-2 click confirmation post-F8. |
+| —  | Maps window / Maps… button | covered by prior smoke | [smoke-maps-window.md](smoke-maps-window.md) | Tauri `plugin:window` capability fix landed (commit `53cf15f`); F8 click fix (commit 191fd39) confirms button is now clickable. |
+| P2 | **Task 4a: MBTiles Topo tile loading** | partial (F8 fixed; bundle list UI unclear) | [smoke-mbtiles-tiles.md](smoke-mbtiles-tiles.md) | Maps… button click works. Map Bundles window opens. Bundle list structure in AX tree not immediately clear; may require scrolling or custom component inspection. |
+| P2 | **Task 4b: OZF2 satellite raster loading** | partial (OZF2 pipeline verified; switching not yet attempted) | [smoke-ozf2-tiles.md](smoke-ozf2-tiles.md) | OZF2 tile pipeline confirmed working (active map = Satellite OZF2). Maps… button click works. Bundle list navigation same blocker as Task 4a. |
+| P3 | **Task 4c: OSM online fallback** | hidden — no unload UI in MVP | [smoke-osm-fallback.md](smoke-osm-fallback.md) | OSM attribution visible on map (MapLibre + OpenStreetMap). No UI to deactivate/unload current bundle. Feature cannot be triggered via Appium; code review needed to confirm implementation. |
 
 ## Notes
 
