@@ -194,8 +194,15 @@ Until F7 is reproduced or cleared, F1/F6 fixes stand on:
 ## F8 — `appium_click` MCP wrapper posts an unsupported body to `/appium/mac2/click`
 
 Severity: **P0 — blocks Tier-2 UI driving for the MVP audit.**
-Status: **Open. Discovered 2026-05-01 during the controller-driven Tier-2
-verification of bundle-open and map-switch (Audit Task 3).**
+Status: **Resolved by commit `191fd39` (2026-05-01).** Live MCP re-verified on
+2026-05-01: with a fresh `target/release/ozi-rs-mcp` binary and an active Mac2
+session, `appium_click` on `//XCUIElementTypeButton[@title="Maps…"]` returned
+`ok: true` with a structured success message; the AX tree captured immediately
+afterwards grew from 57 KB (one window) to 304 KB (two windows) and contained
+three "Map Bundles" mentions, confirming the secondary window opened
+end-to-end. Click went through the standard WebDriver `POST /element` →
+`POST /element/{eid}/click` flow introduced by the fix (24/24 unit tests
+green, clippy clean).
 
 `tools/ozi-rs-mcp/src/appium.rs:437-451` posts `{ "selector": ... }` to
 `POST /session/{sid}/appium/mac2/click`. The Appium Mac2 driver's
@@ -263,7 +270,7 @@ Fix sketch:
 | F1 | P0 | Resolved (commit `c25c2a9`) — unit-tested + live MCP re-verified |
 | F2 | P0 | Resolved (commit `1337926`) — unit-tested |
 | F3 | P1 | Documented degraded path in `docs/native-qa-mcp.md` |
-| F8 | P0 | Open — `appium_click` body shape wrong; blocks Tier-2 UI driving |
+| F8 | P0 | Resolved (commit `191fd39`) — unit-tested + live MCP re-verified |
 | F4 | P1 | Open — not reproduced in live re-check; stale-session repro remains |
 | F5 | P2 | Documented TCC grant boundaries in `docs/native-qa-mcp.md` |
 | F6 | P0 | Resolved (commit `998bc13`) — unit-tested + live MCP re-verified |

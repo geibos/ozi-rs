@@ -17,8 +17,8 @@
   "session": {
     "running": false,
     "app_path": "target/debug/bundle/macos/ozi-rs.app",
-    "launched_at": "unix_ms:1777464015131",
-    "stopped_at": "unix_ms:1777464079265"
+    "launched_at": "unix_ms:1777606891019",
+    "stopped_at": "unix_ms:1777606961747"
   },
   "artifact_paths": []
 }
