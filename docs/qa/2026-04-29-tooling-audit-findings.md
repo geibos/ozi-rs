@@ -191,6 +191,57 @@ Until F7 is reproduced or cleared, F1/F6 fixes stand on:
 - the same-day curl evidence that proved bundleId was the missing key
 - successful MCP `appium_doctor` confirming the install path works
 
+## F8 — `appium_click` MCP wrapper posts an unsupported body to `/appium/mac2/click`
+
+Severity: **P0 — blocks Tier-2 UI driving for the MVP audit.**
+Status: **Open. Discovered 2026-05-01 during the controller-driven Tier-2
+verification of bundle-open and map-switch (Audit Task 3).**
+
+`tools/ozi-rs-mcp/src/appium.rs:437-451` posts `{ "selector": ... }` to
+`POST /session/{sid}/appium/mac2/click`. The Appium Mac2 driver's
+`/appium/mac2/click` endpoint does **not** accept `selector` — it expects
+either `{ "x": <px>, "y": <px> }` or `{ "elementId": "<wd-element-uuid>" }`.
+Result: every selector form (`name=...`, `~...`, `//XCUIElementTypeButton[@title="..."]`,
+`//XCUIElementTypeButton[contains(@title,...)]`) returns HTTP 404 because
+the body shape never resolves to an element or a coordinate pair.
+
+Tested against a fresh Mac2 session (id `09232fe5-691a-4dbc-ab3c-451966ae6769`)
+on 2026-05-01 against the running ozi-rs app. The AX tree at the same time
+**did** expose every HTML control inside the WKWebView as a normal
+`XCUIElementTypeButton` with the textual content in `@title` — so the
+elements are reachable through standard WebDriver, just not through the
+current MCP wrapper.
+
+What works (verified by direct curl):
+- `GET /session/{sid}/source` — returns the full AX tree, 57 KB, including
+  every sidebar button (`Maps…`, `Open`, `Save`, `↩`, `↪`, `Import GPX`,
+  `Import PLT`, `Create Track`, `Add Waypoint`, `Reveal in Finder`,
+  `Show/Hide Tracks/Points/Waypoints Panel`, theme `PopUpButton`, etc.)
+  plus the rendered application menu and "Active map" state.
+
+What is needed in `tools/ozi-rs-mcp/src/appium.rs`:
+1. Replace the `selector` shortcut with the standard WebDriver flow:
+   - `POST /session/{sid}/element` with `{ "using": "xpath", "value": "..." }` —
+     get the WD element id.
+   - `POST /session/{sid}/element/{eid}/click` — click via the standard endpoint.
+2. Translate convenience selector forms (`name=...`, `~...`, raw XPath) on
+   the MCP side before issuing the `find_element` call.
+3. Surface `element_not_found` (no such element) vs. `webdriver_error` (HTTP
+   500/etc.) distinctly so the audit anti-loop rule has clean signals.
+4. Same fix should apply to `appium_type_text` (`appium.rs:453`), which uses
+   `/appium/mac2/keys` — that endpoint also expects an element id, not a
+   `selector` string.
+
+Workaround for the in-flight audit: the controller can issue
+`POST /element` + `POST /element/{eid}/click` directly via curl while F8
+is open. This is not protocol-compliant (the audit procedure says "use the
+MCP tools"), so audit runs that depend on `appium_click` will be marked
+`broken-driver` until F8 is resolved.
+
+Direct evidence captured during the failure: every click attempt from
+session `09232fe5-...` returned the exact same `HTTP 404` from
+`/appium/mac2/click` regardless of selector form.
+
 ## F5 — `mcp__computer-use__*` requires Accessibility + Screen Recording grants for its host process
 
 Severity: P2 — alternate channel; not part of the verification protocol but
@@ -212,6 +263,7 @@ Fix sketch:
 | F1 | P0 | Resolved (commit `c25c2a9`) — unit-tested + live MCP re-verified |
 | F2 | P0 | Resolved (commit `1337926`) — unit-tested |
 | F3 | P1 | Documented degraded path in `docs/native-qa-mcp.md` |
+| F8 | P0 | Open — `appium_click` body shape wrong; blocks Tier-2 UI driving |
 | F4 | P1 | Open — not reproduced in live re-check; stale-session repro remains |
 | F5 | P2 | Documented TCC grant boundaries in `docs/native-qa-mcp.md` |
 | F6 | P0 | Resolved (commit `998bc13`) — unit-tested + live MCP re-verified |
