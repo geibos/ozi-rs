@@ -70,8 +70,8 @@ The current `triage.md` priority assignments reflect predicted risk. Once Appium
 
 - **P0 (broken on critical path):** 0 rows. The infrastructure that previously gated the audit (F8) has been fixed.
 - **P1 (missing on critical path) — predicted, not yet verified:** 7 rows. WPT export, save/load `.ozp`, recent projects, undo/redo, track point delete, waypoint delete, sort by timestamp.
-- **P2 (partial / pending on any feature):** 25 rows.
-- **P3 (hidden / missing off critical path):** 7 rows including all three on-map tools (confirmed missing) and theme/devtools (predicted missing).
+- **P2 (partial / pending on any feature):** 23 rows.
+- **P3 (hidden / missing off critical path):** 10 rows including all three on-map tools (confirmed missing) and theme/devtools (predicted missing).
 
 The seven P1 predictions should be the *first* targets of the next driven run, because each one's verdict materially changes the MVP gap list.
 
@@ -118,8 +118,8 @@ The seven P1 predictions should be the *first* targets of the next driven run, b
 | Pending (smoke ready, not yet driven) | 28 | Need a follow-up Appium pass. |
 | **P0 blockers** | 0 | F8 closed the only known infra blocker. |
 | **P1 — predicted critical gaps** | 7 | Verdicts pending the next driven run. |
-| **P2 — partials & non-critical pending** | 25 | |
-| **P3 — hidden / off-critical missing** | 7 | Includes the three confirmed-missing on-map tools. |
+| **P2 — partials & non-critical pending** | 23 | |
+| **P3 — hidden / off-critical missing** | 10 | Includes the three confirmed-missing on-map tools. |
 
 ---
 
