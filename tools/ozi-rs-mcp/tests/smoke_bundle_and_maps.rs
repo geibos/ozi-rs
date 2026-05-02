@@ -106,18 +106,20 @@ fn smoke_bundle_and_maps() {
     let final_logs = capture_logs();
 
     // Check if logs contain any map/tile markers
-    if let Some(log_artifact) = final_logs.artifact_paths.first() {
-        if let Ok(log_content) = fs::read_to_string(workspace.join(log_artifact)) {
-            let has_map_marker = log_content.contains("tile_source")
-                || log_content.contains("map_switch")
-                || log_content.contains("ozi://")
-                || log_content.contains("sqlite://");
+    if let Some(log_content) = final_logs
+        .artifact_paths
+        .first()
+        .and_then(|log_artifact| fs::read_to_string(workspace.join(log_artifact)).ok())
+    {
+        let has_map_marker = log_content.contains("tile_source")
+            || log_content.contains("map_switch")
+            || log_content.contains("ozi://")
+            || log_content.contains("sqlite://");
 
-            if has_map_marker {
-                println!("Map/tile markers found in logs");
-            } else {
-                println!("Note: No explicit map-switch markers in logs (expected for AX-tree-only audit)");
-            }
+        if has_map_marker {
+            println!("Map/tile markers found in logs");
+        } else {
+            println!("Note: No explicit map-switch markers in logs (expected for AX-tree-only audit)");
         }
     }
 
@@ -152,7 +154,7 @@ fn smoke_bundle_and_maps() {
             eprintln!("Missing artifact: {}", artifact);
             panic!("Evidence file not found: {}", artifact);
         }
-        println!("✓ Evidence verified: {}", artifact);
+        println!("ok: evidence verified: {}", artifact);
     }
 
     // Step 9: Print summary
