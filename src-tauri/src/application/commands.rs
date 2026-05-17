@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::domain::{
-    simplify_track_points, LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId,
-    TrackLayer, TrackPoint, TrackPointId, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
+    LayerId, MapLayer, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint,
+    TrackPointId, TrackSegmentId, Waypoint, WaypointId, WaypointLayer, simplify_track_points,
 };
 use std::path::PathBuf;
 
@@ -354,7 +354,11 @@ impl ProjectCommand {
         }
     }
 
-    pub fn create_empty_track(layer_id: LayerId, track_id: TrackId, name: impl Into<String>) -> Self {
+    pub fn create_empty_track(
+        layer_id: LayerId,
+        track_id: TrackId,
+        name: impl Into<String>,
+    ) -> Self {
         Self::CreateEmptyTrack {
             layer_id,
             track_id,
@@ -531,7 +535,11 @@ impl ProjectCommand {
                 new_symbol,
                 ..
             } => {
-                project.set_waypoint_symbol_in_layer(*layer_id, *waypoint_id, new_symbol.clone())?;
+                project.set_waypoint_symbol_in_layer(
+                    *layer_id,
+                    *waypoint_id,
+                    new_symbol.clone(),
+                )?;
                 Ok(())
             }
             Self::SimplifyTrack {
@@ -724,8 +732,7 @@ impl ProjectCommand {
                             })
                     });
 
-                let (index, point) = found
-                    .unwrap_or((*removed_index, removed_point.clone()));
+                let (index, point) = found.unwrap_or((*removed_index, removed_point.clone()));
 
                 Self::InsertTrackPoint {
                     layer_id: *layer_id,
@@ -1166,8 +1173,8 @@ impl CommandStack {
 mod tests {
     use super::{CommandError, CommandStack, ProjectCommand};
     use crate::domain::{
-        LayerId, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint,
-        TrackPointId, TrackSegment, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
+        LayerId, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint, TrackPointId,
+        TrackSegment, TrackSegmentId, Waypoint, WaypointId, WaypointLayer,
     };
     use std::path::Path;
 
@@ -1392,7 +1399,10 @@ mod tests {
         let point_id = TrackPointId::new(3);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1428,7 +1438,10 @@ mod tests {
         let point_id = TrackPointId::new(3);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1465,7 +1478,10 @@ mod tests {
         let point_id = TrackPointId::new(3);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1512,7 +1528,10 @@ mod tests {
         let point_id = TrackPointId::new(3);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1547,7 +1566,10 @@ mod tests {
         let point_id = TrackPointId::new(3);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1584,7 +1606,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1628,7 +1653,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1668,7 +1696,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1710,7 +1741,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1756,7 +1790,10 @@ mod tests {
         let new_segment_id = TrackSegmentId::new(99);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1798,7 +1835,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1840,7 +1880,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1885,7 +1928,10 @@ mod tests {
         let track_id = TrackId::new(1);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1928,7 +1974,10 @@ mod tests {
         let track_id = TrackId::new(1);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -1972,7 +2021,10 @@ mod tests {
         let track_id = TrackId::new(1);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -2015,7 +2067,10 @@ mod tests {
         let track_id = TrackId::new(1);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
         history
             .apply(
@@ -2025,7 +2080,10 @@ mod tests {
             .unwrap();
 
         history
-            .apply(&mut project, &ProjectCommand::delete_track(layer_id, track_id))
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_track(layer_id, track_id),
+            )
             .unwrap();
 
         assert!(project.track_layers()[0].tracks().is_empty());
@@ -2039,7 +2097,10 @@ mod tests {
         let track_id = TrackId::new(1);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
         history
             .apply(
@@ -2049,7 +2110,10 @@ mod tests {
             .unwrap();
 
         history
-            .apply(&mut project, &ProjectCommand::delete_track(layer_id, track_id))
+            .apply(
+                &mut project,
+                &ProjectCommand::delete_track(layer_id, track_id),
+            )
             .unwrap();
 
         assert!(history.undo(&mut project));
@@ -2064,7 +2128,10 @@ mod tests {
         let layer_id = LayerId::new(20);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let error = history
@@ -2214,7 +2281,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].name(), "Base camp");
+        assert_eq!(
+            project.waypoint_layers()[0].waypoints()[0].name(),
+            "Base camp"
+        );
     }
 
     #[test]
@@ -2260,7 +2330,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -2296,7 +2369,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -2335,7 +2411,10 @@ mod tests {
         let segment_id = TrackSegmentId::new(2);
 
         history
-            .apply(&mut project, &ProjectCommand::add_track_layer(layer_id, "Tracks"))
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
             .unwrap();
 
         let mut track = Track::new(track_id, "Morning route");
@@ -2541,14 +2620,12 @@ mod tests {
         let mut history = CommandStack::default();
         let result = history.apply(
             &mut project,
-            &ProjectCommand::rename_waypoint(
-                LayerId::new(999),
-                WaypointId::new(1),
-                "Old",
-                "New",
-            ),
+            &ProjectCommand::rename_waypoint(LayerId::new(999), WaypointId::new(1), "Old", "New"),
         );
-        assert!(result.is_err(), "expected Err when waypoint layer does not exist");
+        assert!(
+            result.is_err(),
+            "expected Err when waypoint layer does not exist"
+        );
     }
 
     #[test]
@@ -2566,7 +2643,10 @@ mod tests {
             )],
         };
         let result = history.apply(&mut project, &cmd);
-        assert!(result.is_err(), "expected Err when layer does not exist and removed is non-empty");
+        assert!(
+            result.is_err(),
+            "expected Err when layer does not exist and removed is non-empty"
+        );
     }
 
     #[test]
@@ -2577,6 +2657,9 @@ mod tests {
             &mut project,
             &ProjectCommand::create_empty_track(LayerId::new(999), TrackId::new(1), "Ghost Track"),
         );
-        assert!(result.is_err(), "expected Err when track layer does not exist");
+        assert!(
+            result.is_err(),
+            "expected Err when track layer does not exist"
+        );
     }
 }

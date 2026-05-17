@@ -500,8 +500,8 @@ fn rdp(
 #[cfg(test)]
 mod tests {
     use super::{
-        simplify_track_points, Track, TrackId, TrackPoint, TrackPointId, TrackSegment,
-        TrackSegmentId,
+        Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
+        simplify_track_points,
     };
 
     #[test]

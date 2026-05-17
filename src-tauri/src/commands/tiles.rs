@@ -140,43 +140,46 @@ pub fn get_ozi_metadata(map_path: String) -> Result<serde_json::Value, String> {
         .collect();
 
     // Compute geographic bounds and zoom hints from georeference + level-0 dimensions.
-    let (bounds, native_zoom, min_zoom) =
-        if let Some(lvl0) = source.levels().first() {
-            let corners = [
-                context.georeference.pixel_to_lat_lon(0.0, 0.0),
-                context.georeference.pixel_to_lat_lon(lvl0.width() as f64, 0.0),
-                context.georeference.pixel_to_lat_lon(0.0, lvl0.height() as f64),
-                context
-                    .georeference
-                    .pixel_to_lat_lon(lvl0.width() as f64, lvl0.height() as f64),
-            ];
-            let (min_lon, max_lon) = corners
-                .iter()
-                .map(|(_, lon)| *lon)
-                .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), lon| {
-                    (min.min(lon), max.max(lon))
-                });
-            let (min_lat, max_lat) = corners
-                .iter()
-                .map(|(lat, _)| *lat)
-                .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), lat| {
-                    (min.min(lat), max.max(lat))
-                });
+    let (bounds, native_zoom, min_zoom) = if let Some(lvl0) = source.levels().first() {
+        let corners = [
+            context.georeference.pixel_to_lat_lon(0.0, 0.0),
+            context
+                .georeference
+                .pixel_to_lat_lon(lvl0.width() as f64, 0.0),
+            context
+                .georeference
+                .pixel_to_lat_lon(0.0, lvl0.height() as f64),
+            context
+                .georeference
+                .pixel_to_lat_lon(lvl0.width() as f64, lvl0.height() as f64),
+        ];
+        let (min_lon, max_lon) = corners
+            .iter()
+            .map(|(_, lon)| *lon)
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), lon| {
+                (min.min(lon), max.max(lon))
+            });
+        let (min_lat, max_lat) = corners
+            .iter()
+            .map(|(lat, _)| *lat)
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), lat| {
+                (min.min(lat), max.max(lat))
+            });
 
-            let pixels_per_deg = context.georeference.pixels_per_lon_degree();
-            let native_zoom = ((pixels_per_deg * 360.0 / 256.0).log2().round() as u32).min(22);
+        let pixels_per_deg = context.georeference.pixels_per_lon_degree();
+        let native_zoom = ((pixels_per_deg * 360.0 / 256.0).log2().round() as u32).min(22);
 
-            let lon_span = (max_lon - min_lon).max(0.001);
-            let min_zoom = ((360.0_f64 / lon_span).log2().ceil() as u32).saturating_sub(1);
+        let lon_span = (max_lon - min_lon).max(0.001);
+        let min_zoom = ((360.0_f64 / lon_span).log2().ceil() as u32).saturating_sub(1);
 
-            (
-                serde_json::json!([min_lon, min_lat, max_lon, max_lat]),
-                native_zoom,
-                min_zoom,
-            )
-        } else {
-            (serde_json::Value::Null, 14u32, 0u32)
-        };
+        (
+            serde_json::json!([min_lon, min_lat, max_lon, max_lat]),
+            native_zoom,
+            min_zoom,
+        )
+    } else {
+        (serde_json::Value::Null, 14u32, 0u32)
+    };
 
     Ok(serde_json::json!({
         "map_path": map_path,

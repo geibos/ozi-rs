@@ -49,7 +49,10 @@ pub fn export_plt(
     write!(writer, "OziExplorer Track Point File Version 2.1\r\n")?;
     write!(writer, "WGS 84\r\n")?;
     write!(writer, "Altitude is in Feet\r\n")?;
-    write!(writer, "Field 1 = Lat, Field 2 = Lon, Field 3 = Code, Field 4 = Alt, Field 5 = Date, Field 6 = Stop, Field 7 = Bearing\r\n")?;
+    write!(
+        writer,
+        "Field 1 = Lat, Field 2 = Lon, Field 3 = Code, Field 4 = Alt, Field 5 = Date, Field 6 = Stop, Field 7 = Bearing\r\n"
+    )?;
     write!(
         writer,
         "{},0,{colorref},{width_int},0,0,0\r\n",
@@ -193,7 +196,11 @@ mod tests {
                     assert!(diff <= 1, "timestamps differ by more than 1s: {ta} vs {tb}");
                 }
                 (None, None) => {}
-                _ => panic!("timestamp mismatch: {:?} vs {:?}", a.timestamp(), b.timestamp()),
+                _ => panic!(
+                    "timestamp mismatch: {:?} vs {:?}",
+                    a.timestamp(),
+                    b.timestamp()
+                ),
             }
         }
     }

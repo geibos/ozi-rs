@@ -165,13 +165,18 @@ fn leading_prefix(rel: &str) -> (Option<u32>, &str) {
     }
     let rest = &head[digits.len()..];
     if rest.starts_with('-') || rest.starts_with('_') || rest.is_empty() {
-        digits.parse::<u32>().ok().map_or((None, rel), |p| (Some(p), rel))
+        digits
+            .parse::<u32>()
+            .ok()
+            .map_or((None, rel), |p| (Some(p), rel))
     } else {
         (None, rel)
     }
 }
 
-pub fn fetch_project_summaries_streaming<F>(mut on_chunk: F) -> Result<Vec<LizaProjectSummary>, String>
+pub fn fetch_project_summaries_streaming<F>(
+    mut on_chunk: F,
+) -> Result<Vec<LizaProjectSummary>, String>
 where
     F: FnMut(Vec<LizaProjectSummary>),
 {
@@ -224,7 +229,8 @@ pub fn load_project_summaries_cache(root: &Path) -> Result<Vec<LizaProjectSummar
     }
 
     let cache_text = fs::read_to_string(&cache_path).map_err(|err| err.to_string())?;
-    let cache: ProjectsCacheFile = serde_json::from_str(&cache_text).map_err(|err| err.to_string())?;
+    let cache: ProjectsCacheFile =
+        serde_json::from_str(&cache_text).map_err(|err| err.to_string())?;
 
     if cache.version != PROJECTS_CACHE_VERSION {
         return Err(format!(
@@ -456,7 +462,6 @@ pub struct BundleDownloadConfig {
     pub cancel: CancelToken,
 }
 
-
 /// Download a LizaAlert project bundle with per-file notifications.
 ///
 /// Files are enumerated, sorted by prefix (`00-`, `10-`, …), and downloaded
@@ -524,12 +529,19 @@ pub async fn download_bundle_concurrent(
         let file_count = total;
         let client = async_client.clone();
         set.spawn(async move {
-            let permit = permit_sem.acquire_owned().await.map_err(|e| e.to_string())?;
+            let permit = permit_sem
+                .acquire_owned()
+                .await
+                .map_err(|e| e.to_string())?;
             if cancel.is_cancelled() {
                 drop(permit);
                 return Err(CANCEL_ERROR.to_owned());
             }
-            let RemoteFileDownload { url, path, relative } = file;
+            let RemoteFileDownload {
+                url,
+                path,
+                relative,
+            } = file;
             let pkg = relative.clone();
             if path.exists() {
                 // Already on disk (resume). Emit one synthetic progress + ready.
@@ -767,7 +779,9 @@ where
         };
         let Some(chunk) = next else { break };
         let chunk = chunk.map_err(|err| err.to_string())?;
-        file.write_all(&chunk).await.map_err(|err| err.to_string())?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|err| err.to_string())?;
         downloaded_bytes += chunk.len() as u64;
         on_progress(downloaded_bytes, total_bytes);
     }
@@ -1514,10 +1528,10 @@ mod bundle_download_tests {
         // Nested directory listing.
         Mock::given(method("GET"))
             .and(path("/bundle/10-Tracks/"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
-                ("a.ozf2", false),
-                ("b.ozf2", false),
-            ])))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(index_html(&[("a.ozf2", false), ("b.ozf2", false)])),
+            )
             .mount(&server)
             .await;
 
@@ -1919,12 +1933,8 @@ mod bundle_download_tests {
                     let now = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
                     let mut best = peak.load(Ordering::SeqCst);
                     while now > best
-                        && let Err(actual) = peak.compare_exchange(
-                            best,
-                            now,
-                            Ordering::SeqCst,
-                            Ordering::SeqCst,
-                        )
+                        && let Err(actual) =
+                            peak.compare_exchange(best, now, Ordering::SeqCst, Ordering::SeqCst)
                     {
                         best = actual;
                     }

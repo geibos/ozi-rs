@@ -67,7 +67,9 @@ pub fn save_app_session(
 
 pub fn load_app_session(path: &Path) -> Result<Option<PersistedAppSession>, PersistenceError> {
     match std::fs::read_to_string(path) {
-        Ok(json) => serde_json::from_str(&json).map(Some).map_err(PersistenceError::Json),
+        Ok(json) => serde_json::from_str(&json)
+            .map(Some)
+            .map_err(PersistenceError::Json),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(PersistenceError::Io(error)),
     }
