@@ -2476,6 +2476,8 @@ dependencies = [
 [[package]]
 name = "ozf2"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c220883ac02a230574638f0bff2a80d618200905c8636a289bf202536e47d2cd"
 dependencies = [
  "flate2",
 ]
