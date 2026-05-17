@@ -5,7 +5,13 @@
     waypointsPanelOpen,
     selectedWaypointId,
   } from "../lib/stores";
-  import { getWaypoints, deleteWaypoint, renameWaypoint, setWaypointSymbol } from "../lib/api";
+  import {
+    getWaypoints,
+    deleteWaypoint,
+    renameWaypoint,
+    setWaypointSymbol,
+    toggleWaypointVisible,
+  } from "../lib/api";
   import type { WaypointData } from "../lib/types";
   import SymbolPicker from "./SymbolPicker.svelte";
 
@@ -69,6 +75,17 @@
     if (layerId === null) return;
     await setWaypointSymbol(layerId, BigInt(wp.id), symbol);
   }
+
+  async function handleToggleVisible(wp: WaypointData) {
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null) return;
+    await toggleWaypointVisible(layerId, BigInt(wp.id));
+    // Optimistically update local list so the checkbox reflects the change
+    // even before the `state-changed` event triggers a full refresh.
+    waypoints = waypoints.map((w) =>
+      w.id === wp.id ? { ...w, visible: !w.visible } : w
+    );
+  }
 </script>
 
 {#if $waypointsPanelOpen}
@@ -82,7 +99,15 @@
         <div class="empty">No waypoints</div>
       {:else}
         {#each waypoints as wp (wp.id)}
-          <div class="waypoint-row">
+          <div class="waypoint-row" class:hidden-waypoint={!wp.visible}>
+            <input
+              type="checkbox"
+              class="visibility-toggle"
+              checked={wp.visible}
+              title={wp.visible ? "Hide waypoint" : "Show waypoint"}
+              aria-label="Toggle waypoint visibility"
+              onchange={() => handleToggleVisible(wp)}
+            />
             <SymbolPicker
               symbol={wp.symbol}
               onSelect={(symbol) => handleSetSymbol(wp, symbol)}
@@ -181,6 +206,17 @@
 
   .waypoint-row:hover {
     background: var(--ctp-surface0);
+  }
+
+  .waypoint-row.hidden-waypoint .waypoint-name {
+    color: var(--ctp-overlay1);
+    font-style: italic;
+  }
+
+  .visibility-toggle {
+    flex-shrink: 0;
+    cursor: pointer;
+    margin: 0;
   }
 
   .waypoint-name {
