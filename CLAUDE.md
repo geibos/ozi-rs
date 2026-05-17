@@ -16,6 +16,11 @@ Communicate in Russian. Technical terms and code identifiers stay in English.
 - Keep TypeScript types (`src/lib/types.ts`) in sync with Rust structs manually
 - All edits must go through `ProjectCommand` — see `docs/commands-reference.md`
 
+## File deletion
+
+- **Always use `rip` instead of `rm`** (recoverable trash; binary at `/opt/homebrew/bin/rip`). Same flags as `rm`: `rip <path>`, `rip -r <dir>`. Restore via `rip --unbury` if you delete the wrong thing.
+- `rm` is intentionally not in the permission allowlist, so attempts will be blocked. Use `rip` for any unlink, including `find ... -exec rip {} \;`.
+
 ## Verification
 
 Before claiming a desktop fix or feature works, follow `docs/agent-verification.md`.
