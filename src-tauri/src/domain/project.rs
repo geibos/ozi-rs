@@ -339,6 +339,27 @@ impl WaypointLayer {
         waypoint.move_to(latitude, longitude);
         true
     }
+
+    /// Set a waypoint's visibility flag. Returns the new value on success
+    /// or `None` if the waypoint is missing. Non-undoable mutation.
+    pub fn set_waypoint_visible(&mut self, waypoint_id: WaypointId, visible: bool) -> Option<bool> {
+        let waypoint = self
+            .waypoints
+            .iter_mut()
+            .find(|waypoint| waypoint.id() == waypoint_id)?;
+        waypoint.set_visible(visible);
+        Some(visible)
+    }
+
+    /// Flip a waypoint's visibility flag. Returns the new value or `None`
+    /// if the waypoint is missing. Non-undoable mutation.
+    pub fn toggle_waypoint_visible(&mut self, waypoint_id: WaypointId) -> Option<bool> {
+        let waypoint = self
+            .waypoints
+            .iter_mut()
+            .find(|waypoint| waypoint.id() == waypoint_id)?;
+        Some(waypoint.toggle_visible())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -565,6 +586,20 @@ impl Project {
         let waypoint_id = waypoint_id.into_u64();
         let layer = self.waypoint_layer_mut(layer_id)?;
         layer.set_waypoint_symbol(waypoint_id, symbol)
+    }
+
+    /// Flip the `visible` flag on a waypoint. Non-undoable mutation,
+    /// returns the new value or `None` if the layer/waypoint is missing.
+    pub fn toggle_waypoint_visible_in_layer(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+    ) -> Option<bool> {
+        let layer = self
+            .waypoint_layers
+            .iter_mut()
+            .find(|layer| layer.id() == layer_id)?;
+        layer.toggle_waypoint_visible(waypoint_id)
     }
 
     pub fn move_waypoint_in_layer<L: LayerIdLike, W: WaypointIdLike>(

@@ -322,7 +322,6 @@
       try {
         waypoints = await getWaypoints(layerId);
       } catch {
-        // layer may not yet exist on the backend; skip gracefully.
         continue;
       }
 

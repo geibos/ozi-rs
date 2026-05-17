@@ -101,6 +101,13 @@ export async function toggleTrackVisible(
   return invoke("toggle_track_visible", { layerId, trackId });
 }
 
+export async function toggleWaypointVisible(
+  layerId: bigint,
+  waypointId: bigint
+): Promise<void> {
+  return invoke("toggle_waypoint_visible", { layerId, waypointId });
+}
+
 export async function revealBundle(): Promise<void> {
   return invoke("reveal_bundle");
 }

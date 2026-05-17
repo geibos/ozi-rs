@@ -42,6 +42,7 @@ pub fn run() {
             commands::rename_track,
             commands::set_track_color,
             commands::toggle_track_visible,
+            commands::toggle_waypoint_visible,
             commands::move_track_point,
             commands::delete_track_point,
             commands::insert_track_point,
