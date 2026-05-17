@@ -16,12 +16,15 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1.12"
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "stream"] }
 rusqlite = { version = "0.39", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 gpx = "0.10"
 zip = { version = "8.4", default-features = false, features = ["deflate"] }
 ozf2-rs = { path = "../../ozf2-rs" }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time", "fs", "io-util"] }
+futures-util = "0.3"
+uuid = { version = "1", features = ["v4"] }
 
 # Logging
 tracing = "0.1"
@@ -29,6 +32,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # PNG encoding for tile delivery
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time", "test-util"] }
+tempfile = "3"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
