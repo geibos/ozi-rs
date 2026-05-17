@@ -15,12 +15,25 @@ For maximum context in every new session:
 7. For native desktop QA, read `docs/native-qa-mcp.md` (the project-local MCP server replaces Playwright as the default) and `docs/agent-verification.md` (binding verification protocol — read before claiming any desktop fix or feature works).
 8. Check the current git state before editing because this repository may contain unrelated dirty files from prior work.
 9. Prefer evidence over assumptions: search existing code patterns, keep frontend IPC calls in `src/lib/api.ts`, and run targeted tests plus `just test` / `just clippy` before completion.
+10. For any change to user-visible behavior, read the relevant `openspec/specs/<capability>/spec.md` first and propose changes through the OpenSpec workflow (see "Behavioral changes via OpenSpec" below).
 
 ## What this project is
 
 **ozi-rs** is a Tauri 2 desktop application for [LizaAlert](https://lizaalert.org) search-and-rescue volunteers — an offline-first map editor replacing OziExplorer. We don't need all OziExplorer features, only those actually used by SAR volunteers.
 
 **Stack:** Rust backend (Tauri 2) + Svelte 5 + MapLibre GL 4 frontend.
+
+## Behavioral changes via OpenSpec
+
+Behavioral requirements are captured in `openspec/specs/<capability>/spec.md`. Any change that adds, removes, or modifies user-visible behavior MUST go through the OpenSpec workflow:
+
+1. Create a change directory under `openspec/changes/<change-name>/` containing `proposal.md`, `tasks.md`, optional `design.md`, and one `specs/<capability>/spec.md` per affected capability with `## ADDED Requirements` / `## MODIFIED Requirements` / `## REMOVED Requirements` deltas.
+2. Validate with `openspec validate <change-name> --strict`.
+3. After review, run `openspec archive <change-name>` to merge deltas into the canonical specs.
+
+Current capabilities (in `openspec/specs/`): `map-bundles`, `lizaalert-integration`, `tile-rendering`, `project-persistence`, `layers`, `track-import`, `track-export`, `track-display`, `track-editing`, `waypoints`, `undo-redo`, `ui-shell`.
+
+Implementation-only refactors (no behavior change) do not require an OpenSpec proposal, but SHOULD be checked against the relevant spec(s) for accidental contract drift. `docs/feature-status.md` remains the QA evidence matrix and is owned by the QA workflow — it does not supersede OpenSpec specs.
 
 ## Commands
 
