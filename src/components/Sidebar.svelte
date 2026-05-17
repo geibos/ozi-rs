@@ -49,6 +49,7 @@
   } from "$lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
+  import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
 
@@ -120,6 +121,9 @@
       drawingModeActive.set(true);
     } catch (error) {
       console.error("Failed to start track drawing mode", error);
+      toast.error("Failed to start track drawing mode", {
+        description: String(error),
+      });
     }
   }
 </script>
@@ -135,7 +139,6 @@
   </header>
 
   <ScrollArea class="flex-1">
-    <Tooltip.Provider delayDuration={300}>
       <section class="flex flex-col gap-1.5 px-2 py-2">
         <h2
           class="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase"
@@ -350,7 +353,6 @@
           {$addWaypointMode ? "Cancel Add Waypoint" : "Add Waypoint"}
         </Button>
       </section>
-    </Tooltip.Provider>
   </ScrollArea>
 
   <div

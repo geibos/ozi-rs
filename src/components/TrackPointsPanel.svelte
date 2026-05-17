@@ -12,6 +12,7 @@
     selectedPointId,
   } from "$lib/stores";
   import { getTrackDetail } from "$lib/api";
+  import { toast } from "svelte-sonner";
   import type { TrackDetail } from "$lib/types";
 
   let trackDetail: TrackDetail | null = $state(null);
@@ -31,6 +32,7 @@
       expandedSegments = {};
     } catch (e) {
       console.error("Failed to load track details", e);
+      toast.error("Failed to load track details", { description: String(e) });
       trackDetail = null;
     }
   }
@@ -54,7 +56,6 @@
     >
       <span>Track Points</span>
       <div class="flex items-center gap-1.5">
-        <Tooltip.Provider delayDuration={300}>
           <Tooltip.Root>
             <Tooltip.Trigger>
               {#snippet child({ props })}
@@ -75,7 +76,6 @@
                 : "Select a track to enable edit mode"}
             </Tooltip.Content>
           </Tooltip.Root>
-        </Tooltip.Provider>
         <Button
           variant="ghost"
           size="icon-xs"

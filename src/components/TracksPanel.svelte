@@ -195,7 +195,6 @@
           No tracks loaded
         </div>
       {:else}
-        <Tooltip.Provider delayDuration={300}>
           {#each tracks as track, idx (trackIdentity(track))}
             {#if idx > 0}
               <Separator />
@@ -354,7 +353,6 @@
               </div>
             </div>
           {/each}
-        </Tooltip.Provider>
       {/if}
     </div>
     <SimplifyPanel />
