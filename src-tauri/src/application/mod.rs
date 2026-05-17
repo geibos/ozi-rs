@@ -13,7 +13,7 @@ use crate::infrastructure::lizaalert;
 use crate::infrastructure::persistence::{self, PersistedActiveMap, PersistedAppSession};
 use std::collections::{HashSet, VecDeque};
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MapCenter {
@@ -141,6 +141,19 @@ struct LizaAlertState {
     busy: bool,
     /// Package names currently being downloaded (allows parallel map downloads).
     downloading: HashSet<String>,
+    /// Files that have finished downloading in the active bundle. Lets the UI
+    /// surface partial bundle availability before the whole download finishes.
+    ready_bundle_files: Vec<ReadyBundleFile>,
+}
+
+/// A file that has been fully downloaded and fsync'd inside an in-progress
+/// bundle download.
+#[derive(Debug, Clone)]
+pub struct ReadyBundleFile {
+    #[allow(dead_code)]
+    pub package_name: String,
+    #[allow(dead_code)]
+    pub local_path: PathBuf,
 }
 
 const MAX_DIAGNOSTICS: usize = 200;
@@ -175,6 +188,7 @@ impl AppState {
                 status: "Load projects from maps.lizaalert.ru".to_owned(),
                 busy: false,
                 downloading: HashSet::new(),
+                ready_bundle_files: Vec::new(),
             },
         }
     }
@@ -214,6 +228,7 @@ impl AppState {
             .cloned()?;
 
         self.lizaalert.busy = true;
+        self.lizaalert.ready_bundle_files.clear();
         let status = if lizaalert::is_project_cached(&summary.slug, &self.bundles_root) {
             format!("Opening cached project {}...", summary.name)
         } else {
@@ -354,6 +369,43 @@ impl AppState {
 
     pub fn apply_progress(&mut self, message: String) {
         self.update_status(DiagnosticLevel::Info, message);
+    }
+
+    /// Record that a bundle file finished downloading so partial-bundle UIs
+    /// can surface it before the rest of the bundle catches up.
+    ///
+    /// Currently mirrors the file into `ready_bundle_files` (used by status
+    /// reports) and updates the per-map `local_path` if the file corresponds
+    /// to a known map package. Importantly this never errors when the file
+    /// is not (yet) a recognised map: a `.pdf` reference file should still
+    /// register as ready without disrupting state.
+    pub fn note_bundle_file_ready(&mut self, package_name: &str, local_path: &Path) {
+        self.lizaalert
+            .ready_bundle_files
+            .push(ReadyBundleFile {
+                package_name: package_name.to_owned(),
+                local_path: local_path.to_path_buf(),
+            });
+        if let Some(project) = self.lizaalert.selected_project.as_mut() {
+            // Match by file_name suffix; bundle packages store the local
+            // file name as `file_name`, while `package_name` here is a path
+            // relative to the bundle root.
+            for map in project.maps.iter_mut() {
+                if package_name.ends_with(&map.file_name) {
+                    map.local_path = Some(local_path.to_path_buf());
+                }
+            }
+        }
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!("Ready: {package_name}"),
+        );
+    }
+
+    /// Snapshot of currently-known ready files, e.g. for diagnostics or tests.
+    #[allow(dead_code)]
+    pub fn ready_bundle_files(&self) -> &[ReadyBundleFile] {
+        &self.lizaalert.ready_bundle_files
     }
 
     // ── Synchronous map-open helpers ──
