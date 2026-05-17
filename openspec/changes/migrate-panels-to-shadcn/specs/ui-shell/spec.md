@@ -1,18 +1,4 @@
-## MODIFIED Requirements
-
-### Requirement: System provides a Catppuccin theme selector with five options
-
-The system SHALL apply one of the Catppuccin palettes — Auto (follow OS), Latte, Frappé, Macchiato, or Mocha — to the UI via CSS custom properties (`--ctp-*`) and the semantic-token layer (`--background`, `--foreground`, `--primary`, …) introduced by `add-design-tokens-and-shadcn`. The Auto option SHALL track the OS light/dark preference dynamically. The theme picker SHALL render through the shadcn-svelte `Select` primitive, not a native `<select>` element.
-
-#### Scenario: Pick a manual theme
-
-- **WHEN** the user selects "Mocha" from the theme picker
-- **THEN** the UI re-renders with the Mocha palette applied via both `--ctp-*` variables and the matching semantic tokens; every panel that uses Tailwind utility classes (`bg-background`, `text-foreground`, …) re-renders to the Mocha equivalent
-
-#### Scenario: Auto follows OS
-
-- **WHEN** the user selects "Auto" and the OS toggles between light and dark mode
-- **THEN** the UI switches between Latte (light) and Mocha (dark) accordingly, and the `class="dark"` toggle on `<html>` is set whenever the active flavour is not Latte
+## ADDED Requirements
 
 ### Requirement: All in-app panels render through shadcn-svelte primitives and Tailwind utility classes that consume semantic tokens
 
@@ -46,14 +32,7 @@ Toast notifications SHALL be routed through `svelte-sonner` mounted in the root 
 - **WHEN** the maintainer reviews the `MapView.svelte` migration commit
 - **THEN** the diff modifies only the outer wrapper container's classes (Tailwind utilities) and any Tailwind-replaced wrapper styles; MapLibre `new maplibregl.Map(...)` construction, source/layer setup, drag handlers, click handlers, and the tile-protocol code SHALL be byte-identical to before the commit
 
-### Requirement: Theme choice persists across sessions via localStorage
-
-The system SHALL persist the selected theme in browser localStorage and SHALL restore it on the next session. Theme is intentionally NOT stored in the Rust session file (see `project-persistence`).
-
-#### Scenario: Theme survives restart
-
-- **WHEN** the user selects "Frappé" and restarts the application
-- **THEN** the UI starts in Frappé without prompting the user
+## MODIFIED Requirements
 
 ### Requirement: Backtick key toggles an in-app developer console
 
@@ -63,12 +42,3 @@ The system SHALL toggle visibility of an in-app developer console whenever the u
 
 - **WHEN** the user presses backtick once and then again
 - **THEN** the developer console appears on the first press (rendered as a `Card` with theme-aware semantic-token surfaces) and disappears on the second
-
-### Requirement: F3 toggles an FPS counter overlay
-
-The system SHALL toggle visibility of a frame-rate counter overlay whenever the user presses F3. The counter SHALL display real-time FPS computed from frame times.
-
-#### Scenario: Toggle FPS overlay
-
-- **WHEN** the user presses F3
-- **THEN** an FPS overlay appears in a corner of the application window and updates continuously until F3 is pressed again
