@@ -71,13 +71,25 @@ pub fn decode_plt_bytes(bytes: &[u8]) -> Result<String, PltImportError> {
     // genuinely-corrupt files surface as `Decode` errors instead of silently
     // gaining `U+FFFD`.
     if bytes.starts_with(BOM_UTF8) {
-        return decode_with(encoding_rs::UTF_8, &bytes[BOM_UTF8.len()..], "UTF-8 (with BOM)");
+        return decode_with(
+            encoding_rs::UTF_8,
+            &bytes[BOM_UTF8.len()..],
+            "UTF-8 (with BOM)",
+        );
     }
     if bytes.starts_with(BOM_UTF16_LE) {
-        return decode_with(encoding_rs::UTF_16LE, &bytes[BOM_UTF16_LE.len()..], "UTF-16 LE");
+        return decode_with(
+            encoding_rs::UTF_16LE,
+            &bytes[BOM_UTF16_LE.len()..],
+            "UTF-16 LE",
+        );
     }
     if bytes.starts_with(BOM_UTF16_BE) {
-        return decode_with(encoding_rs::UTF_16BE, &bytes[BOM_UTF16_BE.len()..], "UTF-16 BE");
+        return decode_with(
+            encoding_rs::UTF_16BE,
+            &bytes[BOM_UTF16_BE.len()..],
+            "UTF-16 BE",
+        );
     }
 
     // Step 2: strict UTF-8 (also covers pure ASCII).
@@ -393,9 +405,7 @@ mod tests {
     fn decode_plt_bytes_cp1251_cyrillic() {
         // "Поход 2025" in cp1251:
         // П=0xCF о=0xEE х=0xF5 о=0xEE д=0xE4 ' '=0x20 '2'=0x32 '0'=0x30 '2'=0x32 '5'=0x35
-        let bytes: &[u8] = &[
-            0xCF, 0xEE, 0xF5, 0xEE, 0xE4, 0x20, 0x32, 0x30, 0x32, 0x35,
-        ];
+        let bytes: &[u8] = &[0xCF, 0xEE, 0xF5, 0xEE, 0xE4, 0x20, 0x32, 0x30, 0x32, 0x35];
         let decoded = decode_plt_bytes(bytes).expect("decode cp1251");
         assert_eq!(decoded, "Поход 2025");
         assert!(!decoded.contains('\u{FFFD}'));
@@ -459,10 +469,7 @@ mod tests {
         assert!(!had_errors, "all chars must be cp1251-representable");
 
         let dir = std::env::temp_dir();
-        let path = dir.join(format!(
-            "ozi-rs-plt-cp1251-{}.plt",
-            std::process::id()
-        ));
+        let path = dir.join(format!("ozi-rs-plt-cp1251-{}.plt", std::process::id()));
         std::fs::write(&path, &cp1251_bytes).expect("write tempfile");
 
         let import = import_plt_file(&path).expect("import");

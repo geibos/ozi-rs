@@ -539,7 +539,7 @@ pub fn appium_click_with_session_id(
                 "appium_click",
                 "selector_required",
                 "appium_click requires a selector".to_owned(),
-            )
+            );
         }
     };
 
@@ -595,17 +595,23 @@ pub fn appium_type_text_with_session_id(
                 "appium_type_text",
                 "selector_required",
                 "appium_type_text requires a selector".to_owned(),
-            )
+            );
         }
     };
 
     let (using, value) = parse_selector(sel);
 
-    let eid =
-        match find_wd_element("appium_type_text", server_url, session_id, using, &value, sel) {
-            Ok(id) => id,
-            Err(result) => return result,
-        };
+    let eid = match find_wd_element(
+        "appium_type_text",
+        server_url,
+        session_id,
+        using,
+        &value,
+        sel,
+    ) {
+        Ok(id) => id,
+        Err(result) => return result,
+    };
 
     let body = json!({ "text": text });
     match webdriver_request(

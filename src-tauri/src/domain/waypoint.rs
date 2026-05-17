@@ -136,7 +136,10 @@ mod tests {
         waypoint.set_visible(false);
 
         let json = serde_json::to_string(&waypoint).expect("serialize");
-        assert!(json.contains("\"visible\":false"), "serialized JSON must include visible flag: {json}");
+        assert!(
+            json.contains("\"visible\":false"),
+            "serialized JSON must include visible flag: {json}"
+        );
 
         let restored: Waypoint = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored, waypoint);

@@ -164,7 +164,8 @@ mod tests {
         let mut bytes = Vec::new();
         write_wpt(Vec::<Waypoint>::new(), &mut bytes).expect("write");
 
-        let expected = b"OziExplorer Waypoint File Version 1.1\r\nWGS 84\r\nReserved 2\r\nReserved 3\r\n";
+        let expected =
+            b"OziExplorer Waypoint File Version 1.1\r\nWGS 84\r\nReserved 2\r\nReserved 3\r\n";
         assert_eq!(bytes, expected);
     }
 

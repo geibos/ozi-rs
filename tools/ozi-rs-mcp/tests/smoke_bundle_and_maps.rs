@@ -33,10 +33,7 @@ fn smoke_bundle_and_maps() {
     if !doctor.available {
         println!(
             "Appium not available, skipping smoke test. Reason: {}",
-            doctor
-                .message
-                .as_deref()
-                .unwrap_or("unknown reason")
+            doctor.message.as_deref().unwrap_or("unknown reason")
         );
         return;
     }
@@ -48,14 +45,8 @@ fn smoke_bundle_and_maps() {
     let launch_result = appium_launch_session();
 
     if !launch_result.ok {
-        eprintln!(
-            "Failed to launch session: {:?}",
-            launch_result.error_kind
-        );
-        panic!(
-            "appium_launch_session failed: {:?}",
-            launch_result.message
-        );
+        eprintln!("Failed to launch session: {:?}", launch_result.error_kind);
+        panic!("appium_launch_session failed: {:?}", launch_result.message);
     }
 
     let session_id = match &launch_result.session_id {
@@ -119,7 +110,9 @@ fn smoke_bundle_and_maps() {
         if has_map_marker {
             println!("Map/tile markers found in logs");
         } else {
-            println!("Note: No explicit map-switch markers in logs (expected for AX-tree-only audit)");
+            println!(
+                "Note: No explicit map-switch markers in logs (expected for AX-tree-only audit)"
+            );
         }
     }
 
@@ -178,14 +171,8 @@ fn smoke_bundle_and_maps() {
         doctor.available,
         "Appium must be available for the test to pass"
     );
-    assert!(
-        launch_result.ok,
-        "Session launch must succeed"
-    );
-    assert!(
-        baseline_screenshot.ok,
-        "Screenshot capture must succeed"
-    );
+    assert!(launch_result.ok, "Session launch must succeed");
+    assert!(baseline_screenshot.ok, "Screenshot capture must succeed");
     assert!(
         stop_result.ok || stop_result.session_id.is_some(),
         "Session stop should succeed or session should already be terminated"

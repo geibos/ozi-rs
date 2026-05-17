@@ -259,7 +259,7 @@ fn solve_3x3(mut a: [[f64; 3]; 3], mut b: [f64; 3]) -> Option<[f64; 3]> {
 #[cfg(test)]
 mod tests {
     use super::{
-        affine_fit, linear_fit, parse_calibration_point, parse_ozi_georeference, OziGeoreference,
+        OziGeoreference, affine_fit, linear_fit, parse_calibration_point, parse_ozi_georeference,
     };
 
     #[test]

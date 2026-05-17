@@ -5,7 +5,10 @@ pub use crate::infrastructure::import::PltImportError;
 pub use commands::{CommandError, CommandStack, ProjectCommand};
 pub use import::{ArchiveImportError, ArchiveImportReport};
 
-use crate::domain::{LayerId, Project, ProjectLayerError, TrackId, TrackPointId, TrackSegmentId, Waypoint, WaypointId};
+use crate::domain::{
+    LayerId, Project, ProjectLayerError, TrackId, TrackPointId, TrackSegmentId, Waypoint,
+    WaypointId,
+};
 use crate::infrastructure::import::{
     OziMapParseError, OziRasterKind, parse_ozi_map_metadata, read_ozi_map_text,
 };
@@ -169,7 +172,10 @@ impl AppState {
         let mut project = Project::default();
         // Ensure default layers exist so the UI can use layerId=1 immediately
         project.add_track_layer(crate::domain::TrackLayer::new(LayerId::new(1), "Tracks"));
-        project.add_waypoint_layer(crate::domain::WaypointLayer::new(LayerId::new(1), "Waypoints"));
+        project.add_waypoint_layer(crate::domain::WaypointLayer::new(
+            LayerId::new(1),
+            "Waypoints",
+        ));
         Self {
             history: CommandStack::default(),
             project,
@@ -380,12 +386,10 @@ impl AppState {
     /// is not (yet) a recognised map: a `.pdf` reference file should still
     /// register as ready without disrupting state.
     pub fn note_bundle_file_ready(&mut self, package_name: &str, local_path: &Path) {
-        self.lizaalert
-            .ready_bundle_files
-            .push(ReadyBundleFile {
-                package_name: package_name.to_owned(),
-                local_path: local_path.to_path_buf(),
-            });
+        self.lizaalert.ready_bundle_files.push(ReadyBundleFile {
+            package_name: package_name.to_owned(),
+            local_path: local_path.to_path_buf(),
+        });
         if let Some(project) = self.lizaalert.selected_project.as_mut() {
             // Match by file_name suffix; bundle packages store the local
             // file name as `file_name`, while `package_name` here is a path
@@ -396,10 +400,7 @@ impl AppState {
                 }
             }
         }
-        self.update_status(
-            DiagnosticLevel::Info,
-            format!("Ready: {package_name}"),
-        );
+        self.update_status(DiagnosticLevel::Info, format!("Ready: {package_name}"));
     }
 
     /// Snapshot of currently-known ready files, e.g. for diagnostics or tests.
@@ -712,9 +713,8 @@ impl AppState {
         segment_id: TrackSegmentId,
         point_id: TrackPointId,
     ) -> Result<(), ProjectLayerError> {
-        let cmd = commands::ProjectCommand::delete_track_point(
-            layer_id, track_id, segment_id, point_id,
-        );
+        let cmd =
+            commands::ProjectCommand::delete_track_point(layer_id, track_id, segment_id, point_id);
         self.history
             .apply(&mut self.project, &cmd)
             .map_err(|e| match e {
@@ -811,12 +811,8 @@ impl AppState {
         segment_id_a: TrackSegmentId,
         segment_id_b: TrackSegmentId,
     ) -> Result<(), ProjectLayerError> {
-        let cmd = commands::ProjectCommand::join_segments(
-            layer_id,
-            track_id,
-            segment_id_a,
-            segment_id_b,
-        );
+        let cmd =
+            commands::ProjectCommand::join_segments(layer_id, track_id, segment_id_a, segment_id_b);
         self.history
             .apply(&mut self.project, &cmd)
             .map_err(|e| match e {
@@ -850,13 +846,7 @@ impl AppState {
                 .track_layers()
                 .iter()
                 .find(|l| l.id() == layer_id)
-                .map(|l| {
-                    l.tracks()
-                        .iter()
-                        .map(|t| t.id().value())
-                        .max()
-                        .unwrap_or(0)
-                })
+                .map(|l| l.tracks().iter().map(|t| t.id().value()).max().unwrap_or(0))
                 .unwrap_or(0);
             TrackId::new(max + 1)
         };
@@ -933,9 +923,8 @@ impl AppState {
             })
             .unwrap_or_default();
 
-        let cmd = commands::ProjectCommand::rename_waypoint(
-            layer_id, waypoint_id, old_name, new_name,
-        );
+        let cmd =
+            commands::ProjectCommand::rename_waypoint(layer_id, waypoint_id, old_name, new_name);
         self.history
             .apply(&mut self.project, &cmd)
             .map_err(|e| match e {
@@ -972,12 +961,7 @@ impl AppState {
             })
     }
 
-    pub fn set_track_line_width(
-        &mut self,
-        layer_id: LayerId,
-        track_id: TrackId,
-        width: f32,
-    ) {
+    pub fn set_track_line_width(&mut self, layer_id: LayerId, track_id: TrackId, width: f32) {
         if let Ok(track) = self.project.track_mut(layer_id.value(), track_id.value()) {
             track.style_mut().line_width = width.clamp(0.5, 20.0);
         }
@@ -1023,10 +1007,7 @@ impl AppState {
         let mut file = match std::fs::File::create(&path) {
             Ok(file) => file,
             Err(e) => {
-                self.update_status(
-                    DiagnosticLevel::Error,
-                    format!("Export failed: {e}"),
-                );
+                self.update_status(DiagnosticLevel::Error, format!("Export failed: {e}"));
                 return;
             }
         };
@@ -1176,7 +1157,10 @@ impl AppState {
             return;
         };
         let Some(selection) = active_map_selection_from_persisted(active_map) else {
-            self.update_status(DiagnosticLevel::Error, "Session restore skipped invalid active map kind");
+            self.update_status(
+                DiagnosticLevel::Error,
+                "Session restore skipped invalid active map kind",
+            );
             return;
         };
         if !selection.local_path.exists() {
@@ -1298,7 +1282,9 @@ fn persisted_active_map_from_selection(selection: &ActiveMapSelection) -> Persis
     }
 }
 
-fn active_map_selection_from_persisted(active_map: PersistedActiveMap) -> Option<ActiveMapSelection> {
+fn active_map_selection_from_persisted(
+    active_map: PersistedActiveMap,
+) -> Option<ActiveMapSelection> {
     let kind = match active_map.kind.as_str() {
         "sqlite" => ActiveMapKind::SqliteTiles,
         "ozi" => ActiveMapKind::OziRaster,
@@ -1363,10 +1349,8 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("time")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!(
-            "ozi-rs-{label}-{}-{unique}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("ozi-rs-{label}-{}-{unique}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("create temp session dir");
         dir
     }
@@ -1378,7 +1362,10 @@ mod tests {
                 name: "Demo Project".to_owned(),
                 url: "https://example.invalid/project".to_owned(),
             },
-            center: MapCenter { lat: 55.0, lon: 37.0 },
+            center: MapCenter {
+                lat: 55.0,
+                lon: 37.0,
+            },
             maps: vec![LizaMapPackage {
                 name: "demo-map".to_owned(),
                 file_name: "demo-map.sqlitedb".to_owned(),
@@ -1453,7 +1440,9 @@ mod tests {
             state
                 .recent_diagnostics()
                 .any(|entry| entry.level() == DiagnosticLevel::Error
-                    && entry.message().contains("Session restore skipped missing project")),
+                    && entry
+                        .message()
+                        .contains("Session restore skipped missing project")),
             "expected missing-project diagnostic"
         );
     }
@@ -1485,7 +1474,12 @@ mod tests {
             selected_project.maps[0].local_path.as_deref(),
             Some(selection.local_path.as_path())
         );
-        assert!(!state.lizaalert.downloading.contains(&selection.package_name));
+        assert!(
+            !state
+                .lizaalert
+                .downloading
+                .contains(&selection.package_name)
+        );
         assert_eq!(state.lizaalert.active_map.as_ref(), Some(&selection));
     }
 
@@ -1700,7 +1694,10 @@ mod tests {
         let file_name = path.file_name().and_then(|name| name.to_str());
 
         assert_eq!(file_name, Some("20240601_Иванов.plt"));
-        assert_eq!(path.parent().and_then(|dir| dir.file_name()), Some("10-Tracks".as_ref()));
+        assert_eq!(
+            path.parent().and_then(|dir| dir.file_name()),
+            Some("10-Tracks".as_ref())
+        );
     }
 
     #[test]
@@ -1748,7 +1745,11 @@ mod tests {
             .expect("default path returned");
 
         assert_eq!(path, PathBuf::from("Waypoints.wpt"));
-        assert!(path.parent().map(|p| p.as_os_str().is_empty()).unwrap_or(true));
+        assert!(
+            path.parent()
+                .map(|p| p.as_os_str().is_empty())
+                .unwrap_or(true)
+        );
     }
 
     #[test]
@@ -1770,7 +1771,10 @@ mod tests {
                 .join("restored-project")
                 .join("8-Android&iOS")
                 .join("restored.sqlitedb"),
-            center: MapCenter { lat: 55.0, lon: 37.0 },
+            center: MapCenter {
+                lat: 55.0,
+                lon: 37.0,
+            },
             base_zoom: 12,
         });
 
@@ -1778,6 +1782,12 @@ mod tests {
             .export_default_tracks_dir_path("20240601_Test", "gpx")
             .expect("restored active map default path");
 
-        assert!(path.ends_with(PathBuf::from("restored-project").join("10-Tracks").join("20240601_Test.gpx")));
+        assert!(
+            path.ends_with(
+                PathBuf::from("restored-project")
+                    .join("10-Tracks")
+                    .join("20240601_Test.gpx")
+            )
+        );
     }
 }

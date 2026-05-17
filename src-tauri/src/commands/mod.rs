@@ -144,10 +144,7 @@ fn format_track_color(style: &crate::domain::TrackStyle) -> String {
     )
 }
 
-fn to_track_summary_dto(
-    layer_id: u64,
-    track: &crate::domain::Track,
-) -> TrackSummaryDto {
+fn to_track_summary_dto(layer_id: u64, track: &crate::domain::Track) -> TrackSummaryDto {
     let style = track.style();
     let duration_seconds = track.total_duration().and_then(|d| {
         let secs = d.num_seconds();
@@ -1051,7 +1048,7 @@ pub fn rename_waypoint(
             WaypointId::new(waypoint_id),
             new_name,
         )
-         .map_err(|e| format!("{e}"))?;
+        .map_err(|e| format!("{e}"))?;
     let _ = app.emit("state-changed", ());
     Ok(())
 }
@@ -1192,9 +1189,7 @@ pub fn get_track_detail(
                     lat: pt.latitude(),
                     lon: pt.longitude(),
                     elevation: pt.elevation().map(|e| e as f32),
-                    timestamp: pt
-                        .timestamp()
-                        .map(|ts| ts.to_rfc3339()),
+                    timestamp: pt.timestamp().map(|ts| ts.to_rfc3339()),
                 })
                 .collect(),
         })
@@ -1218,10 +1213,7 @@ pub struct WaypointDto {
 }
 
 #[tauri::command]
-pub fn get_waypoints(
-    state: State<SharedState>,
-    layer_id: u64,
-) -> Result<Vec<WaypointDto>, String> {
+pub fn get_waypoints(state: State<SharedState>, layer_id: u64) -> Result<Vec<WaypointDto>, String> {
     use crate::domain::LayerId;
     let app_state = lock_app_state(state.inner())?;
     let lid = LayerId::new(layer_id);
@@ -1270,7 +1262,7 @@ pub fn get_simplified_preview(
     track_id: u64,
     tolerance: f64,
 ) -> Result<SimplifiedPreviewDto, String> {
-    use crate::domain::{simplify_track_points, LayerId, TrackId};
+    use crate::domain::{LayerId, TrackId, simplify_track_points};
     let app_state = lock_app_state(state.inner())?;
     let lid = LayerId::new(layer_id);
     let tid = TrackId::new(track_id);
@@ -1357,9 +1349,7 @@ pub fn create_empty_track(
 #[cfg(test)]
 mod tests {
     use super::{PointDetailDto, SegmentDetailDto, TrackDetailDto};
-    use crate::domain::{
-        Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
-    };
+    use crate::domain::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
 
     #[test]
     fn test_get_track_detail() {

@@ -517,8 +517,7 @@ fn appium_type_text_resolves_then_types() {
 #[test]
 fn appium_type_text_requires_a_selector() {
     // None selector
-    let result_none =
-        appium_type_text_with_session_id("http://127.0.0.1:9", "sid-9", None, "text");
+    let result_none = appium_type_text_with_session_id("http://127.0.0.1:9", "sid-9", None, "text");
     assert!(!result_none.ok, "{result_none:?}");
     assert_eq!(
         result_none.error_kind.as_deref(),
