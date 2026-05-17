@@ -3,19 +3,24 @@
   import { get } from "svelte/store";
   import { listen } from "@tauri-apps/api/event";
   import {
+    activeDownloadId,
     appState,
     appendProjectsChunk,
     busy,
     currentProject,
     downloadProgress,
     downloadingMaps,
+    noteBundleFileReady,
     projects,
     projectsLoading,
+    readyBundleFiles,
+    resetBundleDownloadState,
     status,
     syncProjectsFromAppState,
     updateDownloadProgress,
   } from "../lib/stores";
   import {
+    cancelDownload,
     loadProjects,
     loadProject,
     openSelectedMap,
@@ -24,6 +29,7 @@
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import type {
+    BundleFileReadyPayload,
     BundleProgressPayload,
     DownloadProgressPayload,
     LizaProjectSummaryDto,
@@ -33,6 +39,8 @@
   let selectedSlug = $state("");
   let bundleProgress = $state<BundleProgressPayload | null>(null);
   let refreshTimer: number | null = null;
+  // Current-file label derived from the most recent download-progress event.
+  let currentDownload = $state<DownloadProgressPayload | null>(null);
 
   async function refreshState() {
     await appState.refresh();
@@ -65,13 +73,20 @@
     const unlisten = await listen<void>("state-changed", scheduleRefresh);
     const unlistenProgress = await listen<DownloadProgressPayload>(
       "download-progress",
-      (e) => updateDownloadProgress(e.payload)
+      (e) => {
+        updateDownloadProgress(e.payload);
+        currentDownload = e.payload;
+      }
     );
     const unlistenBundleProgress = await listen<BundleProgressPayload>(
       "bundle-progress",
       (e) => {
         bundleProgress = e.payload;
       }
+    );
+    const unlistenBundleFileReady = await listen<BundleFileReadyPayload>(
+      "bundle-file-ready",
+      (e) => noteBundleFileReady(e.payload)
     );
     const unlistenProjectsChunk = await listen<LizaProjectSummaryDto[]>(
       "projects-chunk",
@@ -89,6 +104,7 @@
       unlisten();
       unlistenProgress();
       unlistenBundleProgress();
+      unlistenBundleFileReady();
       unlistenProjectsChunk();
       unlistenClose();
     };
@@ -105,9 +121,21 @@
     await loadProjects();
   }
 
-  async function handleSelectProject(slug: string) {
+  function handleSelectProject(slug: string) {
     selectedSlug = slug;
-    await loadProject(slug);
+    // Reset partial-bundle UI state before kicking off the new download.
+    // `loadProject` resolves once the Tauri command handler returns the
+    // download_id — NOT once the bundle finishes downloading. The download
+    // proceeds on a background Tokio task and progress arrives via events.
+    resetBundleDownloadState(null);
+    currentDownload = null;
+    loadProject(slug)
+      .then((id) => {
+        if (id) activeDownloadId.set(id);
+      })
+      .catch(() => {
+        /* errors surface via diagnostics */
+      });
   }
 
   async function handleOpenMap(mapName: string) {
@@ -116,7 +144,18 @@
 
   async function handleOpenLocalBundle() {
     const dir = await open({ directory: true, multiple: false });
-    if (dir) await openLocalBundle(dir as string);
+    if (dir) {
+      resetBundleDownloadState(null);
+      const id = await openLocalBundle(dir as string);
+      if (id) activeDownloadId.set(id);
+    }
+  }
+
+  async function handleCancelDownload() {
+    const id = $activeDownloadId;
+    if (!id) return;
+    await cancelDownload(id);
+    activeDownloadId.set(null);
   }
 
   async function handleSetBundlesRoot() {
@@ -135,6 +174,27 @@
       ? Math.round(((bundleProgress.completed ?? 0) / bundleProgress.total) * 100)
       : null
   );
+
+  /**
+   * Current-file label text — `Downloading 3 / 12 — 10-Tracks/foo.ozf2`.
+   * Returns null when there is no per-file event in flight (so the label
+   * hides cleanly).
+   */
+  const currentFileLabel = $derived.by(() => {
+    if (!currentDownload) return null;
+    if (
+      currentDownload.file_index == null ||
+      currentDownload.file_count == null
+    )
+      return null;
+    return `${currentDownload.file_index + 1} / ${currentDownload.file_count} — ${currentDownload.package_name}`;
+  });
+
+  // A bundle becomes openable as soon as at least one file is ready. The MVP
+  // contract is intentionally permissive: any file ready ⇒ the user can hit
+  // "Open bundle now" because parsers tolerate missing references and the
+  // operator wants the map ASAP.
+  const canOpenPartial = $derived($readyBundleFiles.length > 0 && $busy);
 </script>
 
 <div class="root">
@@ -250,6 +310,16 @@
     {/if}
     <div class="status-main">
       <span class="status-text">{bundleProgress?.message ?? $status}</span>
+      {#if currentFileLabel}
+        <span class="current-file" data-testid="current-file-label">
+          Downloading {currentFileLabel}
+        </span>
+      {/if}
+      {#if currentDownload && currentDownload.total_bytes == null && currentDownload.downloaded_bytes > 0}
+        <div class="bundle-track" data-testid="indeterminate-bar">
+          <div class="bundle-fill indeterminate-bar"></div>
+        </div>
+      {/if}
       {#if bundleProgress}
         <div class="bundle-meta">
           {#if bundleProgress.total != null}
@@ -267,6 +337,33 @@
             <div class="bundle-fill" style={`width: ${bundlePercent}%`}></div>
           </div>
         {/if}
+      {/if}
+      {#if $readyBundleFiles.length > 0}
+        <div class="ready-files" data-testid="ready-files">
+          {#each $readyBundleFiles as f (f.package_name)}
+            <div class="ready-row">
+              <span class="ready-tick">✓</span>
+              <span class="ready-name">{f.package_name}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    <div class="status-actions">
+      {#if canOpenPartial}
+        <!-- Opening a partial bundle just refreshes the current view; the
+             backend already exposes ready files through `current_project`.
+             Future versions may fire a dedicated `open_partial_bundle`
+             command. -->
+        <button class="action-btn" data-testid="open-bundle-now" onclick={refreshState}>
+          Open bundle now
+        </button>
+      {/if}
+      {#if $activeDownloadId && $busy}
+        <button
+          class="action-btn"
+          data-testid="cancel-download"
+          onclick={handleCancelDownload}>Cancel</button>
       {/if}
     </div>
   </div>
@@ -553,6 +650,74 @@
     height: 100%;
     background: linear-gradient(90deg, var(--ctp-blue), var(--ctp-teal));
     transition: width 0.2s ease;
+  }
+
+  @keyframes indeterminate-bar {
+    0% { margin-left: -40%; width: 40%; }
+    100% { margin-left: 100%; width: 40%; }
+  }
+
+  .bundle-fill.indeterminate-bar {
+    animation: indeterminate-bar 1.2s ease-in-out infinite;
+    background: var(--ctp-blue);
+  }
+
+  .current-file {
+    font-size: 10px;
+    color: var(--ctp-subtext1);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ready-files {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 80px;
+    overflow-y: auto;
+    margin-top: 2px;
+  }
+
+  .ready-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--ctp-subtext0);
+  }
+
+  .ready-tick {
+    color: var(--ctp-green);
+    font-weight: 700;
+  }
+
+  .ready-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .action-btn {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: var(--ctp-surface1);
+    color: var(--ctp-text);
+    border: 1px solid var(--ctp-surface2);
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .action-btn:hover {
+    background: var(--ctp-surface2);
   }
 
   @keyframes spin {
