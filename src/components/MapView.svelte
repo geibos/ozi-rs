@@ -17,6 +17,7 @@
     drawingFinishRequested,
     drawingSegmentId,
     simplifyState,
+    visibleWaypointLayers,
   } from "../lib/stores";
   import {
     deleteTrackPoint,
@@ -41,7 +42,9 @@
   let appliedMapPath: string | null = null;
   let pointMarkers: maplibregl.Marker[] = [];
   let markerElements = new Map<number, HTMLDivElement>();
-  let waypointMarkers: maplibregl.Marker[] = [];
+  // Keyed by `${layerId}:${waypointId}` so that toggling a single layer's
+  // visibility removes only that layer's markers without disturbing the rest.
+  let waypointMarkers = new Map<string, maplibregl.Marker>();
   let drawingPreviewPoints: Array<{ lat: number; lon: number }> = [];
   let drawingCommandCount = 0;
   let pendingDrawingClickTimeout: number | null = null;
@@ -287,48 +290,79 @@
   }
 
   function clearWaypointMarkers() {
-    for (const m of waypointMarkers) {
+    for (const m of waypointMarkers.values()) {
       m.remove();
     }
-    waypointMarkers = [];
+    waypointMarkers.clear();
   }
 
+  function waypointMarkerKey(layerId: bigint, waypointId: number): string {
+    return `${layerId.toString()}:${waypointId}`;
+  }
+
+  /**
+   * Renders waypoint markers from every visible waypoint layer in the current
+   * project. Edit interactions (drag-to-move) are routed only for markers
+   * belonging to the active waypoint layer; markers from inactive layers are
+   * rendered as read-only context (no drag handle) so switching the active
+   * layer is non-destructive — markers from other layers stay on screen.
+   */
   async function refreshWaypointMarkers() {
     if (!map) return;
     clearWaypointMarkers();
-    const layerId = $activeWaypointLayerId;
-    if (!$appState || $appState.waypoint_layer_count === 0 || layerId === null) return;
-    try {
-      const waypoints = await getWaypoints(layerId);
+    if (!$appState || $appState.waypoint_layer_count === 0) return;
+
+    const activeId = $activeWaypointLayerId;
+    const layers = $visibleWaypointLayers;
+
+    for (const layer of layers) {
+      const layerId = BigInt(layer.id);
+      const isActive = activeId !== null && layerId === activeId;
+      let waypoints;
+      try {
+        waypoints = await getWaypoints(layerId);
+      } catch {
+        // layer may not yet exist on the backend; skip gracefully.
+        continue;
+      }
+
       for (const wp of waypoints) {
+        if (wp.visible === false) continue;
+
         const el = document.createElement("div");
         el.className = "waypoint-marker";
-        el.style.cursor = "grab";
-        const wpId = wp.id;
-        const marker = new maplibregl.Marker({ element: el, draggable: true })
+        if (!isActive) {
+          // Visual cue that this marker belongs to an inactive layer
+          // (read-only context). Drag is disabled below.
+          el.classList.add("inactive-layer");
+        }
+        el.style.cursor = isActive ? "grab" : "default";
+
+        const marker = new maplibregl.Marker({ element: el, draggable: isActive })
           .setLngLat([wp.lon, wp.lat])
           .setPopup(new maplibregl.Popup({ offset: 16 }).setText(wp.name))
           .addTo(map);
 
-        marker.on("dragstart", () => {
-          el.style.cursor = "grabbing";
-        });
+        if (isActive) {
+          const wpId = wp.id;
+          marker.on("dragstart", () => {
+            el.style.cursor = "grabbing";
+          });
 
-        marker.on("dragend", async () => {
-          el.style.cursor = "grab";
-          const lngLat = marker.getLngLat();
-          try {
-            await moveWaypoint(layerId, BigInt(wpId), [lngLat.lat, lngLat.lng]);
-          } catch (error) {
-            console.error("Failed to move waypoint", error);
-            marker.setLngLat([wp.lon, wp.lat]);
-          }
-        });
+          marker.on("dragend", async () => {
+            el.style.cursor = "grab";
+            const lngLat = marker.getLngLat();
+            try {
+              await moveWaypoint(layerId, BigInt(wpId), [lngLat.lat, lngLat.lng]);
+            } catch (error) {
+              console.error("Failed to move waypoint", error);
+              marker.setLngLat([wp.lon, wp.lat]);
+            }
+          });
+        }
 
-        waypointMarkers.push(marker);
+        waypointMarkers.set(waypointMarkerKey(layerId, wp.id), marker);
       }
-    } catch {
-      // layer may not exist yet
     }
   }
 
@@ -886,5 +920,10 @@
 
   :global(.waypoint-marker:active) {
     cursor: grabbing;
+  }
+
+  :global(.waypoint-marker.inactive-layer) {
+    opacity: 0.6;
+    cursor: default;
   }
 </style>
