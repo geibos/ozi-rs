@@ -31,7 +31,8 @@
   } from "../lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import { openBundleLoader } from "../lib/windows";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
 
   async function handleImportGpx() {
     const path = await open({ multiple: false, filters: [{ name: "GPX", extensions: ["gpx", "zip"] }] });
@@ -109,7 +110,7 @@
 
   <div class="section">
     <div class="section-title">Map</div>
-    <button class="full primary" onclick={openBundleLoader}>Maps…</button>
+    <button class="full primary" onclick={() => goto(resolve("/"))}>Maps…</button>
 
     {#if $activeMap}
       <div class="active-map">

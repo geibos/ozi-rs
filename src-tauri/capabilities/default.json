@@ -2,16 +2,9 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema/acl-manifest.json",
   "identifier": "default",
   "description": "Default permissions for all windows",
-  "windows": ["main", "bundles"],
+  "windows": ["main"],
   "permissions": [
     "core:default",
-    "core:window:allow-create",
-    "core:window:allow-get-all-windows",
-    "core:window:allow-hide",
-    "core:window:allow-set-focus",
-    "core:window:allow-show",
-    "core:webview:allow-create-webview",
-    "core:webview:allow-create-webview-window",
     "dialog:allow-open",
     "dialog:allow-save",
     "shell:allow-open"
