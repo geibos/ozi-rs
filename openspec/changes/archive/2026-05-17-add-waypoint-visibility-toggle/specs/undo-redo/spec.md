@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: Style and visibility mutations bypass the command stack
+### Requirement: Track style mutations bypass the command stack
 
 The system SHALL NOT route `set_track_color`, `set_track_line_width`, `toggle_track_visible`, or `toggle_waypoint_visible` through the undo stack. These mutations SHALL apply immediately and SHALL NOT add undo steps.
 
