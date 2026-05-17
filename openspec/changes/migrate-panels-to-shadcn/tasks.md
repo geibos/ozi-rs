@@ -1,14 +1,14 @@
 ## 1. Validate deltas
 
-- [ ] 1.1 Run `openspec validate migrate-panels-to-shadcn --strict` and confirm the `ui-shell` MODIFIED requirement parses with at least one scenario.
-- [ ] 1.2 Confirm the full-text copy of every MODIFIED requirement matches the current `openspec/specs/ui-shell/spec.md` body before any new requirements / scenarios are added.
-- [ ] 1.3 Confirm both predecessor changes (`migrate-to-sveltekit` and `add-design-tokens-and-shadcn`) are merged before starting Section 2.
+- [x] 1.1 Run `openspec validate migrate-panels-to-shadcn --strict` and confirm the `ui-shell` MODIFIED requirement parses with at least one scenario.
+- [x] 1.2 Confirm the full-text copy of every MODIFIED requirement matches the current `openspec/specs/ui-shell/spec.md` body before any new requirements / scenarios are added.
+- [x] 1.3 Confirm both predecessor changes (`migrate-to-sveltekit` and `add-design-tokens-and-shadcn`) are merged before starting Section 2.
 
 ## 2. Console.svelte (step 3.1)
 
-- [ ] 2.1 Replace the outer `<div class="console">` with `Card` (header + content), the log body with `ScrollArea`, and the close `<button>` with `Button` (icon variant).
-- [ ] 2.2 Delete the component-local `<style>` block; replace with Tailwind utility classes that read semantic tokens (`bg-card`, `text-card-foreground`, `border-border`).
-- [ ] 2.3 Keep the backtick / Escape `onkeydown` handler and the `$effect`-driven autoscroll untouched.
+- [x] 2.1 Replace the outer `<div class="console">` with `Card` (header + content), the log body with `ScrollArea`, and the close `<button>` with `Button` (icon variant).
+- [x] 2.2 Delete the component-local `<style>` block; replace with Tailwind utility classes that read semantic tokens (`bg-card`, `text-card-foreground`, `border-border`).
+- [x] 2.3 Keep the backtick / Escape `onkeydown` handler and the `$effect`-driven autoscroll untouched.
 - [ ] 2.4 Verify the Console looks correct in all four Catppuccin flavours via `ozi-rs-mcp` screenshots (Latte, Frappé, Macchiato, Mocha).
 - [ ] 2.5 Smoke-test: press backtick to open, press backtick again to close; trigger a diagnostic and confirm autoscroll lands at the bottom of the new line.
 
