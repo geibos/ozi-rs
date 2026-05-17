@@ -75,6 +75,8 @@ Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
 | `import_plt` | Import PLT file |
 | `export_gpx` | Export track layer to GPX |
 | `export_track_plt` | Export single track to PLT |
+| `export_wpt_waypoints` | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF) |
+| `get_wpt_export_default_path` | Suggest WPT export path (`<bundle>/<layer>.wpt`) |
 
 ### Track Mutations (via CommandStack, undoable)
 

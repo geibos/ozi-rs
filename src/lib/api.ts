@@ -70,6 +70,19 @@ export async function exportTrackPlt(
   return invoke("export_track_plt", { layerId, trackId, path });
 }
 
+export async function exportWptWaypoints(
+  layerId: bigint,
+  path: string
+): Promise<void> {
+  return invoke("export_wpt_waypoints", { layerId, path });
+}
+
+export async function getWptExportDefaultPath(
+  layerId: bigint
+): Promise<string | null> {
+  return invoke("get_wpt_export_default_path", { layerId });
+}
+
 export async function undo(): Promise<void> {
   return invoke("undo");
 }

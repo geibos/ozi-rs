@@ -11,7 +11,10 @@
     renameWaypoint,
     setWaypointSymbol,
     toggleWaypointVisible,
+    exportWptWaypoints,
+    getWptExportDefaultPath,
   } from "../lib/api";
+  import { open } from "@tauri-apps/plugin-dialog";
   import type { WaypointData } from "../lib/types";
   import SymbolPicker from "./SymbolPicker.svelte";
 
@@ -80,11 +83,23 @@
     const layerId = $activeWaypointLayerId;
     if (layerId === null) return;
     await toggleWaypointVisible(layerId, BigInt(wp.id));
-    // Optimistically update local list so the checkbox reflects the change
-    // even before the `state-changed` event triggers a full refresh.
     waypoints = waypoints.map((w) =>
       w.id === wp.id ? { ...w, visible: !w.visible } : w
     );
+  }
+
+  async function handleExportWpt() {
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null || waypoints.length === 0) return;
+    const defaultPath = await getWptExportDefaultPath(layerId);
+    const path = await open({
+      save: true,
+      defaultPath: defaultPath ?? "waypoints.wpt",
+      filters: [{ name: "OziExplorer WPT", extensions: ["wpt"] }],
+    } as Parameters<typeof open>[0]);
+    if (path) {
+      await exportWptWaypoints(layerId, path as string);
+    }
   }
 </script>
 
@@ -92,7 +107,15 @@
   <div class="panel">
     <div class="panel-header">
       <span>Waypoints ({waypoints.length})</span>
-      <button onclick={() => waypointsPanelOpen.set(false)}>✕</button>
+      <div class="header-actions">
+        <button
+          class="export-btn"
+          disabled={waypoints.length === 0}
+          title={waypoints.length === 0 ? "No waypoints to export" : "Export waypoints (WPT)"}
+          onclick={handleExportWpt}
+        >Export WPT</button>
+        <button onclick={() => waypointsPanelOpen.set(false)}>✕</button>
+      </div>
     </div>
     <div class="panel-body">
       {#if waypoints.length === 0}
@@ -181,6 +204,31 @@
     border: none;
     color: var(--ctp-overlay1);
     padding: 0 2px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .export-btn {
+    font-size: 11px;
+    padding: 1px 6px !important;
+    border: 1px solid var(--ctp-surface0) !important;
+    border-radius: 3px;
+    color: var(--ctp-text) !important;
+    cursor: pointer;
+  }
+
+  .export-btn:disabled {
+    color: var(--ctp-overlay0) !important;
+    cursor: not-allowed;
+    border-color: var(--ctp-surface0) !important;
+  }
+
+  .export-btn:not(:disabled):hover {
+    background: var(--ctp-surface0);
   }
 
   .panel-body {

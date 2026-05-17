@@ -61,6 +61,8 @@ pub fn run() {
             commands::get_simplified_preview,
             commands::reveal_bundle,
             commands::export_track_plt,
+            commands::export_wpt_waypoints,
+            commands::get_wpt_export_default_path,
             commands::create_empty_track,
             commands::tiles::get_sqlite_tile,
             commands::tiles::get_ozi_tile,
