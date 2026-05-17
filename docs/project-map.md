@@ -18,18 +18,31 @@ ozi-rs/
 ├── docs/                   # All design docs (this is your map).
 │   └── adr/                # 19 architecture decision records (ADR-0001..0019).
 │
-├── src/                    # Svelte 5 + MapLibre frontend.
-│   ├── App.svelte          # Main window root.
-│   ├── main.ts             # Entry; routes ?view=bundles to BundleLoaderView.
-│   ├── components/         # MapView, Sidebar, panels, pickers, console.
-│   ├── views/              # BundleLoaderView (separate Tauri webview).
+├── src/                    # Svelte 5 + SvelteKit (adapter-static) + MapLibre frontend.
+│   ├── app.css             # Tailwind 4 entry + semantic-token layer.
+│   ├── app.html            # SvelteKit document shell.
+│   ├── routes/             # File-based routing:
+│   │   ├── +layout.svelte  # Single host for Sidebar slot, MapView (mounted once),
+│   │   │                   # Console, Toaster, and global Tooltip.Provider.
+│   │   ├── +layout.ts      # `ssr=false`, `prerender=true`.
+│   │   ├── +page.svelte    # `/` — bundle loader (project + map lists).
+│   │   └── project/+page.svelte  # `/project` — workspace (Sidebar + floating panels).
+│   ├── components/         # Feature components: MapView, Sidebar, panels, pickers, console.
+│   │                       # All migrated to shadcn-svelte primitives + Tailwind in
+│   │                       # `migrate-panels-to-shadcn`; no component-local `<style>`
+│   │                       # blocks except MapView's load-bearing :global() marker rules.
 │   ├── lib/
 │   │   ├── api.ts          # Typed Tauri IPC wrappers — never bypass.
 │   │   ├── stores.ts       # Svelte stores (synced + UI-only).
 │   │   ├── types.ts        # TS DTOs mirroring Rust structs (manual sync).
-│   │   ├── theme.ts        # Catppuccin CSS custom properties.
-│   │   ├── windows.ts      # Bundle-loader webview lifecycle helpers.
+│   │   ├── theme.ts        # Catppuccin palette + semantic-token layer (light/dark maps).
+│   │   ├── utils.ts        # `cn()` helper (twMerge ∘ clsx) for shadcn primitives.
 │   │   ├── track-names.ts  # OK-standard regex.
+│   │   ├── components/
+│   │   │   └── ui/         # shadcn-svelte primitives over bits-ui: button, card, dialog,
+│   │   │                   # popover, scroll-area, select, separator, slider, sonner,
+│   │   │                   # switch, table, tabs, tooltip, label, input.
+│   │   ├── forms/          # felte + zod helpers (`create-form.ts`, `schemas/`).
 │   │   └── maplibre/       # Tile protocols and track GeoJSON layer.
 │   └── test/               # Vitest specs.
 │
@@ -73,8 +86,9 @@ Sibling repository `../ozf2-rs` (path dependency) supplies the OZF2 raster decod
 | Svelte stores | `src/lib/stores.ts` | n/a | frontend-architecture.md |
 | Typed IPC wrappers | `src/lib/api.ts` | n/a | frontend-architecture.md |
 | OK-standard validation | `src/lib/track-names.ts` (UI only) | `src/test/track-name-validation.test.ts` | ADR-0019, feature-status.md |
-| Bundle-loader window | `src/lib/windows.ts`, `src/main.ts`, `src/views/BundleLoaderView.svelte` | n/a | frontend-architecture.md |
-| Catppuccin theming | `src/lib/theme.ts` | n/a | frontend-architecture.md |
+| Bundle loader (single-window) | `src/routes/+page.svelte` | n/a | frontend-architecture.md |
+| shadcn-svelte primitives | `src/lib/components/ui/` (button, dialog, popover, select, scroll-area, slider, switch, separator, sonner, table, tabs, tooltip, …) | n/a | frontend-architecture.md, `add-design-tokens-and-shadcn`, `migrate-panels-to-shadcn` |
+| Catppuccin theming + semantic tokens | `src/lib/theme.ts`, `src/app.css` | n/a | frontend-architecture.md |
 | Native QA / desktop checks | `tools/ozi-rs-mcp/` | `tools/ozi-rs-mcp/tests/` | native-qa-mcp.md, testing-strategy.md |
 
 ## Common tasks → entry points
