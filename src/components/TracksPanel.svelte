@@ -12,6 +12,7 @@
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { isOkStandardTrackName } from "../lib/track-names";
+  import { formatTrackStats } from "../lib/track-stats";
   import SimplifyPanel from "./SimplifyPanel.svelte";
 
   interface TrackFeature {
@@ -21,6 +22,9 @@
     color: string;
     lineWidth: number;
     visible: boolean;
+    distanceKm: number;
+    durationSeconds: number | null;
+    pointCount: number;
   }
 
   let tracks: TrackFeature[] = $state([]);
@@ -41,14 +45,26 @@
     const geojson = await getTracksGeojson();
     tracks = geojson.features
       .filter((f) => f.geometry.type === "LineString")
-      .map((f) => ({
-        layerId: BigInt(f.properties!.layer_id as number),
-        trackId: BigInt(f.properties!.track_id as number),
-        name: f.properties!.name as string,
-        color: f.properties!.color as string,
-        lineWidth: Number(f.properties!.line_width ?? 3),
-        visible: f.properties!.visible as boolean,
-      }));
+      .map((f) => {
+        const rawDuration = f.properties!.duration_seconds as
+          | number
+          | null
+          | undefined;
+        return {
+          layerId: BigInt(f.properties!.layer_id as number),
+          trackId: BigInt(f.properties!.track_id as number),
+          name: f.properties!.name as string,
+          color: f.properties!.color as string,
+          lineWidth: Number(f.properties!.line_width ?? 3),
+          visible: f.properties!.visible as boolean,
+          distanceKm: Number(f.properties!.distance_km ?? 0),
+          durationSeconds:
+            rawDuration === null || rawDuration === undefined
+              ? null
+              : Number(rawDuration),
+          pointCount: Number(f.properties!.point_count ?? 0),
+        };
+      });
   }
 
   function colorToHex(color: string) {
@@ -214,6 +230,13 @@
                 {#if !isOkStandardTrackName(track.name)}
                   <span class="ok-name-warning">Use YYYYMMDD_Callsign</span>
                 {/if}
+                <span class="track-stats" data-testid="track-stats">
+                  {formatTrackStats(
+                    track.distanceKm,
+                    track.durationSeconds,
+                    track.pointCount
+                  )}
+                </span>
               {/if}
             </div>
 
@@ -392,6 +415,15 @@
     color: var(--ctp-yellow);
     font-size: 10px;
     line-height: 1.1;
+  }
+
+  .track-stats {
+    color: var(--ctp-overlay1);
+    font-size: 10px;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .actions {

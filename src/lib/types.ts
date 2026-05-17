@@ -38,6 +38,25 @@ export interface LayerSummaryDto {
   name: string;
 }
 
+/**
+ * Per-track summary surfaced to the UI. Mirrors `TrackSummaryDto` in
+ * `src-tauri/src/commands/mod.rs`.
+ *
+ * `duration_seconds` is null when none of the track points carry timestamps,
+ * in which case the UI must omit the duration segment.
+ */
+export interface TrackSummary {
+  layer_id: number;
+  track_id: number;
+  name: string;
+  color: string;
+  line_width: number;
+  visible: boolean;
+  distance_km: number;
+  duration_seconds: number | null;
+  point_count: number;
+}
+
 export interface AppStateDto {
   project_name: string;
   project_saved: boolean;
@@ -52,6 +71,7 @@ export interface AppStateDto {
   waypoint_layers: LayerSummaryDto[];
   track_layer_count: number;
   waypoint_layer_count: number;
+  tracks: TrackSummary[];
 }
 
 export interface OziLevelDto {

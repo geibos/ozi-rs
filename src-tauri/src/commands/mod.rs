@@ -42,12 +42,31 @@ pub struct AppStateDto {
     pub waypoint_layers: Vec<LayerSummaryDto>,
     pub track_layer_count: usize,
     pub waypoint_layer_count: usize,
+    pub tracks: Vec<TrackSummaryDto>,
 }
 
 #[derive(serde::Serialize, Clone)]
 pub struct LayerSummaryDto {
     pub id: u64,
     pub name: String,
+}
+
+/// Per-track summary surfaced to the UI for the Tracks panel rows.
+///
+/// Includes derived statistics (distance, duration, point count) computed
+/// from the domain `Track` so the frontend can render them without re-walking
+/// the segment data.
+#[derive(serde::Serialize, Clone)]
+pub struct TrackSummaryDto {
+    pub layer_id: u64,
+    pub track_id: u64,
+    pub name: String,
+    pub color: String,
+    pub line_width: f32,
+    pub visible: bool,
+    pub distance_km: f64,
+    pub duration_seconds: Option<u64>,
+    pub point_count: u32,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -80,6 +99,36 @@ pub struct ActiveMapDto {
     pub center_lat: f64,
     pub center_lon: f64,
     pub base_zoom: u8,
+}
+
+fn format_track_color(style: &crate::domain::TrackStyle) -> String {
+    let [r, g, b, a] = style.color;
+    format!(
+        "rgba({r},{g},{b},{:.3})",
+        a as f64 / 255.0 * style.opacity as f64
+    )
+}
+
+fn to_track_summary_dto(
+    layer_id: u64,
+    track: &crate::domain::Track,
+) -> TrackSummaryDto {
+    let style = track.style();
+    let duration_seconds = track.total_duration().and_then(|d| {
+        let secs = d.num_seconds();
+        if secs < 0 { None } else { Some(secs as u64) }
+    });
+    TrackSummaryDto {
+        layer_id,
+        track_id: track.id().value(),
+        name: track.name().to_owned(),
+        color: format_track_color(style),
+        line_width: style.line_width,
+        visible: style.visible,
+        distance_km: track.total_distance_km(),
+        duration_seconds,
+        point_count: track.point_count() as u32,
+    }
 }
 
 fn to_project_summary_dtos(projects: &[LizaProjectSummary]) -> Vec<LizaProjectSummaryDto> {
@@ -173,6 +222,18 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         })
         .collect();
 
+    let tracks: Vec<TrackSummaryDto> = s
+        .track_layers()
+        .iter()
+        .flat_map(|layer| {
+            let layer_id = layer.id().value();
+            layer
+                .tracks()
+                .iter()
+                .map(move |track| to_track_summary_dto(layer_id, track))
+        })
+        .collect();
+
     let waypoint_layers = s
         .project_waypoint_layers()
         .iter()
@@ -196,6 +257,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         waypoint_layers,
         track_layer_count: s.track_layer_count(),
         waypoint_layer_count: s.waypoint_layer_count(),
+        tracks,
     })
 }
 
@@ -210,12 +272,7 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
         // LayerId has .value(); TrackId is #[serde(transparent)] so it serializes as u64
         let layer_id_val = layer.id().value();
         for track in layer.tracks() {
-            let style = track.style();
-            let [r, g, b, a] = style.color;
-            let color = format!(
-                "rgba({r},{g},{b},{:.3})",
-                a as f64 / 255.0 * style.opacity as f64
-            );
+            let summary = to_track_summary_dto(layer_id_val, track);
 
             let coords: Vec<serde_json::Value> = track
                 .segments()
@@ -231,12 +288,15 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
             features.push(serde_json::json!({
                 "type": "Feature",
                 "properties": {
-                    "layer_id": layer_id_val,
-                    "track_id": track.id(),
-                    "name": track.name(),
-                    "color": color,
-                    "line_width": style.line_width,
-                    "visible": style.visible,
+                    "layer_id": summary.layer_id,
+                    "track_id": summary.track_id,
+                    "name": summary.name,
+                    "color": summary.color,
+                    "line_width": summary.line_width,
+                    "visible": summary.visible,
+                    "distance_km": summary.distance_km,
+                    "duration_seconds": summary.duration_seconds,
+                    "point_count": summary.point_count,
                 },
                 "geometry": {
                     "type": "LineString",
@@ -510,6 +570,31 @@ pub fn get_track_export_default_path(
 ) -> Result<Option<String>, String> {
     Ok(lock_app_state(state.inner())?
         .export_default_tracks_dir_path(&track_name, &extension)
+        .map(|path| path.display().to_string()))
+}
+
+#[tauri::command]
+pub fn export_wpt_waypoints(
+    layer_id: u64,
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    lock_app_state(state.inner())?
+        .export_wpt_waypoints(LayerId::new(layer_id), PathBuf::from(path));
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_wpt_export_default_path(
+    layer_id: u64,
+    state: State<SharedState>,
+) -> Result<Option<String>, String> {
+    use crate::domain::LayerId;
+    Ok(lock_app_state(state.inner())?
+        .export_wpt_default_path(LayerId::new(layer_id))
         .map(|path| path.display().to_string()))
 }
 
