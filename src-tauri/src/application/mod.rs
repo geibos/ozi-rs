@@ -593,6 +593,18 @@ impl AppState {
             .set_track_visible_in_layer(layer_id, track_id, !visible);
     }
 
+    /// Flip a waypoint's visibility flag. Non-undoable — mirrors
+    /// `toggle_track_visible` and never enters the undo stack.
+    pub fn toggle_waypoint_visible(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: crate::domain::WaypointId,
+    ) {
+        let _ = self
+            .project
+            .toggle_waypoint_visible_in_layer(layer_id, waypoint_id);
+    }
+
     pub fn rename_track(&mut self, layer_id: LayerId, track_id: TrackId, new_name: String) {
         let old_name = self
             .project
@@ -1397,6 +1409,76 @@ mod tests {
 
         let second_request = state.begin_open_map(&selection.package_name);
         assert!(matches!(second_request, Some(OpenMapRequest::Local(_))));
+    }
+
+    #[test]
+    fn toggle_waypoint_visible_flips_flag_and_is_not_undoable() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let waypoint_id = WaypointId::new(1);
+
+        state
+            .project
+            .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667))
+            .unwrap();
+
+        // A waypoint that has been added through the undoable add-waypoint
+        // path would push an entry; here we add directly to the layer so
+        // the stack starts empty. Use a real undoable mutation to make
+        // the test meaningful.
+        state
+            .apply_set_waypoint_symbol(layer_id, waypoint_id, Some("camp".to_owned()))
+            .unwrap();
+        let undo_depth_before_toggle = state.history.undo_depth();
+        assert_eq!(undo_depth_before_toggle, 1);
+
+        // Default is visible == true.
+        assert!(state.project.waypoint_layers()[0].waypoints()[0].visible());
+
+        state.toggle_waypoint_visible(layer_id, waypoint_id);
+        assert!(!state.project.waypoint_layers()[0].waypoints()[0].visible());
+        assert_eq!(
+            state.history.undo_depth(),
+            undo_depth_before_toggle,
+            "toggle_waypoint_visible SHALL NOT push an undo entry"
+        );
+
+        state.toggle_waypoint_visible(layer_id, waypoint_id);
+        assert!(state.project.waypoint_layers()[0].waypoints()[0].visible());
+        assert_eq!(
+            state.history.undo_depth(),
+            undo_depth_before_toggle,
+            "toggle_waypoint_visible (second flip) SHALL NOT push an undo entry"
+        );
+
+        // Undo SHALL revert the symbol change (not the visibility toggles).
+        state.undo();
+        assert_eq!(
+            state.project.waypoint_layers()[0].waypoints()[0].symbol(),
+            None
+        );
+        // Visibility stays as last toggled.
+        assert!(state.project.waypoint_layers()[0].waypoints()[0].visible());
+    }
+
+    #[test]
+    fn toggle_waypoint_visible_is_a_no_op_for_missing_waypoint() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        state
+            .project
+            .add_waypoint_to_layer(
+                layer_id,
+                Waypoint::new(WaypointId::new(1), "Camp", 53.9, 27.5667),
+            )
+            .unwrap();
+
+        let before = state.project.clone();
+        state.toggle_waypoint_visible(layer_id, WaypointId::new(999));
+        assert_eq!(state.project, before);
+
+        state.toggle_waypoint_visible(LayerId::new(99), WaypointId::new(1));
+        assert_eq!(state.project, before);
     }
 
     #[test]

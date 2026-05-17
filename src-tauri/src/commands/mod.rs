@@ -631,6 +631,20 @@ pub fn toggle_track_visible(
     Ok(())
 }
 
+#[tauri::command]
+pub fn toggle_waypoint_visible(
+    layer_id: u64,
+    waypoint_id: u64,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state.toggle_waypoint_visible(LayerId::new(layer_id), WaypointId::new(waypoint_id));
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Track point and track mutations ───────────────────────────────────────────
 
 #[tauri::command]
@@ -967,6 +981,7 @@ pub struct WaypointDto {
     pub lat: f64,
     pub lon: f64,
     pub symbol: Option<String>,
+    pub visible: bool,
 }
 
 #[tauri::command]
@@ -993,6 +1008,7 @@ pub fn get_waypoints(
             lat: w.latitude(),
             lon: w.longitude(),
             symbol: w.symbol().map(str::to_owned),
+            visible: w.visible(),
         })
         .collect();
 

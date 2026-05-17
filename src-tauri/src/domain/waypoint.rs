@@ -21,6 +21,16 @@ pub struct Waypoint {
     symbol: Option<String>,
     latitude: f64,
     longitude: f64,
+    /// Whether this waypoint is rendered on the map. Defaults to `true`.
+    ///
+    /// Marked with `#[serde(default = "default_true")]` so legacy `.ozp`
+    /// files without the field deserialize as visible.
+    #[serde(default = "default_true")]
+    visible: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Waypoint {
@@ -31,6 +41,7 @@ impl Waypoint {
             symbol: None,
             latitude,
             longitude,
+            visible: true,
         }
     }
 
@@ -66,6 +77,22 @@ impl Waypoint {
     pub fn set_symbol(&mut self, symbol: Option<String>) -> Option<String> {
         std::mem::replace(&mut self.symbol, symbol)
     }
+
+    pub const fn visible(&self) -> bool {
+        self.visible
+    }
+
+    /// Flip the visibility flag and return the new value.
+    ///
+    /// Visibility is a non-undoable style mutation; mirrors `TrackStyle.visible`.
+    pub fn toggle_visible(&mut self) -> bool {
+        self.visible = !self.visible;
+        self.visible
+    }
+
+    pub fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
 }
 
 #[cfg(test)]
@@ -90,6 +117,50 @@ mod tests {
 
         assert_eq!(waypoint.latitude(), 54.1);
         assert_eq!(waypoint.longitude(), 27.8);
+    }
+
+    #[test]
+    fn waypoint_default_visible_is_true_and_toggle_flips() {
+        let mut waypoint = Waypoint::new(WaypointId::new(8), "Camp", 53.9, 27.5667);
+
+        assert!(waypoint.visible(), "new waypoints SHALL default to visible");
+        assert!(!waypoint.toggle_visible());
+        assert!(!waypoint.visible());
+        assert!(waypoint.toggle_visible());
+        assert!(waypoint.visible());
+    }
+
+    #[test]
+    fn waypoint_serde_round_trip_preserves_visible_field() {
+        let mut waypoint = Waypoint::new(WaypointId::new(8), "Camp", 53.9, 27.5667);
+        waypoint.set_visible(false);
+
+        let json = serde_json::to_string(&waypoint).expect("serialize");
+        assert!(json.contains("\"visible\":false"), "serialized JSON must include visible flag: {json}");
+
+        let restored: Waypoint = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored, waypoint);
+        assert!(!restored.visible());
+    }
+
+    #[test]
+    fn waypoint_legacy_json_without_visible_field_deserializes_as_visible() {
+        // Pre-change `.ozp` files have no `visible` field — they must
+        // deserialize as visible.
+        let legacy = r#"{
+            "id": 8,
+            "name": "Camp",
+            "symbol": null,
+            "latitude": 53.9,
+            "longitude": 27.5667
+        }"#;
+
+        let waypoint: Waypoint = serde_json::from_str(legacy).expect("legacy deserialize");
+        assert!(
+            waypoint.visible(),
+            "missing `visible` field SHALL deserialize as `true` for backward compatibility"
+        );
+        assert_eq!(waypoint.name(), "Camp");
     }
 
     #[test]

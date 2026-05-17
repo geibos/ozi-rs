@@ -300,7 +300,9 @@
     if (!$appState || $appState.waypoint_layer_count === 0 || layerId === null) return;
     try {
       const waypoints = await getWaypoints(layerId);
-      for (const wp of waypoints) {
+      // Render only visible waypoints — hidden ones stay in the project
+      // file and panel but are filtered out of the map source.
+      for (const wp of waypoints.filter((w) => w.visible !== false)) {
         const el = document.createElement("div");
         el.className = "waypoint-marker";
         el.style.cursor = "grab";

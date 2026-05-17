@@ -1121,6 +1121,12 @@ impl CommandStack {
         !self.undo_history.is_empty()
     }
 
+    /// Current depth of the undo stack. Exposed for tests that verify
+    /// non-undoable mutations (style/visibility) do not push entries.
+    pub fn undo_depth(&self) -> usize {
+        self.undo_history.len()
+    }
+
     pub fn can_redo(&self) -> bool {
         !self.redo_history.is_empty()
     }
