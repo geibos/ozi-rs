@@ -59,10 +59,10 @@
 
 ## 8. TrackPointsPanel.svelte (step 3.7)
 
-- [ ] 8.1 Replace the manually-rendered rows with `Table` (`Table.Root` / `Table.Header` / `Table.Body` / `Table.Row` / `Table.Cell`); wrap the body in `ScrollArea`.
-- [ ] 8.2 Wrap per-row action buttons in `Tooltip`.
-- [ ] 8.3 Delete the component-local `<style>` block; selected-row / hover state moves to Tailwind utility classes.
-- [ ] 8.4 Keep the segment-expansion `$state` map (`expandedSegments`) and the `getTrackDetail` call site untouched.
+- [x] 8.1 Replace the manually-rendered rows with `Table` (`Table.Root` / `Table.Header` / `Table.Body` / `Table.Row` / `Table.Cell`); wrap the body in `ScrollArea`.
+- [x] 8.2 Wrap per-row action buttons in `Tooltip`.
+- [x] 8.3 Delete the component-local `<style>` block; selected-row / hover state moves to Tailwind utility classes.
+- [x] 8.4 Keep the segment-expansion `$state` map (`expandedSegments`) and the `getTrackDetail` call site untouched.
 - [ ] 8.5 Verify the panel looks correct in all four flavours via `ozi-rs-mcp` screenshots.
 - [ ] 8.6 Smoke-test: select a track, open Track Points, expand/collapse segments, select a point, confirm the map highlights it.
 
