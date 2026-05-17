@@ -325,8 +325,7 @@
         continue;
       }
 
-      for (const wp of waypoints) {
-        if (wp.visible === false) continue;
+      for (const wp of waypoints.filter((w) => w.visible !== false)) {
 
         const el = document.createElement("div");
         el.className = "waypoint-marker";

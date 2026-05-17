@@ -68,8 +68,10 @@ describe("MapView non-destructive waypoint rendering", () => {
   });
 
   it("honours per-waypoint visibility flag", () => {
-    expect(mapViewSource).toContain("if (wp.visible === false) continue;");
-    expect(typesSource).toContain("visible?: boolean");
+    expect(mapViewSource).toMatch(
+      /if \(wp\.visible === false\) continue;|waypoints\.filter\(\(w\) => w\.visible !== false\)/,
+    );
+    expect(typesSource).toMatch(/visible[?:]?\s*:\s*boolean/);
   });
 
   it("routes click-to-add (placement mode) only to the active waypoint layer", () => {
