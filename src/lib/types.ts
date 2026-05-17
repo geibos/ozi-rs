@@ -116,6 +116,7 @@ export interface WaypointData {
   lat: number;
   lon: number;
   symbol?: string;
+  visible: boolean;
 }
 
 export interface SimplifiedSegmentPreview {
