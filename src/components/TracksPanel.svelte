@@ -1,5 +1,19 @@
 <script lang="ts">
-  import { appState, tracksPanelOpen, selectedTrack, simplifyState } from "../lib/stores";
+  import DownloadIcon from "@lucide/svelte/icons/download";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+  import FileOutputIcon from "@lucide/svelte/icons/file-output";
+  import WavesIcon from "@lucide/svelte/icons/waves";
+  import XIcon from "@lucide/svelte/icons/x";
+  import { Button } from "$lib/components/ui/button";
+  import { Separator } from "$lib/components/ui/separator";
+  import * as Tooltip from "$lib/components/ui/tooltip";
+  import {
+    appState,
+    tracksPanelOpen,
+    selectedTrack,
+    simplifyState,
+  } from "$lib/stores";
   import {
     getTracksGeojson,
     renameTrack,
@@ -9,10 +23,10 @@
     exportTrackPlt,
     setTrackColor,
     setTrackLineWidth,
-  } from "../lib/api";
+  } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { isOkStandardTrackName } from "../lib/track-names";
-  import { formatTrackStats } from "../lib/track-stats";
+  import { isOkStandardTrackName } from "$lib/track-names";
+  import { formatTrackStats } from "$lib/track-stats";
   import SimplifyPanel from "./SimplifyPanel.svelte";
 
   interface TrackFeature {
@@ -159,288 +173,190 @@
 </script>
 
 {#if $tracksPanelOpen}
-  <div class="panel">
-    <div class="panel-header">
+  <div
+    class="bg-popover text-popover-foreground border-border fixed top-[60px] right-4 z-[200] flex max-h-[calc(100vh-80px)] w-72 resize flex-col overflow-hidden rounded-lg border shadow-lg"
+  >
+    <div
+      class="bg-card text-muted-foreground border-border flex cursor-move items-center justify-between border-b px-2.5 py-1 text-xs select-none"
+    >
       <span>Tracks ({tracks.length})</span>
-      <button onclick={() => tracksPanelOpen.set(false)}>✕</button>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        onclick={() => tracksPanelOpen.set(false)}
+        aria-label="Close tracks panel"
+      >
+        <XIcon />
+      </Button>
     </div>
-    <div class="panel-body">
+    <div class="flex-1 overflow-y-auto py-1">
       {#if tracks.length === 0}
-        <div class="empty">No tracks loaded</div>
+        <div class="text-muted-foreground p-3 text-center text-xs">
+          No tracks loaded
+        </div>
       {:else}
-        {#each tracks as track (trackIdentity(track))}
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div 
-            class="track-row" 
-            class:hidden={!track.visible}
-            class:selected={isSelectedTrack(track)}
-            onclick={() => selectedTrack.set({ layerId: track.layerId, trackId: track.trackId })}
-          >
-            <span
-              class="color-dot"
-              style="background: {track.color}"
-            ></span>
-
+        <Tooltip.Provider delayDuration={300}>
+          {#each tracks as track, idx (trackIdentity(track))}
+            {#if idx > 0}
+              <Separator />
+            {/if}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              class="style-controls"
-              onclick={(event) => event.stopPropagation()}
-              onmousedown={(event) => event.stopPropagation()}
+              class="hover:bg-muted flex cursor-pointer items-center gap-1.5 px-2.5 py-1 transition-colors"
+              class:bg-accent={isSelectedTrack(track)}
+              class:text-accent-foreground={isSelectedTrack(track)}
+              class:opacity-40={!track.visible}
+              onclick={() =>
+                selectedTrack.set({
+                  layerId: track.layerId,
+                  trackId: track.trackId,
+                })}
             >
-              <input
-                class="color-input"
-                type="color"
-                value={colorToHex(track.color)}
-                title="Track color"
-                aria-label="Track color"
-                onchange={(event) => handleColorChange(track, event)}
-              />
-              <input
-                class="width-input"
-                type="range"
-                min="1"
-                max="12"
-                step="1"
-                value={track.lineWidth}
-                title={`Track width: ${track.lineWidth}px`}
-                aria-label="Track line width"
-                onchange={(event) => handleLineWidthChange(track, event)}
-              />
-              <span class="width-value">{track.lineWidth}px</span>
-            </div>
+              <span
+                class="size-2.5 shrink-0 rounded-full"
+                style="background: {track.color}"
+              ></span>
 
-            <div class="name-block">
-              {#if editingTrack === trackIdentity(track)}
-                <input
-                  class="name-input"
-                  bind:value={editName}
-                  onblur={() => commitRename(track)}
-                  onkeydown={(e) => e.key === "Enter" && commitRename(track)}
-                  use:focusOnMount
-                />
-                {#if !isOkStandardTrackName(editName)}
-                  <span class="ok-name-warning">Use YYYYMMDD_Callsign</span>
-                {/if}
-              {:else}
-                <span
-                  class="track-name"
-                  ondblclick={() => startRename(track)}
-                  title="Double-click to rename"
-                >{track.name}</span>
-                {#if !isOkStandardTrackName(track.name)}
-                  <span class="ok-name-warning">Use YYYYMMDD_Callsign</span>
-                {/if}
-                <span class="track-stats" data-testid="track-stats">
-                  {formatTrackStats(
-                    track.distanceKm,
-                    track.durationSeconds,
-                    track.pointCount
-                  )}
-                </span>
-              {/if}
-            </div>
-
-            <div class="actions">
-              {#if isSelectedTrack(track)}
-                <button
-                  class="icon-btn"
-                  title="Simplify Track"
-                  onclick={() => {
-                    simplifyState.set({
-                      active: true,
-                      layerId: track.layerId,
-                      trackId: track.trackId,
-                      tolerance: 10,
-                      preview: null
-                    });
-                  }}
-                >〰</button>
-                <button
-                  class="icon-btn"
-                  title="Export as PLT"
-                  onclick={() => handleExportPlt(track)}
-                >PLT</button>
-              {/if}
-              <button
-                class="icon-btn"
-                title={track.visible ? "Hide" : "Show"}
-                onclick={() => handleToggleVisible(track)}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="flex shrink-0 items-center gap-1"
+                onclick={(event) => event.stopPropagation()}
+                onmousedown={(event) => event.stopPropagation()}
               >
-                {track.visible ? "👁" : "🙈"}
-              </button>
-              <button
-                class="icon-btn"
-                title="Export to GPX"
-                onclick={() => handleExport(track)}
-              >↓</button>
+                <input
+                  class="border-border h-[18px] w-[18px] rounded-sm border bg-transparent p-0"
+                  type="color"
+                  value={colorToHex(track.color)}
+                  title="Track color"
+                  aria-label="Track color"
+                  onchange={(event) => handleColorChange(track, event)}
+                />
+                <input
+                  class="accent-primary w-[42px]"
+                  type="range"
+                  min="1"
+                  max="12"
+                  step="1"
+                  value={track.lineWidth}
+                  title={`Track width: ${track.lineWidth}px`}
+                  aria-label="Track line width"
+                  onchange={(event) => handleLineWidthChange(track, event)}
+                />
+                <span
+                  class="text-muted-foreground min-w-[24px] text-[10px]"
+                  >{track.lineWidth}px</span
+                >
+              </div>
+
+              <div class="flex min-w-0 flex-1 flex-col gap-px">
+                {#if editingTrack === trackIdentity(track)}
+                  <input
+                    class="bg-background text-foreground border-input w-full rounded-sm border px-1 py-px text-xs"
+                    bind:value={editName}
+                    onblur={() => commitRename(track)}
+                    onkeydown={(e) =>
+                      e.key === "Enter" && commitRename(track)}
+                    use:focusOnMount
+                  />
+                  {#if !isOkStandardTrackName(editName)}
+                    <span class="text-[10px] leading-tight text-yellow-500">
+                      Use YYYYMMDD_Callsign
+                    </span>
+                  {/if}
+                {:else}
+                  <span
+                    class="cursor-text truncate text-xs"
+                    ondblclick={() => startRename(track)}
+                    title="Double-click to rename">{track.name}</span
+                  >
+                  {#if !isOkStandardTrackName(track.name)}
+                    <span class="text-[10px] leading-tight text-yellow-500">
+                      Use YYYYMMDD_Callsign
+                    </span>
+                  {/if}
+                  <span
+                    class="text-muted-foreground truncate text-[10px] leading-tight"
+                    data-testid="track-stats"
+                  >
+                    {formatTrackStats(
+                      track.distanceKm,
+                      track.durationSeconds,
+                      track.pointCount,
+                    )}
+                  </span>
+                {/if}
+              </div>
+
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <div
+                class="flex shrink-0 items-center"
+                onclick={(event) => event.stopPropagation()}
+              >
+                {#if isSelectedTrack(track)}
+                  <Tooltip.Root>
+                    <Tooltip.Trigger
+                      class={"text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"}
+                      onclick={() => {
+                        simplifyState.set({
+                          active: true,
+                          layerId: track.layerId,
+                          trackId: track.trackId,
+                          tolerance: 10,
+                          preview: null,
+                        });
+                      }}
+                      aria-label="Simplify track"
+                    >
+                      <WavesIcon class="size-3.5" />
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Simplify track</Tooltip.Content>
+                  </Tooltip.Root>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger
+                      class={"text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"}
+                      onclick={() => handleExportPlt(track)}
+                      aria-label="Export as PLT"
+                    >
+                      <FileOutputIcon class="size-3.5" />
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Export as PLT</Tooltip.Content>
+                  </Tooltip.Root>
+                {/if}
+                <Tooltip.Root>
+                  <Tooltip.Trigger
+                    class={"text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"}
+                    onclick={() => handleToggleVisible(track)}
+                    aria-label={track.visible ? "Hide track" : "Show track"}
+                  >
+                    {#if track.visible}
+                      <EyeIcon class="size-3.5" />
+                    {:else}
+                      <EyeOffIcon class="size-3.5" />
+                    {/if}
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    {track.visible ? "Hide" : "Show"}
+                  </Tooltip.Content>
+                </Tooltip.Root>
+                <Tooltip.Root>
+                  <Tooltip.Trigger
+                    class={"text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"}
+                    onclick={() => handleExport(track)}
+                    aria-label="Export to GPX"
+                  >
+                    <DownloadIcon class="size-3.5" />
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>Export to GPX</Tooltip.Content>
+                </Tooltip.Root>
+              </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+        </Tooltip.Provider>
       {/if}
     </div>
     <SimplifyPanel />
   </div>
 {/if}
-
-<style>
-  .panel {
-    position: fixed;
-    top: 60px;
-    right: 16px;
-    width: 280px;
-    max-height: calc(100vh - 80px);
-    background: var(--ctp-mantle);
-    border: 1px solid var(--ctp-surface0);
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    display: flex;
-    flex-direction: column;
-    z-index: 200;
-    resize: both;
-    overflow: hidden;
-  }
-
-  .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 10px;
-    background: var(--ctp-crust);
-    border-bottom: 1px solid var(--ctp-surface0);
-    cursor: move;
-    font-size: 12px;
-    color: var(--ctp-subtext1);
-    user-select: none;
-  }
-
-  .panel-header button {
-    background: none;
-    border: none;
-    color: var(--ctp-overlay1);
-    padding: 0 2px;
-  }
-
-  .panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4px 0;
-  }
-
-  .empty {
-    padding: 12px;
-    color: var(--ctp-overlay1);
-    text-align: center;
-    font-size: 11px;
-  }
-
-  .track-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    transition: background 0.1s;
-    cursor: pointer;
-  }
-
-  .track-row:hover {
-    background: var(--ctp-surface0);
-  }
-
-  .track-row.selected {
-    background: var(--ctp-surface1);
-  }
-
-  .track-row.hidden {
-    opacity: 0.4;
-  }
-
-  .color-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .style-controls {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    flex-shrink: 0;
-  }
-
-  .color-input {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    background: transparent;
-    border: 1px solid var(--ctp-surface1);
-    border-radius: 3px;
-  }
-
-  .width-input {
-    width: 42px;
-    accent-color: var(--ctp-blue);
-  }
-
-  .width-value {
-    min-width: 24px;
-    color: var(--ctp-overlay1);
-    font-size: 10px;
-  }
-
-  .name-block {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .track-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    cursor: text;
-  }
-
-  .name-input {
-    width: 100%;
-    box-sizing: border-box;
-    font-size: 12px;
-    padding: 1px 4px;
-  }
-
-  .ok-name-warning {
-    color: var(--ctp-yellow);
-    font-size: 10px;
-    line-height: 1.1;
-  }
-
-  .track-stats {
-    color: var(--ctp-overlay1);
-    font-size: 10px;
-    line-height: 1.1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .actions {
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
-  }
-
-  .icon-btn {
-    background: none;
-    border: none;
-    color: var(--ctp-overlay1);
-    padding: 0 3px;
-    font-size: 11px;
-  }
-
-  .icon-btn:hover {
-    color: var(--ctp-text);
-  }
-</style>

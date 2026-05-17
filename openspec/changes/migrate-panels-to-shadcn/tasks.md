@@ -40,11 +40,11 @@
 
 ## 6. TracksPanel.svelte (step 3.5)
 
-- [ ] 6.1 Replace the action buttons (toggle visibility, export GPX, export PLT, rename) with `Button` (appropriate variants); use `lucide-svelte` icons where they improve clarity over emoji/text.
-- [ ] 6.2 Replace ad-hoc dividers between rows with `Separator`; wrap row actions in `Tooltip`.
-- [ ] 6.3 **Retain the native `<input type="color">` for the per-track colour swatch.** Confirm it binds to `TrackStyle.color` (RGBA bytes via `setTrackColor`) and not to any `--ctp-*` or semantic token.
-- [ ] 6.4 Keep the dynamic colour preview using inline `style="background: {track.color}"` — NOT a Tailwind class.
-- [ ] 6.5 Delete the component-local `<style>` block; row layout, hover, selected state all move to Tailwind utility classes with semantic tokens.
+- [x] 6.1 Replace the action buttons (toggle visibility, export GPX, export PLT, rename) with `Button` (appropriate variants); use `lucide-svelte` icons where they improve clarity over emoji/text.
+- [x] 6.2 Replace ad-hoc dividers between rows with `Separator`; wrap row actions in `Tooltip`.
+- [x] 6.3 **Retain the native `<input type="color">` for the per-track colour swatch.** Confirm it binds to `TrackStyle.color` (RGBA bytes via `setTrackColor`) and not to any `--ctp-*` or semantic token.
+- [x] 6.4 Keep the dynamic colour preview using inline `style="background: {track.color}"` — NOT a Tailwind class.
+- [x] 6.5 Delete the component-local `<style>` block; row layout, hover, selected state all move to Tailwind utility classes with semantic tokens.
 - [ ] 6.6 Verify the panel looks correct in all four flavours via `ozi-rs-mcp` screenshots; specifically verify each track's colour swatch is identical across all four flavours (mitigation for the "colour tied to theme" risk).
 - [ ] 6.7 Smoke-test: rename a track, change its colour, toggle visibility, export GPX, export PLT — all from the migrated panel.
 
