@@ -514,6 +514,31 @@ pub fn get_track_export_default_path(
 }
 
 #[tauri::command]
+pub fn export_wpt_waypoints(
+    layer_id: u64,
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    lock_app_state(state.inner())?
+        .export_wpt_waypoints(LayerId::new(layer_id), PathBuf::from(path));
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_wpt_export_default_path(
+    layer_id: u64,
+    state: State<SharedState>,
+) -> Result<Option<String>, String> {
+    use crate::domain::LayerId;
+    Ok(lock_app_state(state.inner())?
+        .export_wpt_default_path(LayerId::new(layer_id))
+        .map(|path| path.display().to_string()))
+}
+
+#[tauri::command]
 pub fn export_track_plt(
     layer_id: u64,
     track_id: u64,
