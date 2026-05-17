@@ -69,7 +69,8 @@
 ### D6. Аудит зависимостей
 
 **Решение:**
-- Rust: `cargo audit --deny warnings` через `taiki-e/install-action@v2`. Падение CI на security advisories.
+- Rust: `cargo audit --file src-tauri/Cargo.lock` через `taiki-e/install-action@v2`. **Без** `--deny warnings`: vulnerabilities (severity advisories) валят CI, а informational warnings (unmaintained / unsound) — нет. Причина: транзитивные зависимости Tauri / gtk-rs выдают 20+ unmaintained-warnings, которые ozi-rs не может починить напрямую (только через upstream Tauri bump). Делать их блокирующими — превратить CI в шум.
+- Игнорируемые advisories — через `.cargo/audit.toml`, каждая запись требует комментария с причиной и recheck-условием (например, «ждать Tauri bump»). На момент создания change в ignore три уязвимости `rustls-webpki 0.103.10` (RUSTSEC-2026-0098/0099/0104), приходящие цепочкой `tauri → reqwest → quinn → rustls-webpki`.
 - Frontend: `npm audit --omit=dev --audit-level=high` — только prod-зависимости, только high+critical. Dev-зависимости (eslint, vitest) шумные и не попадают в бандл.
 
 **Альтернатива:** Dependabot/Renovate — отдельная задача, не блокирует этот change.

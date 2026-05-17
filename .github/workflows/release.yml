@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Build & publish (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (with macOS universal targets)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release-${{ matrix.platform }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build & upload Tauri bundle (draft release)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseBody: |
+            ozi-rs ${{ github.ref_name }}.
+
+            Artifacts are not code-signed yet. macOS users may need to clear the
+            quarantine flag (`xattr -dr com.apple.quarantine /Applications/ozi-rs.app`);
+            Windows users will see the SmartScreen unknown-publisher prompt.
+
+            See docs/ci.md for the release process and known gaps.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
