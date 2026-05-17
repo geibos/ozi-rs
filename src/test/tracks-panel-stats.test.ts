@@ -40,7 +40,9 @@ describe("TracksPanel statistics formatter", () => {
 describe("TracksPanel statistics rendering", () => {
   it("imports the formatter and exposes a track-stats element", () => {
     expect(source).toContain('import { formatTrackStats }');
-    expect(source).toContain('class="track-stats"');
+    // The `class="track-stats"` selector is gone (chrome moved to Tailwind
+    // utilities reading semantic tokens); the test-only data-testid hook is
+    // still the contract for downstream UI/E2E assertions.
     expect(source).toContain('data-testid="track-stats"');
   });
 

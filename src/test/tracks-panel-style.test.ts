@@ -22,13 +22,22 @@ describe("TracksPanel style controls", () => {
   it("keys and selects tracks by layer and track identity", () => {
     expect(source).toContain("trackIdentity(track)");
     expect(source).toContain("isSelectedTrack(track)");
-    expect(source).toContain("{#each tracks as track (trackIdentity(track))}");
-    expect(source).toContain("class:selected={isSelectedTrack(track)}");
+    // Iteration carries `idx` so the migrated panel can place a Separator
+    // between rows; the key still discriminates by trackIdentity.
+    expect(source).toContain(
+      "{#each tracks as track, idx (trackIdentity(track))}"
+    );
+    // Selected state now lights the semantic-token accent surface via
+    // class:bg-accent / class:text-accent-foreground instead of a hand-rolled
+    // .selected class.
+    expect(source).toContain("class:bg-accent={isSelectedTrack(track)}");
     expect(source).toContain("{#if isSelectedTrack(track)}");
     expect(source).not.toContain(
       "class:selected={$selectedTrack?.trackId === track.trackId}"
     );
-    expect(source).not.toContain("{#if $selectedTrack?.trackId === track.trackId}");
+    expect(source).not.toContain(
+      "{#if $selectedTrack?.trackId === track.trackId}"
+    );
   });
 
   it("renders compact bounded controls without row selection interference", () => {
