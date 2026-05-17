@@ -1,10 +1,10 @@
 <script lang="ts">
   // @ts-nocheck
-  // Legacy MapView keeps its pre-svelte-check syntax during Change 1 of the
-  // SvelteKit migration; per Decision 5 in
-  // `openspec/changes/migrate-to-sveltekit/design.md`, legacy
-  // `src/components/**` migrate one-by-one in Change 3 and this pragma goes
-  // away when MapView is converted.
+  // MapLibre integration kept under @ts-nocheck because the wrapper-only
+  // migration in `migrate-panels-to-shadcn` (section 10) explicitly forbids
+  // touching MapLibre internals, source/layer setup, drag handlers, click
+  // handlers, or the tile-protocol code — tightening types there is a
+  // follow-up change.
   import { onMount } from "svelte";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
@@ -811,60 +811,44 @@
   });
 </script>
 
-<div class="map-container" bind:this={mapEl}>
+<div class="relative h-full min-w-0 flex-1" bind:this={mapEl}>
   {#if contextMenu}
-    <div class="point-context-menu" style={`left:${contextMenu.x}px; top:${contextMenu.y}px;`}>
-      <button onclick={handleDeletePoint}>Delete Point</button>
-      <button onclick={handleInsertPointAfter}>Insert Point After</button>
+    <div
+      class="bg-popover text-popover-foreground border-border absolute z-40 flex min-w-40 flex-col gap-0.5 rounded-md border p-1 shadow-lg"
+      style={`left:${contextMenu.x}px; top:${contextMenu.y}px;`}
+    >
+      <button
+        class="hover:bg-muted rounded-sm px-2 py-1.5 text-left text-xs"
+        onclick={handleDeletePoint}>Delete Point</button
+      >
+      <button
+        class="hover:bg-muted rounded-sm px-2 py-1.5 text-left text-xs"
+        onclick={handleInsertPointAfter}>Insert Point After</button
+      >
     </div>
   {/if}
   {#if fpsVisible}
-    <div class="fps-badge">{fps} fps</div>
+    <div
+      class="pointer-events-none absolute top-2 right-2 z-10 rounded-sm bg-black/55 px-1.5 py-0.5 font-mono text-xs text-emerald-400 tabular-nums"
+    >
+      {fps} fps
+    </div>
   {/if}
   {#if $drawingModeActive}
-    <div class="drawing-badge">
-      Drawing track · {$drawingPointCount} {$drawingPointCount === 1 ? "point" : "points"}
+    <div
+      class="bg-primary/20 border-primary text-primary pointer-events-none absolute top-2 left-2 z-10 rounded-md border px-2 py-1 text-xs"
+    >
+      Drawing track · {$drawingPointCount}
+      {$drawingPointCount === 1 ? "point" : "points"}
     </div>
   {/if}
 </div>
 
 <style>
-  .map-container {
-    flex: 1;
-    height: 100%;
-    min-width: 0;
-    position: relative;
-  }
-
-  .fps-badge {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.55);
-    color: #00ff88;
-    font-family: monospace;
-    font-size: 12px;
-    padding: 2px 7px;
-    border-radius: 3px;
-    pointer-events: none;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .drawing-badge {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 10;
-    background: rgba(0, 102, 255, 0.2);
-    color: #dbe9ff;
-    border: 1px solid #0066ff;
-    border-radius: 4px;
-    font-size: 12px;
-    padding: 4px 8px;
-    pointer-events: none;
-  }
-
+  /* Load-bearing rules for MapLibre marker DOM elements created by
+     new maplibregl.Marker({ element }). Tailwind utilities cannot
+     reach these because the elements are created via document.createElement
+     in MapLibre internals, not in this component's template. */
   :global(.track-point-marker) {
     width: 10px;
     height: 10px;
@@ -882,35 +866,6 @@
 
   :global(.track-point-marker:active) {
     cursor: grabbing;
-  }
-
-  .point-context-menu {
-    position: absolute;
-    z-index: 40;
-    min-width: 160px;
-    padding: 4px;
-    border-radius: 6px;
-    border: 1px solid var(--ctp-surface1);
-    background: var(--ctp-mantle);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .point-context-menu button {
-    border: none;
-    background: transparent;
-    color: var(--ctp-text);
-    text-align: left;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .point-context-menu button:hover {
-    background: var(--ctp-surface0);
   }
 
   :global(.waypoint-marker) {

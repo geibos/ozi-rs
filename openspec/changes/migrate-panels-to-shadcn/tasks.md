@@ -76,9 +76,9 @@
 
 ## 10. MapView.svelte (step 3.9 — wrapper only)
 
-- [ ] 10.1 Migrate ONLY the outer wrapper `<div>` that hosts the MapLibre canvas to Tailwind utilities (`relative h-full w-full`).
-- [ ] 10.2 Delete the wrapper portion of the component-local `<style>` block. Preserve any rules that target the MapLibre canvas itself if they're load-bearing for the map.
-- [ ] 10.3 Confirm the MapLibre instance, source/layer setup, drag handlers, click handlers, and the tile-protocol code are **not touched** in this commit.
+- [x] 10.1 Migrate ONLY the outer wrapper `<div>` that hosts the MapLibre canvas to Tailwind utilities (`relative h-full w-full`).
+- [x] 10.2 Delete the wrapper portion of the component-local `<style>` block. Preserve any rules that target the MapLibre canvas itself if they're load-bearing for the map.
+- [x] 10.3 Confirm the MapLibre instance, source/layer setup, drag handlers, click handlers, and the tile-protocol code are **not touched** in this commit.
 - [ ] 10.4 Verify the map renders correctly in all four flavours via `ozi-rs-mcp` screenshots.
 - [ ] 10.5 Smoke-test: pan, zoom, click a track, click a waypoint, draw a new track point — all behaviours unchanged from before migration.
 
