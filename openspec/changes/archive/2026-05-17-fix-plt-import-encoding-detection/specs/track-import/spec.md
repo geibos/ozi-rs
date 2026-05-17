@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: PLT import accepts mixed encodings via auto-detection
+### Requirement: PLT import accepts Windows-1251 encoded text
 
 The system SHALL decode PLT file content by detecting the encoding from a prioritized chain (BOM → strict UTF-8 → statistical detection via `chardetng` → Windows-1251 fallback) and SHALL convert the decoded text to UTF-8 before structural parsing. The decoder SHALL NOT introduce `U+FFFD` replacement characters for files whose bytes are a valid sequence in any supported encoding.
 
