@@ -30,5 +30,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # PNG encoding for tile delivery
 image = { version = "0.25", default-features = false, features = ["png"] }
 
+# Encoding detection / conversion for PLT import
+encoding_rs = "0.8"
+chardetng = "0.1"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
