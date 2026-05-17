@@ -30,7 +30,10 @@ describe("OK-standard track-name validation", () => {
 describe("TracksPanel warning-only validation", () => {
   it("uses the shared track-name helper for warnings", () => {
     expect(tracksPanelSource).toContain("isOkStandardTrackName");
-    expect(tracksPanelSource).toContain("ok-name-warning");
+    // The legacy `.ok-name-warning` CSS class is gone; the warning surface
+    // now uses a Tailwind warning colour utility instead (`text-yellow-500`).
+    expect(tracksPanelSource).toContain("text-yellow-500");
+    expect(tracksPanelSource).toContain("Use YYYYMMDD_Callsign");
   });
 
   it("keeps rename non-blocking by still calling renameTrack", () => {

@@ -23,14 +23,18 @@ describe("WaypointsPanel visibility toggle", () => {
 
   it("renders a visibility checkbox per waypoint row bound to wp.visible", () => {
     expect(panelSource).toContain('type="checkbox"');
-    expect(panelSource).toContain("class=\"visibility-toggle\"");
+    // Chrome moved to Tailwind utilities (accent-primary / cursor-pointer /
+    // shrink-0) — the legacy `class="visibility-toggle"` selector is gone.
+    expect(panelSource).toContain("accent-primary");
     expect(panelSource).toContain("checked={wp.visible}");
     expect(panelSource).toContain("handleToggleVisible(wp)");
   });
 
   it("indicates hidden state on the row without removing it from the panel", () => {
-    expect(panelSource).toContain("class:hidden-waypoint={!wp.visible}");
-    expect(panelSource).toContain(".hidden-waypoint");
+    // Legacy `.hidden-waypoint` CSS class is gone; the hidden state now
+    // dims the row with the Tailwind `opacity-50` utility (which is theme-
+    // and flavour-independent, and does not unmount the row).
+    expect(panelSource).toContain("class:opacity-50={!wp.visible}");
   });
 });
 
