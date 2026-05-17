@@ -3,8 +3,8 @@
 After `migrate-to-sveltekit` puts the file-based routing skeleton in place and `add-design-tokens-and-shadcn` installs Tailwind, the Catppuccin→semantic-token mapping, and the shadcn-svelte primitive library, the existing nine panels under `src/components/` still render through ad-hoc native controls and per-file `<style>` blocks. The visual feel does not yet match the meetily-style design language we committed to in [`docs/superpowers/specs/2026-05-17-shadcn-ui-kit-svelte-design.md`](../../../docs/superpowers/specs/2026-05-17-shadcn-ui-kit-svelte-design.md). This change finishes the UI-kit axis by migrating every existing panel to shadcn-svelte primitives + Tailwind utility classes that consume the semantic tokens, while leaving the domain (track/waypoint RGBA colours, MapLibre internals) untouched.
 
 This change **depends on** both:
-- `2026-05-17-migrate-to-sveltekit` (Change 1 — provides `$lib` alias, `routes/project/+page.svelte` shell, ESLint/Prettier baseline);
-- `2026-05-17-add-design-tokens-and-shadcn` (Change 2 — provides Tailwind, `--background`/`--foreground`/… semantic tokens, the primitive components under `src/lib/components/ui/`, `cn()`, `lucide-svelte`, `svelte-sonner`).
+- `migrate-to-sveltekit` (Change 1 — provides `$lib` alias, `routes/project/+page.svelte` shell, ESLint/Prettier baseline);
+- `add-design-tokens-and-shadcn` (Change 2 — provides Tailwind, `--background`/`--foreground`/… semantic tokens, the primitive components under `src/lib/components/ui/`, `cn()`, `lucide-svelte`, `svelte-sonner`).
 
 Neither dependency can be skipped: Tailwind utilities and the primitive imports do not exist without Change 2, and the `$lib`-pathed imports do not resolve without Change 1.
 

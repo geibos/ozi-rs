@@ -4,8 +4,8 @@ This change is the third and final step of the UI-kit axis defined in [`docs/sup
 
 The change has hard dependencies on both predecessors:
 
-- **Change 1 — `2026-05-17-migrate-to-sveltekit`** is required because primitives and `cn()` are imported through `$lib/...`, and the `routes/project/+page.svelte` host that mounts `Sidebar` + `MapView` is created there.
-- **Change 2 — `2026-05-17-add-design-tokens-and-shadcn`** is required because the Tailwind utility classes used throughout (`bg-background`, `text-foreground`, `border-border`, …) resolve to nothing without Tailwind installed and the Catppuccin→semantic-token mapping applied; and the primitive components (`Card`, `Dialog`, `Popover`, `Select`, `Tabs`, `Tooltip`, `Switch`, `Separator`, `ScrollArea`, `Slider`, `Label`, `Table`, `Button`) are not on disk until Change 2 runs `shadcn-svelte init` and adds them.
+- **Change 1 — `migrate-to-sveltekit`** is required because primitives and `cn()` are imported through `$lib/...`, and the `routes/project/+page.svelte` host that mounts `Sidebar` + `MapView` is created there.
+- **Change 2 — `add-design-tokens-and-shadcn`** is required because the Tailwind utility classes used throughout (`bg-background`, `text-foreground`, `border-border`, …) resolve to nothing without Tailwind installed and the Catppuccin→semantic-token mapping applied; and the primitive components (`Card`, `Dialog`, `Popover`, `Select`, `Tabs`, `Tooltip`, `Switch`, `Separator`, `ScrollArea`, `Slider`, `Label`, `Table`, `Button`) are not on disk until Change 2 runs `shadcn-svelte init` and adds them.
 
 If either dependency is rolled back, this change must be rolled back with it.
 
