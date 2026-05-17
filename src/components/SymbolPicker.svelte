@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { buttonVariants } from "$lib/components/ui/button";
+  import * as Popover from "$lib/components/ui/popover";
+  import * as Tooltip from "$lib/components/ui/tooltip";
+
   let {
     symbol = null,
     onSelect,
@@ -10,177 +14,70 @@
   let open = $state(false);
 
   const SYMBOLS = [
-    { value: 'flag', emoji: '🏁', label: 'Flag' },
-    { value: 'camp', emoji: '🏕️', label: 'Camp' },
-    { value: 'danger', emoji: '⚠️', label: 'Danger' },
-    { value: 'water', emoji: '💧', label: 'Water' },
-    { value: 'shelter', emoji: '🏠', label: 'Shelter' },
-    { value: 'meeting-point', emoji: '👥', label: 'Meeting Point' },
-    { value: 'start', emoji: '🟢', label: 'Start' },
-    { value: 'finish', emoji: '🔴', label: 'Finish' },
-    { value: 'viewpoint', emoji: '👁️', label: 'Viewpoint' },
-    { value: 'parking', emoji: '🅿️', label: 'Parking' },
+    { value: "flag", emoji: "🏁", label: "Flag" },
+    { value: "camp", emoji: "🏕️", label: "Camp" },
+    { value: "danger", emoji: "⚠️", label: "Danger" },
+    { value: "water", emoji: "💧", label: "Water" },
+    { value: "shelter", emoji: "🏠", label: "Shelter" },
+    { value: "meeting-point", emoji: "👥", label: "Meeting Point" },
+    { value: "start", emoji: "🟢", label: "Start" },
+    { value: "finish", emoji: "🔴", label: "Finish" },
+    { value: "viewpoint", emoji: "👁️", label: "Viewpoint" },
+    { value: "parking", emoji: "🅿️", label: "Parking" },
   ];
 
   function getEmoji(val: string | null | undefined): string {
-    if (!val) return '📍';
-    const found = SYMBOLS.find(s => s.value === val);
-    return found ? found.emoji : '📍';
+    if (!val) return "📍";
+    const found = SYMBOLS.find((s) => s.value === val);
+    return found ? found.emoji : "📍";
   }
 
   function handleSelect(val: string | null) {
     onSelect(val);
     open = false;
   }
-
-  // Click outside and Escape handling
-  $effect(() => {
-    if (!open) return;
-
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.symbol-picker-container')) {
-        open = false;
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        open = false;
-      }
-    };
-
-    // Use capture to handle it before other elements stop propagation
-    document.addEventListener('click', handleDocumentClick, true);
-    document.addEventListener('keydown', handleKeyDown, true);
-
-    return () => {
-      document.removeEventListener('click', handleDocumentClick, true);
-      document.removeEventListener('keydown', handleKeyDown, true);
-    };
-  });
 </script>
 
-<div class="symbol-picker-container">
-  <button 
-    class="trigger-btn" 
-    title={symbol ? `Symbol: ${symbol}` : "Default symbol"}
-    onclick={(e) => {
-      e.stopPropagation();
-      open = !open;
-    }}
+<Popover.Root bind:open>
+  <Popover.Trigger
+    class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+    aria-label={symbol ? `Symbol: ${symbol}` : "Default symbol"}
   >
-    {getEmoji(symbol)}
-  </button>
-
-  {#if open}
-    <div class="popover">
-      <div class="grid">
-        <button 
-          class="grid-item" 
-          class:selected={!symbol}
-          title="None (Default)"
-          onclick={() => handleSelect(null)}
-        >
-          <span class="emoji">📍</span>
-          <span class="label">None</span>
-        </button>
-
-        {#each SYMBOLS as s}
-          <button 
-            class="grid-item" 
-            class:selected={symbol === s.value}
-            title={s.label}
-            onclick={() => handleSelect(s.value)}
+    <span class="text-sm leading-none">{getEmoji(symbol)}</span>
+  </Popover.Trigger>
+  <Popover.Content class="w-auto p-2">
+    <Tooltip.Provider delayDuration={300}>
+      <div class="grid grid-cols-5 gap-2">
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class={buttonVariants({
+              variant: !symbol ? "secondary" : "ghost",
+              size: "icon",
+            })}
+            onclick={() => handleSelect(null)}
+            aria-label="None (default)"
           >
-            <span class="emoji">{s.emoji}</span>
-            <span class="label">{s.label}</span>
-          </button>
+            <span class="text-base leading-none">📍</span>
+          </Tooltip.Trigger>
+          <Tooltip.Content>None</Tooltip.Content>
+        </Tooltip.Root>
+
+        {#each SYMBOLS as s (s.value)}
+          <Tooltip.Root>
+            <Tooltip.Trigger
+              class={buttonVariants({
+                variant: symbol === s.value ? "secondary" : "ghost",
+                size: "icon",
+              })}
+              onclick={() => handleSelect(s.value)}
+              aria-label={s.label}
+            >
+              <span class="text-base leading-none">{s.emoji}</span>
+            </Tooltip.Trigger>
+            <Tooltip.Content>{s.label}</Tooltip.Content>
+          </Tooltip.Root>
         {/each}
       </div>
-    </div>
-  {/if}
-</div>
-
-<style>
-  .symbol-picker-container {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-  }
-
-  .trigger-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: background-color 0.1s, border-color 0.1s;
-  }
-
-  .trigger-btn:hover {
-    background: var(--ctp-surface0);
-    border-color: var(--ctp-surface1);
-  }
-
-  .popover {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
-    background: var(--ctp-mantle);
-    border: 1px solid var(--ctp-surface1);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    padding: 8px;
-    z-index: 1000;
-    width: 240px;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-  }
-
-  .grid-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    padding: 4px 8px;
-    cursor: pointer;
-    text-align: left;
-    color: var(--ctp-text);
-    transition: background-color 0.1s;
-  }
-
-  .grid-item:hover {
-    background: var(--ctp-surface0);
-  }
-
-  .grid-item.selected {
-    background: var(--ctp-surface1);
-    border-color: var(--ctp-surface2);
-  }
-
-  .emoji {
-    font-size: 14px;
-    flex-shrink: 0;
-  }
-
-  .label {
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-</style>
+    </Tooltip.Provider>
+  </Popover.Content>
+</Popover.Root>

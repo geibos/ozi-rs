@@ -22,10 +22,10 @@
 
 ## 4. SymbolPicker.svelte (step 3.3)
 
-- [ ] 4.1 Replace the open/close-state-driven `<div>` overlay with `Popover.Root` + `Popover.Trigger` + `Popover.Content`; the trigger uses `Button` (icon-only ghost variant).
-- [ ] 4.2 Wrap each symbol option in `Tooltip` so its label appears on hover.
-- [ ] 4.3 Delete the component-local `<style>` block; grid layout moves to Tailwind utilities (`grid grid-cols-5 gap-2 p-2`).
-- [ ] 4.4 Keep the `SYMBOLS` data array and `getEmoji()` helper untouched (this is data, not chrome).
+- [x] 4.1 Replace the open/close-state-driven `<div>` overlay with `Popover.Root` + `Popover.Trigger` + `Popover.Content`; the trigger uses `Button` (icon-only ghost variant).
+- [x] 4.2 Wrap each symbol option in `Tooltip` so its label appears on hover.
+- [x] 4.3 Delete the component-local `<style>` block; grid layout moves to Tailwind utilities (`grid grid-cols-5 gap-2 p-2`).
+- [x] 4.4 Keep the `SYMBOLS` data array and `getEmoji()` helper untouched (this is data, not chrome).
 - [ ] 4.5 Verify the popover renders correctly in all four flavours via `ozi-rs-mcp` screenshots; confirm it portals above the MapLibre canvas.
 - [ ] 4.6 Smoke-test: open the picker over the map, pick a symbol, confirm the trigger updates and the popover closes.
 
