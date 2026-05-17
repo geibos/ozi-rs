@@ -2474,7 +2474,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ozf2-rs"
+name = "ozf2"
 version = "0.1.0"
 dependencies = [
  "flate2",
@@ -2490,7 +2490,7 @@ dependencies = [
  "futures-util",
  "gpx",
  "image",
- "ozf2-rs",
+ "ozf2",
  "regex",
  "reqwest",
  "rusqlite",

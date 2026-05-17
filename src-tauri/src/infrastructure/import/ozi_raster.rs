@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::infrastructure::import::{OziMapMetadata, OziRasterKind};
-use ozf2_rs::{DecodedTile, OzfError, OziRaster, PaletteEntry};
+use ozf2::{DecodedTile, OzfError, OziRaster, PaletteEntry};
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -381,7 +381,7 @@ mod tests {
     use super::{
         OziRasterLevelMetadata, crop_rgba_tile, indexed_tile_to_rgba, visible_tile_extent,
     };
-    use ozf2_rs::{DecodedTile, PaletteEntry};
+    use ozf2::{DecodedTile, PaletteEntry};
 
     #[test]
     fn level_metadata_reports_partial_edge_tile_size() {
