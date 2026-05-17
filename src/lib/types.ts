@@ -36,6 +36,9 @@ export interface ActiveMapDto {
 export interface LayerSummaryDto {
   id: number;
   name: string;
+  // Optional per-layer visibility flag. When absent (current backend),
+  // the layer is treated as visible. Reserved for future per-layer toggling.
+  visible?: boolean;
 }
 
 /**
@@ -136,6 +139,9 @@ export interface WaypointData {
   lat: number;
   lon: number;
   symbol?: string;
+  // Optional per-waypoint visibility flag. When absent (current backend),
+  // the waypoint is treated as visible. Reserved for future per-waypoint toggling.
+  visible?: boolean;
 }
 
 export interface SimplifiedSegmentPreview {
