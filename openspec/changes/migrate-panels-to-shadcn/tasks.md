@@ -68,9 +68,9 @@
 
 ## 9. Sidebar.svelte (step 3.8)
 
-- [ ] 9.1 Replace the panel-switcher chrome with `Tabs.Root` + `Tabs.List` + `Tabs.Trigger` + `Tabs.Content`; the per-tab content wraps the already-migrated panels from steps 2–8.
-- [ ] 9.2 Wrap the scrollable body of each tab in `ScrollArea`.
-- [ ] 9.3 Delete the component-local `<style>` block; sidebar chrome (width, border, background) moves to Tailwind utilities (`w-80 border-r border-border bg-background`).
+- [~] 9.1 ~~Replace the panel-switcher chrome with `Tabs.Root` + `Tabs.List` + `Tabs.Trigger` + `Tabs.Content`; the per-tab content wraps the already-migrated panels from steps 2–8.~~ **Reinterpreted, no `Tabs.Root`.** Tracks / Waypoints / Track Points are independent floating windows by design (user requirement: must be simultaneously visible), so `Tabs.Root` (one-active-tab semantics) does not fit. Sidebar chrome is migrated to `Button` + `Select` + `Separator` + `ScrollArea` + `Tooltip`, with per-panel "Show/Hide …" toggle buttons preserved.
+- [x] 9.2 Wrap the scrollable body of each tab in `ScrollArea`. (Applied to the single sidebar scroll body — see 9.1 reinterpretation.)
+- [x] 9.3 Delete the component-local `<style>` block; sidebar chrome (width, border, background) moves to Tailwind utilities (`w-80 border-r border-border bg-background`).
 - [ ] 9.4 Verify the Sidebar looks correct in all four flavours via `ozi-rs-mcp` screenshots.
 - [ ] 9.5 Smoke-test: switch between Tracks / Waypoints / Track Points tabs, confirm the active tab content renders and scrolls.
 

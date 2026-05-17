@@ -1,4 +1,22 @@
 <script lang="ts">
+  import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
+  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
+  import ListIcon from "@lucide/svelte/icons/list";
+  import ListOrderedIcon from "@lucide/svelte/icons/list-ordered";
+  import MapIcon from "@lucide/svelte/icons/map";
+  import MapPinIcon from "@lucide/svelte/icons/map-pin";
+  import MapPinPlusIcon from "@lucide/svelte/icons/map-pin-plus";
+  import PencilLineIcon from "@lucide/svelte/icons/pencil-line";
+  import RedoIcon from "@lucide/svelte/icons/redo-2";
+  import SaveIcon from "@lucide/svelte/icons/save";
+  import TerminalIcon from "@lucide/svelte/icons/terminal";
+  import UndoIcon from "@lucide/svelte/icons/undo-2";
+  import UploadIcon from "@lucide/svelte/icons/upload";
+  import { Button } from "$lib/components/ui/button";
+  import { ScrollArea } from "$lib/components/ui/scroll-area";
+  import * as Select from "$lib/components/ui/select";
+  import { Separator } from "$lib/components/ui/separator";
+  import * as Tooltip from "$lib/components/ui/tooltip";
   import {
     appState,
     status,
@@ -17,7 +35,7 @@
     drawingSegmentId,
     editModeActive,
     consoleOpen,
-  } from "../lib/stores";
+  } from "$lib/stores";
   import {
     importGpx,
     importPlt,
@@ -28,19 +46,40 @@
     revealBundle,
     createEmptyTrack,
     getTrackDetail,
-  } from "../lib/api";
+  } from "$lib/api";
   import ThemePicker from "./ThemePicker.svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
 
+  const trackLayers = $derived($appState?.track_layers ?? []);
+  const waypointLayers = $derived($appState?.waypoint_layers ?? []);
+
+  const trackLayerSelectValue = $derived(
+    $activeTrackLayerId !== null ? $activeTrackLayerId.toString() : "",
+  );
+  const waypointLayerSelectValue = $derived(
+    $activeWaypointLayerId !== null ? $activeWaypointLayerId.toString() : "",
+  );
+
+  const statusIsError = $derived(
+    $status.toLowerCase().includes("error") ||
+      $status.toLowerCase().includes("failed"),
+  );
+
   async function handleImportGpx() {
-    const path = await open({ multiple: false, filters: [{ name: "GPX", extensions: ["gpx", "zip"] }] });
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "GPX", extensions: ["gpx", "zip"] }],
+    });
     if (path) await importGpx(path as string);
   }
 
   async function handleImportPlt() {
-    const path = await open({ multiple: false, filters: [{ name: "PLT track", extensions: ["plt"] }] });
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "PLT track", extensions: ["plt"] }],
+    });
     if (path) await importPlt(path as string);
   }
 
@@ -53,7 +92,10 @@
   }
 
   async function handleOpen() {
-    const path = await open({ multiple: false, filters: [{ name: "OZI Project", extensions: ["ozp"] }] });
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "OZI Project", extensions: ["ozp"] }],
+    });
     if (path) await loadProjectFile(path as string);
   }
 
@@ -80,286 +122,250 @@
       console.error("Failed to start track drawing mode", error);
     }
   }
-
-  function handleActiveTrackLayerChange(event: Event) {
-    const value = (event.currentTarget as HTMLSelectElement).value;
-    activeTrackLayerId.set(BigInt(value));
-  }
-
-  function handleActiveWaypointLayerChange(event: Event) {
-    const value = (event.currentTarget as HTMLSelectElement).value;
-    activeWaypointLayerId.set(BigInt(value));
-  }
 </script>
 
-<aside class="sidebar">
-  <header class="sidebar-header">
-    <span class="app-title">ozi-rs</span>
+<aside
+  class="bg-card text-card-foreground border-border flex h-full w-56 shrink-0 flex-col overflow-hidden border-r"
+>
+  <header
+    class="bg-popover text-popover-foreground border-border flex items-center justify-between border-b px-2.5 py-2"
+  >
+    <span class="text-primary text-sm font-semibold">ozi-rs</span>
     <ThemePicker />
   </header>
 
-  <div class="section">
-    <div class="section-title">Project</div>
-    <div class="btn-row">
-      <button onclick={handleOpen}>Open</button>
-      <button onclick={handleSave}>Save</button>
-      <button onclick={undo} title="Undo">↩</button>
-      <button onclick={redo} title="Redo">↪</button>
-    </div>
-  </div>
+  <ScrollArea class="flex-1">
+    <Tooltip.Provider delayDuration={300}>
+      <section class="flex flex-col gap-1.5 px-2 py-2">
+        <h2
+          class="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase"
+        >
+          Project
+        </h2>
+        <div class="flex flex-wrap gap-1">
+          <Button variant="outline" size="xs" onclick={handleOpen}>
+            <FolderOpenIcon />
+            Open
+          </Button>
+          <Button variant="outline" size="xs" onclick={handleSave}>
+            <SaveIcon />
+            Save
+          </Button>
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              {#snippet child({ props })}
+                <Button {...props} variant="outline" size="icon-xs" onclick={undo}>
+                  <UndoIcon />
+                </Button>
+              {/snippet}
+            </Tooltip.Trigger>
+            <Tooltip.Content>Undo</Tooltip.Content>
+          </Tooltip.Root>
+          <Tooltip.Root>
+            <Tooltip.Trigger>
+              {#snippet child({ props })}
+                <Button {...props} variant="outline" size="icon-xs" onclick={redo}>
+                  <RedoIcon />
+                </Button>
+              {/snippet}
+            </Tooltip.Trigger>
+            <Tooltip.Content>Redo</Tooltip.Content>
+          </Tooltip.Root>
+        </div>
+      </section>
 
-  <div class="section">
-    <div class="section-title">Map</div>
-    <button class="full primary" onclick={() => goto(resolve("/"))}>Maps…</button>
+      <Separator />
 
-    {#if $activeMap}
-      <div class="active-map">
-        <div class="active-map-label">Active</div>
-        <div class="active-map-name">{$activeMap.project_name}</div>
-        <div class="active-map-pkg">{$activeMap.package_name}</div>
-        <button class="full secondary small" onclick={revealBundle}>Reveal in Finder</button>
-      </div>
-    {/if}
-  </div>
+      <section class="flex flex-col gap-1.5 px-2 py-2">
+        <h2
+          class="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase"
+        >
+          Map
+        </h2>
+        <Button
+          variant="default"
+          size="sm"
+          class="w-full justify-start"
+          onclick={() => goto(resolve("/"))}
+        >
+          <MapIcon />
+          Maps…
+        </Button>
 
-  <div class="section">
-    <div class="section-title">Tracks</div>
-    {#if ($appState?.track_layers ?? []).length > 0}
-      <label class="layer-picker">
-        <span>Track layer</span>
-        <select
-          value={$activeTrackLayerId?.toString() ?? ""}
-          onchange={handleActiveTrackLayerChange}
+        {#if $activeMap}
+          <div class="bg-muted flex flex-col gap-0.5 rounded-md p-1.5">
+            <div class="text-muted-foreground text-[10px]">Active</div>
+            <div class="text-foreground truncate text-xs font-medium">
+              {$activeMap.project_name}
+            </div>
+            <div class="text-muted-foreground truncate text-[11px]">
+              {$activeMap.package_name}
+            </div>
+            <Button
+              variant="outline"
+              size="xs"
+              class="w-full justify-start"
+              onclick={revealBundle}
+            >
+              <ExternalLinkIcon />
+              Reveal in Finder
+            </Button>
+          </div>
+        {/if}
+      </section>
+
+      <Separator />
+
+      <section class="flex flex-col gap-1.5 px-2 py-2">
+        <h2
+          class="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase"
+        >
+          Tracks
+        </h2>
+        {#if trackLayers.length > 0}
+          <label class="flex flex-col gap-1">
+            <span class="text-muted-foreground text-[10px]">Track layer</span>
+            <Select.Root
+              type="single"
+              value={trackLayerSelectValue}
+              onValueChange={(v) =>
+                v && activeTrackLayerId.set(BigInt(v))}
+              disabled={$drawingModeActive}
+            >
+              <Select.Trigger aria-label="Track layer" size="sm" class="w-full">
+                {trackLayers.find(
+                  (l) => String(l.id) === trackLayerSelectValue,
+                )?.name ?? "Pick layer"}
+              </Select.Trigger>
+              <Select.Content>
+                {#each trackLayers as layer (layer.id)}
+                  <Select.Item value={String(layer.id)} label={layer.name}>
+                    {layer.name}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+        {/if}
+        <div class="flex flex-wrap gap-1">
+          <Button variant="outline" size="xs" onclick={handleImportGpx}>
+            <UploadIcon />
+            GPX
+          </Button>
+          <Button variant="outline" size="xs" onclick={handleImportPlt}>
+            <UploadIcon />
+            PLT
+          </Button>
+        </div>
+        <Button
+          variant={$drawingModeActive ? "default" : "outline"}
+          size="sm"
+          class="w-full justify-start"
+          onclick={toggleTrackDrawingMode}
+          aria-label={$drawingModeActive
+            ? "Finish drawing mode and keep the new track."
+            : "Create an empty track and click on the map to add points."}
+        >
+          <PencilLineIcon />
+          {$drawingModeActive
+            ? `Done (${$drawingPointCount} points)`
+            : "Create Track"}
+        </Button>
+        <Button
+          variant={$tracksPanelOpen ? "secondary" : "outline"}
+          size="sm"
+          class="w-full justify-start"
+          onclick={() => tracksPanelOpen.update((v) => !v)}
+        >
+          <ListIcon />
+          {$tracksPanelOpen ? "Hide Tracks" : "Show Tracks"}
+        </Button>
+        <Button
+          variant={$trackPointsPanelOpen ? "secondary" : "outline"}
+          size="sm"
+          class="w-full justify-start"
+          onclick={() => trackPointsPanelOpen.update((v) => !v)}
+        >
+          <ListOrderedIcon />
+          {$trackPointsPanelOpen ? "Hide Points" : "Show Points"}
+        </Button>
+      </section>
+
+      <Separator />
+
+      <section class="flex flex-col gap-1.5 px-2 py-2">
+        <h2
+          class="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase"
+        >
+          Waypoints
+        </h2>
+        {#if waypointLayers.length > 0}
+          <label class="flex flex-col gap-1">
+            <span class="text-muted-foreground text-[10px]">
+              Waypoint layer
+            </span>
+            <Select.Root
+              type="single"
+              value={waypointLayerSelectValue}
+              onValueChange={(v) =>
+                v && activeWaypointLayerId.set(BigInt(v))}
+            >
+              <Select.Trigger
+                aria-label="Waypoint layer"
+                size="sm"
+                class="w-full"
+              >
+                {waypointLayers.find(
+                  (l) => String(l.id) === waypointLayerSelectValue,
+                )?.name ?? "Pick layer"}
+              </Select.Trigger>
+              <Select.Content>
+                {#each waypointLayers as layer (layer.id)}
+                  <Select.Item value={String(layer.id)} label={layer.name}>
+                    {layer.name}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </label>
+        {/if}
+        <Button
+          variant={$waypointsPanelOpen ? "secondary" : "outline"}
+          size="sm"
+          class="w-full justify-start"
+          onclick={() => waypointsPanelOpen.update((v) => !v)}
+        >
+          <MapPinIcon />
+          {$waypointsPanelOpen ? "Hide Waypoints" : "Show Waypoints"}
+        </Button>
+        <Button
+          variant={$addWaypointMode ? "default" : "outline"}
+          size="sm"
+          class="w-full justify-start"
           disabled={$drawingModeActive}
+          onclick={() => addWaypointMode.update((v) => !v)}
+          aria-label="Click on the map to place a waypoint. Press Escape to cancel."
         >
-          {#each $appState?.track_layers ?? [] as layer (layer.id)}
-            <option value={String(layer.id)}>{layer.name}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
-    <div class="btn-row">
-      <button onclick={handleImportGpx}>Import GPX</button>
-      <button onclick={handleImportPlt}>Import PLT</button>
-    </div>
-    <button
-      class="full"
-      class:active={$drawingModeActive}
-      onclick={toggleTrackDrawingMode}
-      title={$drawingModeActive
-        ? "Finish drawing mode and keep the new track."
-        : "Create an empty track and click on the map to add points."}
-    >
-      {$drawingModeActive ? `Done (${$drawingPointCount} points)` : "Create Track"}
-    </button>
-    <button class="full" onclick={() => tracksPanelOpen.update((v) => !v)}>
-      {$tracksPanelOpen ? "Hide" : "Show"} Tracks Panel
-    </button>
-    <button class="full" onclick={() => trackPointsPanelOpen.update((v) => !v)}>
-      {$trackPointsPanelOpen ? "Hide" : "Show"} Points Panel
-    </button>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Waypoints</div>
-    {#if ($appState?.waypoint_layers ?? []).length > 0}
-      <label class="layer-picker">
-        <span>Waypoint layer</span>
-        <select
-          value={$activeWaypointLayerId?.toString() ?? ""}
-          onchange={handleActiveWaypointLayerChange}
-        >
-          {#each $appState?.waypoint_layers ?? [] as layer (layer.id)}
-            <option value={String(layer.id)}>{layer.name}</option>
-          {/each}
-        </select>
-      </label>
-    {/if}
-    <button class="full" onclick={() => waypointsPanelOpen.update(v => !v)}>
-      {$waypointsPanelOpen ? "Hide" : "Show"} Waypoints Panel
-    </button>
-    <button
-      class="full"
-      class:active={$addWaypointMode}
-      disabled={$drawingModeActive}
-      onclick={() => addWaypointMode.update(v => !v)}
-      title="Click on the map to place a waypoint. Press Escape to cancel."
-    >
-      {$addWaypointMode ? "Cancel Add Waypoint" : "Add Waypoint"}
-    </button>
-  </div>
+          <MapPinPlusIcon />
+          {$addWaypointMode ? "Cancel Add Waypoint" : "Add Waypoint"}
+        </Button>
+      </section>
+    </Tooltip.Provider>
+  </ScrollArea>
 
   <div
-    class="status-bar"
-    class:error={$status.toLowerCase().includes("error") || $status.toLowerCase().includes("failed")}
+    class="bg-popover border-border flex min-h-6 items-center justify-between gap-2 border-t px-2 py-1 text-[10px]"
+    class:text-destructive={statusIsError}
+    class:text-muted-foreground={!statusIsError}
   >
-    <span>{$status}</span>
-    <button
-      class="console-toggle"
+    <span class="flex-1 truncate">{$status}</span>
+    <Button
+      variant="ghost"
+      size="icon-xs"
       onclick={() => consoleOpen.update((v) => !v)}
-      title="Toggle console (`)"
-    >›_</button>
+      aria-label="Toggle console (`)"
+    >
+      <TerminalIcon />
+    </Button>
   </div>
 </aside>
-
-<style>
-  .sidebar {
-    width: 200px;
-    height: 100%;
-    background: var(--ctp-mantle);
-    border-right: 1px solid var(--ctp-surface0);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-
-  .sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 10px;
-    background: var(--ctp-crust);
-    border-bottom: 1px solid var(--ctp-surface0);
-  }
-
-  .app-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ctp-mauve);
-  }
-
-  .section {
-    padding: 8px;
-    border-bottom: 1px solid var(--ctp-surface0);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .section-title {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--ctp-overlay1);
-    margin-bottom: 2px;
-  }
-
-  .btn-row {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-
-  button.full {
-    width: 100%;
-    text-align: left;
-  }
-
-  .layer-picker {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 10px;
-    color: var(--ctp-overlay1);
-  }
-
-  .layer-picker select {
-    width: 100%;
-    min-width: 0;
-    font-size: 11px;
-  }
-
-  button.primary {
-    background: var(--ctp-blue);
-    color: var(--ctp-base);
-    border-color: var(--ctp-blue);
-  }
-
-  button.primary:hover { filter: brightness(1.1); }
-
-  button.active {
-    background: var(--ctp-green);
-    color: var(--ctp-base);
-    border-color: var(--ctp-green);
-  }
-
-  button.active:hover { filter: brightness(1.1); }
-
-  button.secondary {
-    background: transparent;
-    border-color: var(--ctp-surface2);
-    color: var(--ctp-subtext1);
-  }
-
-  button.small {
-    font-size: 11px;
-    padding: 2px 6px;
-  }
-
-  .active-map {
-    background: var(--ctp-surface0);
-    border-radius: 4px;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .active-map-label {
-    font-size: 10px;
-    color: var(--ctp-overlay1);
-  }
-
-  .active-map-name {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--ctp-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .active-map-pkg {
-    font-size: 11px;
-    color: var(--ctp-subtext0);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .status-bar {
-    margin-top: auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 8px;
-    font-size: 10px;
-    color: var(--ctp-subtext0);
-    background: var(--ctp-crust);
-    border-top: 1px solid var(--ctp-surface0);
-    min-height: 24px;
-  }
-
-  .status-bar.error { color: var(--ctp-red); }
-
-  .status-bar span {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .console-toggle {
-    background: none;
-    border: none;
-    color: var(--ctp-overlay1);
-    font-family: monospace;
-    font-size: 11px;
-    padding: 0 4px;
-    flex-shrink: 0;
-  }
-
-  .console-toggle:hover { color: var(--ctp-text); }
-</style>
