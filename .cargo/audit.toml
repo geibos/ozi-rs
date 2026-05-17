@@ -1,0 +1,32 @@
+# cargo-audit configuration for the ozi-rs Tauri backend.
+#
+# CI invokes `cargo audit --file src-tauri/Cargo.lock` (no `--deny warnings`):
+#   - RUSTSEC vulnerabilities (severity advisories) FAIL the build.
+#   - RUSTSEC warnings (unmaintained / unsound informational) DO NOT fail
+#     the build, because most of them come from transitive Tauri 2 / gtk-rs
+#     dependencies that ozi-rs cannot fix directly.
+#
+# When a vulnerability matches a transitive dependency with no upstream fix,
+# add the advisory ID to the `ignore` list below. Every ignore entry MUST
+# include a comment explaining:
+#   - WHY the advisory cannot be addressed right now (no upstream fix,
+#     dependency pinned by Tauri, etc.);
+#   - WHEN the entry should be reconsidered (next Tauri bump, specific
+#     date, upstream issue link).
+#
+# Recheck cadence: at every Tauri / reqwest / rustls bump, remove any
+# entry whose upstream chain has been updated and re-run `cargo audit`.
+
+[advisories]
+ignore = [
+    # rustls-webpki 0.103.10 — three advisories from 2026-04 (panic in CRL
+    # parsing, two name-constraints issues). Pulled in via the chain
+    # tauri 2.10.3 -> reqwest 0.13.2 -> quinn 0.11.9 -> quinn-proto 0.11.14
+    # -> rustls 0.23.x -> rustls-webpki 0.103.10. ozi-rs cannot bump
+    # rustls-webpki directly; the fix must land in rustls / quinn / reqwest
+    # first, then in a Tauri release. Recheck on every Tauri bump.
+    # Tracking: https://github.com/tauri-apps/tauri/issues (search "rustls-webpki").
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+]

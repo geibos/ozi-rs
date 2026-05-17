@@ -60,12 +60,31 @@ build-ui:
 # ── Check & lint ──────────────────────────────────────────────────────────────
 
 # Run cargo check on the Tauri backend
-check:
+check-rust:
     cargo check --manifest-path src-tauri/Cargo.toml
+
+# Type-check Svelte components with svelte-check
+check-ui:
+    npm exec -- svelte-kit sync
+    npm exec -- svelte-check --tsconfig ./tsconfig.json
+
+# Run both Rust and Svelte type-checks
+check: check-rust check-ui
 
 # Run cargo clippy on the Tauri backend
 clippy:
     cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+# Lint frontend with ESLint (Svelte + TS flat config)
+lint:
+    npm exec -- eslint .
+
+# Format the workspace with Prettier
+fmt:
+    npm exec -- prettier --write .
+
+# Run all CI-equivalent gates locally (clippy + check + lint + test)
+ci: clippy check lint test
 
 # Run local release warning hygiene gate
 check-release-warnings:
