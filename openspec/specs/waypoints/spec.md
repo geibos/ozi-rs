@@ -57,6 +57,16 @@ The system SHALL render all waypoints in visible layers simultaneously and SHALL
 - **WHEN** the user toggles a waypoint's visibility off
 - **THEN** its marker disappears from the map but the panel row remains and indicates hidden state
 
+#### Scenario: Toggle visibility off and back on
+
+- **WHEN** the user toggles a waypoint's visibility off via the Waypoints panel and then toggles it on again
+- **THEN** the marker disappears from the map after the first toggle and reappears unchanged after the second; the panel row remains visible during both states
+
+#### Scenario: Visibility toggle is not undoable
+
+- **WHEN** the user toggles a waypoint's visibility off and then invokes undo
+- **THEN** undo reverts the most recent undoable edit (not the visibility toggle) and the waypoint stays hidden
+
 ### Requirement: System exports waypoints to GPX
 
 The system SHALL provide an "Export waypoints to GPX" action that writes all waypoints in a chosen layer to a user-selected `.gpx` file.
@@ -66,12 +76,22 @@ The system SHALL provide an "Export waypoints to GPX" action that writes all way
 - **WHEN** the user exports waypoints from a layer with three named waypoints
 - **THEN** the resulting `.gpx` contains three `<wpt>` elements with names, coordinates, and (where present) symbols
 
-### Requirement: System exports waypoints to PLT
+### Requirement: System exports waypoints to OziExplorer WPT
 
-The system SHALL provide an "Export waypoints to PLT" action that writes waypoints to a user-selected `.plt` file in the OziExplorer PLT format.
+The system SHALL provide an "Export waypoints (WPT)" action that writes all waypoints in a chosen layer to a user-selected `.wpt` file in the OziExplorer WPT format (version 1.1 header, latitude/longitude in WGS84 decimal degrees, optional symbol code, optional elevation and timestamp).
 
-#### Scenario: Export waypoints to PLT
+#### Scenario: Export waypoints with symbols to WPT
 
-- **WHEN** the user exports a waypoint collection to PLT
-- **THEN** the resulting `.plt` file is valid OziExplorer PLT containing each waypoint
+- **WHEN** the user invokes "Export waypoints (WPT)" on a layer with three waypoints, two of which have symbols
+- **THEN** the resulting `.wpt` file contains exactly three rows in OziExplorer 1.1 WPT format with symbol codes preserved for the two waypoints and a default symbol for the third
+
+#### Scenario: WPT export dialog suggests `<bundle>/<layer>.wpt`
+
+- **WHEN** the user invokes WPT export with a bundle active and a waypoint layer named `points`
+- **THEN** the file picker pre-fills with `<bundle>/points.wpt`
+
+#### Scenario: WPT export with no active bundle suggests filename only
+
+- **WHEN** the user invokes WPT export with no active bundle
+- **THEN** the file picker suggests `<layer>.wpt` only, without a directory
 

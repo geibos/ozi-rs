@@ -55,7 +55,7 @@ The system SHALL detect consecutive commands that target the same entity (e.g. s
 
 ### Requirement: Track style mutations bypass the command stack
 
-The system SHALL NOT route `set_track_color`, `set_track_line_width`, or `toggle_track_visible` through the undo stack. These mutations SHALL apply immediately and SHALL NOT add undo steps.
+The system SHALL NOT route `set_track_color`, `set_track_line_width`, `toggle_track_visible`, or `toggle_waypoint_visible` through the undo stack. These mutations SHALL apply immediately and SHALL NOT add undo steps.
 
 #### Scenario: Color change is not undoable
 
@@ -66,6 +66,11 @@ The system SHALL NOT route `set_track_color`, `set_track_line_width`, or `toggle
 
 - **WHEN** the user toggles a track's visibility off and invokes undo
 - **THEN** undo reverts the most recent undoable edit (not the visibility toggle)
+
+#### Scenario: Waypoint visibility toggle is not undoable
+
+- **WHEN** the user toggles a waypoint's visibility off and invokes undo
+- **THEN** undo reverts the most recent undoable edit (not the waypoint visibility toggle) and the waypoint stays hidden
 
 ### Requirement: Undo history is not persisted across app restarts
 
