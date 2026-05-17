@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { selectedTheme } from "../lib/stores";
-  import { applyTheme, type ThemeName } from "../lib/theme";
+  import * as Select from "$lib/components/ui/select";
+  import { selectedTheme } from "$lib/stores";
+  import { applyTheme, type ThemeName } from "$lib/theme";
 
   const themes: { value: ThemeName; label: string }[] = [
     { value: "auto", label: "Auto" },
@@ -10,12 +11,14 @@
     { value: "mocha", label: "Mocha" },
   ];
 
-  // Apply on mount and on change
+  const selectedLabel = $derived(
+    themes.find((t) => t.value === $selectedTheme)?.label ?? "Theme",
+  );
+
   $effect(() => {
     applyTheme($selectedTheme as ThemeName);
   });
 
-  // Re-apply when system preference changes (for Auto mode)
   $effect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = () => {
@@ -26,8 +29,13 @@
   });
 </script>
 
-<select bind:value={$selectedTheme} title="Color theme">
-  {#each themes as t}
-    <option value={t.value}>{t.label}</option>
-  {/each}
-</select>
+<Select.Root type="single" bind:value={$selectedTheme}>
+  <Select.Trigger aria-label="Color theme" size="sm">
+    {selectedLabel}
+  </Select.Trigger>
+  <Select.Content>
+    {#each themes as t (t.value)}
+      <Select.Item value={t.value} label={t.label}>{t.label}</Select.Item>
+    {/each}
+  </Select.Content>
+</Select.Root>

@@ -14,9 +14,9 @@
 
 ## 3. ThemePicker.svelte (step 3.2)
 
-- [ ] 3.1 Replace the native `<select>` with `Select.Root` + `Select.Trigger` + `Select.Content` + `Select.Item` from `$lib/components/ui/select`.
-- [ ] 3.2 Delete the component-local `<style>` block; trigger inherits styling from the primitive.
-- [ ] 3.3 Keep the `applyTheme($selectedTheme)` `$effect` and the `prefers-color-scheme` listener for Auto mode untouched.
+- [x] 3.1 Replace the native `<select>` with `Select.Root` + `Select.Trigger` + `Select.Content` + `Select.Item` from `$lib/components/ui/select`.
+- [x] 3.2 Delete the component-local `<style>` block; trigger inherits styling from the primitive.
+- [x] 3.3 Keep the `applyTheme($selectedTheme)` `$effect` and the `prefers-color-scheme` listener for Auto mode untouched.
 - [ ] 3.4 Verify the ThemePicker dropdown looks correct in all four Catppuccin flavours via `ozi-rs-mcp` screenshots.
 - [ ] 3.5 Smoke-test: switch flavour Latte → Frappé → Macchiato → Mocha → Auto; confirm `--ctp-*` AND semantic tokens update on `<html>` for each step.
 
