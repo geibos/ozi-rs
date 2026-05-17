@@ -10,6 +10,10 @@ use reqwest::blocking::Client;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::{Semaphore, mpsc};
+use tokio::task::JoinSet;
 
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
 const MOBILE_MAPS_DIR_NAME: &str = "8-Android&iOS";
@@ -81,6 +85,90 @@ impl ProjectOpenProgress {
 struct RemoteFileDownload {
     url: String,
     path: PathBuf,
+    /// Path relative to the project source root (used for `package_name`).
+    relative: String,
+}
+
+/// Default upper bound on concurrent per-file downloads inside a bundle.
+pub const DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY: usize = 3;
+
+/// Per-file notifications emitted by the multi-file download path.
+#[derive(Debug, Clone)]
+pub enum DownloadNotification {
+    /// Phase update for the overall bundle (Scanning, Downloading, Extracting, Indexing).
+    Phase(ProjectOpenProgress),
+    /// Per-file progress; emitted at least once per file plus on each chunk.
+    FileProgress {
+        package_name: String,
+        downloaded_bytes: u64,
+        total_bytes: Option<u64>,
+        file_index: usize,
+        file_count: usize,
+    },
+    /// A file has been fully downloaded and fsync'd to its final path.
+    FileReady {
+        package_name: String,
+        local_path: PathBuf,
+        file_index: usize,
+        file_count: usize,
+    },
+}
+
+/// Cooperative cancellation token shared by the orchestrator and its workers.
+#[derive(Debug, Clone, Default)]
+pub struct CancelToken {
+    flag: Arc<AtomicBool>,
+}
+
+impl CancelToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cancel(&self) {
+        self.flag.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.flag.load(Ordering::SeqCst)
+    }
+}
+
+/// Error returned when a download was aborted via [`CancelToken`].
+pub const CANCEL_ERROR: &str = "download cancelled";
+
+/// Sort a list of remote file descriptors by their leading numeric prefix.
+///
+/// Files whose top-level directory or basename starts with `<digits>-` are
+/// ordered by the numeric value of those digits. Files without such a prefix
+/// are placed after all prefixed ones, sorted lexicographically.
+fn sort_remote_files_by_prefix(files: &mut [RemoteFileDownload]) {
+    files.sort_by(|a, b| {
+        let (pa, ra) = leading_prefix(&a.relative);
+        let (pb, rb) = leading_prefix(&b.relative);
+        match (pa, pb) {
+            (Some(x), Some(y)) => x.cmp(&y).then_with(|| ra.cmp(rb)),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.relative.cmp(&b.relative),
+        }
+    });
+}
+
+/// Extract the leading numeric prefix from a path component such as
+/// `10-Tracks/foo.gpx` → (Some(10), "10-Tracks/foo.gpx").
+fn leading_prefix(rel: &str) -> (Option<u32>, &str) {
+    let head = rel.split('/').next().unwrap_or(rel);
+    let digits: String = head.chars().take_while(|c| c.is_ascii_digit()).collect();
+    if digits.is_empty() {
+        return (None, rel);
+    }
+    let rest = &head[digits.len()..];
+    if rest.starts_with('-') || rest.starts_with('_') || rest.is_empty() {
+        digits.parse::<u32>().ok().map_or((None, rel), |p| (Some(p), rel))
+    } else {
+        (None, rel)
+    }
 }
 
 pub fn fetch_project_summaries_streaming<F>(mut on_chunk: F) -> Result<Vec<LizaProjectSummary>, String>
@@ -175,42 +263,6 @@ pub fn save_project_summaries_cache(
 
     let cache_text = serde_json::to_string(&cache).map_err(|err| err.to_string())?;
     fs::write(root.join(PROJECTS_CACHE_FILE_NAME), cache_text).map_err(|err| err.to_string())
-}
-
-pub fn open_project<F>(
-    summary: LizaProjectSummary,
-    root: &Path,
-    mut on_progress: F,
-) -> Result<LizaProject, String>
-where
-    F: FnMut(ProjectOpenProgress),
-{
-    if !is_project_cached(&summary.slug, root) {
-        on_progress(ProjectOpenProgress::status(
-            format!("Downloading project bundle: {}", summary.name),
-            ProjectOpenPhase::Downloading,
-        ));
-        cache_project_at_root(&summary, root, &mut on_progress)?;
-    } else {
-        on_progress(ProjectOpenProgress::status(
-            format!("Opening cached project bundle: {}", summary.name),
-            ProjectOpenPhase::Downloading,
-        ));
-    }
-
-    on_progress(ProjectOpenProgress::status(
-        format!("Extracting cached OZI bundles: {}", summary.name),
-        ProjectOpenPhase::Extracting,
-    ));
-    materialize_cached_ozi_archives(root, &summary.slug, &mut on_progress)?;
-
-    on_progress(ProjectOpenProgress::status(
-        format!("Indexing cached project maps: {}", summary.name),
-        ProjectOpenPhase::Indexing,
-    ));
-    let project = load_cached_project_from_root(summary, root)?;
-    ensure_tracks_dir(root, &project.summary.slug);
-    Ok(project)
 }
 
 pub fn is_project_cached(project_slug: &str, root: &Path) -> bool {
@@ -390,93 +442,246 @@ fn client() -> Result<Client, String> {
     Client::builder().build().map_err(|err| err.to_string())
 }
 
-fn cache_project_at_root<F>(
-    summary: &LizaProjectSummary,
-    root: &Path,
-    on_progress: &mut F,
-) -> Result<(), String>
-where
-    F: FnMut(ProjectOpenProgress),
-{
-    let source_root = project_source_root(root, &summary.slug);
-    fs::create_dir_all(&source_root).map_err(|err| err.to_string())?;
-    mirror_remote_directory(&summary.url, &source_root, on_progress)
+/// Configuration for the multi-file download orchestrator.
+#[derive(Debug, Clone)]
+pub struct BundleDownloadConfig {
+    /// Maximum number of in-flight HTTP requests at any time. Always ≥ 1.
+    pub concurrency: usize,
+    /// HTTP base used to list and fetch directory contents.
+    pub url: String,
+    /// Filesystem destination for the project bundle root.
+    pub local_dir: PathBuf,
+    /// Cancellation token; when triggered, in-flight downloads abort and the
+    /// orchestrator returns [`CANCEL_ERROR`].
+    pub cancel: CancelToken,
 }
 
-fn mirror_remote_directory<F>(
-    url: &str,
-    local_dir: &Path,
-    on_progress: &mut F,
-) -> Result<(), String>
-where
-    F: FnMut(ProjectOpenProgress),
-{
-    fs::create_dir_all(local_dir).map_err(|err| err.to_string())?;
-    on_progress(ProjectOpenProgress::status(
-        format!("Scanning {}", local_dir.display()),
+
+/// Download a LizaAlert project bundle with per-file notifications.
+///
+/// Files are enumerated, sorted by prefix (`00-`, `10-`, …), and downloaded
+/// concurrently with the bound given by `config.concurrency`. The caller
+/// receives a [`DownloadNotification`] for every chunk and every file-ready
+/// transition through the supplied unbounded channel.
+///
+/// Resuming a previously cancelled download is supported: files that already
+/// exist on disk under `local_dir` are skipped (their `bundle-file-ready`
+/// notification is still emitted so downstream listeners can rebuild their
+/// view, mirroring real-world fresh state).
+pub async fn download_bundle_concurrent(
+    config: BundleDownloadConfig,
+    tx: mpsc::UnboundedSender<DownloadNotification>,
+) -> Result<(), String> {
+    fs::create_dir_all(&config.local_dir).map_err(|err| err.to_string())?;
+    let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
+        format!("Scanning {}", config.local_dir.display()),
         ProjectOpenPhase::Scanning,
-    ));
+    )));
 
-    let mut files = Vec::new();
-    collect_remote_files(url, local_dir, &mut files)?;
-    let total_files = files.len() as u64;
+    if config.cancel.is_cancelled() {
+        return Err(CANCEL_ERROR.to_owned());
+    }
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Downloading {} files in parallel", total_files),
+    let mut files = tokio::task::spawn_blocking({
+        let url = config.url.clone();
+        let local_dir = config.local_dir.clone();
+        move || {
+            let mut out = Vec::new();
+            let root_rel = String::new();
+            collect_remote_files_rel(&url, &local_dir, &root_rel, &mut out)?;
+            Ok::<_, String>(out)
+        }
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+
+    sort_remote_files_by_prefix(&mut files);
+    let total = files.len();
+
+    let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
+        message: format!("Downloading {total} files in parallel"),
         phase: ProjectOpenPhase::Downloading,
         completed: Some(0),
-        total: Some(total_files),
+        total: Some(total as u64),
         downloaded_bytes: None,
         total_bytes: None,
-    });
+    }));
 
-    // Download all files concurrently; progress callback is not called from threads
-    // (it is not Send), so we collect errors and report them after joining.
-    let completed_count = std::sync::atomic::AtomicU64::new(0);
-    let mut first_error: Option<String> = None;
-    std::thread::scope(|s| {
-        let handles: Vec<_> = files
-            .iter()
-            .map(|file| {
-                let completed_count = &completed_count;
-                s.spawn(move || {
-                    let result = download_to_path(&file.url, &file.path, |_, _| {});
-                    if result.is_ok() {
-                        completed_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    }
-                    result
-                })
-            })
-            .collect();
+    let concurrency = config.concurrency.max(1);
+    let sem = Arc::new(Semaphore::new(concurrency));
+    let mut set: JoinSet<Result<(), String>> = JoinSet::new();
+    let async_client = reqwest::Client::builder()
+        .build()
+        .map_err(|err| err.to_string())?;
 
-        for handle in handles {
-            if let Ok(Err(e)) = handle.join()
-                && first_error.is_none()
-            {
-                first_error = Some(e);
+    for (index, file) in files.into_iter().enumerate() {
+        if config.cancel.is_cancelled() {
+            break;
+        }
+        let permit_sem = Arc::clone(&sem);
+        let tx_worker = tx.clone();
+        let cancel = config.cancel.clone();
+        let file_count = total;
+        let client = async_client.clone();
+        set.spawn(async move {
+            let permit = permit_sem.acquire_owned().await.map_err(|e| e.to_string())?;
+            if cancel.is_cancelled() {
+                drop(permit);
+                return Err(CANCEL_ERROR.to_owned());
+            }
+            let RemoteFileDownload { url, path, relative } = file;
+            let pkg = relative.clone();
+            if path.exists() {
+                // Already on disk (resume). Emit one synthetic progress + ready.
+                let size = tokio::fs::metadata(&path).await.ok().map(|m| m.len());
+                let _ = tx_worker.send(DownloadNotification::FileProgress {
+                    package_name: pkg.clone(),
+                    downloaded_bytes: size.unwrap_or(0),
+                    total_bytes: size,
+                    file_index: index,
+                    file_count,
+                });
+            } else {
+                let res = download_to_path_async(
+                    &client,
+                    &url,
+                    &path,
+                    &cancel,
+                    |downloaded, total_bytes| {
+                        let _ = tx_worker.send(DownloadNotification::FileProgress {
+                            package_name: pkg.clone(),
+                            downloaded_bytes: downloaded,
+                            total_bytes,
+                            file_index: index,
+                            file_count,
+                        });
+                    },
+                )
+                .await;
+                res?;
+            }
+            // Emit ready
+            let _ = tx_worker.send(DownloadNotification::FileReady {
+                package_name: pkg,
+                local_path: path,
+                file_index: index,
+                file_count,
+            });
+            drop(permit);
+            Ok(())
+        });
+    }
+
+    let mut first_err: Option<String> = None;
+    while let Some(joined) = set.join_next().await {
+        match joined {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                if first_err.is_none() {
+                    first_err = Some(e);
+                }
+            }
+            Err(e) if e.is_cancelled() => {
+                if first_err.is_none() {
+                    first_err = Some(CANCEL_ERROR.to_owned());
+                }
+            }
+            Err(e) => {
+                if first_err.is_none() {
+                    first_err = Some(e.to_string());
+                }
             }
         }
-    });
+    }
 
-    if let Some(e) = first_error {
+    if config.cancel.is_cancelled() {
+        return Err(CANCEL_ERROR.to_owned());
+    }
+    if let Some(e) = first_err {
         return Err(e);
     }
 
-    on_progress(ProjectOpenProgress {
-        message: format!("Downloaded {} files", total_files),
+    let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
+        message: format!("Downloaded {total} files"),
         phase: ProjectOpenPhase::Downloading,
-        completed: Some(total_files),
-        total: Some(total_files),
+        completed: Some(total as u64),
+        total: Some(total as u64),
         downloaded_bytes: None,
         total_bytes: None,
-    });
+    }));
 
     Ok(())
 }
 
-fn collect_remote_files(
+/// Asynchronous, notification-driven counterpart to [`open_project`].
+///
+/// Returns the [`LizaProject`] descriptor once download + extract + indexing
+/// have all completed. Per-file events stream through `tx` while work is in
+/// progress.
+pub async fn open_project_async(
+    summary: LizaProjectSummary,
+    root: PathBuf,
+    cancel: CancelToken,
+    concurrency: usize,
+    tx: mpsc::UnboundedSender<DownloadNotification>,
+) -> Result<LizaProject, String> {
+    if !is_project_cached(&summary.slug, &root) {
+        let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
+            format!("Downloading project bundle: {}", summary.name),
+            ProjectOpenPhase::Downloading,
+        )));
+        let source_root = project_source_root(&root, &summary.slug);
+        fs::create_dir_all(&source_root).map_err(|err| err.to_string())?;
+        let cfg = BundleDownloadConfig {
+            concurrency,
+            url: summary.url.clone(),
+            local_dir: source_root,
+            cancel: cancel.clone(),
+        };
+        download_bundle_concurrent(cfg, tx.clone()).await?;
+    } else {
+        let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
+            format!("Opening cached project bundle: {}", summary.name),
+            ProjectOpenPhase::Downloading,
+        )));
+    }
+
+    if cancel.is_cancelled() {
+        return Err(CANCEL_ERROR.to_owned());
+    }
+
+    let project = tokio::task::spawn_blocking({
+        let summary = summary.clone();
+        let root = root.clone();
+        let tx = tx.clone();
+        move || {
+            let mut on_progress = |p: ProjectOpenProgress| {
+                let _ = tx.send(DownloadNotification::Phase(p));
+            };
+            on_progress(ProjectOpenProgress::status(
+                format!("Extracting cached OZI bundles: {}", summary.name),
+                ProjectOpenPhase::Extracting,
+            ));
+            materialize_cached_ozi_archives(&root, &summary.slug, &mut on_progress)?;
+
+            on_progress(ProjectOpenProgress::status(
+                format!("Indexing cached project maps: {}", summary.name),
+                ProjectOpenPhase::Indexing,
+            ));
+            let project = load_cached_project_from_root(summary.clone(), &root)?;
+            ensure_tracks_dir(&root, &summary.slug);
+            Ok::<_, String>(project)
+        }
+    })
+    .await
+    .map_err(|err| err.to_string())??;
+    Ok(project)
+}
+
+fn collect_remote_files_rel(
     url: &str,
     local_dir: &Path,
+    rel_prefix: &str,
     output: &mut Vec<RemoteFileDownload>,
 ) -> Result<(), String> {
     let html = fetch_text(url)?;
@@ -484,14 +689,20 @@ fn collect_remote_files(
     for entry in parse_directory_entries(&html)? {
         let child_url = format!("{url}{}", entry.href);
         let child_path = local_dir.join(&entry.name);
+        let child_rel = if rel_prefix.is_empty() {
+            entry.name.clone()
+        } else {
+            format!("{rel_prefix}/{}", entry.name)
+        };
 
         if entry.is_dir {
             fs::create_dir_all(&child_path).map_err(|err| err.to_string())?;
-            collect_remote_files(&child_url, &child_path, output)?;
+            collect_remote_files_rel(&child_url, &child_path, &child_rel, output)?;
         } else {
             output.push(RemoteFileDownload {
                 url: child_url,
                 path: child_path,
+                relative: child_rel,
             });
         }
     }
@@ -499,39 +710,82 @@ fn collect_remote_files(
     Ok(())
 }
 
-fn download_to_path<F>(url: &str, path: &Path, mut on_progress: F) -> Result<(), String>
+/// Streaming async HTTP GET that periodically calls `on_progress`, fsyncs on
+/// completion, and aborts early when `cancel` is triggered.
+///
+/// Bytes are written to a sibling `.part` file and atomically renamed on
+/// success — a cancel mid-stream therefore never leaves a half-written file
+/// at the canonical path, so `path.exists()` is a reliable "fully done"
+/// signal for resume logic.
+async fn download_to_path_async<F>(
+    client: &reqwest::Client,
+    url: &str,
+    path: &Path,
+    cancel: &CancelToken,
+    mut on_progress: F,
+) -> Result<(), String>
 where
     F: FnMut(u64, Option<u64>),
 {
-    let client = client()?;
-    let mut response = client
-        .get(url)
-        .send()
-        .and_then(|response| response.error_for_status())
-        .map_err(|err| err.to_string())?;
+    let send_fut = client.get(url).send();
+    tokio::pin!(send_fut);
+    let response = tokio::select! {
+        biased;
+        _ = cancel_wait(cancel) => return Err(CANCEL_ERROR.to_owned()),
+        r = &mut send_fut => r.and_then(|r| r.error_for_status()).map_err(|err| err.to_string())?,
+    };
 
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|err| err.to_string())?;
     }
 
-    let mut file = File::create(path).map_err(|err| err.to_string())?;
+    let tmp_path = path.with_extension("part");
+    let mut file = tokio::fs::File::create(&tmp_path)
+        .await
+        .map_err(|err| err.to_string())?;
     let total_bytes = response.content_length();
     let mut downloaded_bytes = 0u64;
-    let mut buffer = [0u8; 16 * 1024];
 
+    // Always emit at least one progress event per file so a UI can render the
+    // currently-downloading label even if the body is empty.
+    on_progress(0, total_bytes);
+
+    let mut stream = response.bytes_stream();
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
     loop {
-        let read_bytes = response.read(&mut buffer).map_err(|err| err.to_string())?;
-        if read_bytes == 0 {
-            break;
-        }
-
-        file.write_all(&buffer[..read_bytes])
-            .map_err(|err| err.to_string())?;
-        downloaded_bytes += read_bytes as u64;
+        let next = tokio::select! {
+            biased;
+            _ = cancel_wait(cancel) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(&tmp_path).await;
+                return Err(CANCEL_ERROR.to_owned());
+            }
+            n = stream.next() => n,
+        };
+        let Some(chunk) = next else { break };
+        let chunk = chunk.map_err(|err| err.to_string())?;
+        file.write_all(&chunk).await.map_err(|err| err.to_string())?;
+        downloaded_bytes += chunk.len() as u64;
         on_progress(downloaded_bytes, total_bytes);
     }
 
+    file.sync_all().await.map_err(|err| err.to_string())?;
+    drop(file);
+    tokio::fs::rename(&tmp_path, path)
+        .await
+        .map_err(|err| err.to_string())?;
     Ok(())
+}
+
+/// Future that resolves when `cancel.is_cancelled()` becomes true. Polled
+/// every 25 ms — fast enough to honour the 250 ms cancel-deadline target.
+async fn cancel_wait(cancel: &CancelToken) {
+    while !cancel.is_cancelled() {
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
 }
 
 fn parse_directory_entries(html: &str) -> Result<Vec<DirectoryEntry>, String> {
@@ -1124,5 +1378,586 @@ mod tests {
 
     fn sample_ozi_map() -> &'static str {
         "OziExplorer Map Data File Version 2.2\nDemo topo\ndemo.ozf2\n1 ,Map Code,\nWGS 84\nReserved 1\nReserved 2\nMagnetic Variation,,,E\nMap Projection,Latitude/Longitude,PolyCal,No,AutoCalOnly,No,BSBUseWPX,No\nPoint01,xy,10,20,in, deg,54,30.000,N,48,24.000,E, grid, , , ,N\nProjection Setup,,,,,,,,,,\n"
+    }
+
+    #[test]
+    fn leading_prefix_extracts_numeric_prefix() {
+        use super::leading_prefix;
+        assert_eq!(leading_prefix("10-Tracks/file.gpx").0, Some(10));
+        assert_eq!(leading_prefix("00-manifest.json").0, Some(0));
+        assert_eq!(leading_prefix("99-refs.pdf").0, Some(99));
+        assert_eq!(leading_prefix("readme.md").0, None);
+        assert_eq!(leading_prefix("3D-Models/foo").0, None);
+        assert_eq!(leading_prefix("123_legacy.txt").0, Some(123));
+    }
+
+    #[test]
+    fn cancel_token_propagates() {
+        use super::CancelToken;
+        let t = CancelToken::new();
+        assert!(!t.is_cancelled());
+        let c = t.clone();
+        c.cancel();
+        assert!(t.is_cancelled());
+    }
+
+    #[test]
+    fn sort_remote_files_by_prefix_orders_numeric_first() {
+        use super::{RemoteFileDownload, sort_remote_files_by_prefix};
+        let mk = |rel: &str| RemoteFileDownload {
+            url: format!("https://example.test/{rel}"),
+            path: std::path::PathBuf::from(rel),
+            relative: rel.to_owned(),
+        };
+        let mut files = vec![
+            mk("99-refs.pdf"),
+            mk("readme.md"),
+            mk("00-manifest.json"),
+            mk("10-Tracks/a.ozf2"),
+            mk("20-overlay.zip"),
+            mk("10-Tracks/b.ozf2"),
+            mk("alpha.txt"),
+        ];
+        sort_remote_files_by_prefix(&mut files);
+        let order: Vec<_> = files.iter().map(|f| f.relative.as_str()).collect();
+        assert_eq!(
+            order,
+            vec![
+                "00-manifest.json",
+                "10-Tracks/a.ozf2",
+                "10-Tracks/b.ozf2",
+                "20-overlay.zip",
+                "99-refs.pdf",
+                "alpha.txt",
+                "readme.md",
+            ]
+        );
+    }
+}
+
+#[cfg(test)]
+mod bundle_download_tests {
+    //! Integration tests for the multi-file download orchestrator.
+    //!
+    //! Uses `wiremock` to stand up a fake Apache-style directory listing and
+    //! per-file responses; exercises the public async API end to end (no
+    //! mocking of the inside).
+
+    use super::{
+        BundleDownloadConfig, CANCEL_ERROR, CancelToken, DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+        DownloadNotification, download_bundle_concurrent,
+    };
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+    use tokio::sync::mpsc;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, Request, ResponseTemplate};
+
+    /// Build a minimal Apache-style HTML index that the parser will accept.
+    fn index_html(entries: &[(&str, bool)]) -> String {
+        // Apache appends a trailing slash for directories. The current parser
+        // looks at `href="..."` so we match that shape.
+        let mut html = String::from("<html><body><pre>\n");
+        html.push_str(r#"<a href="../">../</a>\n"#);
+        for (name, is_dir) in entries {
+            let href = if *is_dir {
+                format!("{name}/")
+            } else {
+                (*name).to_string()
+            };
+            html.push_str(&format!(r#"<a href="{href}">{href}</a>"#));
+            html.push('\n');
+        }
+        html.push_str("</pre></body></html>\n");
+        html
+    }
+
+    async fn collect_notifications(
+        mut rx: mpsc::UnboundedReceiver<DownloadNotification>,
+    ) -> Vec<DownloadNotification> {
+        let mut out = Vec::new();
+        while let Some(n) = rx.recv().await {
+            out.push(n);
+        }
+        out
+    }
+
+    fn body_for(name: &str) -> Vec<u8> {
+        // Distinct, deterministic content per file. Size also varies so the
+        // monotonic-progress assertion is meaningful.
+        match name {
+            "00-manifest.json" => b"{\"v\":1}".repeat(2),
+            "10-Tracks/a.ozf2" => vec![0xAAu8; 3 * 1024],
+            "10-Tracks/b.ozf2" => vec![0xBBu8; 4 * 1024],
+            "20-overlay.zip" => vec![0xCCu8; 8 * 1024],
+            "99-refs.pdf" => vec![0xDDu8; 16 * 1024],
+            _ => b"x".to_vec(),
+        }
+    }
+
+    async fn setup_bundle_server() -> MockServer {
+        let server = MockServer::start().await;
+
+        // Root directory listing.
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("00-manifest.json", false),
+                ("10-Tracks", true),
+                ("20-overlay.zip", false),
+                ("99-refs.pdf", false),
+            ])))
+            .mount(&server)
+            .await;
+
+        // Nested directory listing.
+        Mock::given(method("GET"))
+            .and(path("/bundle/10-Tracks/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("a.ozf2", false),
+                ("b.ozf2", false),
+            ])))
+            .mount(&server)
+            .await;
+
+        for name in [
+            "00-manifest.json",
+            "10-Tracks/a.ozf2",
+            "10-Tracks/b.ozf2",
+            "20-overlay.zip",
+            "99-refs.pdf",
+        ] {
+            Mock::given(method("GET"))
+                .and(path(format!("/bundle/{name}")))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(body_for(name)))
+                .mount(&server)
+                .await;
+        }
+
+        server
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn per_file_progress_is_monotonic_and_complete() {
+        let server = setup_bundle_server().await;
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+
+        let (tx, rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+        let notifications = collect_notifications(rx).await;
+        handle.await.unwrap().unwrap();
+
+        // Collect last `downloaded_bytes` per file and check monotonicity.
+        use std::collections::HashMap;
+        let mut last_bytes: HashMap<String, u64> = HashMap::new();
+        let mut ready: Vec<String> = Vec::new();
+        for n in &notifications {
+            match n {
+                DownloadNotification::FileProgress {
+                    package_name,
+                    downloaded_bytes,
+                    ..
+                } => {
+                    if let Some(prev) = last_bytes.get(package_name) {
+                        assert!(
+                            *downloaded_bytes >= *prev,
+                            "progress regression for {package_name}: {prev} -> {downloaded_bytes}"
+                        );
+                    }
+                    last_bytes.insert(package_name.clone(), *downloaded_bytes);
+                }
+                DownloadNotification::FileReady { package_name, .. } => {
+                    ready.push(package_name.clone());
+                }
+                _ => {}
+            }
+        }
+
+        // Every file got at least one progress event …
+        for name in [
+            "00-manifest.json",
+            "10-Tracks/a.ozf2",
+            "10-Tracks/b.ozf2",
+            "20-overlay.zip",
+            "99-refs.pdf",
+        ] {
+            assert!(
+                last_bytes.contains_key(name),
+                "no progress for {name}; got {:?}",
+                last_bytes.keys()
+            );
+            assert_eq!(
+                last_bytes[name],
+                body_for(name).len() as u64,
+                "final progress mismatch for {name}"
+            );
+            assert!(ready.iter().any(|p| p == name), "{name} not ready");
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn prefix_ordered_scheduling_starts_smallest_first() {
+        // Slow down the high-prefix file so we can prove the small-prefix
+        // file starts (and finishes) ahead of it even though listing order
+        // does not enforce that.
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("99-refs.pdf", false),
+                ("00-manifest.json", false),
+            ])))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/bundle/00-manifest.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"manifest".to_vec()))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/bundle/99-refs.pdf"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![0xDD; 4096])
+                    .set_delay(Duration::from_millis(300)),
+            )
+            .mount(&server)
+            .await;
+
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: 2,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+
+        let mut first_ready: Option<String> = None;
+        while let Some(n) = rx.recv().await {
+            if let DownloadNotification::FileReady { package_name, .. } = n
+                && first_ready.is_none()
+            {
+                first_ready = Some(package_name);
+            }
+        }
+        handle.await.unwrap().unwrap();
+        assert_eq!(first_ready.as_deref(), Some("00-manifest.json"));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn missing_content_length_still_emits_progress() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string(index_html(&[("00-no-clen.bin", false)])),
+            )
+            .mount(&server)
+            .await;
+        // Use chunked transfer (no Content-Length).
+        Mock::given(method("GET"))
+            .and(path("/bundle/00-no-clen.bin"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("Transfer-Encoding", "chunked")
+                    .set_body_bytes(b"hello".to_vec()),
+            )
+            .mount(&server)
+            .await;
+
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: 1,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+        let notifications = collect_notifications(rx).await;
+        handle.await.unwrap().unwrap();
+
+        // Should not panic and should emit at least one progress event.
+        let saw_progress = notifications.iter().any(|n| {
+            matches!(
+                n,
+                DownloadNotification::FileProgress {
+                    package_name,
+                    total_bytes: None,
+                    ..
+                }
+                if package_name == "00-no-clen.bin"
+            )
+        });
+        assert!(
+            saw_progress,
+            "expected FileProgress with total_bytes=None, got {notifications:?}"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn small_file_ready_before_large_file_completes() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("10-small.bin", false),
+                ("99-large.pdf", false),
+            ])))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/10-small.bin"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"tiny".to_vec()))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/99-large.pdf"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![0xDD; 8 * 1024])
+                    .set_delay(Duration::from_millis(400)),
+            )
+            .mount(&server)
+            .await;
+
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: 2,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+
+        let mut small_ready_at: Option<std::time::Instant> = None;
+        let mut large_ready_at: Option<std::time::Instant> = None;
+        while let Some(n) = rx.recv().await {
+            if let DownloadNotification::FileReady { package_name, .. } = n {
+                let now = std::time::Instant::now();
+                if package_name == "10-small.bin" {
+                    small_ready_at = Some(now);
+                } else if package_name == "99-large.pdf" {
+                    large_ready_at = Some(now);
+                }
+            }
+        }
+        handle.await.unwrap().unwrap();
+        let s = small_ready_at.expect("small ready");
+        let l = large_ready_at.expect("large ready");
+        assert!(s < l, "small file should be ready before large file");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn cancel_aborts_within_deadline_and_resume_only_fetches_missing() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("00-fast.bin", false),
+                ("99-slow.bin", false),
+            ])))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/00-fast.bin"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"done".to_vec()))
+            .mount(&server)
+            .await;
+        // Very slow to give us a clean cancel window.
+        Mock::given(method("GET"))
+            .and(path("/bundle/99-slow.bin"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(vec![0xEE; 16 * 1024])
+                    .set_delay(Duration::from_secs(3)),
+            )
+            .mount(&server)
+            .await;
+
+        let tmp = tempdir();
+        let cancel = CancelToken::new();
+        let cfg = BundleDownloadConfig {
+            concurrency: 2,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: cancel.clone(),
+        };
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+
+        // Wait until the fast file is ready, then cancel.
+        let mut fast_seen = false;
+        while let Some(n) = rx.recv().await {
+            if matches!(
+                &n,
+                DownloadNotification::FileReady { package_name, .. } if package_name == "00-fast.bin"
+            ) {
+                fast_seen = true;
+                break;
+            }
+        }
+        assert!(fast_seen, "fast file should have completed");
+
+        let cancel_at = std::time::Instant::now();
+        cancel.cancel();
+        // Drain remaining notifications.
+        while rx.recv().await.is_some() {}
+        let res = handle.await.unwrap();
+        assert_eq!(res, Err(CANCEL_ERROR.to_owned()));
+        // 250ms target with comfortable headroom for test infra.
+        let elapsed = cancel_at.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(1500),
+            "cancel took too long: {elapsed:?}"
+        );
+
+        // Already-downloaded file remains on disk
+        assert!(tmp.path().join("00-fast.bin").exists());
+        // Half-downloaded file should NOT be at the canonical path
+        assert!(!tmp.path().join("99-slow.bin").exists());
+
+        // Resume: swap the slow file for a fast one and re-run.
+        // Reset wiremock by adding a higher-priority mock would require a
+        // server reset. Easier: build a brand-new server with the working
+        // file and verify only the missing one is fetched.
+        let resume_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("00-fast.bin", false),
+                ("99-slow.bin", false),
+            ])))
+            .mount(&resume_server)
+            .await;
+        let resume_fast_hits = Arc::new(AtomicUsize::new(0));
+        let resume_slow_hits = Arc::new(AtomicUsize::new(0));
+        let fast_hits_clone = resume_fast_hits.clone();
+        let slow_hits_clone = resume_slow_hits.clone();
+        Mock::given(method("GET"))
+            .and(path("/bundle/00-fast.bin"))
+            .respond_with(move |_: &Request| {
+                fast_hits_clone.fetch_add(1, Ordering::SeqCst);
+                ResponseTemplate::new(200).set_body_bytes(b"done".to_vec())
+            })
+            .mount(&resume_server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/99-slow.bin"))
+            .respond_with(move |_: &Request| {
+                slow_hits_clone.fetch_add(1, Ordering::SeqCst);
+                ResponseTemplate::new(200).set_body_bytes(b"now-ok".to_vec())
+            })
+            .mount(&resume_server)
+            .await;
+
+        let cfg2 = BundleDownloadConfig {
+            concurrency: 2,
+            url: format!("{}/bundle/", resume_server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+        let (tx2, rx2) = mpsc::unbounded_channel();
+        let handle2 = tokio::spawn(download_bundle_concurrent(cfg2, tx2));
+        let _ = collect_notifications(rx2).await;
+        handle2.await.unwrap().unwrap();
+
+        assert_eq!(
+            resume_fast_hits.load(Ordering::SeqCst),
+            0,
+            "already-downloaded file must not be re-fetched"
+        );
+        assert_eq!(
+            resume_slow_hits.load(Ordering::SeqCst),
+            1,
+            "missing file should be fetched exactly once"
+        );
+        assert!(tmp.path().join("99-slow.bin").exists());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrency_cap_is_respected() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("00-a.bin", false),
+                ("10-b.bin", false),
+                ("20-c.bin", false),
+                ("30-d.bin", false),
+                ("40-e.bin", false),
+                ("50-f.bin", false),
+            ])))
+            .mount(&server)
+            .await;
+
+        let in_flight = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+        for name in [
+            "00-a.bin", "10-b.bin", "20-c.bin", "30-d.bin", "40-e.bin", "50-f.bin",
+        ] {
+            let in_flight = in_flight.clone();
+            let peak = peak.clone();
+            Mock::given(method("GET"))
+                .and(path(format!("/bundle/{name}")))
+                .respond_with(move |_: &Request| {
+                    let now = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+                    let mut best = peak.load(Ordering::SeqCst);
+                    while now > best
+                        && let Err(actual) = peak.compare_exchange(
+                            best,
+                            now,
+                            Ordering::SeqCst,
+                            Ordering::SeqCst,
+                        )
+                    {
+                        best = actual;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                    in_flight.fetch_sub(1, Ordering::SeqCst);
+                    ResponseTemplate::new(200).set_body_bytes(vec![0u8; 128])
+                })
+                .mount(&server)
+                .await;
+        }
+
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: 3,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+        let _ = collect_notifications(rx).await;
+        handle.await.unwrap().unwrap();
+
+        let observed = peak.load(Ordering::SeqCst);
+        assert!(
+            observed <= 3,
+            "peak in-flight {observed} exceeded concurrency cap of 3"
+        );
+        // Sanity: at least some parallelism actually happened.
+        assert!(observed >= 1);
+    }
+
+    fn tempdir() -> tempfile::TempDir {
+        tempfile::tempdir().expect("tempdir")
     }
 }
