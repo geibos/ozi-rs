@@ -1,3 +1,67 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /*
+     * Semantic shadcn tokens (HSL triplets, no `hsl(...)` wrapper) are written
+     * to <html> at runtime by `applySemanticTokens()` in `$lib/theme`. The
+     * fallback values here mirror the Latte (light) mapping so primitives
+     * render correctly during SSR / prerender / the first paint before the
+     * theme bootstrap runs.
+     */
+    --background: 220 23% 95%;
+    --foreground: 234 16% 35%;
+    --card: 220 22% 92%;
+    --card-foreground: 234 16% 35%;
+    --popover: 220 23% 95%;
+    --popover-foreground: 234 16% 35%;
+    --primary: 220 91% 54%;
+    --primary-foreground: 220 23% 95%;
+    --secondary: 223 16% 83%;
+    --secondary-foreground: 234 16% 35%;
+    --muted: 223 16% 83%;
+    --muted-foreground: 233 10% 47%;
+    --accent: 225 14% 77%;
+    --accent-foreground: 234 16% 35%;
+    --destructive: 347 87% 44%;
+    --destructive-foreground: 220 23% 95%;
+    --border: 225 14% 77%;
+    --input: 225 14% 77%;
+    --ring: 231 97% 72%;
+  }
+}
+
 /* Catppuccin CSS custom properties — populated dynamically by ThemePicker */
 :root {
   --ctp-rosewater: #dc8a78;
@@ -28,13 +92,17 @@
   --ctp-crust: #dce0e8;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body, #app {
+html,
+body,
+#app {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -73,7 +141,8 @@ button.primary:hover {
   filter: brightness(1.1);
 }
 
-input, select {
+input,
+select {
   background: var(--ctp-surface0);
   color: var(--ctp-text);
   border: 1px solid var(--ctp-surface2);
@@ -82,7 +151,8 @@ input, select {
   font-size: 12px;
 }
 
-select:focus, input:focus {
+select:focus,
+input:focus {
   outline: 2px solid var(--ctp-blue);
   outline-offset: -1px;
 }

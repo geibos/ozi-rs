@@ -4,7 +4,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { appState, updateDownloadProgress } from "../lib/stores";
   import { loadProjects } from "../lib/api";
-  import { applyStoredTheme } from "../lib/theme";
+  import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
   import Console from "../components/Console.svelte";
   import type { DownloadProgressPayload } from "../lib/types";
@@ -20,6 +20,7 @@
     let cancelled = false;
     let unlistenState: (() => void) | null = null;
     let unlistenProgress: (() => void) | null = null;
+    const unlistenAutoTheme = installAutoThemeListener();
 
     (async () => {
       await appState.refresh();
@@ -41,6 +42,7 @@
       cancelled = true;
       unlistenState?.();
       unlistenProgress?.();
+      unlistenAutoTheme();
     };
   });
 </script>

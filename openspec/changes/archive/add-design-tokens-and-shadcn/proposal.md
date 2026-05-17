@@ -4,7 +4,7 @@ We want the `ozi-rs` UI to feel as polished as modern shadcn-style applications 
 
 This change introduces the design-token contract and the shadcn-svelte primitive library on top of the SvelteKit foundation. It is **Change 2 of 3** in the shadcn UI-kit migration described in `docs/superpowers/specs/2026-05-17-shadcn-ui-kit-svelte-design.md` — see decisions D1, D4, D5, D6, D7, D8 and the "Catppuccin → semantic token mapping" architecture section.
 
-**Dependency:** Change 1 (`2026-05-17-migrate-to-sveltekit`) MUST land first. This change assumes the SvelteKit shell, `$lib` alias, `routes/` layout, ESLint flat config, and Prettier config from Change 1 are already present. This change adds `prettier-plugin-tailwindcss` to that Prettier config; it does not establish the config itself.
+**Dependency:** Change 1 (`migrate-to-sveltekit`) MUST land first. This change assumes the SvelteKit shell, `$lib` alias, `routes/` layout, ESLint flat config, and Prettier config from Change 1 are already present. This change adds `prettier-plugin-tailwindcss` to that Prettier config; it does not establish the config itself.
 
 ## What Changes
 

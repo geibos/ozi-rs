@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "identifier": "ru.lizaalert.ozi-rs",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../build",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "licenseFile": "../THIRD_PARTY_LICENSES.md",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

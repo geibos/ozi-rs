@@ -9,7 +9,7 @@ This change implements **Change 2** of the three-change shadcn UI-kit migration 
 - **D7** — Forms via `felte` + `zod`. `superforms` is rejected because it needs SvelteKit form actions, which we do not use.
 - **D8** — Industry-standard tooling baseline; `prettier-plugin-tailwindcss` is added in this change on top of the Prettier config from Change 1.
 
-This change depends on Change 1 (`2026-05-17-migrate-to-sveltekit`) being already merged: SvelteKit, the `$lib` alias, route layout, ESLint flat config, the base Prettier config, `svelte-check` in CI, and `@testing-library/svelte` must all exist before this change starts.
+This change depends on Change 1 (`migrate-to-sveltekit`) being already merged: SvelteKit, the `$lib` alias, route layout, ESLint flat config, the base Prettier config, `svelte-check` in CI, and `@testing-library/svelte` must all exist before this change starts.
 
 ## Key decisions
 
@@ -68,6 +68,18 @@ Adapted from the parent design's "Catppuccin → semantic token mapping" section
 | `--ring` | `lavender` | `lavender` | Focus rings |
 
 The exact light/dark resolution per token is encoded in `SEMANTIC_MAP_LIGHT` and `SEMANTIC_MAP_DARK`. The parent design doc remains the canonical reference if disputes arise during implementation.
+
+## Implementation deviations from the initial proposal
+
+These are the load-bearing deltas vs. the proposal that landed during implementation. They preserve every requirement in `specs/ui-shell/spec.md`; what changed is the underlying packaging.
+
+1. **Tailwind v4, not v3.** The `shadcn-svelte@1.x` CLI requires Tailwind v4 to fetch components; the legacy Tailwind v3 registry hosted at `tw3.shadcn-svelte.com` returns 404 across `/registry/*` paths and is effectively unsupported. We migrated to Tailwind v4: `@tailwindcss/vite` plugin in `vite.config.ts`, `@import "tailwindcss"` plus `@theme inline { ... }` in `src/app.css`, no `tailwind.config.ts`, no PostCSS. `tailwindcss-animate` → `tw-animate-css` (its v4 successor).
+2. **`components.json` authored manually.** `shadcn-svelte@1.2.7 init` only goes non-interactive when given a `--preset` value from the live registry; the CLI hangs on stdin in our environment. We wrote `components.json` by hand to match the spec (style `nova`, baseColor `zinc`, aliases per the spec, registry pointing at `https://shadcn-svelte.com/registry`) and used `shadcn-svelte@1.2.7 add ... -y --skip-preflight --no-deps` for every primitive — that flow is non-interactive.
+3. **`mode-watcher` is a peer dep, not a theme source.** `svelte-sonner` pulls `mode-watcher` transitively. It is installed but never used as a theme controller — KD4 stands: `applySemanticTokens` is the only writer to `html.dark`.
+4. **`csstype` + `skipLibCheck: true`.** Recent bits-ui type declarations reference CSS properties (`BlockOverflow`, `InputSecurity`, …) that the latest published `csstype` (3.2.3) does not export. We installed `csstype` explicitly and enabled `skipLibCheck` in `tsconfig.json` so the typecheck stays green without touching bits-ui internals.
+5. **`@felte/validator-zod` added.** The proposal said "felte + zod"; the actual integration goes through the official `@felte/validator-zod` adapter exposed by `src/lib/forms/create-form.ts`. zod pinned to `^3` because `@felte/validator-zod@1.x` requires `zod@^3.2.0`.
+6. **`skipLibCheck` and ignored generated trees in ESLint.** `src/lib/components/ui/**` is generator output (`shadcn-svelte add`) and `.claude/worktrees/**` is a CI worktree mirror — both are ignored by ESLint so `just lint` only inspects code we author.
+7. **Vitest plumbing.** Added `@testing-library/svelte/vite`'s `svelteTesting()` plugin to the `vitest.config.ts` so primitives mount in client (not SSR) mode, plus a `src/test/setup.ts` polyfill that backfills `localStorage` because Node's experimental implementation is incomplete under vitest workers, which broke `mode-watcher` at module load.
 
 ## Risks
 

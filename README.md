@@ -149,3 +149,13 @@ and testable without the UI runtime.
 - `docs/testing-strategy.md` — test layers and quality gates
 - `docs/roadmap.md` — phases and status
 - `docs/adr/` — architecture decision records (19 ADRs)
+
+## Credits
+
+The UI kit stands on the shoulders of the following projects (see
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) for the full list and
+their licences):
+
+- [`shadcn-svelte`](https://shadcn-svelte.com) — primitive scaffolding
+- [`bits-ui`](https://bits-ui.com) — headless behaviour
+- [`@catppuccin/palette`](https://github.com/catppuccin/palette) — canonical colour source

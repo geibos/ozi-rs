@@ -1,10 +1,11 @@
 import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { sveltekit } from "@sveltejs/kit/vite";
+import tailwindcss from "@tailwindcss/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [tailwindcss(), sveltekit()],
   clearScreen: false,
   server: {
     host: host || false,
