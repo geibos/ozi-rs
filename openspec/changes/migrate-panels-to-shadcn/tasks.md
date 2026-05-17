@@ -50,10 +50,10 @@
 
 ## 7. WaypointsPanel.svelte (step 3.6)
 
-- [ ] 7.1 Reuse the primitives from step 6 (`Button`, `Separator`, `Tooltip`), then add `Dialog` for any rename / delete / symbol-change confirm flow that today is inline.
-- [ ] 7.2 If a per-waypoint colour swatch is exposed, it stays on native `<input type="color">` and binds to domain RGBA only (same constraint as TracksPanel; see D6 in parent design).
-- [ ] 7.3 Keep `SymbolPicker` (already migrated in step 4) as the symbol-choice surface inside the row.
-- [ ] 7.4 Delete the component-local `<style>` block; layout moves to Tailwind utilities.
+- [x] 7.1 Reuse the primitives from step 6 (`Button`, `Separator`, `Tooltip`), then add `Dialog` for any rename / delete / symbol-change confirm flow that today is inline.
+- [x] 7.2 If a per-waypoint colour swatch is exposed, it stays on native `<input type="color">` and binds to domain RGBA only (same constraint as TracksPanel; see D6 in parent design).
+- [x] 7.3 Keep `SymbolPicker` (already migrated in step 4) as the symbol-choice surface inside the row.
+- [x] 7.4 Delete the component-local `<style>` block; layout moves to Tailwind utilities.
 - [ ] 7.5 Verify the panel looks correct in all four flavours via `ozi-rs-mcp` screenshots; verify dialog portals above the MapLibre canvas.
 - [ ] 7.6 Smoke-test: add a waypoint via the map, rename it via the panel, toggle visibility, change symbol, delete it via the dialog confirm.
 
