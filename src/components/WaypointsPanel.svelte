@@ -22,6 +22,7 @@
     getWptExportDefaultPath,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { toast } from "svelte-sonner";
   import type { WaypointData } from "$lib/types";
   import SymbolPicker from "./SymbolPicker.svelte";
 
@@ -54,6 +55,7 @@
       }
     } catch (e) {
       console.error("Failed to load waypoints", e);
+      toast.error("Failed to load waypoints", { description: String(e) });
       waypoints = [];
     }
   }
@@ -161,7 +163,6 @@
           No waypoints
         </div>
       {:else}
-        <Tooltip.Provider delayDuration={300}>
           {#each waypoints as wp, idx (wp.id)}
             {#if idx > 0}
               <Separator />
@@ -219,7 +220,6 @@
               </div>
             </div>
           {/each}
-        </Tooltip.Provider>
       {/if}
     </div>
   </div>

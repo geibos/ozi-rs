@@ -7,6 +7,8 @@
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
   import Console from "../components/Console.svelte";
+  import { Toaster } from "$lib/components/ui/sonner";
+  import * as Tooltip from "$lib/components/ui/tooltip";
   import type { DownloadProgressPayload } from "../lib/types";
   import "../app.css";
 
@@ -47,30 +49,14 @@
   });
 </script>
 
-<div class="app-shell">
-  {@render children?.()}
-  <div class="map-host" class:hidden={!isWorkspace}>
-    <MapView />
+<Tooltip.Provider delayDuration={300}>
+  <div class="flex h-full w-full overflow-hidden">
+    {@render children?.()}
+    <div class="flex min-w-0 flex-1" class:hidden={!isWorkspace}>
+      <MapView />
+    </div>
   </div>
-</div>
 
-<Console />
-
-<style>
-  .app-shell {
-    display: flex;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-  }
-
-  .map-host {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-  }
-
-  .map-host.hidden {
-    display: none;
-  }
-</style>
+  <Console />
+  <Toaster richColors closeButton position="bottom-right" />
+</Tooltip.Provider>

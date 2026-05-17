@@ -1,5 +1,6 @@
 <script lang="ts">
   import XIcon from "@lucide/svelte/icons/x";
+  import { toast } from "svelte-sonner";
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import { Slider } from "$lib/components/ui/slider";
@@ -30,6 +31,9 @@
         simplifyState.update((s) => ({ ...s, preview }));
       } catch (err) {
         console.error("Failed to get simplified preview", err);
+        toast.error("Failed to get simplified preview", {
+          description: String(err),
+        });
       }
     }, 300);
   });
@@ -44,6 +48,7 @@
       closePanel();
     } catch (err) {
       console.error("Failed to simplify track", err);
+      toast.error("Failed to simplify track", { description: String(err) });
     }
   }
 

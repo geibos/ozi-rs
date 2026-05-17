@@ -84,8 +84,8 @@
 
 ## 11. Icons audit + toasts
 
-- [ ] 11.1 Audit text/emoji icons across the migrated panels and replace with `lucide-svelte` icons where they improve clarity (export, import, delete, visibility, rename, undo, redo). NOT a blanket replace — leave SymbolPicker's domain emoji set as-is.
-- [ ] 11.2 Route any existing `alert()` / `console.error` notifications surfaced to the user through `svelte-sonner` toasts (the `<Toaster />` host lives in `routes/+layout.svelte` from Change 2).
+- [x] 11.1 Audit text/emoji icons across the migrated panels and replace with `lucide-svelte` icons where they improve clarity (export, import, delete, visibility, rename, undo, redo). NOT a blanket replace — leave SymbolPicker's domain emoji set as-is.
+- [x] 11.2 Route any existing `alert()` / `console.error` notifications surfaced to the user through `svelte-sonner` toasts (the `<Toaster />` host lives in `routes/+layout.svelte` from Change 2).
 - [ ] 11.3 Verify icon alignment and toast appearance across all four flavours via `ozi-rs-mcp` screenshots.
 
 ## 12. Documentation + final QA

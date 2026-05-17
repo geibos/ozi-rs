@@ -46,8 +46,7 @@
     <span class="text-sm leading-none">{getEmoji(symbol)}</span>
   </Popover.Trigger>
   <Popover.Content class="w-auto p-2">
-    <Tooltip.Provider delayDuration={300}>
-      <div class="grid grid-cols-5 gap-2">
+    <div class="grid grid-cols-5 gap-2">
         <Tooltip.Root>
           <Tooltip.Trigger
             class={buttonVariants({
@@ -78,6 +77,5 @@
           </Tooltip.Root>
         {/each}
       </div>
-    </Tooltip.Provider>
   </Popover.Content>
 </Popover.Root>
