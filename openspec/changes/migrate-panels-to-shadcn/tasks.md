@@ -90,9 +90,9 @@
 
 ## 12. Documentation + final QA
 
-- [ ] 12.1 Update `docs/frontend-architecture.md` to describe the post-migration panel structure (primitives consumed, semantic tokens, retained native colour inputs).
-- [ ] 12.2 Update `docs/project-map.md` to reflect any moved imports (`$lib/components/ui/...`) and the deletion of per-component `<style>` blocks.
-- [ ] 12.3 Run `just lint`, `just check`, `just clippy`, `just test` — all green.
+- [x] 12.1 Update `docs/frontend-architecture.md` to describe the post-migration panel structure (primitives consumed, semantic tokens, retained native colour inputs).
+- [x] 12.2 Update `docs/project-map.md` to reflect any moved imports (`$lib/components/ui/...`) and the deletion of per-component `<style>` blocks.
+- [x] 12.3 Run `just lint`, `just check`, `just clippy`, `just test` — all green. (`cargo test` was briefly blocked by an external `ozf2-rs` → `ozf2` rename in the sibling crate; fixed by a one-line dep rename in `src-tauri/Cargo.toml`, kept as a separate commit so it doesn't get tangled with the UI migration history.)
 - [ ] 12.4 Run `tauri build` to confirm the bundled app still launches.
 - [ ] 12.5 Final visual smoke pass via `ozi-rs-mcp`: capture one screenshot per flavour (Latte, Frappé, Macchiato, Mocha) with Sidebar + MapView + at least one open panel; compare against the per-step screenshots for regressions.
-- [ ] 12.6 Run `openspec validate migrate-panels-to-shadcn --strict` one more time before archive.
+- [x] 12.6 Run `openspec validate migrate-panels-to-shadcn --strict` one more time before archive.
