@@ -49,11 +49,17 @@ All common tasks are in `justfile` (requires `just`). Run `just` to list recipes
 | Specific Rust test | `just test-filter <name>` |
 | Frontend tests | `just test-ui` |
 | Clippy | `just clippy` |
-| Cargo check | `just check` |
+| Cargo check | `just check-rust` |
+| Type-check (Svelte) | `just check-ui` |
+| Type-check (Rust + Svelte) | `just check` |
+| Lint (frontend) | `just lint` |
+| Run all CI gates locally | `just ci` |
 
 Clippy is strict: `cargo clippy -- -D warnings`. All warnings must be fixed, not suppressed.
 
 To run a single Rust test: `cargo test --manifest-path src-tauri/Cargo.toml <test_name>`
+
+GitHub Actions runs the same `just` recipes on every PR / push to `main`. See `docs/ci.md` for the full gate list, the release workflow, and how to update the pinned toolchains.
 
 ## Architecture
 
@@ -166,4 +172,5 @@ Verification: `just test` (all), `just clippy` (strict linting).
 - `docs/requirements.md` — product goals, user workflows, MVP scope
 - `docs/roadmap.md` — phase status and remaining work
 - `docs/testing-strategy.md` — test layers and quality gates
+- `docs/ci.md` — GitHub Actions CI / release workflows, toolchain pinning, audit ignore policy
 - `docs/adr/` — 19 architecture decision records
