@@ -77,18 +77,33 @@ export interface OziMetadataDto {
 }
 
 export interface DownloadProgressPayload {
+  download_id: string;
   package_name: string;
   downloaded_bytes: number;
   total_bytes?: number;
+  /** Zero-based position of this file within the prefix-sorted bundle. */
+  file_index?: number;
+  /** Total number of files in the bundle. */
+  file_count?: number;
 }
 
 export interface BundleProgressPayload {
+  download_id: string;
   message: string;
   phase: "scanning" | "downloading" | "extracting" | "indexing";
   completed?: number;
   total?: number;
   downloaded_bytes?: number;
   total_bytes?: number;
+}
+
+/** Emitted once a single file inside a bundle has been fully written to disk. */
+export interface BundleFileReadyPayload {
+  download_id: string;
+  package_name: string;
+  local_path: string;
+  file_index: number;
+  file_count: number;
 }
 
 export interface PointDetail {
