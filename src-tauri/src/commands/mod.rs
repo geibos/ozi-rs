@@ -3,13 +3,48 @@ pub mod tiles;
 use crate::application::{
     ActiveMapKind, AppState, DiagnosticLevel, LizaProjectSummary, OpenMapRequest,
 };
-use crate::infrastructure::lizaalert;
+use crate::infrastructure::lizaalert::{
+    self, CancelToken, DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY, DownloadNotification,
+};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, State};
 
 pub type SharedState = Arc<Mutex<AppState>>;
+
+/// Active downloads registry: `download_id` → cancel token + abort handle.
+#[derive(Default)]
+pub struct DownloadRegistry {
+    inner: Mutex<HashMap<String, CancelToken>>,
+}
+
+impl DownloadRegistry {
+    pub fn register(&self, id: String, token: CancelToken) {
+        if let Ok(mut map) = self.inner.lock() {
+            map.insert(id, token);
+        }
+    }
+
+    pub fn remove(&self, id: &str) -> Option<CancelToken> {
+        self.inner.lock().ok().and_then(|mut map| map.remove(id))
+    }
+
+    pub fn cancel(&self, id: &str) -> bool {
+        let Ok(map) = self.inner.lock() else {
+            return false;
+        };
+        if let Some(token) = map.get(id) {
+            token.cancel();
+            true
+        } else {
+            false
+        }
+    }
+}
+
+pub type SharedDownloads = Arc<DownloadRegistry>;
 
 fn lock_app_state<'a>(
     state: &'a SharedState,
@@ -144,19 +179,34 @@ fn to_project_summary_dtos(projects: &[LizaProjectSummary]) -> Vec<LizaProjectSu
 // Events
 #[derive(serde::Serialize, Clone)]
 struct DownloadProgressPayload {
+    download_id: String,
     package_name: String,
     downloaded_bytes: u64,
     total_bytes: Option<u64>,
+    /// Position of this file in the prefix-sorted bundle (zero-based).
+    file_index: Option<usize>,
+    /// Total number of files in the bundle download.
+    file_count: Option<usize>,
 }
 
 #[derive(serde::Serialize, Clone)]
 struct BundleProgressPayload {
+    download_id: String,
     message: String,
     phase: &'static str,
     completed: Option<u64>,
     total: Option<u64>,
     downloaded_bytes: Option<u64>,
     total_bytes: Option<u64>,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct BundleFileReadyPayload {
+    download_id: String,
+    package_name: String,
+    local_path: String,
+    file_index: usize,
+    file_count: usize,
 }
 
 // ── State snapshot ────────────────────────────────────────────────────────────
@@ -355,38 +405,129 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn load_project(slug: String, state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+pub fn load_project(
+    slug: String,
+    state: State<SharedState>,
+    downloads: State<SharedDownloads>,
+    app: AppHandle,
+) -> Result<String, String> {
     let data = lock_app_state(state.inner())?.begin_load_project(&slug);
     let Some((summary, bundles_root)) = data else {
-        return Ok(());
+        return Ok(String::new());
     };
     let _ = app.emit("state-changed", ());
 
+    let download_id = uuid::Uuid::new_v4().to_string();
+    let cancel = CancelToken::new();
+    downloads.register(download_id.clone(), cancel.clone());
+
     let state_arc = Arc::clone(&state);
-    thread::spawn(move || {
-        let result = lizaalert::open_project(summary, &bundles_root, |progress| {
-            if let Ok(mut s) = lock_app_state(&state_arc) {
-                s.apply_progress(progress.message.clone());
-            }
-            let _ = app.emit(
-                "bundle-progress",
-                BundleProgressPayload {
-                    message: progress.message,
-                    phase: progress.phase.as_str(),
-                    completed: progress.completed,
-                    total: progress.total,
-                    downloaded_bytes: progress.downloaded_bytes,
-                    total_bytes: progress.total_bytes,
-                },
-            );
-        });
+    let downloads_arc = Arc::clone(&downloads);
+    let download_id_for_task = download_id.clone();
+
+    tauri::async_runtime::spawn(async move {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<DownloadNotification>();
+        // Event forwarder task — workers funnel notifications through `tx`,
+        // this task is the sole writer to the Tauri Emitter so the UI sees a
+        // coherent ordered stream.
+        let forwarder = {
+            let app = app.clone();
+            let state_arc = Arc::clone(&state_arc);
+            let download_id = download_id_for_task.clone();
+            tokio::spawn(async move {
+                while let Some(n) = rx.recv().await {
+                    match n {
+                        DownloadNotification::Phase(p) => {
+                            if let Ok(mut s) = lock_app_state(&state_arc) {
+                                s.apply_progress(p.message.clone());
+                            }
+                            let _ = app.emit(
+                                "bundle-progress",
+                                BundleProgressPayload {
+                                    download_id: download_id.clone(),
+                                    message: p.message,
+                                    phase: p.phase.as_str(),
+                                    completed: p.completed,
+                                    total: p.total,
+                                    downloaded_bytes: p.downloaded_bytes,
+                                    total_bytes: p.total_bytes,
+                                },
+                            );
+                        }
+                        DownloadNotification::FileProgress {
+                            package_name,
+                            downloaded_bytes,
+                            total_bytes,
+                            file_index,
+                            file_count,
+                        } => {
+                            let _ = app.emit(
+                                "download-progress",
+                                DownloadProgressPayload {
+                                    download_id: download_id.clone(),
+                                    package_name,
+                                    downloaded_bytes,
+                                    total_bytes,
+                                    file_index: Some(file_index),
+                                    file_count: Some(file_count),
+                                },
+                            );
+                        }
+                        DownloadNotification::FileReady {
+                            package_name,
+                            local_path,
+                            file_index,
+                            file_count,
+                        } => {
+                            if let Ok(mut s) = lock_app_state(&state_arc) {
+                                s.note_bundle_file_ready(&package_name, &local_path);
+                            }
+                            let _ = app.emit(
+                                "bundle-file-ready",
+                                BundleFileReadyPayload {
+                                    download_id: download_id.clone(),
+                                    package_name,
+                                    local_path: local_path.display().to_string(),
+                                    file_index,
+                                    file_count,
+                                },
+                            );
+                        }
+                    }
+                }
+            })
+        };
+
+        let result = lizaalert::open_project_async(
+            summary,
+            bundles_root,
+            cancel,
+            DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            tx,
+        )
+        .await;
+
+        // Drop the sender side by waiting for forwarder to drain; sender drops
+        // automatically when open_project_async returns.
+        let _ = forwarder.await;
+
+        downloads_arc.remove(&download_id_for_task);
+
         if let Ok(mut s) = lock_app_state(&state_arc) {
             s.apply_project_loaded(result);
         }
         let _ = app.emit("state-changed", ());
     });
 
-    Ok(())
+    Ok(download_id)
+}
+
+#[tauri::command]
+pub fn cancel_download(
+    download_id: String,
+    downloads: State<SharedDownloads>,
+) -> Result<bool, String> {
+    Ok(downloads.cancel(&download_id))
 }
 
 #[tauri::command]
@@ -418,15 +559,19 @@ pub fn open_selected_map(
             let _ = app.emit("state-changed", ());
             let state_arc = Arc::clone(&state);
             let package_name = selection.package_name.clone();
+            let download_id = uuid::Uuid::new_v4().to_string();
             thread::spawn(move || {
                 let pkg = package_name.clone();
                 let result = lizaalert::download_map(selection, |progress| {
                     let _ = app.emit(
                         "download-progress",
                         DownloadProgressPayload {
+                            download_id: download_id.clone(),
                             package_name: pkg.clone(),
                             downloaded_bytes: progress.downloaded_bytes,
                             total_bytes: progress.total_bytes,
+                            file_index: None,
+                            file_count: None,
                         },
                     );
                 });
@@ -446,14 +591,16 @@ pub fn open_local_bundle(
     dir: String,
     state: State<SharedState>,
     app: AppHandle,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let data = lock_app_state(state.inner())?.begin_open_local_bundle(PathBuf::from(&dir));
     let Some(dir_path) = data else {
-        return Ok(());
+        return Ok(String::new());
     };
     let _ = app.emit("state-changed", ());
 
+    let download_id = uuid::Uuid::new_v4().to_string();
     let state_arc = Arc::clone(&state);
+    let download_id_for_task = download_id.clone();
     thread::spawn(move || {
         let result = lizaalert::open_bundle_directory(&dir_path, |progress| {
             if let Ok(mut s) = lock_app_state(&state_arc) {
@@ -462,6 +609,7 @@ pub fn open_local_bundle(
             let _ = app.emit(
                 "bundle-progress",
                 BundleProgressPayload {
+                    download_id: download_id_for_task.clone(),
                     message: progress.message,
                     phase: progress.phase.as_str(),
                     completed: progress.completed,
@@ -477,7 +625,7 @@ pub fn open_local_bundle(
         let _ = app.emit("state-changed", ());
     });
 
-    Ok(())
+    Ok(download_id)
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────

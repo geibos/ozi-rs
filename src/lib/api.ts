@@ -19,15 +19,36 @@ export async function loadProjects(): Promise<void> {
   return invoke("load_projects");
 }
 
-export async function loadProject(slug: string): Promise<void> {
+/**
+ * Begin downloading a LizaAlert project bundle.
+ *
+ * Returns immediately with a `download_id` that callers use to correlate
+ * `download-progress` / `bundle-file-ready` / `bundle-progress` events and
+ * to cancel via {@link cancelDownload}. The actual download proceeds on a
+ * background task — the returned promise resolves once the Tauri command
+ * handler returns, NOT once the bundle has finished downloading. Callers
+ * MUST NOT `await` the download via this promise; subscribe to events
+ * instead so the main thread stays responsive.
+ */
+export async function loadProject(slug: string): Promise<string> {
   return invoke("load_project", { slug });
+}
+
+/**
+ * Abort an in-flight bundle download. Returns `true` if the download was
+ * known and a cancel signal was delivered; files already on disk remain
+ * untouched and a subsequent {@link loadProject} for the same bundle will
+ * resume by fetching only the missing files.
+ */
+export async function cancelDownload(downloadId: string): Promise<boolean> {
+  return invoke("cancel_download", { downloadId });
 }
 
 export async function openSelectedMap(mapName: string): Promise<void> {
   return invoke("open_selected_map", { mapName });
 }
 
-export async function openLocalBundle(dir: string): Promise<void> {
+export async function openLocalBundle(dir: string): Promise<string> {
   return invoke("open_local_bundle", { dir });
 }
 
