@@ -3,7 +3,7 @@ mod commands;
 mod domain;
 mod infrastructure;
 
-use commands::SharedState;
+use commands::{DownloadRegistry, SharedDownloads, SharedState};
 use std::sync::{Arc, Mutex};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,16 +18,19 @@ pub fn run() {
     let state: SharedState = Arc::new(Mutex::new(application::AppState::new_with_session_path(
         infrastructure::persistence::default_app_session_path(),
     )));
+    let downloads: SharedDownloads = Arc::new(DownloadRegistry::default());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .manage(state)
+        .manage(downloads)
         .invoke_handler(tauri::generate_handler![
             commands::get_app_state,
             commands::get_tracks_geojson,
             commands::load_projects,
             commands::load_project,
+            commands::cancel_download,
             commands::open_selected_map,
             commands::open_local_bundle,
             commands::set_bundles_root,
