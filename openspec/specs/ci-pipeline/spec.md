@@ -1,7 +1,9 @@
 # ci-pipeline Specification
 
 ## Purpose
-TBD - created by archiving change add-github-ci. Update Purpose after archive.
+
+Define the automated quality gates and release pipeline that protect `main` and produce distributable artifacts. Covers the GitHub Actions workflows (`ci.yml`, `release.yml`), the cross-platform smoke build matrix, the OpenSpec / security audit gates, the pinned Rust + Node toolchains, the audit-ignore policy, and the documentation contract for keeping CI behavior reproducible between local and runner environments.
+
 ## Requirements
 ### Requirement: Continuous integration pipeline on pull requests and main
 
