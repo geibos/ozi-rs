@@ -83,6 +83,9 @@ lint:
 fmt:
     npm exec -- prettier --write .
 
+# Run all CI-equivalent gates locally (clippy + check + lint + test)
+ci: clippy check lint test
+
 # Run local release warning hygiene gate
 check-release-warnings:
     ./scripts/check-release-warnings.sh

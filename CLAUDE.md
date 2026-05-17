@@ -12,7 +12,8 @@ Communicate in Russian. Technical terms and code identifiers stay in English.
 
 - Before making changes, read the relevant source files
 - For user-visible behavior changes, read `openspec/specs/<capability>/spec.md` and follow the OpenSpec workflow described in `AGENTS.md` ("Behavioral changes via OpenSpec")
-- Run `just clippy`, `just check`, `just lint`, and `just test` after code changes (frontend type-check and lint are wired via SvelteKit + ESLint flat config)
+- Run `just ci` (or individually: `just clippy`, `just check`, `just lint`, `just test`) after code changes — GitHub Actions runs the same gates on every PR (see `docs/ci.md`); if any of these fail locally, the PR will be blocked
+- Make sure `openspec validate <change> --strict` passes for every active change directory — the `openspec-validate` CI job will fail otherwise
 - Keep TypeScript types (`src/lib/types.ts`) in sync with Rust structs manually
 - All edits must go through `ProjectCommand` — see `docs/commands-reference.md`
 
