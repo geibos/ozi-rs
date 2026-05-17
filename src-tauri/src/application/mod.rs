@@ -940,6 +940,60 @@ impl AppState {
         }
     }
 
+    /// Export all waypoints of the given layer to an OziExplorer `.wpt` file.
+    pub fn export_wpt_waypoints(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
+        let Some(layer) = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+        else {
+            self.update_status(
+                DiagnosticLevel::Error,
+                "Waypoint layer not found for export",
+            );
+            return;
+        };
+        let waypoints: Vec<Waypoint> = layer.waypoints().to_vec();
+
+        let mut file = match std::fs::File::create(&path) {
+            Ok(file) => file,
+            Err(e) => {
+                self.update_status(
+                    DiagnosticLevel::Error,
+                    format!("Export failed: {e}"),
+                );
+                return;
+            }
+        };
+
+        match crate::infrastructure::export::wpt::write_wpt(waypoints, &mut file) {
+            Ok(()) => self.update_status(
+                DiagnosticLevel::Info,
+                format!("Exported waypoints to {}", path.display()),
+            ),
+            Err(e) => {
+                self.update_status(DiagnosticLevel::Error, format!("Export failed: {e}"));
+            }
+        }
+    }
+
+    /// Default path suggestion for a WPT waypoint export.
+    /// Returns `<bundle>/<layer_name>.wpt` when a bundle is active; otherwise
+    /// `<layer_name>.wpt` (filename only, the dialog will pick a directory).
+    pub fn export_wpt_default_path(&self, layer_id: LayerId) -> Option<PathBuf> {
+        let layer = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)?;
+        let file_name = format!("{}.wpt", layer.name());
+        match self.active_bundle_dir() {
+            Some(dir) => Some(dir.join(file_name)),
+            None => Some(PathBuf::from(file_name)),
+        }
+    }
+
     pub fn undo(&mut self) {
         self.history.undo(&mut self.project);
     }
@@ -1520,6 +1574,53 @@ mod tests {
         let state = AppState::new();
 
         assert_eq!(state.export_default_tracks_dir_path("Track 1", "gpx"), None);
+    }
+
+    #[test]
+    fn export_wpt_default_path_uses_active_bundle_when_present() {
+        let mut state = AppState::new();
+        let project = sample_project_with_remote_map();
+        state.lizaalert.selected_project = Some(project.clone());
+        state.lizaalert.active_map = Some(ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: project.summary.name.clone(),
+            package_name: project.maps[0].name.clone(),
+            remote_url: project.maps[0].url.clone(),
+            local_path: PathBuf::from("/tmp/demo-map.sqlitedb"),
+            center: project.center,
+            base_zoom: project.maps[0].base_zoom,
+        });
+
+        let layer_id = LayerId::new(1);
+        // Default waypoint layer "Waypoints" is created in AppState::new()
+        let path = state
+            .export_wpt_default_path(layer_id)
+            .expect("default path returned");
+
+        let file_name = path.file_name().and_then(|name| name.to_str());
+        assert_eq!(file_name, Some("Waypoints.wpt"));
+        // Parent directory should be the bundle (named after slug "demo-project").
+        let parent = path.parent().and_then(|dir| dir.file_name());
+        assert_eq!(parent.and_then(|s| s.to_str()), Some("demo-project"));
+    }
+
+    #[test]
+    fn export_wpt_default_path_without_bundle_returns_filename_only() {
+        let state = AppState::new();
+        let layer_id = LayerId::new(1);
+
+        let path = state
+            .export_wpt_default_path(layer_id)
+            .expect("default path returned");
+
+        assert_eq!(path, PathBuf::from("Waypoints.wpt"));
+        assert!(path.parent().map(|p| p.as_os_str().is_empty()).unwrap_or(true));
+    }
+
+    #[test]
+    fn export_wpt_default_path_is_none_for_unknown_layer() {
+        let state = AppState::new();
+        assert!(state.export_wpt_default_path(LayerId::new(999)).is_none());
     }
 
     #[test]
