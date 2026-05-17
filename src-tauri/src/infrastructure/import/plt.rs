@@ -7,6 +7,10 @@ use std::path::Path;
 const PLT_HEADER: &str = "OziExplorer Track Point File Version";
 const PLT_FIXED_HEADER_LINES: usize = 6;
 
+const BOM_UTF8: &[u8] = &[0xEF, 0xBB, 0xBF];
+const BOM_UTF16_LE: &[u8] = &[0xFF, 0xFE];
+const BOM_UTF16_BE: &[u8] = &[0xFE, 0xFF];
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PltImport {
     pub source_path: String,
@@ -18,6 +22,7 @@ pub enum PltImportError {
     Io(std::io::Error),
     MissingHeader,
     MissingTrackProperties,
+    Decode(&'static str),
 }
 
 impl fmt::Display for PltImportError {
@@ -26,6 +31,9 @@ impl fmt::Display for PltImportError {
             Self::Io(e) => write!(f, "failed to read PLT file: {e}"),
             Self::MissingHeader => write!(f, "not an OziExplorer track file"),
             Self::MissingTrackProperties => write!(f, "missing track properties line"),
+            Self::Decode(encoding) => {
+                write!(f, "failed to decode PLT bytes as {encoding}")
+            }
         }
     }
 }
@@ -39,10 +47,79 @@ impl std::error::Error for PltImportError {
     }
 }
 
+/// Decode raw PLT file bytes into a UTF-8 `String` using a prioritized
+/// detection chain.
+///
+/// Order of attempts:
+/// 1. **BOM** — UTF-8 (`EF BB BF`), UTF-16 LE (`FF FE`), or UTF-16 BE
+///    (`FE FF`). The BOM is stripped and the body decoded with the matching
+///    `encoding_rs::Encoding`.
+/// 2. **Strict UTF-8** — if the bytes are valid UTF-8 (no malformed
+///    sequences), reuse them verbatim. This also handles pure ASCII.
+/// 3. **`chardetng` statistical detection** — feed bytes to the detector with
+///    `allow_utf8 = false`; if it returns a legacy single-byte encoding,
+///    decode with it.
+/// 4. **Windows-1251 fallback** — the historically correct default for
+///    OziExplorer PLT files exported on Russian Windows.
+///
+/// The decoder must not introduce `U+FFFD` replacement characters when the
+/// bytes are a valid sequence in any supported encoding; in the fallback
+/// branch we still rely on `encoding_rs` to map cp1251 single-byte values,
+/// which never fails (every byte has a defined codepoint).
+pub fn decode_plt_bytes(bytes: &[u8]) -> Result<String, PltImportError> {
+    // Step 1: BOM check. Strip the BOM and decode the body strictly so that
+    // genuinely-corrupt files surface as `Decode` errors instead of silently
+    // gaining `U+FFFD`.
+    if bytes.starts_with(BOM_UTF8) {
+        return decode_with(encoding_rs::UTF_8, &bytes[BOM_UTF8.len()..], "UTF-8 (with BOM)");
+    }
+    if bytes.starts_with(BOM_UTF16_LE) {
+        return decode_with(encoding_rs::UTF_16LE, &bytes[BOM_UTF16_LE.len()..], "UTF-16 LE");
+    }
+    if bytes.starts_with(BOM_UTF16_BE) {
+        return decode_with(encoding_rs::UTF_16BE, &bytes[BOM_UTF16_BE.len()..], "UTF-16 BE");
+    }
+
+    // Step 2: strict UTF-8 (also covers pure ASCII).
+    if let Ok(s) = std::str::from_utf8(bytes) {
+        return Ok(s.to_owned());
+    }
+
+    // Step 3: chardetng for legacy single-byte encodings.
+    let mut detector = chardetng::EncodingDetector::new();
+    detector.feed(bytes, true);
+    let detected = detector.guess(None, false);
+    // `guess` with `allow_utf8 = false` may still return UTF-8 if nothing
+    // else fits; in that case its `decode_without_bom_handling_and_without_replacement`
+    // would fail, so fall through to cp1251.
+    if detected != encoding_rs::UTF_8
+        && let Some(cow) = detected.decode_without_bom_handling_and_without_replacement(bytes)
+    {
+        return Ok(cow.into_owned());
+    }
+
+    // Step 4: Windows-1251 fallback.
+    // cp1251 is a single-byte encoding with a mapping for every byte value,
+    // so decoding is infallible.
+    let (cow, _) = encoding_rs::WINDOWS_1251.decode_without_bom_handling(bytes);
+    Ok(cow.into_owned())
+}
+
+fn decode_with(
+    encoding: &'static encoding_rs::Encoding,
+    bytes: &[u8],
+    label: &'static str,
+) -> Result<String, PltImportError> {
+    encoding
+        .decode_without_bom_handling_and_without_replacement(bytes)
+        .map(|cow| cow.into_owned())
+        .ok_or(PltImportError::Decode(label))
+}
+
 /// Import an OziExplorer `.plt` track file.
 pub fn import_plt_file(path: &Path) -> Result<PltImport, PltImportError> {
     let bytes = std::fs::read(path).map_err(PltImportError::Io)?;
-    let text = String::from_utf8_lossy(&bytes);
+    let text = decode_plt_bytes(&bytes)?;
     import_plt_text(path.display().to_string(), &text)
 }
 
@@ -214,7 +291,9 @@ fn source_path_stem(path: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{colorref_to_rgba, import_plt_text, ole_date_to_chrono};
+    use super::{
+        colorref_to_rgba, decode_plt_bytes, import_plt_file, import_plt_text, ole_date_to_chrono,
+    };
 
     fn sample_plt(color: u32, points: &str) -> String {
         format!(
@@ -302,5 +381,95 @@ mod tests {
         // 0.5 days past epoch = noon 1970-01-01
         let ts = ole_date_to_chrono(25569.5).expect("timestamp");
         assert_eq!(ts.timestamp(), 43200); // 12 * 3600
+    }
+
+    // ---------------------------------------------------------------------
+    // Encoding-detection tests for `decode_plt_bytes`.
+    // ---------------------------------------------------------------------
+
+    /// "Поход 2025" encoded as Windows-1251 must decode to the exact Russian
+    /// string with no U+FFFD replacement characters.
+    #[test]
+    fn decode_plt_bytes_cp1251_cyrillic() {
+        // "Поход 2025" in cp1251:
+        // П=0xCF о=0xEE х=0xF5 о=0xEE д=0xE4 ' '=0x20 '2'=0x32 '0'=0x30 '2'=0x32 '5'=0x35
+        let bytes: &[u8] = &[
+            0xCF, 0xEE, 0xF5, 0xEE, 0xE4, 0x20, 0x32, 0x30, 0x32, 0x35,
+        ];
+        let decoded = decode_plt_bytes(bytes).expect("decode cp1251");
+        assert_eq!(decoded, "Поход 2025");
+        assert!(!decoded.contains('\u{FFFD}'));
+    }
+
+    /// Same string as UTF-8 without a BOM must hit the strict-UTF-8 fast path.
+    #[test]
+    fn decode_plt_bytes_utf8_no_bom() {
+        let bytes = "Поход 2025".as_bytes();
+        let decoded = decode_plt_bytes(bytes).expect("decode utf-8");
+        assert_eq!(decoded, "Поход 2025");
+    }
+
+    /// UTF-8 BOM must be stripped and the body decoded as UTF-8.
+    #[test]
+    fn decode_plt_bytes_utf8_with_bom() {
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice("Поход 2025".as_bytes());
+        let decoded = decode_plt_bytes(&bytes).expect("decode utf-8 with bom");
+        assert_eq!(decoded, "Поход 2025");
+        assert!(!decoded.starts_with('\u{FEFF}'));
+    }
+
+    /// UTF-16 LE with BOM must decode correctly via step 1.
+    #[test]
+    fn decode_plt_bytes_utf16_le_with_bom() {
+        let mut bytes = vec![0xFF, 0xFE];
+        for unit in "Поход 2025".encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        let decoded = decode_plt_bytes(&bytes).expect("decode utf-16 le");
+        assert_eq!(decoded, "Поход 2025");
+    }
+
+    /// Pure ASCII bytes round-trip unchanged (strict-UTF-8 path).
+    #[test]
+    fn decode_plt_bytes_ascii_unchanged() {
+        let bytes = b"OziExplorer Track Point File Version 2.1\n";
+        let decoded = decode_plt_bytes(bytes).expect("decode ascii");
+        assert_eq!(decoded.as_bytes(), bytes);
+    }
+
+    /// Full path: write a cp1251 PLT file to a tempfile, import it via
+    /// `import_plt_file`, assert `Track::name()` equals the original Russian
+    /// string with no `U+FFFD`.
+    #[test]
+    fn import_plt_file_cyrillic_track_name_round_trip() {
+        // Build the PLT text as a UTF-8 Rust string first, then re-encode to
+        // cp1251 for the on-disk file.
+        let text = concat!(
+            "OziExplorer Track Point File Version 2.1\n",
+            "WGS 84\n",
+            "Altitude is in Feet\n",
+            "Reserved 3\n",
+            "0,2,255,Поход 2025,,0,0,8421376,-1,0\n",
+            "0\n",
+            "60.0,30.0,0,0,44000.0,1,0.0\n",
+        );
+
+        let (cp1251_bytes, _, had_errors) = encoding_rs::WINDOWS_1251.encode(text);
+        assert!(!had_errors, "all chars must be cp1251-representable");
+
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!(
+            "ozi-rs-plt-cp1251-{}.plt",
+            std::process::id()
+        ));
+        std::fs::write(&path, &cp1251_bytes).expect("write tempfile");
+
+        let import = import_plt_file(&path).expect("import");
+        // Clean up first so a panic still leaves a tidy temp dir.
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(import.track.name(), "Поход 2025");
+        assert!(!import.track.name().contains('\u{FFFD}'));
     }
 }
