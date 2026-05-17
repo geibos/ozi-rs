@@ -31,10 +31,10 @@
 
 ## 5. SimplifyPanel.svelte (step 3.4)
 
-- [ ] 5.1 Replace the tolerance numeric input/range with `Slider`; replace the "preview" toggle with `Switch`; pair each with `Label`.
-- [ ] 5.2 Replace the confirm / cancel `<button>`s with `Button` (`default` and `outline` variants).
-- [ ] 5.3 Delete the component-local `<style>` block; layout moves to Tailwind utilities.
-- [ ] 5.4 Keep the debounced `getSimplifiedPreview` `$effect` and the `simplifyTrack` call site untouched.
+- [x] 5.1 Replace the tolerance numeric input/range with `Slider`; replace the "preview" toggle with `Switch`; pair each with `Label`.
+- [x] 5.2 Replace the confirm / cancel `<button>`s with `Button` (`default` and `outline` variants).
+- [x] 5.3 Delete the component-local `<style>` block; layout moves to Tailwind utilities.
+- [x] 5.4 Keep the debounced `getSimplifiedPreview` `$effect` and the `simplifyTrack` call site untouched.
 - [ ] 5.5 Verify the panel looks correct in all four flavours via `ozi-rs-mcp` screenshots.
 - [ ] 5.6 Smoke-test: open Simplify on a track, drag the slider, confirm preview updates after debounce, confirm; confirm result lands on the track.
 
