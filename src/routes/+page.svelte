@@ -1,9 +1,20 @@
+<script lang="ts" module>
+  // Module-level cold-start guard: the auto-redirect from `/` to `/project`
+  // fires only the first time `/` mounts in a session. Subsequent visits to
+  // `/` (e.g. via the workspace "Maps…" button) are intentional and must not
+  // bounce the user back to `/project`.
+  let initialRedirectChecked = false;
+</script>
+
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
   import { listen } from "@tauri-apps/api/event";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import {
     activeDownloadId,
+    activeMap,
     appState,
     appendProjectsChunk,
     busy,
@@ -38,82 +49,68 @@
   let projectFilter = $state("");
   let selectedSlug = $state("");
   let bundleProgress = $state<BundleProgressPayload | null>(null);
-  let refreshTimer: number | null = null;
-  // Current-file label derived from the most recent download-progress event.
   let currentDownload = $state<DownloadProgressPayload | null>(null);
 
-  async function refreshState() {
-    await appState.refresh();
-    const latest = get(appState);
-    syncProjectsFromAppState(latest);
-    if (latest && !latest.busy) {
+  $effect(() => {
+    const s = $appState;
+    syncProjectsFromAppState(s);
+    if (s && !s.busy) {
       projectsLoading.set(false);
       bundleProgress = null;
     }
-  }
+  });
 
-  function scheduleRefresh() {
-    if (refreshTimer !== null) return;
-    refreshTimer = window.setTimeout(async () => {
-      refreshTimer = null;
-      await refreshState();
-    }, 120);
-  }
+  onMount(() => {
+    let cancelled = false;
+    const cleanups: Array<() => void> = [];
 
-  onMount(async () => {
-    // Hide instead of close so the window can be re-shown instantly
-    const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-    const currentWindow = getCurrentWebviewWindow();
-    const unlistenClose = await currentWindow.onCloseRequested(async (event) => {
-      event.preventDefault();
-      await currentWindow.hide();
-    });
-
-    // Set up listeners BEFORE any async work so we don't miss events
-    const unlisten = await listen<void>("state-changed", scheduleRefresh);
-    const unlistenProgress = await listen<DownloadProgressPayload>(
-      "download-progress",
-      (e) => {
-        updateDownloadProgress(e.payload);
-        currentDownload = e.payload;
+    (async () => {
+      if (!initialRedirectChecked) {
+        initialRedirectChecked = true;
+        await appState.refresh();
+        if (cancelled) return;
+        if (get(activeMap)) {
+          goto(resolve("/project"));
+          return;
+        }
       }
-    );
-    const unlistenBundleProgress = await listen<BundleProgressPayload>(
-      "bundle-progress",
-      (e) => {
-        bundleProgress = e.payload;
-      }
-    );
-    const unlistenBundleFileReady = await listen<BundleFileReadyPayload>(
-      "bundle-file-ready",
-      (e) => noteBundleFileReady(e.payload)
-    );
-    const unlistenProjectsChunk = await listen<LizaProjectSummaryDto[]>(
-      "projects-chunk",
-      (e) => appendProjectsChunk(e.payload)
-    );
 
-    // Show cached state immediately, then trigger a fresh load
-    await refreshState();
-    loadProjects().catch(() => {});
+      const subscribers: Array<Promise<() => void>> = [
+        listen<DownloadProgressPayload>("download-progress", (e) => {
+          updateDownloadProgress(e.payload);
+          currentDownload = e.payload;
+        }),
+        listen<BundleProgressPayload>("bundle-progress", (e) => {
+          bundleProgress = e.payload;
+        }),
+        listen<BundleFileReadyPayload>("bundle-file-ready", (e) =>
+          noteBundleFileReady(e.payload),
+        ),
+        listen<LizaProjectSummaryDto[]>("projects-chunk", (e) =>
+          appendProjectsChunk(e.payload),
+        ),
+      ];
+
+      const fns = await Promise.all(subscribers);
+      if (cancelled) {
+        fns.forEach((fn) => fn());
+        return;
+      }
+      cleanups.push(...fns);
+
+      loadProjects().catch(() => {});
+    })();
 
     return () => {
-      if (refreshTimer !== null) {
-        window.clearTimeout(refreshTimer);
-      }
-      unlisten();
-      unlistenProgress();
-      unlistenBundleProgress();
-      unlistenBundleFileReady();
-      unlistenProjectsChunk();
-      unlistenClose();
+      cancelled = true;
+      cleanups.forEach((fn) => fn());
     };
   });
 
   const filtered = $derived(
     $projects.filter((p) =>
-      p.name.toLowerCase().includes(projectFilter.toLowerCase())
-    )
+      p.name.toLowerCase().includes(projectFilter.toLowerCase()),
+    ),
   );
 
   async function handleRefresh() {
@@ -123,10 +120,6 @@
 
   function handleSelectProject(slug: string) {
     selectedSlug = slug;
-    // Reset partial-bundle UI state before kicking off the new download.
-    // `loadProject` resolves once the Tauri command handler returns the
-    // download_id — NOT once the bundle finishes downloading. The download
-    // proceeds on a background Tokio task and progress arrives via events.
     resetBundleDownloadState(null);
     currentDownload = null;
     loadProject(slug)
@@ -140,6 +133,7 @@
 
   async function handleOpenMap(mapName: string) {
     await openSelectedMap(mapName);
+    if (get(activeMap)) goto(resolve("/project"));
   }
 
   async function handleOpenLocalBundle() {
@@ -172,14 +166,9 @@
   const bundlePercent = $derived(
     bundleProgress?.total
       ? Math.round(((bundleProgress.completed ?? 0) / bundleProgress.total) * 100)
-      : null
+      : null,
   );
 
-  /**
-   * Current-file label text — `Downloading 3 / 12 — 10-Tracks/foo.ozf2`.
-   * Returns null when there is no per-file event in flight (so the label
-   * hides cleanly).
-   */
   const currentFileLabel = $derived.by(() => {
     if (!currentDownload) return null;
     if (
@@ -190,11 +179,12 @@
     return `${currentDownload.file_index + 1} / ${currentDownload.file_count} — ${currentDownload.package_name}`;
   });
 
-  // A bundle becomes openable as soon as at least one file is ready. The MVP
-  // contract is intentionally permissive: any file ready ⇒ the user can hit
-  // "Open bundle now" because parsers tolerate missing references and the
-  // operator wants the map ASAP.
+  // A bundle becomes openable as soon as at least one file is ready.
   const canOpenPartial = $derived($readyBundleFiles.length > 0 && $busy);
+
+  async function handleOpenPartial() {
+    await appState.refresh();
+  }
 </script>
 
 <div class="root">
@@ -351,11 +341,7 @@
     </div>
     <div class="status-actions">
       {#if canOpenPartial}
-        <!-- Opening a partial bundle just refreshes the current view; the
-             backend already exposes ready files through `current_project`.
-             Future versions may fire a dedicated `open_partial_bundle`
-             command. -->
-        <button class="action-btn" data-testid="open-bundle-now" onclick={refreshState}>
+        <button class="action-btn" data-testid="open-bundle-now" onclick={handleOpenPartial}>
           Open bundle now
         </button>
       {/if}
@@ -371,6 +357,8 @@
 
 <style>
   .root {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -603,6 +591,10 @@
   }
 
   .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -613,6 +605,7 @@
     border-top: 1px solid var(--ctp-surface0);
     min-height: 24px;
     overflow: hidden;
+    z-index: 10;
   }
 
   .status-main {

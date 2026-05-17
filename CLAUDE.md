@@ -12,7 +12,7 @@ Communicate in Russian. Technical terms and code identifiers stay in English.
 
 - Before making changes, read the relevant source files
 - For user-visible behavior changes, read `openspec/specs/<capability>/spec.md` and follow the OpenSpec workflow described in `AGENTS.md` ("Behavioral changes via OpenSpec")
-- Run `just clippy` and `just test` after code changes
+- Run `just clippy`, `just check`, `just lint`, and `just test` after code changes (frontend type-check and lint are wired via SvelteKit + ESLint flat config)
 - Keep TypeScript types (`src/lib/types.ts`) in sync with Rust structs manually
 - All edits must go through `ProjectCommand` — see `docs/commands-reference.md`
 

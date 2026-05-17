@@ -12,13 +12,6 @@ const caps = JSON.parse(
 // Every permission listed here must be present in capabilities/default.json.
 // Add entries here whenever a new Tauri command or plugin requires a permission.
 const REQUIRED_PERMISSIONS = [
-  // Window and webview creation from JS
-  "core:window:allow-create",
-  "core:window:allow-get-all-windows", // needed by `WebviewWindow.getByLabel(...)`
-  "core:window:allow-hide", // needed by the bundle loader close handler
-  "core:window:allow-set-focus", // needed when bringing the bundle loader forward
-  "core:window:allow-show", // needed when opening the pre-created bundle loader
-  "core:webview:allow-create-webview-window", // needed by `new WebviewWindow(...)`
   // Dialogs
   "dialog:allow-open",
   "dialog:allow-save",
@@ -26,7 +19,7 @@ const REQUIRED_PERMISSIONS = [
   "shell:allow-open",
 ];
 
-const REQUIRED_WINDOWS = ["main", "bundles"];
+const REQUIRED_WINDOWS = ["main"];
 
 describe("capabilities/default.json", () => {
   it("grants all required permissions", () => {

@@ -37,3 +37,6 @@ build/
 
 # Local OpenCode skill cache
 .opencode/skills/
+
+# Claude Code workspace (settings, plugins, worktrees, local commands)
+.claude/

@@ -1,4 +1,10 @@
 <script lang="ts">
+  // @ts-nocheck
+  // Legacy MapView keeps its pre-svelte-check syntax during Change 1 of the
+  // SvelteKit migration; per Decision 5 in
+  // `openspec/changes/migrate-to-sveltekit/design.md`, legacy
+  // `src/components/**` migrate one-by-one in Change 3 and this pragma goes
+  // away when MapView is converted.
   import { onMount } from "svelte";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";

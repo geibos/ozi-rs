@@ -81,8 +81,16 @@ src-tauri/src/
   lib.rs           # Tauri init + command registration
 
 src/
+  app.html         # SvelteKit HTML shell (replaces the old root index.html)
+  app.d.ts         # SvelteKit ambient types
+  app.css          # Global styles (Catppuccin custom properties, base resets)
+  routes/
+    +layout.svelte # Persistent app shell: mounts MapView and Console, hosts <slot />
+    +layout.ts     # ssr = false; prerender = true (adapter-static + Tauri)
+    +page.svelte   # `/` — BundleLoaderView (welcome / load surface)
+    project/
+      +page.svelte # `/project` — Sidebar + Tracks/TrackPoints/Waypoints panels
   components/      # Svelte 5 components (MapView, Sidebar, panels, pickers)
-  views/           # Page-level views (BundleLoaderView)
   lib/
     api.ts         # Typed Tauri IPC wrappers — ONLY way to call backend
     stores.ts      # Svelte stores (app state + UI-only state)
@@ -90,6 +98,8 @@ src/
     theme.ts       # Catppuccin CSS custom properties
     maplibre/      # Tile protocols (sqlite://, ozi://), track rendering
 ```
+
+The frontend ships as a single Tauri `WebviewWindow` (label `main`). Two top-level surfaces are exposed as routes — `/` (bundle loader) and `/project` (workspace) — with client-side `goto()` redirects in `onMount` (prerender precludes runtime store access in route-level `load` functions). `MapView` is mounted once in the root layout and toggled visible via CSS, so cross-route navigation does not destroy the MapLibre map.
 
 ### Command-driven editing
 

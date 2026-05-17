@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 const loaderSource = readFileSync(
-  join(__dirname, "../views/BundleLoaderView.svelte"),
+  join(__dirname, "../routes/+page.svelte"),
   "utf-8"
 );
 const storesSource = readFileSync(
