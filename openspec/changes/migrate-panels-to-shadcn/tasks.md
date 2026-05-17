@@ -1,8 +1,8 @@
 ## 1. Validate deltas
 
-- [ ] 1.1 Run `openspec validate 2026-05-17-migrate-panels-to-shadcn --strict` and confirm the `ui-shell` MODIFIED requirement parses with at least one scenario.
+- [ ] 1.1 Run `openspec validate migrate-panels-to-shadcn --strict` and confirm the `ui-shell` MODIFIED requirement parses with at least one scenario.
 - [ ] 1.2 Confirm the full-text copy of every MODIFIED requirement matches the current `openspec/specs/ui-shell/spec.md` body before any new requirements / scenarios are added.
-- [ ] 1.3 Confirm both predecessor changes (`2026-05-17-migrate-to-sveltekit` and `2026-05-17-add-design-tokens-and-shadcn`) are merged before starting Section 2.
+- [ ] 1.3 Confirm both predecessor changes (`migrate-to-sveltekit` and `add-design-tokens-and-shadcn`) are merged before starting Section 2.
 
 ## 2. Console.svelte (step 3.1)
 
@@ -95,4 +95,4 @@
 - [ ] 12.3 Run `just lint`, `just check`, `just clippy`, `just test` — all green.
 - [ ] 12.4 Run `tauri build` to confirm the bundled app still launches.
 - [ ] 12.5 Final visual smoke pass via `ozi-rs-mcp`: capture one screenshot per flavour (Latte, Frappé, Macchiato, Mocha) with Sidebar + MapView + at least one open panel; compare against the per-step screenshots for regressions.
-- [ ] 12.6 Run `openspec validate 2026-05-17-migrate-panels-to-shadcn --strict` one more time before archive.
+- [ ] 12.6 Run `openspec validate migrate-panels-to-shadcn --strict` one more time before archive.
