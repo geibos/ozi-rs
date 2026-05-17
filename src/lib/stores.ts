@@ -6,6 +6,9 @@ import type {
   SimplifiedPreview,
 } from "./types";
 import { getAppState } from "./api";
+import { selectVisibleWaypointLayers } from "./waypoint-layers";
+
+export { selectVisibleWaypointLayers };
 
 function createAppStore() {
   const { subscribe, set } = writable<AppStateDto | null>(null);
@@ -30,6 +33,15 @@ export const projectsLoading = writable(false);
 export const currentProject = derived(appState, ($s) => $s?.current_project ?? null);
 export const activeMap = derived(appState, ($s) => $s?.active_map ?? null);
 export const trackLayerCount = derived(appState, ($s) => $s?.track_layer_count ?? 0);
+/**
+ * All waypoint layer summaries from the current project filtered by per-layer
+ * `visible` (defaulting to true when absent). Renderers consume this to draw
+ * markers from every layer simultaneously, regardless of which layer is active
+ * for editing — required by the non-destructive active-layer invariant.
+ */
+export const visibleWaypointLayers = derived(appState, ($s) =>
+  selectVisibleWaypointLayers($s?.waypoint_layers ?? null),
+);
 export const downloadingMaps = derived(appState, ($s) => new Set($s?.downloading_maps ?? []));
 
 function syncActiveLayer(
