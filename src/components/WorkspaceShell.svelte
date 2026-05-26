@@ -22,7 +22,11 @@
    * the layout's `MapView` shows.
    */
   import { onDestroy, type Snippet } from "svelte";
-  import { commandPaletteOpen, inspectorOpen } from "$lib/stores";
+  import {
+    bundleProgress,
+    commandPaletteOpen,
+    inspectorOpen,
+  } from "$lib/stores";
 
   let {
     libraryRail,
@@ -115,7 +119,26 @@
       {/if}
     </main>
 
-    <div class="status-bar" data-testid="workspace-status-bar"></div>
+    <div class="status-bar" data-testid="workspace-status-bar">
+      {#if $bundleProgress}
+        <!--
+          Bug 3 fix (fix-redesign-functional-bugs): the status bar now
+          mirrors the bundle-loader's progress line whenever a download is
+          in flight. The `bundleProgress` store is fed by the layout-level
+          `bundle-progress` listener (single-owner rule); no new
+          subscription is registered here.
+        -->
+        <span class="status-progress" data-testid="status-bundle-progress">
+          <span class="status-phase">{$bundleProgress.phase}</span>
+          <span class="status-message">{$bundleProgress.message}</span>
+          {#if $bundleProgress.completed != null && $bundleProgress.total != null}
+            <span class="status-counts">
+              {$bundleProgress.completed} / {$bundleProgress.total}
+            </span>
+          {/if}
+        </span>
+      {/if}
+    </div>
   </div>
 
   {#if $inspectorOpen}
@@ -267,5 +290,31 @@
     align-items: center;
     padding: 0 10px;
     flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .status-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .status-phase {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: hsl(var(--primary));
+    font-weight: 600;
+  }
+
+  .status-message {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-counts {
+    color: hsl(var(--foreground));
+    font-variant-numeric: tabular-nums;
   }
 </style>
