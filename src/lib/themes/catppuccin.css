@@ -1,0 +1,51 @@
+/*
+ * Catppuccin opt-in theme pack.
+ *
+ * Previously these `--ctp-*` values were hardcoded in `src/app.css` so the
+ * theme was active by default. Per the `redesign-shell-layout` change the
+ * default theme is now native Zinc + Teal (declared in `src/lib/tokens.css`),
+ * and Catppuccin is loaded by `applyTheme()` in `theme.ts` only when the
+ * user has opted into the pack.
+ *
+ * `applyTheme(<latte|frappe|macchiato|mocha|auto>)` overwrites every
+ * `--ctp-<key>` AND the shadcn semantic tokens (`--background`, …) at
+ * runtime from the live `@catppuccin/palette` data, so this static file
+ * only matters as a fallback before that JS runs (Latte / light values).
+ *
+ * The static fallback intentionally mirrors Latte (light flavour) so the
+ * pre-bootstrap paint of a Catppuccin-opted-in session does not flash dark
+ * before the JS resolves the active flavour.
+ *
+ * The file is imported once by `applyTheme()` in `theme.ts` via a side-effect
+ * import; until then, no `--ctp-*` variable is present on the root element
+ * (verified by the "Default native theme on first launch" spec scenario).
+ */
+
+:root {
+  --ctp-rosewater: #dc8a78;
+  --ctp-flamingo: #dd7878;
+  --ctp-pink: #ea76cb;
+  --ctp-mauve: #8839ef;
+  --ctp-red: #d20f39;
+  --ctp-maroon: #e64553;
+  --ctp-peach: #fe640b;
+  --ctp-yellow: #df8e1d;
+  --ctp-green: #40a02b;
+  --ctp-teal: #179299;
+  --ctp-sky: #04a5e5;
+  --ctp-sapphire: #209fb5;
+  --ctp-blue: #1e66f5;
+  --ctp-lavender: #7287fd;
+  --ctp-text: #4c4f69;
+  --ctp-subtext1: #5c5f77;
+  --ctp-subtext0: #6c6f85;
+  --ctp-overlay2: #7c7f93;
+  --ctp-overlay1: #8c8fa1;
+  --ctp-overlay0: #9ca0b0;
+  --ctp-surface2: #acb0be;
+  --ctp-surface1: #bcc0cc;
+  --ctp-surface0: #ccd0da;
+  --ctp-base: #eff1f5;
+  --ctp-mantle: #e6e9ef;
+  --ctp-crust: #dce0e8;
+}

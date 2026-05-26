@@ -4,10 +4,7 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { activeMap } from "../../lib/stores";
-  import Sidebar from "../../components/Sidebar.svelte";
-  import TracksPanel from "../../components/TracksPanel.svelte";
-  import TrackPointsPanel from "../../components/TrackPointsPanel.svelte";
-  import WaypointsPanel from "../../components/WaypointsPanel.svelte";
+  import WorkspaceShell from "../../components/WorkspaceShell.svelte";
 
   onMount(() => {
     if (!get(activeMap)) {
@@ -24,7 +21,15 @@
   });
 </script>
 
-<Sidebar />
-<TracksPanel />
-<TrackPointsPanel />
-<WaypointsPanel />
+<!--
+  The 2-column `Sidebar.svelte` + floating `TracksPanel` / `TrackPointsPanel`
+  / `WaypointsPanel` mount has been replaced by the 3-pane WorkspaceShell.
+  Those components stay in the repository tree for the follow-up
+  `library-sidebar` and `inspector-pane` changes to reuse or delete; this
+  page no longer mounts any of them. The `library-rail` and `inspector-rail`
+  slots are intentionally empty here — they receive content from the next
+  two changes. `MapView` continues to be mounted from `src/routes/+layout.svelte`
+  and becomes visible inside the canvas region while the workspace route is
+  active.
+-->
+<WorkspaceShell />

@@ -1,0 +1,136 @@
+/*
+ * Design-token layer for the redesign-shell-layout change.
+ *
+ * Declares the native Zinc + Teal palette as the application default.
+ *
+ *   - Neutrals: Zinc scale (slate-tinted-cool). Dark surface base is
+ *     off-black `#0a0a0a` — NEVER pure `#000`.
+ *   - Accent: a single desaturated Teal (`oklch(0.65 0.10 190)` ≈ `#0d9488`).
+ *     There is intentionally NO secondary accent variable.
+ *   - Radii: `--radius-card` (1.5rem) for inspector cards;
+ *     `--radius-pill` for chips / pills.
+ *   - Shadows: three tinted elevations (not flat gray drop shadow).
+ *   - Inner-border: a 1px hairline at `zinc-200/50` light / `zinc-800/60` dark.
+ *
+ * Semantic shadcn tokens (`--background`, `--foreground`, …) are also
+ * declared here as HSL triplets without the `hsl(...)` wrapper so the
+ * `@theme inline` mapping in `app.css` (which composes them via
+ * `hsl(var(--background) / <alpha-value>)`) keeps working unchanged.
+ *
+ * The Catppuccin opt-in pack lives at `src/lib/themes/catppuccin.css` and
+ * overrides these tokens at runtime via `applyTheme()` in `theme.ts` only
+ * when the pack is enabled.
+ */
+
+@theme {
+  /* --- Zinc neutrals --------------------------------------------------- */
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #0a0a0a;
+
+  /* --- Teal accent (single hue, ≤ 70% saturation) ---------------------- */
+  --color-teal-50:  oklch(0.972 0.020 190);
+  --color-teal-100: oklch(0.932 0.040 190);
+  --color-teal-200: oklch(0.872 0.060 190);
+  --color-teal-300: oklch(0.792 0.080 190);
+  --color-teal-400: oklch(0.725 0.090 190);
+  --color-teal-500: oklch(0.650 0.100 190); /* primary accent */
+  --color-teal-600: oklch(0.572 0.095 190);
+  --color-teal-700: oklch(0.500 0.085 190);
+  --color-teal-800: oklch(0.420 0.070 190);
+  --color-teal-900: oklch(0.350 0.060 190);
+
+  /* --- Radii ----------------------------------------------------------- */
+  --radius-card: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* --- Tinted elevation shadows --------------------------------------- */
+  --shadow-elev-1: 0 1px 2px -1px oklch(0.15 0.02 240 / 0.10),
+                   0 1px 1px oklch(0.15 0.02 240 / 0.06);
+  --shadow-elev-2: 0 6px 16px -6px oklch(0.15 0.02 240 / 0.16),
+                   0 2px 4px -2px oklch(0.15 0.02 240 / 0.08);
+  --shadow-elev-3: 0 20px 40px -16px oklch(0.15 0.02 240 / 0.22),
+                   0 8px 16px -8px oklch(0.15 0.02 240 / 0.12);
+
+  /* --- Stable layout dimensions (workspace shell) ---------------------- */
+  --status-bar-height: 28px;
+}
+
+/*
+ * Native default semantic tokens — light mode.
+ *
+ * These are written as bare HSL triplets ("H S% L%") so the existing
+ * `@theme inline` mapping in `app.css` composes them through
+ * `hsl(var(--background) / <alpha-value>)` for alpha-friendly utilities.
+ *
+ * Catppuccin pack (when enabled) overwrites these at runtime via
+ * `applySemanticTokens()` in `theme.ts`.
+ */
+:root {
+  /* Zinc-50 ≈ hsl(0 0% 98%) */
+  --background: 0 0% 98%;
+  /* Zinc-900 — off-black-ish foreground for high-contrast body text */
+  --foreground: 240 6% 10%;
+  /* Cards lift one step from the background — Zinc-100 */
+  --card: 240 5% 96%;
+  --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  /* Teal-600 — primary action, low-sat */
+  --primary: 184 49% 35%;
+  --primary-foreground: 0 0% 100%;
+  /* Zinc-200 for secondary surfaces */
+  --secondary: 240 5% 90%;
+  --secondary-foreground: 240 6% 10%;
+  --muted: 240 5% 90%;
+  --muted-foreground: 240 4% 46%;
+  --accent: 240 5% 90%;
+  --accent-foreground: 240 6% 10%;
+  --destructive: 0 72% 50%;
+  --destructive-foreground: 0 0% 100%;
+  /* Zinc-200/50 hairline border (resolves through `border-border`) */
+  --border: 240 6% 89%;
+  --input: 240 6% 89%;
+  /* Teal-500 ring */
+  --ring: 184 45% 45%;
+
+  /* Inner-border colour exposed to component code that wants the 1px hairline
+   * without going through `border-border`. Light: zinc-200/50; Dark below. */
+  --inner-border: oklch(0.92 0.005 240 / 0.5);
+}
+
+.dark {
+  /* Off-black workspace surface — NOT #000000. Zinc-950 = #0a0a0a. */
+  --background: 240 5% 4%;
+  --foreground: 0 0% 98%;
+  /* Cards sit one step above the background — Zinc-900 */
+  --card: 240 4% 9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 4% 9%;
+  --popover-foreground: 0 0% 98%;
+  /* Teal-500 reads cleaner on dark surfaces */
+  --primary: 184 49% 50%;
+  --primary-foreground: 240 5% 4%;
+  --secondary: 240 4% 15%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 240 4% 15%;
+  --muted-foreground: 240 4% 65%;
+  --accent: 240 4% 15%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 0 0% 98%;
+  /* Zinc-800/60 hairline border */
+  --border: 240 4% 16%;
+  --input: 240 4% 16%;
+  --ring: 184 45% 55%;
+
+  --inner-border: oklch(0.27 0.005 240 / 0.6);
+}

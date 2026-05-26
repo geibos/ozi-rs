@@ -1008,15 +1008,19 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--ctp-lavender);
-    border: 2px solid var(--ctp-base);
-    box-shadow: 0 0 0 1px var(--ctp-blue);
+    /* Per-marker colours stay independent of the active theme. Catppuccin
+     * variables are kept as the primary value (so the Catppuccin pack still
+     * tints them) with hex fallbacks for the native default theme where
+     * the `--ctp-*` variables are absent. */
+    background: var(--ctp-lavender, #b4befe);
+    border: 2px solid var(--ctp-base, hsl(var(--background)));
+    box-shadow: 0 0 0 1px var(--ctp-blue, hsl(var(--primary)));
     cursor: grab;
   }
 
   :global(.track-point-marker.selected) {
-    background: var(--ctp-yellow);
-    box-shadow: 0 0 0 1px var(--ctp-peach);
+    background: var(--ctp-yellow, #f9e2af);
+    box-shadow: 0 0 0 1px var(--ctp-peach, #fab387);
   }
 
   :global(.track-point-marker:active) {
