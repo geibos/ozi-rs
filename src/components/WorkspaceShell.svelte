@@ -53,6 +53,7 @@
    */
   const LIBRARY_WIDTH = "280px";
   const INSPECTOR_WIDTH = "360px";
+  const INSPECTOR_COLLAPSED_WIDTH = "8px";
   const CONTEXT_BAR_HEIGHT = "36px";
 
   function writeCanvasInsets(inspectorVisible: boolean) {
@@ -61,7 +62,7 @@
     root.style.setProperty("--canvas-left", LIBRARY_WIDTH);
     root.style.setProperty(
       "--canvas-right",
-      inspectorVisible ? INSPECTOR_WIDTH : "0px",
+      inspectorVisible ? INSPECTOR_WIDTH : INSPECTOR_COLLAPSED_WIDTH,
     );
     root.style.setProperty("--canvas-top", CONTEXT_BAR_HEIGHT);
     root.style.setProperty("--canvas-bottom", "var(--status-bar-height)");
@@ -97,10 +98,31 @@
   <div class="canvas-column">
     <div class="context-bar">
       <div class="mode-chips" role="group" aria-label="Mode (inert placeholder)">
-        <button type="button" class="chip" tabindex="-1">View</button>
-        <button type="button" class="chip" tabindex="-1">Draw</button>
-        <button type="button" class="chip" tabindex="-1">Edit</button>
-        <button type="button" class="chip" tabindex="-1">Measure</button>
+        <button
+          type="button"
+          class="chip"
+          tabindex="-1"
+          aria-disabled="true"
+        >View</button>
+        <button
+          type="button"
+          class="chip"
+          tabindex="-1"
+          aria-disabled="true"
+        >Draw</button>
+        <button
+          type="button"
+          class="chip"
+          tabindex="-1"
+          aria-disabled="true"
+        >Edit</button>
+        <button
+          type="button"
+          class="chip"
+          tabindex="-1"
+          aria-disabled="true"
+        >Measure</button>
+        <span class="chips-divider" aria-hidden="true"></span>
       </div>
       <!--
         Bug 5 fix (fix-redesign-functional-bugs): the previous "Search…"
@@ -151,15 +173,17 @@
     </div>
   </div>
 
-  {#if $inspectorOpen}
-    <aside class="rail inspector" aria-label="Inspector">
-      {#if inspectorRail}
-        {@render inspectorRail()}
-      {:else}
-        <div class="placeholder" aria-hidden="true">Inspector</div>
-      {/if}
-    </aside>
-  {/if}
+  <aside
+    class="rail inspector"
+    class:collapsed={!$inspectorOpen}
+    aria-label="Inspector"
+  >
+    {#if inspectorRail}
+      {@render inspectorRail()}
+    {:else}
+      <div class="placeholder" aria-hidden="true">Inspector</div>
+    {/if}
+  </aside>
 </div>
 
 <style>
@@ -167,7 +191,7 @@
     flex: 1;
     min-width: 0;
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr) 8px;
     grid-template-rows: 1fr;
     height: 100%;
     background: hsl(var(--background));
@@ -187,6 +211,15 @@
 
   .rail.inspector {
     box-shadow: inset 1px 0 0 var(--inner-border);
+  }
+
+  .rail.inspector.collapsed {
+    /* Visually a narrow strip; InspectorRail renders the edge handle inside.
+       overflow: visible lets the 8px → 12px hover widen the handle without
+       pushing the grid column (the column stays 8px wide).            */
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
   }
 
   .placeholder {
@@ -227,6 +260,15 @@
     gap: 4px;
   }
 
+  .chips-divider {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    margin: 0 6px;
+    background: var(--inner-border);
+    flex-shrink: 0;
+  }
+
   .chip {
     appearance: none;
     background: transparent;
@@ -237,14 +279,15 @@
     line-height: 1;
     padding: 5px 10px;
     border-radius: var(--radius-pill);
-    cursor: default;
+    cursor: not-allowed;
     user-select: none;
-    transition: background 0.1s, color 0.1s;
+    opacity: 0.55;
+    transition: none;
   }
 
-  .chip:hover {
-    background: hsl(var(--secondary));
-    color: hsl(var(--secondary-foreground));
+  .chip[aria-disabled="true"]:hover {
+    background: transparent;
+    color: hsl(var(--muted-foreground));
   }
 
   /*
@@ -277,7 +320,7 @@
     transition:
       background 0.12s ease,
       color 0.12s ease,
-      border-color 0.12s ease;
+      box-shadow 0.12s ease;
   }
 
   .cmdk-trigger:hover {
@@ -287,8 +330,8 @@
 
   .cmdk-trigger:focus-visible {
     outline: none;
-    border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
+    border-color: transparent;
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.45);
   }
 
   .cmdk-label {
