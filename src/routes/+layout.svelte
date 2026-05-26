@@ -12,6 +12,7 @@
     updateDownloadProgress,
   } from "../lib/stores";
   import { loadProjects } from "../lib/api";
+  import { installIpcErrorToastObserver } from "../lib/ipc";
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
   import CommandPalette from "../components/CommandPalette.svelte";
@@ -34,6 +35,11 @@
   onMount(() => {
     let cancelled = false;
     const unlistenAutoTheme = installAutoThemeListener();
+    // Mirrors the `ipc-error` class that `invokeIpc` puts on dev rejection
+    // toasts onto `data-testid="ipc-error"` on the Sonner `<li>`, because
+    // svelte-sonner does not forward `data-*` attributes from `toast({ … })`
+    // options through to the rendered toast root.
+    const uninstallIpcObserver = installIpcErrorToastObserver();
     const unlistens: Array<() => void> = [];
 
     (async () => {
@@ -78,6 +84,7 @@
       cancelled = true;
       unlistens.forEach((fn) => fn());
       unlistenAutoTheme();
+      uninstallIpcObserver();
       // Reset the bundle-loader transient stores so a relaunch (or a
       // hot-reload during dev) starts from a clean slate. activeDownloadId
       // is reset together with the progress/payload stores.

@@ -55,8 +55,10 @@ describe("api.ts wrapper for toggle_waypoint_visible", () => {
     expect(apiSource).toContain(
       "export async function toggleWaypointVisible(\n  layerId: bigint,\n  waypointId: bigint\n)"
     );
+    // `api.ts` now routes through the `invokeIpc` wrapper from
+    // `src/lib/ipc.ts` so dev IPC failures surface as a structured toast.
     expect(apiSource).toContain(
-      'invoke("toggle_waypoint_visible", { layerId, waypointId })'
+      'invokeIpc("toggle_waypoint_visible", { layerId, waypointId })'
     );
   });
 });
