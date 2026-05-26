@@ -16,11 +16,14 @@ const commandsSource = readFileSync(
  * The non-blocking contract is twofold:
  *   1. The Tauri command for load_project must return a download_id, not
  *      block until the bundle is done.
- *   2. The Svelte component must NOT `await loadProject(...)` — instead it
- *      kicks off the request and rerenders purely from events.
+ *   2. The Svelte loader must support cancel-and-restart when the user
+ *      switches projects mid-download — `cancelDownload(previousId)` is
+ *      awaited BEFORE the new `loadProject(slug)` is started, so the
+ *      backend never sees overlapping downloads.
  *
- * Both halves are checked structurally so the test catches a regression
- * to the previous "await loadProject(slug)" loader.
+ * Both halves are checked structurally so the test catches regressions
+ * to either the old "fire-and-forget loadProject" loader or to a future
+ * loader that forgets to cancel the previous download.
  */
 describe("bundle loader main-thread responsiveness", () => {
   it("backend load_project returns a download_id immediately and spawns the work async", () => {
@@ -43,15 +46,30 @@ describe("bundle loader main-thread responsiveness", () => {
     );
   });
 
-  it("BundleLoaderView does NOT await the loadProject promise inline", () => {
-    // The previous loader had `await loadProject(slug)` directly inside an
-    // event handler. The new contract forbids that — the handler must be
-    // synchronous (modulo a fire-and-forget then-chain) so the Svelte main
-    // thread does not stall.
-    expect(loaderSource).not.toMatch(/await\s+loadProject\(/);
-    expect(loaderSource).toMatch(/loadProject\(slug\)\s*\.then/);
-    // handleSelectProject is intentionally a sync function (no async kw).
-    expect(loaderSource).toMatch(/function\s+handleSelectProject\(slug:\s*string\)\s*\{/);
+  it("handleSelectProject cancels any active download before starting a new one", () => {
+    // Async signature is required to support `await cancelDownload(...)`
+    // before the new `loadProject(...)` call.
+    expect(loaderSource).toMatch(
+      /async\s+function\s+handleSelectProject\(slug:\s*string\)\s*\{/
+    );
+    // cancelDownload must be awaited (sequenced) so the backend never sees
+    // overlapping downloads.
+    expect(loaderSource).toMatch(/await\s+cancelDownload\(/);
+    // loadProject must be called for the newly-selected slug.
+    expect(loaderSource).toMatch(/loadProject\(slug\)/);
+  });
+
+  it("project list is not blanket-disabled while a download is in flight", () => {
+    // The blanket `disabled={$busy}` on project list-item buttons was
+    // removed so the user can switch projects mid-download. The refresh
+    // button keeps its `disabled={$busy}` because that path duplicates an
+    // in-flight loadProjects call.
+    expect(loaderSource).not.toMatch(
+      /class="list-item"[^>]*disabled=\{\$busy\}/
+    );
+    expect(loaderSource).toMatch(
+      /onclick=\{handleRefresh\}[^>]*disabled=\{\$busy\}/
+    );
   });
 
   it("download lifecycle state lives in stores so sibling panels stay reactive", () => {

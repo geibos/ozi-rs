@@ -39,6 +39,7 @@
     setBundlesRoot,
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { toast } from "svelte-sonner";
   import type {
     BundleFileReadyPayload,
     BundleProgressPayload,
@@ -50,6 +51,7 @@
   let selectedSlug = $state("");
   let bundleProgress = $state<BundleProgressPayload | null>(null);
   let currentDownload = $state<DownloadProgressPayload | null>(null);
+  let transientStatus = $state<string | null>(null);
 
   $effect(() => {
     const s = $appState;
@@ -118,21 +120,54 @@
     await loadProjects();
   }
 
-  function handleSelectProject(slug: string) {
+  async function handleSelectProject(slug: string) {
+    // Guard against repeated clicks on the same already-selected project:
+    // without this, a double-click would issue an unnecessary cancel + restart.
+    if (selectedSlug === slug && $activeDownloadId !== null) return;
+
     selectedSlug = slug;
-    resetBundleDownloadState(null);
+
+    // Snapshot the previous id BEFORE any state mutation. We deliberately
+    // do NOT reset `activeDownloadId` to null between cancel and restart —
+    // a concurrent click during the IPC round-trip would otherwise read
+    // null, skip cancel, and let the backend see overlapping downloads.
+    // The id stays pointing to the cancelled download (the backend tolerates
+    // a second cancel) until `loadProject` returns the new id.
+    const previousId = $activeDownloadId;
+    const isSwitching = previousId !== null;
+
+    if (isSwitching) {
+      const project = $projects.find((p) => p.slug === slug);
+      transientStatus = `Switching to ${project?.name ?? slug}…`;
+      try {
+        await cancelDownload(previousId);
+      } catch {
+        // cancel failures should not block the switch
+      }
+    }
+
+    // Clear the per-bundle progress UI without touching activeDownloadId.
+    readyBundleFiles.set([]);
+    downloadProgress.set(new Map());
     currentDownload = null;
-    loadProject(slug)
-      .then((id) => {
-        if (id) activeDownloadId.set(id);
-      })
-      .catch(() => {
-        /* errors surface via diagnostics */
-      });
+
+    try {
+      const id = await loadProject(slug);
+      activeDownloadId.set(id || null);
+    } catch {
+      activeDownloadId.set(null);
+    } finally {
+      transientStatus = null;
+    }
   }
 
   async function handleOpenMap(mapName: string) {
-    await openSelectedMap(mapName);
+    try {
+      await openSelectedMap(mapName);
+    } catch (error) {
+      toast.error("Failed to open map", { description: String(error) });
+      return;
+    }
     if (get(activeMap)) goto(resolve("/project"));
   }
 
@@ -219,7 +254,6 @@
           class="list-item"
           class:active={selectedSlug === p.slug}
           onclick={() => handleSelectProject(p.slug)}
-          disabled={$busy}
         >{p.name}</button>
       {:else}
         <div class="empty">No matches</div>
@@ -291,54 +325,60 @@
     </div>
   </div>
 </div>
-</div>
 
-{#if $busy || $status}
   <div class="status-bar" class:busy={$busy}>
-    {#if $busy}
-      <span class="spinner"></span>
-    {/if}
-    <div class="status-main">
-      <span class="status-text">{bundleProgress?.message ?? $status}</span>
+    <div class="status-line-slot">
+      {#if $busy || transientStatus}
+        <span class="spinner"></span>
+      {/if}
+      <span class="status-text">{transientStatus ?? bundleProgress?.message ?? $status ?? ""}</span>
+    </div>
+
+    <div class="current-file-slot">
       {#if currentFileLabel}
         <span class="current-file" data-testid="current-file-label">
           Downloading {currentFileLabel}
         </span>
       {/if}
+    </div>
+
+    <div class="progress-slot">
       {#if currentDownload && currentDownload.total_bytes == null && currentDownload.downloaded_bytes > 0}
         <div class="bundle-track" data-testid="indeterminate-bar">
           <div class="bundle-fill indeterminate-bar"></div>
         </div>
-      {/if}
-      {#if bundleProgress}
-        <div class="bundle-meta">
-          {#if bundleProgress.total != null}
-            <span>{bundleProgress.completed ?? 0}/{bundleProgress.total}</span>
-          {/if}
-          {#if bundleProgress.downloaded_bytes != null}
-            <span>
-              {formatBytes(bundleProgress.downloaded_bytes)}
-              {bundleProgress.total_bytes ? `/ ${formatBytes(bundleProgress.total_bytes)}` : ""}
-            </span>
-          {/if}
+      {:else if bundlePercent != null}
+        <div class="bundle-track">
+          <div class="bundle-fill" style={`width: ${bundlePercent}%`}></div>
         </div>
-        {#if bundlePercent != null}
-          <div class="bundle-track">
-            <div class="bundle-fill" style={`width: ${bundlePercent}%`}></div>
-          </div>
-        {/if}
-      {/if}
-      {#if $readyBundleFiles.length > 0}
-        <div class="ready-files" data-testid="ready-files">
-          {#each $readyBundleFiles as f (f.package_name)}
-            <div class="ready-row">
-              <span class="ready-tick">✓</span>
-              <span class="ready-name">{f.package_name}</span>
-            </div>
-          {/each}
-        </div>
+      {:else}
+        <div class="bundle-track bundle-track-placeholder"></div>
       {/if}
     </div>
+
+    <div class="meta-slot">
+      {#if bundleProgress?.total != null}
+        <span>{bundleProgress.completed ?? 0}/{bundleProgress.total}</span>
+      {/if}
+      {#if bundleProgress?.downloaded_bytes != null}
+        <span>
+          {formatBytes(bundleProgress.downloaded_bytes)}
+          {bundleProgress.total_bytes ? `/ ${formatBytes(bundleProgress.total_bytes)}` : ""}
+        </span>
+      {/if}
+    </div>
+
+    <div class="ready-list-slot">
+      <div class="ready-files" data-testid="ready-files">
+        {#each $readyBundleFiles as f (f.package_name)}
+          <div class="ready-row">
+            <span class="ready-tick">✓</span>
+            <span class="ready-name">{f.package_name}</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+
     <div class="status-actions">
       {#if canOpenPartial}
         <button class="action-btn" data-testid="open-bundle-now" onclick={handleOpenPartial}>
@@ -353,10 +393,11 @@
       {/if}
     </div>
   </div>
-{/if}
+</div>
 
 <style>
   .root {
+    --bundle-status-bar-height: 160px;
     flex: 1;
     min-width: 0;
     display: flex;
@@ -591,29 +632,65 @@
   }
 
   .status-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
+    flex-shrink: 0;
+    height: var(--bundle-status-bar-height);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "status-line   actions"
+      "current-file  actions"
+      "progress      actions"
+      "meta          actions"
+      "ready-list    actions";
+    grid-template-rows: 20px 16px 12px 16px minmax(80px, 1fr);
+    column-gap: 8px;
+    padding: 6px 10px;
     font-size: 11px;
     color: var(--ctp-subtext0);
     background: var(--ctp-crust);
     border-top: 1px solid var(--ctp-surface0);
-    min-height: 24px;
     overflow: hidden;
-    z-index: 10;
   }
 
-  .status-main {
+  .status-line-slot {
+    grid-area: status-line;
     display: flex;
-    flex: 1;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
-    flex-direction: column;
-    gap: 4px;
+  }
+
+  .current-file-slot {
+    grid-area: current-file;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .progress-slot {
+    grid-area: progress;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .meta-slot {
+    grid-area: meta;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 10px;
+    color: var(--ctp-overlay1);
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .ready-list-slot {
+    grid-area: ready-list;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .status-text {
@@ -623,20 +700,16 @@
     white-space: nowrap;
   }
 
-  .bundle-meta {
-    display: flex;
-    gap: 10px;
-    font-size: 10px;
-    color: var(--ctp-overlay1);
-    font-variant-numeric: tabular-nums;
-  }
-
   .bundle-track {
     width: 100%;
     height: 4px;
     border-radius: 999px;
     overflow: hidden;
     background: var(--ctp-surface0);
+  }
+
+  .bundle-track-placeholder {
+    opacity: 0.5;
   }
 
   .bundle-fill {
@@ -668,9 +741,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    max-height: 80px;
+    height: 100%;
     overflow-y: auto;
-    margin-top: 2px;
   }
 
   .ready-row {
@@ -693,10 +765,12 @@
   }
 
   .status-actions {
+    grid-area: actions;
     display: flex;
     flex-direction: column;
     gap: 4px;
     flex-shrink: 0;
+    align-self: start;
   }
 
   .action-btn {
