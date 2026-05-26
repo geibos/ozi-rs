@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+// Bundle-loader UI lives in two files after `redesign-library-sidebar`:
+//   - `BundleLoader.svelte` — columns (catalog + maps), reused by the
+//     cold-start `/` route and the workspace's bundle-loader Sheet.
+//   - `routes/+page.svelte` — cold-start wrapper that adds the status
+//     bar with the cancel button and current-file label.
 const loaderSource = readFileSync(
+  join(__dirname, "../components/BundleLoader.svelte"),
+  "utf-8"
+);
+const pageSource = readFileSync(
   join(__dirname, "../routes/+page.svelte"),
   "utf-8"
 );
@@ -23,17 +32,16 @@ const commandsSource = readFileSync(
 
 describe("bundle loader per-file progress UI", () => {
   it("renders a current-file label sourced from download-progress events", () => {
-    // Label binds to file_index + file_count + package_name (no division).
-    expect(loaderSource).toContain("currentFileLabel");
-    expect(loaderSource).toContain("file_index");
-    expect(loaderSource).toContain("file_count");
-    expect(loaderSource).toContain("data-testid=\"current-file-label\"");
-    // Source of truth: the `download-progress` listener now lives in
+    expect(pageSource).toContain("currentFileLabel");
+    expect(pageSource).toContain("file_index");
+    expect(pageSource).toContain("file_count");
+    expect(pageSource).toContain("data-testid=\"current-file-label\"");
+    // Source of truth: the `download-progress` listener lives in
     // `+layout.svelte` (single-owner rule, `consolidate-state-event-flow`)
     // and writes the payload into the `currentDownload` store; the page
     // reads `$currentDownload`.
     expect(layoutSource).toMatch(/currentDownload\.set\(event\.payload\)/);
-    expect(loaderSource).toContain("$currentDownload");
+    expect(pageSource).toContain("$currentDownload");
   });
 
   it("per-file readiness streams into AppStateDto live (stream-bundle-file-availability)", () => {
@@ -47,6 +55,8 @@ describe("bundle loader per-file progress UI", () => {
     // The frontend no longer subscribes to bundle-file-ready at the page
     // level — that side channel is gone in favour of the AppStateDto
     // refresh that state-changed triggers.
+    expect(pageSource).not.toContain("noteBundleFileReady");
+    expect(pageSource).not.toMatch(/listen<[^>]*>\(\s*"bundle-file-ready"/);
     expect(loaderSource).not.toContain("noteBundleFileReady");
     expect(loaderSource).not.toMatch(/listen<[^>]*>\(\s*"bundle-file-ready"/);
     // The ready-files affordance and the Open bundle now button are gone;
@@ -58,15 +68,15 @@ describe("bundle loader per-file progress UI", () => {
   });
 
   it("renders an indeterminate animation when total_bytes is missing", () => {
-    expect(loaderSource).toContain("data-testid=\"indeterminate-bar\"");
-    expect(loaderSource).toContain("indeterminate-bar");
-    expect(loaderSource).toContain("$currentDownload.total_bytes == null");
+    expect(pageSource).toContain("data-testid=\"indeterminate-bar\"");
+    expect(pageSource).toContain("indeterminate-bar");
+    expect(pageSource).toContain("$currentDownload.total_bytes == null");
   });
 
   it("exposes a cancel button wired to cancelDownload(activeDownloadId)", () => {
-    expect(loaderSource).toContain("data-testid=\"cancel-download\"");
-    expect(loaderSource).toContain("cancelDownload");
-    expect(loaderSource).toContain("handleCancelDownload");
+    expect(pageSource).toContain("data-testid=\"cancel-download\"");
+    expect(pageSource).toContain("cancelDownload");
+    expect(pageSource).toContain("handleCancelDownload");
     expect(apiSource).toContain("export async function cancelDownload");
     expect(apiSource).toContain('"cancel_download"');
   });

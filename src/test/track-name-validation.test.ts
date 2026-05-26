@@ -3,8 +3,8 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { isOkStandardTrackName } from "../lib/track-names";
 
-const tracksPanelSource = readFileSync(
-  join(__dirname, "../components/TracksPanel.svelte"),
+const tracksTabSource = readFileSync(
+  join(__dirname, "../components/library/TracksTab.svelte"),
   "utf-8"
 );
 
@@ -27,17 +27,17 @@ describe("OK-standard track-name validation", () => {
   });
 });
 
-describe("TracksPanel warning-only validation", () => {
+describe("Library Tracks tab warning-only validation", () => {
   it("uses the shared track-name helper for warnings", () => {
-    expect(tracksPanelSource).toContain("isOkStandardTrackName");
-    // The legacy `.ok-name-warning` CSS class is gone; the warning surface
-    // now uses a Tailwind warning colour utility instead (`text-yellow-500`).
-    expect(tracksPanelSource).toContain("text-yellow-500");
-    expect(tracksPanelSource).toContain("Use YYYYMMDD_Callsign");
+    expect(tracksTabSource).toContain("isOkStandardTrackName");
+    // Warning surface keeps the same Tailwind utility color so the visual
+    // contract carries over from the floating panel.
+    expect(tracksTabSource).toContain("text-yellow-500");
+    expect(tracksTabSource).toContain("Use YYYYMMDD_Callsign");
   });
 
   it("keeps rename non-blocking by still calling renameTrack", () => {
-    expect(tracksPanelSource).toContain("await renameTrack");
-    expect(tracksPanelSource).not.toContain("invoke(");
+    expect(tracksTabSource).toContain("renameTrack");
+    expect(tracksTabSource).not.toContain("invoke(");
   });
 });

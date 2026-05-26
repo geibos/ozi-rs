@@ -8,12 +8,18 @@ const commandsSource = readFileSync(
 );
 const typesSource = readFileSync(join(__dirname, "../lib/types.ts"), "utf-8");
 const storesSource = readFileSync(join(__dirname, "../lib/stores.ts"), "utf-8");
-const sidebarSource = readFileSync(join(__dirname, "../components/Sidebar.svelte"), "utf-8");
-const mapViewSource = readFileSync(join(__dirname, "../components/MapView.svelte"), "utf-8");
-const waypointsPanelSource = readFileSync(
-  join(__dirname, "../components/WaypointsPanel.svelte"),
+// The legacy `Sidebar.svelte` / `WaypointsPanel.svelte` floating-panel
+// surfaces were removed by `redesign-library-sidebar`. Their active-layer
+// wiring now lives inside the three Library tabs.
+const tracksTabSource = readFileSync(
+  join(__dirname, "../components/library/TracksTab.svelte"),
   "utf-8"
 );
+const waypointsTabSource = readFileSync(
+  join(__dirname, "../components/library/WaypointsTab.svelte"),
+  "utf-8"
+);
+const mapViewSource = readFileSync(join(__dirname, "../components/MapView.svelte"), "utf-8");
 
 describe("active layer UI wiring", () => {
   it("exposes minimal track and waypoint layer lists in app state DTOs", () => {
@@ -32,18 +38,16 @@ describe("active layer UI wiring", () => {
     expect(storesSource).toContain("waypoint_layers");
   });
 
-  it("renders minimal active track and waypoint layer selectors in the sidebar", () => {
-    expect(sidebarSource).toContain("activeTrackLayerId");
-    expect(sidebarSource).toContain("activeWaypointLayerId");
-    expect(sidebarSource).toContain("$appState?.track_layers");
-    expect(sidebarSource).toContain("$appState?.waypoint_layers");
-    expect(sidebarSource).toContain("Track layer");
-    expect(sidebarSource).toContain("Waypoint layer");
+  it("renders minimal active track and waypoint layer selectors in the Library tabs", () => {
+    expect(tracksTabSource).toContain("activeTrackLayerId");
+    expect(tracksTabSource).toContain("$appState?.track_layers");
+    expect(tracksTabSource).toContain("Track layer");
+    expect(waypointsTabSource).toContain("activeWaypointLayerId");
+    expect(waypointsTabSource).toContain("$appState?.waypoint_layers");
+    expect(waypointsTabSource).toContain("Waypoint layer");
   });
 
   it("routes drawing workflows through the selected track layer", () => {
-    expect(sidebarSource).not.toContain("createEmptyTrack(1n");
-    expect(sidebarSource).not.toContain("getTrackDetail(1n");
     expect(mapViewSource).not.toContain("insertTrackPoint(1n");
     expect(storesSource).toContain("drawingTrackLayerId");
   });
@@ -52,13 +56,13 @@ describe("active layer UI wiring", () => {
     expect(mapViewSource).not.toContain("getWaypoints(1n");
     expect(mapViewSource).not.toContain("addWaypoint(1n");
     expect(mapViewSource).not.toContain("moveWaypoint(1n");
-    expect(waypointsPanelSource).not.toContain("currentLayerId = 1n");
-    expect(waypointsPanelSource).toContain("activeWaypointLayerId");
+    expect(waypointsTabSource).not.toContain("currentLayerId = 1n");
+    expect(waypointsTabSource).toContain("activeWaypointLayerId");
   });
 
   it("keeps Svelte components behind typed API wrappers", () => {
-    expect(sidebarSource).not.toContain("invoke(");
+    expect(tracksTabSource).not.toContain("invoke(");
+    expect(waypointsTabSource).not.toContain("invoke(");
     expect(mapViewSource).not.toContain("invoke(");
-    expect(waypointsPanelSource).not.toContain("invoke(");
   });
 });

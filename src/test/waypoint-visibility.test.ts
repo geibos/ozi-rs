@@ -2,8 +2,15 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const panelSource = readFileSync(
-  join(__dirname, "../components/WaypointsPanel.svelte"),
+// Waypoint visibility wiring lives in the Library Waypoints tab and its
+// shared `LibraryRow.svelte` row primitive after `redesign-library-sidebar`.
+const tabSource = readFileSync(
+  join(__dirname, "../components/library/WaypointsTab.svelte"),
+  "utf-8"
+);
+
+const rowSource = readFileSync(
+  join(__dirname, "../components/library/LibraryRow.svelte"),
   "utf-8"
 );
 
@@ -15,26 +22,25 @@ const mapViewSource = readFileSync(
 const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
 const typesSource = readFileSync(join(__dirname, "../lib/types.ts"), "utf-8");
 
-describe("WaypointsPanel visibility toggle", () => {
+describe("Library Waypoints tab visibility toggle", () => {
   it("imports the typed toggleWaypointVisible wrapper", () => {
-    expect(panelSource).toContain("toggleWaypointVisible");
-    expect(panelSource).not.toContain("invoke(");
+    expect(tabSource).toContain("toggleWaypointVisible");
+    expect(tabSource).not.toContain("invoke(");
   });
 
-  it("renders a visibility checkbox per waypoint row bound to wp.visible", () => {
-    expect(panelSource).toContain('type="checkbox"');
-    // Chrome moved to Tailwind utilities (accent-primary / cursor-pointer /
-    // shrink-0) — the legacy `class="visibility-toggle"` selector is gone.
-    expect(panelSource).toContain("accent-primary");
-    expect(panelSource).toContain("checked={wp.visible}");
-    expect(panelSource).toContain("handleToggleVisible(wp)");
+  it("renders a visibility icon button per waypoint row via LibraryRow", () => {
+    // LibraryRow encapsulates the Eye / EyeOff icon-button toggle; the
+    // tab passes an `onToggleVisibility` callback per row.
+    expect(tabSource).toContain("onToggleVisibility");
+    expect(tabSource).toContain("handleToggleVisible(r)");
+    expect(rowSource).toContain("EyeIcon");
+    expect(rowSource).toContain("EyeOffIcon");
   });
 
-  it("indicates hidden state on the row without removing it from the panel", () => {
-    // Legacy `.hidden-waypoint` CSS class is gone; the hidden state now
-    // dims the row with the Tailwind `opacity-50` utility (which is theme-
-    // and flavour-independent, and does not unmount the row).
-    expect(panelSource).toContain("class:opacity-50={!wp.visible}");
+  it("indicates hidden state on the row without removing it from the tab", () => {
+    // LibraryRow dims hidden rows via the `opacity-60` Tailwind utility;
+    // the row keeps rendering in the list regardless of visibility.
+    expect(rowSource).toContain("class:opacity-60={!visible}");
   });
 });
 
