@@ -102,13 +102,23 @@
         <button type="button" class="chip" tabindex="-1">Edit</button>
         <button type="button" class="chip" tabindex="-1">Measure</button>
       </div>
+      <!--
+        Bug 5 fix (fix-redesign-functional-bugs): the previous "Search…"
+        copy made the trigger read as a text input — users typed into it
+        and got no response. The trigger is now visually a button: a
+        "Command palette" label paired with a key-cap `⌘K` chord, no
+        input-like ring, no caret. Activating it opens the
+        `CommandPalette` dialog whose own `cmdk` Command.Input takes
+        focus.
+      -->
       <button
         type="button"
         class="cmdk-trigger"
         aria-label="Open command palette"
+        title="Open command palette (⌘K)"
         onclick={() => commandPaletteOpen.set(true)}
       >
-        <span class="cmdk-label">Search…</span>
+        <span class="cmdk-label">Command palette</span>
         <kbd class="cmdk-glyph">⌘K</kbd>
       </button>
     </div>
@@ -237,38 +247,64 @@
     color: hsl(var(--secondary-foreground));
   }
 
+  /*
+   * Cmd-K trigger — explicitly a button, NOT an input.
+   *
+   * Discipline (per `fix-redesign-functional-bugs` ui-shell spec):
+   *   - No caret, no `cursor: text` on the trigger or its children.
+   *   - No focus ring that mimics input focus (use shell button affordance).
+   *   - Label is "Command palette", NOT "Search…" with a placeholder
+   *     ellipsis that reads as an input awaiting text.
+   *   - The `⌘K` chord is a `<kbd>` styled as a key-cap badge,
+   *     visually heavier than placeholder copy.
+   *   - Hover / focus use background tint + button-style ring matching
+   *     other workspace buttons.
+   */
   .cmdk-trigger {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    background: hsl(var(--card));
+    gap: 10px;
+    background: transparent;
     color: hsl(var(--muted-foreground));
-    border: 1px solid hsl(var(--border));
+    border: 1px solid transparent;
     border-radius: var(--radius-pill);
     padding: 4px 6px 4px 12px;
     font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
-    min-width: 200px;
-    justify-content: space-between;
+    user-select: none;
+    line-height: 1;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease,
+      border-color 0.12s ease;
   }
 
   .cmdk-trigger:hover {
-    background: hsl(var(--accent));
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+  }
+
+  .cmdk-trigger:focus-visible {
+    outline: none;
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
   }
 
   .cmdk-label {
-    flex: 1;
-    text-align: left;
+    cursor: pointer;
   }
 
   .cmdk-glyph {
     font-family: var(--font-mono);
     font-size: 10px;
+    font-weight: 600;
     background: hsl(var(--muted));
     color: hsl(var(--muted-foreground));
     border: 1px solid hsl(var(--border));
+    border-bottom-width: 2px;
     border-radius: 4px;
-    padding: 1px 5px;
+    padding: 1px 6px;
     line-height: 1;
   }
 
