@@ -7,6 +7,7 @@ import * as Button from "$lib/components/ui/button";
 import * as Card from "$lib/components/ui/card";
 import * as Command from "$lib/components/ui/command";
 import * as Dialog from "$lib/components/ui/dialog";
+import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 import * as Input from "$lib/components/ui/input";
 import * as Label from "$lib/components/ui/label";
 import * as Popover from "$lib/components/ui/popover";
@@ -60,6 +61,10 @@ describe("shadcn-svelte primitives", () => {
     ["command", Command.Root],
     ["command-input", Command.Input],
     ["command-list", Command.List],
+    ["dropdown-menu", DropdownMenu.Root],
+    ["dropdown-menu-trigger", DropdownMenu.Trigger],
+    ["dropdown-menu-content", DropdownMenu.Content],
+    ["dropdown-menu-item", DropdownMenu.Item],
   ];
 
   for (const [name, exportRef] of cases) {
