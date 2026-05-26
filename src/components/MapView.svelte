@@ -6,11 +6,13 @@
   // handlers, or the tile-protocol code — tightening types there is a
   // follow-up change.
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
   import {
     appState,
     activeMap,
+    activeMapRef,
     editModeActive,
     selectedPointId,
     selectedTrack,
@@ -23,7 +25,9 @@
     drawingFinishRequested,
     drawingSegmentId,
     simplifyState,
+    tracksFingerprint,
     visibleWaypointLayers,
+    waypointsFingerprint,
   } from "../lib/stores";
   import {
     deleteTrackPoint,
@@ -295,11 +299,19 @@
     }
   }
 
+  /**
+   * Legacy clear-all-and-recreate path. Retained as an explicit debugging
+   * affordance per `consolidate-state-event-flow` design — the normal hot
+   * path goes through the incremental reconciler in `refreshWaypointMarkers`.
+   * Also called from teardown and from the empty-state branch of the
+   * reconciler to drop every marker in one pass.
+   */
   function clearWaypointMarkers() {
     for (const m of waypointMarkers.values()) {
       m.remove();
     }
     waypointMarkers.clear();
+    appliedWaypoints.clear();
   }
 
   function waypointMarkerKey(layerId: bigint, waypointId: number): string {
@@ -307,19 +319,54 @@
   }
 
   /**
+   * Snapshot of the marker metadata last applied to MapLibre. Used by the
+   * incremental reconciler (`refreshWaypointMarkers`) so that subsequent
+   * state updates only do the DOM work that actually changed. Keyed by the
+   * same `${layerId}:${waypointId}` string as `waypointMarkers`.
+   */
+  interface AppliedWaypoint {
+    lat: number;
+    lon: number;
+    name: string;
+    isActive: boolean;
+  }
+  let appliedWaypoints = new Map<string, AppliedWaypoint>();
+
+  /**
    * Renders waypoint markers from every visible waypoint layer in the current
    * project. Edit interactions (drag-to-move) are routed only for markers
    * belonging to the active waypoint layer; markers from inactive layers are
    * rendered as read-only context (no drag handle) so switching the active
    * layer is non-destructive — markers from other layers stay on screen.
+   *
+   * Reconciliation contract (consolidate-state-event-flow): the function
+   * diffs the incoming `(layer_id, waypoint_id) → snapshot` map against the
+   * current `waypointMarkers` map and performs the minimum DOM work —
+   * create on additions, remove on deletions, setLngLat / popup text update
+   * on coordinate or name changes. The active-vs-inactive flag forces a
+   * marker rebuild because drag-handler attachment is set at construction
+   * time. The legacy clear-all-and-recreate path is kept as
+   * `clearWaypointMarkers()` for debugging.
    */
   async function refreshWaypointMarkers() {
     if (!map) return;
-    clearWaypointMarkers();
-    if (!$appState || $appState.waypoint_layer_count === 0) return;
+    // Read appState non-reactively. This function is invoked both from a
+    // slice $effect (where reactivity is already scoped) and from explicit
+    // mutation handlers (where we want a snapshot, not a subscription).
+    const snapshot = get(appState);
+    if (!snapshot || snapshot.waypoint_layer_count === 0) {
+      clearWaypointMarkers();
+      return;
+    }
 
-    const activeId = $activeWaypointLayerId;
-    const layers = $visibleWaypointLayers;
+    const activeId = get(activeWaypointLayerId);
+    const layers = get(visibleWaypointLayers);
+
+    // Build the desired marker set first; only then mutate MapLibre. This
+    // avoids a window where the map shows zero markers between clear and
+    // recreate (the failure mode of the previous implementation).
+    type Incoming = AppliedWaypoint & { wpId: number };
+    const incoming = new Map<string, { layerId: bigint; data: Incoming }>();
 
     for (const layer of layers) {
       const layerId = BigInt(layer.id);
@@ -332,23 +379,52 @@
       }
 
       for (const wp of waypoints.filter((w) => w.visible !== false)) {
+        const key = waypointMarkerKey(layerId, wp.id);
+        incoming.set(key, {
+          layerId,
+          data: {
+            wpId: wp.id,
+            lat: wp.lat,
+            lon: wp.lon,
+            name: wp.name,
+            isActive,
+          },
+        });
+      }
+    }
 
+    // 1. Remove markers that are gone or whose draggable state flipped
+    //    (draggable is wired at Marker construction; we can't toggle it
+    //    in place without re-creating the marker).
+    for (const [key, marker] of waypointMarkers) {
+      const next = incoming.get(key);
+      const applied = appliedWaypoints.get(key);
+      if (!next || (applied && applied.isActive !== next.data.isActive)) {
+        marker.remove();
+        waypointMarkers.delete(key);
+        appliedWaypoints.delete(key);
+      }
+    }
+
+    // 2. Add new markers and update existing ones in place.
+    for (const [key, { layerId, data }] of incoming) {
+      const existing = waypointMarkers.get(key);
+      if (!existing) {
+        const isActive = data.isActive;
         const el = document.createElement("div");
         el.className = "waypoint-marker";
         if (!isActive) {
-          // Visual cue that this marker belongs to an inactive layer
-          // (read-only context). Drag is disabled below.
           el.classList.add("inactive-layer");
         }
         el.style.cursor = isActive ? "grab" : "default";
 
         const marker = new maplibregl.Marker({ element: el, draggable: isActive })
-          .setLngLat([wp.lon, wp.lat])
-          .setPopup(new maplibregl.Popup({ offset: 16 }).setText(wp.name))
+          .setLngLat([data.lon, data.lat])
+          .setPopup(new maplibregl.Popup({ offset: 16 }).setText(data.name))
           .addTo(map);
 
         if (isActive) {
-          const wpId = wp.id;
+          const wpId = data.wpId;
           marker.on("dragstart", () => {
             el.style.cursor = "grabbing";
           });
@@ -360,13 +436,34 @@
               await moveWaypoint(layerId, BigInt(wpId), [lngLat.lat, lngLat.lng]);
             } catch (error) {
               console.error("Failed to move waypoint", error);
-              marker.setLngLat([wp.lon, wp.lat]);
+              // The state-changed → reconcile pass that follows will pull
+              // the authoritative coords; we just reset to the last
+              // applied snapshot to avoid a flash at a wrong location.
+              const last = appliedWaypoints.get(key);
+              if (last) marker.setLngLat([last.lon, last.lat]);
             }
           });
         }
 
-        waypointMarkers.set(waypointMarkerKey(layerId, wp.id), marker);
+        waypointMarkers.set(key, marker);
+        appliedWaypoints.set(key, { ...data });
+        continue;
       }
+
+      const applied = appliedWaypoints.get(key);
+      if (!applied || applied.lat !== data.lat || applied.lon !== data.lon) {
+        existing.setLngLat([data.lon, data.lat]);
+      }
+      if (!applied || applied.name !== data.name) {
+        const popup = existing.getPopup();
+        if (popup) popup.setText(data.name);
+      }
+      appliedWaypoints.set(key, {
+        lat: data.lat,
+        lon: data.lon,
+        name: data.name,
+        isActive: data.isActive,
+      });
     }
   }
 
@@ -579,11 +676,19 @@
     };
   });
 
-  // When active map changes, update the raster tile source
+  // When the active map's local_path changes, update the raster tile source.
+  // Driven by the `activeMapRef` slice selector (a string) so the effect body
+  // skips work on state-changed bursts that don't touch the active map
+  // (downloads, track mutations). `activeMap` is read non-reactively here so
+  // the effect does NOT re-run on every `derived(appState, ...)` recompute —
+  // only on `local_path` change. The `appliedMapPath` guard is kept as a
+  // belt-and-braces second filter.
   $effect(() => {
-    const am = $activeMap;
-    if (!am || !map) return;
-    if (am.local_path === appliedMapPath) return;
+    const ref = $activeMapRef;
+    if (!ref || !map) return;
+    if (ref === appliedMapPath) return;
+    const am = get(activeMap);
+    if (!am) return;
 
     async function applyActiveMap() {
       appliedMapPath = am.local_path;
@@ -653,23 +758,72 @@
     }
   });
 
-  // When app state changes (tracks added, etc.) refresh tracks GeoJSON
-  $effect(() => {
-    if (!map || !$appState) return;
-    void $activeWaypointLayerId;
+  /**
+   * Last applied tracks fingerprint. Used by the slice effect below to skip
+   * the IPC + GeoJSON apply when the fingerprint hasn't changed since the
+   * last run. The empty-string sentinel matches the "no tracks loaded" state
+   * before any project is open.
+   */
+  let appliedTracksFingerprint: string | null = null;
+  /**
+   * Last applied waypoints fingerprint (over `waypoint_layers`). The
+   * incremental reconciler is cheap, but a coarse pre-check still avoids
+   * the per-layer `getWaypoints` IPC round-trip when nothing layer-side
+   * changed (e.g., a download-progress emit that triggers a `state-changed`
+   * via per-file readiness).
+   */
+  let appliedWaypointsFingerprint: string | null = null;
 
-    // Run after map is loaded
+  // Slice effect: re-fetch tracks GeoJSON only when the tracks-relevant
+  // fingerprint changes. Replaces the old "run on every $appState change"
+  // path — during a bundle download, the fingerprint is stable, so
+  // `get_tracks_geojson` is no longer called on every per-file `state-changed`
+  // emit (`consolidate-state-event-flow` change, Decision 2).
+  $effect(() => {
+    const fp = $tracksFingerprint;
+    if (!map) return;
+    if (fp === appliedTracksFingerprint) return;
+
     if (!map.isStyleLoaded()) {
       map.once("load", async () => {
+        if (fp !== $tracksFingerprint) return; // a newer fingerprint will run
         const geojson = await getTracksGeojson();
         updateTracksLayer(map, geojson);
-        refreshWaypointMarkers();
+        appliedTracksFingerprint = fp;
       });
       return;
     }
 
+    appliedTracksFingerprint = fp;
     getTracksGeojson().then((geojson) => updateTracksLayer(map, geojson));
-    refreshWaypointMarkers();
+  });
+
+  // Slice effect: reconcile waypoint markers only when the waypoint-layer
+  // slice changes, or when the active waypoint layer toggles (because
+  // drag-handler attachment depends on `isActive`). Per-waypoint mutations
+  // arrive via explicit `refreshWaypointMarkers()` calls from the action
+  // handlers (e.g. `handleMapClickForWaypoint`), not via AppStateDto, so
+  // the fingerprint can stay coarse without losing correctness for the
+  // common edit paths.
+  $effect(() => {
+    const fp = $waypointsFingerprint;
+    const activeId = $activeWaypointLayerId;
+    if (!map) return;
+
+    // We treat the (fingerprint, activeId) pair as the slice key. Concatenate
+    // into the local sentinel so a flip in either re-runs reconciliation.
+    const compositeKey = `${fp}|${activeId === null ? "" : activeId.toString()}`;
+    if (compositeKey === appliedWaypointsFingerprint) return;
+    appliedWaypointsFingerprint = compositeKey;
+
+    if (!map.isStyleLoaded()) {
+      map.once("load", () => {
+        void refreshWaypointMarkers();
+      });
+      return;
+    }
+
+    void refreshWaypointMarkers();
   });
 
   $effect(() => {
