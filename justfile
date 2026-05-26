@@ -30,9 +30,17 @@ watch-test:
 run:
     npm run tauri dev
 
-# Build release (no bundle) and run the resulting binary
+# Build release (no bundle) and run the resulting binary.
+#
+# Split into independent layers so each cache (Vite output hash, Cargo
+# incremental) is consulted on its own terms — bypasses `tauri build`'s
+# unconditional `beforeBuildCommand` re-run. See
+# `openspec/specs/build-tooling/spec.md` and `scripts/dev-build-frontend.sh`.
+# The canonical bundled path (`just release`, `just build`) still uses
+# `npm run tauri build` and is unaffected.
 run-release:
-    npm run tauri build -- --no-bundle
+    @./scripts/dev-build-frontend.sh
+    cargo build --release --manifest-path src-tauri/Cargo.toml
     ./target/release/ozi-rs
 
 # ── Build ─────────────────────────────────────────────────────────────────────
