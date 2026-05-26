@@ -286,6 +286,14 @@ export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | nul
 export const selectedWaypointId: import("svelte/store").Writable<bigint | null> = writable(null);
 export const selectedPointId = writable<bigint | null>(null);
 export const bundleLoaderOpen = writable(false);
+/**
+ * Inspector-rail visibility placeholder for the `redesign-shell-layout`
+ * change. When false (default) `WorkspaceShell` omits the right rail from
+ * the DOM and the canvas grows into the freed 360px. The `inspector-pane`
+ * change replaces this writable with content-driven logic that flips true
+ * whenever selection / detail content is present.
+ */
+export const inspectorOpen = writable(false);
 export const simplifyState = writable<{
   active: boolean;
   layerId: bigint;

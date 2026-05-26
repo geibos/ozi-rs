@@ -363,16 +363,16 @@
     display: flex;
     flex: 1;
     min-height: 0;
-    background: var(--ctp-base);
+    background: hsl(var(--background));
     gap: 1px;
-    background-color: var(--ctp-surface0);
+    background-color: hsl(var(--secondary));
   }
 
   .col {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--ctp-base);
+    background: hsl(var(--background));
     min-width: 0;
   }
 
@@ -381,10 +381,10 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px 10px 6px;
-    border-bottom: 1px solid var(--ctp-surface0);
+    border-bottom: 1px solid hsl(var(--secondary));
     font-size: 11px;
     font-weight: 600;
-    color: var(--ctp-subtext1);
+    color: hsl(var(--muted-foreground));
     text-transform: uppercase;
     letter-spacing: 0.05em;
     flex-shrink: 0;
@@ -395,7 +395,7 @@
     text-transform: none;
     letter-spacing: 0;
     font-size: 11px;
-    color: var(--ctp-overlay1);
+    color: hsl(var(--muted-foreground));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -405,23 +405,23 @@
   .refresh-btn {
     background: none;
     border: none;
-    color: var(--ctp-overlay1);
+    color: hsl(var(--muted-foreground));
     font-size: 14px;
     padding: 0 2px;
     cursor: pointer;
     line-height: 1;
   }
 
-  .refresh-btn:hover { color: var(--ctp-text); }
+  .refresh-btn:hover { color: hsl(var(--foreground)); }
 
   .filter-input {
     width: 100%;
     font-size: 12px;
     padding: 4px 8px;
-    background: var(--ctp-mantle);
-    border: 1px solid var(--ctp-surface1);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
     border-radius: 4px;
-    color: var(--ctp-text);
+    color: hsl(var(--foreground));
     flex-shrink: 0;
   }
 
@@ -437,7 +437,7 @@
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: var(--ctp-overlay1);
+    color: hsl(var(--muted-foreground));
     flex-shrink: 0;
   }
 
@@ -456,17 +456,17 @@
     background: none;
     border: none;
     border-radius: 0;
-    color: var(--ctp-text);
+    color: hsl(var(--foreground));
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .list-item:hover { background: var(--ctp-surface0); }
+  .list-item:hover { background: hsl(var(--secondary)); }
   .list-item.active {
-    background: var(--ctp-surface1);
-    color: var(--ctp-blue);
+    background: hsl(var(--border));
+    color: hsl(var(--primary));
     font-weight: 500;
   }
 
@@ -482,7 +482,7 @@
     gap: 5px;
   }
 
-  .map-item:hover { background: var(--ctp-surface0); }
+  .map-item:hover { background: hsl(var(--secondary)); }
   .map-item.is-downloading { opacity: 0.75; cursor: default; }
 
   .map-row {
@@ -495,7 +495,7 @@
   .map-name {
     flex: 1;
     font-size: 12px;
-    color: var(--ctp-text);
+    color: hsl(var(--foreground));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -508,11 +508,15 @@
     border-radius: 3px;
   }
 
-  .badge.green  { background: var(--ctp-green);  color: var(--ctp-base); }
-  .badge.orange { background: var(--ctp-peach);  color: var(--ctp-base); }
+  /* Status badges: green = cached, orange = downloadable. These are semantic
+   * status colours, not theme tokens — kept as flat OKLCH values so they
+   * stay legible in both light and dark mode and don't compete with the
+   * Teal accent. */
+  .badge.green  { background: oklch(0.62 0.14 145); color: hsl(var(--background)); }
+  .badge.orange { background: oklch(0.72 0.16 60);  color: hsl(var(--background)); }
   .badge.blue   {
-    background: var(--ctp-blue);
-    color: var(--ctp-base);
+    background: hsl(var(--primary));
+    color: hsl(var(--background));
     font-variant-numeric: tabular-nums;
     min-width: 32px;
     text-align: center;
@@ -527,14 +531,14 @@
   .prog-track {
     flex: 1;
     height: 3px;
-    background: var(--ctp-surface1);
+    background: hsl(var(--border));
     border-radius: 2px;
     overflow: hidden;
   }
 
   .prog-fill {
     height: 100%;
-    background: var(--ctp-blue);
+    background: hsl(var(--primary));
     border-radius: 2px;
     transition: width 0.25s ease;
   }
@@ -551,14 +555,14 @@
 
   .prog-label {
     font-size: 10px;
-    color: var(--ctp-overlay1);
+    color: hsl(var(--muted-foreground));
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
 
   .col-footer {
     padding: 8px;
-    border-top: 1px solid var(--ctp-surface0);
+    border-top: 1px solid hsl(var(--secondary));
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -574,14 +578,14 @@
 
   .footer-btn.muted {
     background: transparent;
-    border-color: var(--ctp-surface2);
-    color: var(--ctp-subtext1);
+    border-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
   }
 
   .empty {
     padding: 16px 12px;
     font-size: 12px;
-    color: var(--ctp-overlay1);
+    color: hsl(var(--muted-foreground));
     text-align: center;
   }
 
@@ -599,9 +603,9 @@
     column-gap: 8px;
     padding: 6px 10px;
     font-size: 11px;
-    color: var(--ctp-subtext0);
-    background: var(--ctp-crust);
-    border-top: 1px solid var(--ctp-surface0);
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--card));
+    border-top: 1px solid hsl(var(--secondary));
     overflow: hidden;
   }
 
@@ -633,7 +637,7 @@
     align-items: center;
     gap: 10px;
     font-size: 10px;
-    color: var(--ctp-overlay1);
+    color: hsl(var(--muted-foreground));
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     white-space: nowrap;
@@ -651,7 +655,7 @@
     height: 4px;
     border-radius: 999px;
     overflow: hidden;
-    background: var(--ctp-surface0);
+    background: hsl(var(--secondary));
   }
 
   .bundle-track-placeholder {
@@ -660,7 +664,14 @@
 
   .bundle-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--ctp-blue), var(--ctp-teal));
+    /* Bundle-progress fill: a single-hue Teal-derived gradient so we honour
+     * the "no secondary accent" guardrail. Goes from full Teal-500 to a
+     * slightly lighter shade so the bar still reads as motion. */
+    background: linear-gradient(
+      90deg,
+      hsl(var(--primary)),
+      oklch(from hsl(var(--primary)) calc(l + 0.08) c h)
+    );
     transition: width 0.2s ease;
   }
 
@@ -671,12 +682,12 @@
 
   .bundle-fill.indeterminate-bar {
     animation: indeterminate-bar 1.2s ease-in-out infinite;
-    background: var(--ctp-blue);
+    background: hsl(var(--primary));
   }
 
   .current-file {
     font-size: 10px;
-    color: var(--ctp-subtext1);
+    color: hsl(var(--muted-foreground));
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -695,15 +706,15 @@
   .action-btn {
     font-size: 11px;
     padding: 2px 8px;
-    background: var(--ctp-surface1);
-    color: var(--ctp-text);
-    border: 1px solid var(--ctp-surface2);
+    background: hsl(var(--border));
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--muted));
     border-radius: 3px;
     cursor: pointer;
   }
 
   .action-btn:hover {
-    background: var(--ctp-surface2);
+    background: hsl(var(--muted));
   }
 
   @keyframes spin {
@@ -714,8 +725,8 @@
     display: inline-block;
     width: 10px;
     height: 10px;
-    border: 2px solid var(--ctp-surface2);
-    border-top-color: var(--ctp-blue);
+    border: 2px solid hsl(var(--muted));
+    border-top-color: hsl(var(--primary));
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     flex-shrink: 0;
