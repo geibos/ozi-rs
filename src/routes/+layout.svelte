@@ -6,6 +6,7 @@
     appendProjectsChunk,
     appState,
     bundleProgress,
+    commandPaletteOpen,
     currentDownload,
     resetBundleDownloadState,
     updateDownloadProgress,
@@ -13,6 +14,7 @@
   import { loadProjects } from "../lib/api";
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
+  import CommandPalette from "../components/CommandPalette.svelte";
   import Console from "../components/Console.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import * as Tooltip from "$lib/components/ui/tooltip";
@@ -82,7 +84,26 @@
       resetBundleDownloadState(null);
     };
   });
+
+  /**
+   * Global Cmd-K / Ctrl-K handler — captures from any focus state except
+   * when the palette itself is already open (the bits-ui Command primitive
+   * handles its own key flow inside the dialog). `preventDefault` keeps
+   * the WebView from treating the chord as a text shortcut.
+   */
+  function handleGlobalKeydown(event: KeyboardEvent) {
+    const mod = event.metaKey || event.ctrlKey;
+    if (!mod || event.key.toLowerCase() !== "k") return;
+    // Skip if focus is already inside the palette dialog (the dialog's
+    // own keydown listeners handle the chord — closing on Esc, etc.).
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-slot="dialog-content"]')) return;
+    event.preventDefault();
+    commandPaletteOpen.update((open) => !open);
+  }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <Tooltip.Provider delayDuration={300}>
   <!--
@@ -101,6 +122,7 @@
   </div>
 
   <Console />
+  <CommandPalette />
   <Toaster richColors closeButton position="bottom-right" />
 </Tooltip.Provider>
 

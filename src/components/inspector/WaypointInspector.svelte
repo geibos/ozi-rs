@@ -1,0 +1,241 @@
+<script lang="ts">
+  /**
+   * Waypoint Inspector — inline editor for the selected waypoint.
+   *
+   * No dialogs at any point (per locked design). Name / symbol / visibility
+   * edits dispatch through the existing `ProjectCommand`-shaped endpoints
+   * in `src/lib/api.ts`. Delete also dispatches through `ProjectCommand` —
+   * there is intentionally no confirmation dialog here (Undo via Cmd+Z
+   * remains available through the project command bus).
+   */
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+  import FileOutputIcon from "@lucide/svelte/icons/file-output";
+  import MapPinIcon from "@lucide/svelte/icons/map-pin";
+  import MoveIcon from "@lucide/svelte/icons/move";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import {
+    activeWaypointLayerId,
+    appState,
+    selectedWaypointId,
+  } from "$lib/stores";
+  import {
+    deleteWaypoint,
+    exportWptWaypoints,
+    getWaypoints,
+    getWptExportDefaultPath,
+    renameWaypoint,
+    setWaypointSymbol,
+    toggleWaypointVisible,
+  } from "$lib/api";
+  import { open } from "@tauri-apps/plugin-dialog";
+  import { toast } from "svelte-sonner";
+  import type { WaypointData } from "$lib/types";
+  import SymbolPicker from "../SymbolPicker.svelte";
+
+  let waypoint: WaypointData | null = $state(null);
+  let nameDraft = $state("");
+  let nameDirty = $state(false);
+
+  $effect(() => {
+    const id = $selectedWaypointId;
+    const layerId = $activeWaypointLayerId;
+    if (id === null || layerId === null || !$appState) {
+      waypoint = null;
+      return;
+    }
+    void loadWaypoint(layerId, id);
+  });
+
+  async function loadWaypoint(layerId: bigint, id: bigint) {
+    try {
+      const all = await getWaypoints(layerId);
+      const found = all.find((w) => BigInt(w.id) === id) ?? null;
+      waypoint = found;
+      if (found && !nameDirty) nameDraft = found.name;
+    } catch (error) {
+      console.error("WaypointInspector: getWaypoints failed", error);
+      waypoint = null;
+    }
+  }
+
+  async function commitName() {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === wp.name) {
+      nameDraft = wp.name;
+      nameDirty = false;
+      return;
+    }
+    try {
+      await renameWaypoint(layerId, BigInt(wp.id), trimmed);
+      nameDirty = false;
+    } catch (error) {
+      toast.error("Failed to rename waypoint", { description: String(error) });
+      nameDraft = wp.name;
+      nameDirty = false;
+    }
+  }
+
+  function handleNameInput(event: Event) {
+    nameDraft = (event.currentTarget as HTMLInputElement).value;
+    nameDirty = true;
+  }
+
+  async function handleSetSymbol(symbol: string | null) {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    try {
+      await setWaypointSymbol(layerId, BigInt(wp.id), symbol);
+    } catch (error) {
+      toast.error("Failed to change symbol", { description: String(error) });
+    }
+  }
+
+  async function handleToggleVisible() {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    try {
+      await toggleWaypointVisible(layerId, BigInt(wp.id));
+    } catch (error) {
+      toast.error("Failed to toggle visibility", {
+        description: String(error),
+      });
+    }
+  }
+
+  async function handleDelete() {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    try {
+      await deleteWaypoint(layerId, BigInt(wp.id));
+      selectedWaypointId.set(null);
+    } catch (error) {
+      toast.error("Failed to delete waypoint", { description: String(error) });
+    }
+  }
+
+  async function handleExportWpt() {
+    const layerId = $activeWaypointLayerId;
+    if (layerId === null) return;
+    try {
+      const defaultPath = await getWptExportDefaultPath(layerId);
+      const path = await open({
+        save: true,
+        defaultPath: defaultPath ?? "waypoints.wpt",
+        filters: [{ name: "OziExplorer WPT", extensions: ["wpt"] }],
+      } as Parameters<typeof open>[0]);
+      if (path) await exportWptWaypoints(layerId, path as string);
+    } catch (error) {
+      toast.error("Failed to export waypoints", {
+        description: String(error),
+      });
+    }
+  }
+
+  function handleMoveOnMap() {
+    toast.message("Click on the map to move this waypoint", {
+      description:
+        "Drag-to-move on the map is wired by the existing waypoint layer.",
+    });
+  }
+</script>
+
+<div class="flex h-full flex-col gap-4 overflow-y-auto p-4">
+  <header class="flex items-start gap-3">
+    <SymbolPicker symbol={waypoint?.symbol} onSelect={handleSetSymbol} />
+    <div class="min-w-0 flex-1">
+      <Input
+        type="text"
+        value={nameDraft}
+        oninput={handleNameInput}
+        onblur={commitName}
+        onkeydown={(e) => {
+          if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            nameDraft = waypoint?.name ?? "";
+            nameDirty = false;
+            (e.currentTarget as HTMLInputElement).blur();
+          }
+        }}
+        disabled={!waypoint}
+        class="h-8 text-sm font-medium"
+        aria-label="Waypoint name"
+      />
+    </div>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      onclick={handleToggleVisible}
+      disabled={!waypoint}
+      aria-label={waypoint?.visible ? "Hide waypoint" : "Show waypoint"}
+    >
+      {#if waypoint?.visible}
+        <EyeIcon class="size-4" />
+      {:else}
+        <EyeOffIcon class="size-4" />
+      {/if}
+    </Button>
+  </header>
+
+  <section
+    class="bg-card border-border rounded-[var(--radius-card)] border p-4"
+    aria-label="Location"
+  >
+    <h3
+      class="text-muted-foreground/80 mb-3 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
+    >
+      <MapPinIcon class="size-3" />
+      Location
+    </h3>
+    {#if waypoint}
+      <dl class="grid grid-cols-[3.5rem_1fr] gap-x-3 gap-y-2 text-xs">
+        <dt class="text-muted-foreground">Latitude</dt>
+        <dd class="font-mono">{waypoint.lat.toFixed(6)}</dd>
+        <dt class="text-muted-foreground">Longitude</dt>
+        <dd class="font-mono">{waypoint.lon.toFixed(6)}</dd>
+      </dl>
+      <Button
+        variant="outline"
+        size="sm"
+        class="mt-3 w-full justify-start gap-2"
+        onclick={handleMoveOnMap}
+      >
+        <MoveIcon class="size-3.5" />
+        Move on map
+      </Button>
+    {:else}
+      <p class="text-muted-foreground text-xs">No waypoint selected.</p>
+    {/if}
+  </section>
+
+  <section class="flex flex-col gap-2" aria-label="Waypoint actions">
+    <Button
+      variant="outline"
+      size="sm"
+      class="justify-start gap-2"
+      onclick={handleExportWpt}
+      disabled={!waypoint}
+    >
+      <FileOutputIcon class="size-4" />
+      Export WPT
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="justify-start gap-2 text-destructive hover:text-destructive"
+      onclick={handleDelete}
+      disabled={!waypoint}
+    >
+      <Trash2Icon class="size-4" />
+      Delete waypoint
+    </Button>
+  </section>
+</div>

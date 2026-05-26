@@ -38,6 +38,7 @@
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
+  import { appendRecentFile } from "../lib/recentFiles";
 
   let {
     onCloseRequest,
@@ -100,7 +101,16 @@
       toast.error("Failed to open map", { description: String(error) });
       return;
     }
-    if (get(activeMap)) {
+    const am = get(activeMap);
+    if (am) {
+      // Append to the Cmd-K palette's Recent files list (silent on failure;
+      // pure UX convenience per `redesign-inspector-pane`).
+      appendRecentFile({
+        projectSlug: am.project_name,
+        mapPath: am.local_path,
+        mapName: am.package_name,
+        openedAt: Date.now(),
+      });
       if (onCloseRequest) {
         onCloseRequest();
       } else {

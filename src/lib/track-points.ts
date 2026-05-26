@@ -118,3 +118,38 @@ export function paginateTrackDetail(
     paginateSegment(segment, expandedSegmentIds.has(segment.id), limit),
   );
 }
+
+// ── Inspector-compat helpers ────────────────────────────────────────────────
+// The Track Inspector (redesign-inspector-pane) was implemented in parallel
+// with this module and anticipated slightly different naming + return shape.
+// Rather than churn the Inspector's call sites, the canonical helpers above
+// get thin aliases that match the Inspector's expected API.
+
+export const formatPointCoords = formatCoordinates;
+export const formatPointTimestamp = formatTimestamp;
+
+/**
+ * One-line header for a track segment row in the Inspector's segments table.
+ */
+export function segmentHeader(segment: SegmentDetail): string {
+  return `Segment ${segment.id} · ${segment.points.length} pts`;
+}
+
+export interface InspectorPagedSegment {
+  /** Points that should currently be rendered in the segment row. */
+  visible: PointDetail[];
+  /** How many additional points are clipped behind a "Show N more" affordance. */
+  hiddenCount: number;
+}
+
+/**
+ * Adapter around `paginateSegment` returning the field names the Inspector's
+ * table template expects (`visible` / `hiddenCount`).
+ */
+export function pageSegmentPoints(
+  segment: SegmentDetail,
+  expanded: boolean,
+): InspectorPagedSegment {
+  const paged = paginateSegment(segment, expanded);
+  return { visible: paged.displayed, hiddenCount: paged.remaining };
+}

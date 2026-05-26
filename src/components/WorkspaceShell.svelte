@@ -22,7 +22,7 @@
    * the layout's `MapView` shows.
    */
   import { onDestroy, type Snippet } from "svelte";
-  import { inspectorOpen } from "$lib/stores";
+  import { commandPaletteOpen, inspectorOpen } from "$lib/stores";
 
   let {
     libraryRail,
@@ -101,8 +101,8 @@
       <button
         type="button"
         class="cmdk-trigger"
-        aria-label="Open command palette (deferred to inspector-pane)"
-        tabindex="-1"
+        aria-label="Open command palette"
+        onclick={() => commandPaletteOpen.set(true)}
       >
         <span class="cmdk-label">Search…</span>
         <kbd class="cmdk-glyph">⌘K</kbd>
@@ -224,7 +224,7 @@
     border-radius: var(--radius-pill);
     padding: 4px 6px 4px 12px;
     font-size: 12px;
-    cursor: default;
+    cursor: pointer;
     min-width: 200px;
     justify-content: space-between;
   }

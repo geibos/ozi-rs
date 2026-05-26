@@ -6,6 +6,7 @@
   import { activeMap, bundleLoaderOpen } from "../../lib/stores";
   import WorkspaceShell from "../../components/WorkspaceShell.svelte";
   import LibraryRail from "../../components/LibraryRail.svelte";
+  import InspectorRail from "../../components/InspectorRail.svelte";
   import BundleLoader from "../../components/BundleLoader.svelte";
   import * as Sheet from "$lib/components/ui/sheet";
 
@@ -28,8 +29,8 @@
   Workspace shell. The library rail hosts the three-tab `LibraryRail`
   (Maps / Tracks / Waypoints). The canvas is the visual region into which
   `MapView` (mounted once in `src/routes/+layout.svelte`) shows. The
-  inspector rail is owned by the follow-up `redesign-inspector-pane`
-  change.
+  inspector rail hosts the context-sensitive `InspectorRail` driven by
+  selection state (track / waypoint / map info).
 
   The bundle-loader Sheet is mounted alongside the shell so the Maps tab
   header's "Maps…" button can toggle it via the `bundleLoaderOpen` store.
@@ -39,6 +40,9 @@
 <WorkspaceShell>
   {#snippet libraryRail()}
     <LibraryRail />
+  {/snippet}
+  {#snippet inspectorRail()}
+    <InspectorRail />
   {/snippet}
 </WorkspaceShell>
 
