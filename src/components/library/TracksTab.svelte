@@ -12,27 +12,38 @@
    * Clicking a row whose owning layer is not the current active layer
    * switches the active layer first (see `layers` capability extension).
    */
-  import { Button } from "$lib/components/ui/button";
+  import { Button, buttonVariants } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Popover from "$lib/components/ui/popover";
   import * as Select from "$lib/components/ui/select";
   import { Slider } from "$lib/components/ui/slider";
   import { Switch } from "$lib/components/ui/switch";
+  import * as Tooltip from "$lib/components/ui/tooltip";
   import {
     activeTrackLayerId,
+    addWaypointMode,
     appState,
     drawingModeActive,
+    drawingPointCount,
+    drawingSegmentId,
+    drawingTrackId,
+    drawingTrackLayerId,
+    editModeActive,
     selectedTrack,
     simplifyState,
   } from "$lib/stores";
   import {
+    createEmptyTrack,
     deleteTrack,
     exportGpx,
     exportTrackPlt,
     getSimplifiedPreview,
+    getTrackDetail,
     getTrackExportDefaultPath,
     getTracksGeojson,
+    importGpx,
+    importPlt,
     renameTrack,
     setTrackColor,
     setTrackLineWidth,
@@ -41,6 +52,9 @@
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
+  import UploadIcon from "@lucide/svelte/icons/upload";
+  import PencilIcon from "@lucide/svelte/icons/pencil";
+  import CheckIcon from "@lucide/svelte/icons/check";
   import { isOkStandardTrackName } from "$lib/track-names";
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
@@ -197,6 +211,68 @@
     if (path) await exportTrackPlt(t.layerId, t.trackId, path as string);
   }
 
+  async function handleImportGpx() {
+    try {
+      const path = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "GPX", extensions: ["gpx"] }],
+      });
+      if (path) {
+        await importGpx(path as string);
+      }
+    } catch (err) {
+      toast.error("Failed to import GPX", { description: String(err) });
+    }
+  }
+
+  async function handleImportPlt() {
+    try {
+      const path = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "PLT", extensions: ["plt"] }],
+      });
+      if (path) {
+        await importPlt(path as string);
+      }
+    } catch (err) {
+      toast.error("Failed to import PLT", { description: String(err) });
+    }
+  }
+
+  async function handleCreateTrackToggle() {
+    // Toggle drawing mode. On exit we ask MapView to finish via the
+    // existing `drawingFinishRequested` signal it already listens to,
+    // but the legacy Sidebar simply flipped `drawingModeActive` to false
+    // and the same wiring works here — MapView's effect drains the
+    // pending preview when the mode goes false.
+    if ($drawingModeActive) {
+      drawingModeActive.set(false);
+      return;
+    }
+
+    const layerId = $activeTrackLayerId;
+    if (layerId === null) return;
+
+    try {
+      editModeActive.set(false);
+      addWaypointMode.set(false);
+      const trackId = await createEmptyTrack(layerId, "New Track");
+      const detail = await getTrackDetail(layerId, trackId);
+      drawingTrackLayerId.set(layerId);
+      drawingTrackId.set(trackId);
+      drawingSegmentId.set(BigInt(detail.segments[0].id));
+      drawingPointCount.set(0);
+      drawingModeActive.set(true);
+    } catch (err) {
+      console.error("Failed to start track drawing mode", err);
+      toast.error("Failed to start track drawing mode", {
+        description: String(err),
+      });
+    }
+  }
+
   async function handleDelete(t: TrackFeature) {
     try {
       await deleteTrack(t.layerId, t.trackId);
@@ -263,24 +339,84 @@
   <header class="border-border border-b px-2 py-1.5">
     {#if trackLayers.length > 0}
       <Label class="text-muted-foreground text-[10px]">Track layer</Label>
-      <Select.Root
-        type="single"
-        value={trackLayerSelectValue}
-        onValueChange={(v) => v && activeTrackLayerId.set(BigInt(v))}
-        disabled={$drawingModeActive}
-      >
-        <Select.Trigger aria-label="Track layer" size="sm" class="w-full">
-          {trackLayers.find((l) => String(l.id) === trackLayerSelectValue)
-            ?.name ?? "Pick layer"}
-        </Select.Trigger>
-        <Select.Content>
-          {#each trackLayers as layer (layer.id)}
-            <Select.Item value={String(layer.id)} label={layer.name}>
-              {layer.name}
-            </Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
+      <div class="flex items-center gap-1">
+        <Select.Root
+          type="single"
+          value={trackLayerSelectValue}
+          onValueChange={(v) => v && activeTrackLayerId.set(BigInt(v))}
+          disabled={$drawingModeActive}
+        >
+          <Select.Trigger
+            aria-label="Track layer"
+            size="sm"
+            class="min-w-0 flex-1"
+          >
+            {trackLayers.find((l) => String(l.id) === trackLayerSelectValue)
+              ?.name ?? "Pick layer"}
+          </Select.Trigger>
+          <Select.Content>
+            {#each trackLayers as layer (layer.id)}
+              <Select.Item value={String(layer.id)} label={layer.name}>
+                {layer.name}
+              </Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
+
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+            aria-label="Import GPX"
+            disabled={$drawingModeActive || $activeTrackLayerId === null}
+            onclick={handleImportGpx}
+            data-testid="library-import-gpx"
+          >
+            <UploadIcon strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>Import GPX</Tooltip.Content>
+        </Tooltip.Root>
+
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+            aria-label="Import PLT"
+            disabled={$drawingModeActive || $activeTrackLayerId === null}
+            onclick={handleImportPlt}
+            data-testid="library-import-plt"
+          >
+            <UploadIcon strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>Import PLT</Tooltip.Content>
+        </Tooltip.Root>
+
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class={buttonVariants({
+              variant: $drawingModeActive ? "default" : "ghost",
+              size: $drawingModeActive ? "sm" : "icon-sm",
+            })}
+            aria-label={$drawingModeActive
+              ? `Done (${$drawingPointCount} points)`
+              : "Create track"}
+            aria-pressed={$drawingModeActive}
+            disabled={$activeTrackLayerId === null}
+            onclick={handleCreateTrackToggle}
+            data-testid="library-create-track"
+          >
+            {#if $drawingModeActive}
+              <CheckIcon strokeWidth={1.5} />
+              <span class="text-xs">Done ({$drawingPointCount})</span>
+            {:else}
+              <PencilIcon strokeWidth={1.5} />
+            {/if}
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            {$drawingModeActive
+              ? `Finish track (${$drawingPointCount} points)`
+              : "Create track"}
+          </Tooltip.Content>
+        </Tooltip.Root>
+      </div>
     {/if}
   </header>
 
