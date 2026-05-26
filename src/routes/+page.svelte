@@ -21,10 +21,8 @@
     currentProject,
     downloadProgress,
     downloadingMaps,
-    noteBundleFileReady,
     projects,
     projectsLoading,
-    readyBundleFiles,
     resetBundleDownloadState,
     status,
     syncProjectsFromAppState,
@@ -41,7 +39,6 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import type {
-    BundleFileReadyPayload,
     BundleProgressPayload,
     DownloadProgressPayload,
     LizaProjectSummaryDto,
@@ -85,9 +82,6 @@
         listen<BundleProgressPayload>("bundle-progress", (e) => {
           bundleProgress = e.payload;
         }),
-        listen<BundleFileReadyPayload>("bundle-file-ready", (e) =>
-          noteBundleFileReady(e.payload),
-        ),
         listen<LizaProjectSummaryDto[]>("projects-chunk", (e) =>
           appendProjectsChunk(e.payload),
         ),
@@ -147,7 +141,6 @@
     }
 
     // Clear the per-bundle progress UI without touching activeDownloadId.
-    readyBundleFiles.set([]);
     downloadProgress.set(new Map());
     currentDownload = null;
 
@@ -214,12 +207,6 @@
     return `${currentDownload.file_index + 1} / ${currentDownload.file_count} — ${currentDownload.package_name}`;
   });
 
-  // A bundle becomes openable as soon as at least one file is ready.
-  const canOpenPartial = $derived($readyBundleFiles.length > 0 && $busy);
-
-  async function handleOpenPartial() {
-    await appState.refresh();
-  }
 </script>
 
 <div class="root">
@@ -368,23 +355,7 @@
       {/if}
     </div>
 
-    <div class="ready-list-slot">
-      <div class="ready-files" data-testid="ready-files">
-        {#each $readyBundleFiles as f (f.package_name)}
-          <div class="ready-row">
-            <span class="ready-tick">✓</span>
-            <span class="ready-name">{f.package_name}</span>
-          </div>
-        {/each}
-      </div>
-    </div>
-
     <div class="status-actions">
-      {#if canOpenPartial}
-        <button class="action-btn" data-testid="open-bundle-now" onclick={handleOpenPartial}>
-          Open bundle now
-        </button>
-      {/if}
       {#if $activeDownloadId && $busy}
         <button
           class="action-btn"
@@ -397,7 +368,7 @@
 
 <style>
   .root {
-    --bundle-status-bar-height: 160px;
+    --bundle-status-bar-height: 80px;
     flex: 1;
     min-width: 0;
     display: flex;
@@ -640,9 +611,8 @@
       "status-line   actions"
       "current-file  actions"
       "progress      actions"
-      "meta          actions"
-      "ready-list    actions";
-    grid-template-rows: 20px 16px 12px 16px minmax(80px, 1fr);
+      "meta          actions";
+    grid-template-rows: 20px 16px 12px 16px;
     column-gap: 8px;
     padding: 6px 10px;
     font-size: 11px;
@@ -686,13 +656,6 @@
     white-space: nowrap;
   }
 
-  .ready-list-slot {
-    grid-area: ready-list;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-  }
-
   .status-text {
     flex: 1;
     overflow: hidden;
@@ -732,33 +695,6 @@
     font-size: 10px;
     color: var(--ctp-subtext1);
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .ready-files {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  .ready-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 10px;
-    color: var(--ctp-subtext0);
-  }
-
-  .ready-tick {
-    color: var(--ctp-green);
-    font-weight: 700;
-  }
-
-  .ready-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

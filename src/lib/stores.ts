@@ -177,31 +177,8 @@ export function updateDownloadProgress(payload: DownloadProgressPayload) {
 /** ID of the currently-active bundle download, if any. */
 export const activeDownloadId = writable<string | null>(null);
 
-/**
- * Files that have finished downloading inside the active bundle. Cleared at
- * the start of every new download. The UI uses this to render per-file
- * ticks and to gate the "Open bundle now" affordance.
- */
-export const readyBundleFiles = writable<
-  Array<{ package_name: string; local_path: string; file_index: number; file_count: number }>
->([]);
-
-export function noteBundleFileReady(payload: {
-  download_id: string;
-  package_name: string;
-  local_path: string;
-  file_index: number;
-  file_count: number;
-}) {
-  readyBundleFiles.update((list) => {
-    if (list.some((p) => p.package_name === payload.package_name)) return list;
-    return [...list, payload];
-  });
-}
-
 export function resetBundleDownloadState(downloadId: string | null) {
   activeDownloadId.set(downloadId);
-  readyBundleFiles.set([]);
   downloadProgress.set(new Map());
 }
 

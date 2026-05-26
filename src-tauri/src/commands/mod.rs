@@ -489,6 +489,11 @@ pub fn load_project(
                                     file_count,
                                 },
                             );
+                            // Push the freshly-updated AppStateDto so the Maps
+                            // column can flip the per-row badge from blue % to
+                            // green cached while the rest of the bundle is
+                            // still being fetched.
+                            let _ = app.emit("state-changed", ());
                         }
                     }
                 }

@@ -29,20 +29,25 @@ describe("bundle loader per-file progress UI", () => {
     expect(loaderSource).toContain("currentDownload = e.payload");
   });
 
-  it("subscribes to bundle-file-ready and accumulates ready files in a store", () => {
-    expect(loaderSource).toContain("bundle-file-ready");
-    expect(loaderSource).toContain("noteBundleFileReady");
-    expect(storesSource).toContain("readyBundleFiles");
-    expect(storesSource).toContain("noteBundleFileReady");
-    // Ticks rendered as a list inside the loader view.
-    expect(loaderSource).toContain("data-testid=\"ready-files\"");
-    expect(loaderSource).toContain("ready-tick");
-  });
-
-  it("enables an 'Open bundle now' affordance after the first ready file", () => {
-    expect(loaderSource).toContain("canOpenPartial");
-    expect(loaderSource).toContain("$readyBundleFiles.length > 0");
-    expect(loaderSource).toContain("data-testid=\"open-bundle-now\"");
+  it("per-file readiness streams into AppStateDto live (stream-bundle-file-availability)", () => {
+    // The FileReady branch must emit both bundle-file-ready (still kept for
+    // analytics / future consumers) AND state-changed so the Maps column can
+    // flip the row's badge from blue % to green cached the moment the file
+    // is on disk — not at end-of-bundle.
+    expect(commandsSource).toMatch(
+      /DownloadNotification::FileReady[\s\S]+?app\.emit\(\s*"bundle-file-ready"[\s\S]+?app\.emit\(\s*"state-changed"/,
+    );
+    // The frontend no longer subscribes to bundle-file-ready at the page
+    // level — that side channel is gone in favour of the AppStateDto
+    // refresh that state-changed triggers.
+    expect(loaderSource).not.toContain("noteBundleFileReady");
+    expect(loaderSource).not.toMatch(/listen<[^>]*>\(\s*"bundle-file-ready"/);
+    // The ready-files affordance and the Open bundle now button are gone;
+    // the Maps column's per-row badge replaces them.
+    expect(loaderSource).not.toContain("data-testid=\"ready-files\"");
+    expect(loaderSource).not.toContain("data-testid=\"open-bundle-now\"");
+    expect(storesSource).not.toContain("readyBundleFiles");
+    expect(storesSource).not.toContain("noteBundleFileReady");
   });
 
   it("renders an indeterminate animation when total_bytes is missing", () => {

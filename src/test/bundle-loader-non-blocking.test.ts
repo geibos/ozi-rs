@@ -78,7 +78,6 @@ describe("bundle loader main-thread responsiveness", () => {
       "utf-8"
     );
     expect(storesSource).toContain("activeDownloadId");
-    expect(storesSource).toContain("readyBundleFiles");
     expect(storesSource).toContain("resetBundleDownloadState");
   });
 });
