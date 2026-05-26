@@ -90,7 +90,7 @@ struct RemoteFileDownload {
 }
 
 /// Default upper bound on concurrent per-file downloads inside a bundle.
-pub const DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY: usize = 3;
+pub const DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY: usize = 6;
 
 /// Per-file notifications emitted by the multi-file download path.
 #[derive(Debug, Clone)]
