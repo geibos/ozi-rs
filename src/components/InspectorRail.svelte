@@ -56,45 +56,123 @@
   }
 </script>
 
-<div class="inspector-rail-inner" data-testid="inspector-rail">
-  <header class="rail-header">
-    <span class="rail-label">Inspector</span>
+{#if activeKind === null && !pinned}
+  <!--
+    Collapsed state — the rail aside is an 8px-wide vertical strip on the
+    right edge. The handle widens to ≈12px on hover (negative margin keeps
+    grid layout stable so the canvas does not reflow when the user hovers).
+    Clicking the pin button expands the rail; subsequent selection clearing
+    keeps it open (pin == true).
+  -->
+  <div class="inspector-rail-collapsed" data-testid="inspector-rail-collapsed">
     <button
       type="button"
-      class="pin-button"
+      class="edge-handle"
       onclick={togglePin}
-      aria-pressed={pinned}
-      aria-label={pinned ? "Unpin inspector" : "Pin inspector open"}
-      title={pinned ? "Unpin inspector" : "Pin inspector open"}
+      aria-label="Pin inspector open"
+      title="Pin inspector open"
     >
-      {#if pinned}
-        <PinOffIcon class="size-3.5" />
-      {:else}
+      <span class="edge-handle-pin">
         <PinIcon class="size-3.5" />
-      {/if}
+      </span>
     </button>
-  </header>
-
-  <div class="rail-body" data-active-kind={activeKind ?? "none"}>
-    {#if activeKind ==="track"}
-      <TrackInspector />
-    {:else if activeKind ==="waypoint"}
-      <WaypointInspector />
-    {:else if activeKind ==="map"}
-      <MapInspector />
-    {:else}
-      <div class="empty-state">
-        <p class="empty-title">Nothing selected</p>
-        <p class="empty-hint">
-          Pick a Track, Waypoint, or Map from the Library to inspect its
-          properties.
-        </p>
-      </div>
-    {/if}
   </div>
-</div>
+{:else}
+  <div class="inspector-rail-inner" data-testid="inspector-rail">
+    <header class="rail-header">
+      <span class="rail-label">Inspector</span>
+      <button
+        type="button"
+        class="pin-button"
+        onclick={togglePin}
+        aria-pressed={pinned}
+        aria-label={pinned ? "Unpin inspector" : "Pin inspector open"}
+        title={pinned ? "Unpin inspector" : "Pin inspector open"}
+      >
+        {#if pinned}
+          <PinOffIcon class="size-3.5" />
+        {:else}
+          <PinIcon class="size-3.5" />
+        {/if}
+      </button>
+    </header>
+
+    <div class="rail-body" data-active-kind={activeKind ?? "none"}>
+      {#if activeKind ==="track"}
+        <TrackInspector />
+      {:else if activeKind ==="waypoint"}
+        <WaypointInspector />
+      {:else if activeKind ==="map"}
+        <MapInspector />
+      {:else}
+        <div class="empty-state">
+          <p class="empty-title">Nothing selected</p>
+          <p class="empty-hint">
+            Pick a Track, Waypoint, or Map from the Library to inspect its
+            properties.
+          </p>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
 
 <style>
+  /*
+   * Collapsed state — an 8px-wide column hosting a button that fills the
+   * column and widens to 12px on hover/focus. The button is the manual
+   * "pin inspector open" affordance the spec contracts for. Cursor reads
+   * as ew-resize (drag-style) to hint at the open-rail gesture.
+   */
+  .inspector-rail-collapsed {
+    height: 100%;
+    width: 8px;
+    position: relative;
+  }
+
+  .edge-handle {
+    appearance: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 8px;
+    padding: 0;
+    background: hsl(var(--card));
+    border: none;
+    border-left: 1px solid var(--inner-border);
+    color: hsl(var(--muted-foreground));
+    cursor: ew-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+      width 0.12s ease,
+      background 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .edge-handle:hover,
+  .edge-handle:focus-visible {
+    width: 12px;
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    outline: none;
+  }
+
+  .edge-handle-pin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+
+  .edge-handle:hover .edge-handle-pin,
+  .edge-handle:focus-visible .edge-handle-pin {
+    opacity: 1;
+  }
+
   .inspector-rail-inner {
     display: flex;
     flex-direction: column;
