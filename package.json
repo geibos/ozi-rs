@@ -19,6 +19,7 @@
     "@felte/validator-zod": "^1.0.18",
     "@internationalized/date": "^3.12.1",
     "@lucide/svelte": "^1.16.0",
+    "@tanstack/svelte-virtual": "^3.13.24",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.0",
     "@tauri-apps/plugin-shell": "^2",

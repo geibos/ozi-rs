@@ -26,6 +26,7 @@ source in `node_modules/<package>/LICENSE` (or equivalent) after `npm install`.
 | [`@felte/validator-zod`](https://felte.dev/docs/svelte/validators) | MIT | Zod adapter for felte |
 | [`zod`](https://zod.dev) | MIT | Schema validation |
 | [`csstype`](https://github.com/frenic/csstype) | MIT | CSS property types (transitive but listed here because we install it explicitly to satisfy bits-ui's type declarations) |
+| [`@tanstack/svelte-virtual`](https://tanstack.com/virtual) | MIT | Svelte 5 port of TanStack Virtual; bounds the project-list DOM cost to the viewport |
 
 ## Existing dependencies acknowledged (not introduced by this change)
 

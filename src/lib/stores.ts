@@ -1,6 +1,7 @@
-import { writable, derived } from "svelte/store";
+import { writable, derived, get } from "svelte/store";
 import type {
   AppStateDto,
+  CatalogCachePayload,
   DownloadProgressPayload,
   LizaProjectSummaryDto,
   SimplifiedPreview,
@@ -9,6 +10,62 @@ import { getAppState } from "./api";
 import { selectVisibleWaypointLayers } from "./waypoint-layers";
 
 export { selectVisibleWaypointLayers };
+
+/**
+ * Versioned localStorage key for the LizaAlert project catalog cache.
+ * The `v1` suffix lets a future schema change (e.g. extending
+ * `LizaProjectSummaryDto`) bump to `v2` while old cache values are
+ * naturally garbage-collected by the next read attempt.
+ */
+const CATALOG_CACHE_KEY = "liza:projects:v1";
+
+function isValidCacheEntry(value: unknown): value is LizaProjectSummaryDto {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.slug === "string" && typeof candidate.name === "string"
+  );
+}
+
+/**
+ * Read the LizaAlert project catalog from localStorage. Returns the cached
+ * items on success or `null` on any failure (missing, corrupt, wrong shape,
+ * storage unavailable). Never throws.
+ */
+export function loadCatalogCache(): LizaProjectSummaryDto[] | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const payload = parsed as Partial<CatalogCachePayload>;
+    if (!Array.isArray(payload.items)) return null;
+    if (typeof payload.writtenAt !== "string") return null;
+    if (!payload.items.every(isValidCacheEntry)) return null;
+    return payload.items;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write the LizaAlert project catalog to localStorage with an ISO-8601
+ * timestamp. Best-effort: storage errors (e.g. `QuotaExceededError`,
+ * unavailable storage) are swallowed and logged to the dev console only.
+ */
+export function saveCatalogCache(items: LizaProjectSummaryDto[]): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const payload: CatalogCachePayload = {
+      items,
+      writtenAt: new Date().toISOString(),
+    };
+    localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.warn("saveCatalogCache: storage write failed", error);
+  }
+}
 
 function createAppStore() {
   const { subscribe, set } = writable<AppStateDto | null>(null);
@@ -27,7 +84,13 @@ export const appState = createAppStore();
 export const busy = derived(appState, ($s) => $s?.busy ?? false);
 export const status = derived(appState, ($s) => $s?.status ?? "");
 export const diagnostics = derived(appState, ($s) => $s?.diagnostics ?? []);
-export const projectsStore = writable<LizaProjectSummaryDto[]>([]);
+// Seed synchronously from the persisted catalog cache so the bundle loader
+// renders the previous catalog on its first paint without waiting for any
+// IPC round-trip. Falls back to an empty list on first-ever launch or any
+// cache failure.
+export const projectsStore = writable<LizaProjectSummaryDto[]>(
+  loadCatalogCache() ?? [],
+);
 export const projects = derived(projectsStore, ($projects) => $projects);
 export const projectsLoading = writable(false);
 export const currentProject = derived(appState, ($s) => $s?.current_project ?? null);
@@ -55,11 +118,40 @@ function syncActiveLayer(
   return BigInt(layers[0].id);
 }
 
+/**
+ * Upsert-by-slug merge for an incoming `projects-chunk` payload.
+ *
+ * For each entry in `chunk`:
+ *   - if a matching `slug` already exists in `projectsStore`, the existing
+ *     entry's fields are replaced in place (position preserved);
+ *   - otherwise the entry is appended to the end in the order it appears
+ *     within the chunk.
+ *
+ * Entries already present in the store but absent from the chunk are
+ * retained (historical missions never get pruned by a refresh). This
+ * matches the `lizaalert-integration` spec for stale-while-revalidate
+ * refresh semantics.
+ */
 export function appendProjectsChunk(chunk: LizaProjectSummaryDto[]) {
+  if (chunk.length === 0) return;
   projectsStore.update((current) => {
-    const known = new Set(current.map((project) => project.slug));
-    const additions = chunk.filter((project) => !known.has(project.slug));
-    return additions.length > 0 ? [...current, ...additions] : current;
+    const indexBySlug = new Map<string, number>();
+    current.forEach((project, index) => indexBySlug.set(project.slug, index));
+
+    let next: LizaProjectSummaryDto[] | null = null;
+    for (const incoming of chunk) {
+      const existingIndex = indexBySlug.get(incoming.slug);
+      if (existingIndex !== undefined) {
+        // Replace in place — only allocate the new array on first mutation.
+        if (next === null) next = current.slice();
+        next[existingIndex] = incoming;
+      } else {
+        if (next === null) next = current.slice();
+        next.push(incoming);
+        indexBySlug.set(incoming.slug, next.length - 1);
+      }
+    }
+    return next ?? current;
   });
 }
 
@@ -154,4 +246,22 @@ selectedTheme.subscribe((v) => localStorage.setItem("theme", v));
 appState.subscribe((state) => {
   activeTrackLayerId.update((current) => syncActiveLayer(current, state?.track_layers ?? []));
   activeWaypointLayerId.update((current) => syncActiveLayer(current, state?.waypoint_layers ?? []));
+});
+
+// Write the project catalog cache exactly once per completed refresh.
+// We snapshot the catalog on the `busy: true → false` transition (single
+// coherent moment in time, not per `projects-chunk` event) and only if
+// the in-memory list is non-empty — that gate prevents overwriting a
+// good cache with an empty list when a refresh fails before any data
+// arrives.
+let previousBusy = false;
+appState.subscribe((state) => {
+  const currentBusy = state?.busy ?? false;
+  if (previousBusy && !currentBusy) {
+    const projects = get(projectsStore);
+    if (projects.length > 0) {
+      saveCatalogCache(projects);
+    }
+  }
+  previousBusy = currentBusy;
 });

@@ -83,6 +83,17 @@ export interface AppStateDto {
   tracks: TrackSummary[];
 }
 
+/**
+ * Persisted shape of the LizaAlert project catalog cache (see
+ * `cache-project-catalog-locally` change). Stored as JSON under the
+ * versioned `localStorage` key `liza:projects:v1`.
+ */
+export interface CatalogCachePayload {
+  items: LizaProjectSummaryDto[];
+  /** ISO-8601 UTC timestamp written at `saveCatalogCache` time. */
+  writtenAt: string;
+}
+
 export interface OziLevelDto {
   level_index: number;
   width: number;
