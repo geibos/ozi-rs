@@ -33,7 +33,7 @@ run:
 # Build release (no bundle) and run the resulting binary
 run-release:
     npm run tauri build -- --no-bundle
-    ./src-tauri/target/release/ozi-rs
+    ./target/release/ozi-rs
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
