@@ -79,7 +79,7 @@ describe("MapView non-destructive waypoint rendering", () => {
     // addWaypoint with that id, so new waypoints land in layer A only.
     expect(mapViewSource).toContain("async function handleMapClickForWaypoint");
     expect(mapViewSource).toMatch(
-      /handleMapClickForWaypoint[\s\S]+?const layerId = \$activeWaypointLayerId;[\s\S]+?await addWaypoint\(layerId,/,
+      /handleMapClickForWaypoint[\s\S]+?const layerId = \$activeWaypointLayerId!?;[\s\S]+?await addWaypoint\(layerId,/,
     );
   });
 

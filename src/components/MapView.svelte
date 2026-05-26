@@ -373,8 +373,9 @@
   async function handleMapClickForWaypoint(e: maplibregl.MapMouseEvent) {
     if ($drawingModeActive) return;
     if (!$addWaypointMode) return;
-    const layerId = $activeWaypointLayerId;
-    if (layerId === null) return;
+    // Invariant (layers spec): $activeWaypointLayerId is non-null whenever a
+    // project is open. Add-waypoint mode is only reachable from /project.
+    const layerId = $activeWaypointLayerId!;
     const { lat, lng } = e.lngLat;
     try {
       const currentWaypoints = await getWaypoints(layerId);

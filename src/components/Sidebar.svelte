@@ -106,8 +106,10 @@
       return;
     }
 
-    const layerId = $activeTrackLayerId;
-    if (layerId === null) return;
+    // Invariant (layers spec): $activeTrackLayerId is non-null whenever a
+    // project is open. The Sidebar is only mounted under /project, which
+    // implies a project is open.
+    const layerId = $activeTrackLayerId!;
 
     try {
       editModeActive.set(false);

@@ -1197,7 +1197,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(project.track_layers()[0].tracks().len(), 1);
+        assert_eq!(project.track_layers()[1].tracks().len(), 1);
     }
 
     #[test]
@@ -1277,7 +1277,7 @@ mod tests {
             )
             .unwrap();
 
-        let waypoint = &project.waypoint_layers()[0].waypoints()[0];
+        let waypoint = &project.waypoint_layers()[1].waypoints()[0];
         assert_eq!(waypoint.latitude(), 54.1);
         assert_eq!(waypoint.longitude(), 27.8);
     }
@@ -1339,11 +1339,11 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 54.1);
+        assert_eq!(project.waypoint_layers()[1].waypoints()[0].latitude(), 54.1);
         assert!(history.undo(&mut project));
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 53.9);
+        assert_eq!(project.waypoint_layers()[1].waypoints()[0].latitude(), 53.9);
         assert!(history.redo(&mut project));
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 54.1);
+        assert_eq!(project.waypoint_layers()[1].waypoints()[0].latitude(), 54.1);
     }
 
     #[test]
@@ -1384,7 +1384,7 @@ mod tests {
 
         assert_eq!(history.undo_history.len(), 3);
         assert!(history.undo(&mut project));
-        let waypoint = &project.waypoint_layers()[0].waypoints()[0];
+        let waypoint = &project.waypoint_layers()[1].waypoints()[0];
         assert_eq!(waypoint.latitude(), 53.9);
         assert_eq!(waypoint.longitude(), 27.5667);
     }
@@ -1423,7 +1423,7 @@ mod tests {
             )
             .unwrap();
 
-        let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
+        let point = &project.track_layers()[1].tracks()[0].segments()[0].points()[0];
         assert_eq!(point.latitude(), 54.1);
         assert_eq!(point.longitude(), 27.8);
     }
@@ -1463,7 +1463,7 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
+        let point = &project.track_layers()[1].tracks()[0].segments()[0].points()[0];
         assert_eq!(point.latitude(), 53.9);
         assert_eq!(point.longitude(), 27.5667);
     }
@@ -1513,7 +1513,7 @@ mod tests {
 
         assert_eq!(history.undo_history.len(), 3);
         assert!(history.undo(&mut project));
-        let point = &project.track_layers()[0].tracks()[0].segments()[0].points()[0];
+        let point = &project.track_layers()[1].tracks()[0].segments()[0].points()[0];
         assert_eq!(point.latitude(), 53.9);
         assert_eq!(point.longitude(), 27.5667);
     }
@@ -1551,7 +1551,7 @@ mod tests {
             )
             .unwrap();
 
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 1);
         assert_eq!(points[0].id(), TrackPointId::new(4));
     }
@@ -1591,7 +1591,7 @@ mod tests {
 
         assert!(history.undo(&mut project));
 
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 2);
         assert_eq!(points[0].id(), point_id);
         assert_eq!(points[1].id(), TrackPointId::new(4));
@@ -1682,7 +1682,7 @@ mod tests {
             )
             .unwrap();
 
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 3);
         assert_eq!(points[1].id(), TrackPointId::new(20));
     }
@@ -1726,7 +1726,7 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 2);
         assert_eq!(points[0].id(), TrackPointId::new(3));
         assert_eq!(points[1].id(), TrackPointId::new(4));
@@ -1820,7 +1820,7 @@ mod tests {
             )
             .unwrap();
 
-        let segments = project.track_layers()[0].tracks()[0].segments();
+        let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].id(), segment_id);
         assert_eq!(segments[1].id(), new_segment_id);
@@ -1866,7 +1866,7 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        let segments = project.track_layers()[0].tracks()[0].segments();
+        let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].points().len(), 4);
     }
@@ -1960,7 +1960,7 @@ mod tests {
             )
             .unwrap();
 
-        let segments = project.track_layers()[0].tracks()[0].segments();
+        let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].id(), TrackSegmentId::new(10));
         assert_eq!(segments[0].points().len(), 4);
@@ -2007,7 +2007,7 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        let segments = project.track_layers()[0].tracks()[0].segments();
+        let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].id(), TrackSegmentId::new(10));
         assert_eq!(segments[1].id(), TrackSegmentId::new(20));
@@ -2086,7 +2086,7 @@ mod tests {
             )
             .unwrap();
 
-        assert!(project.track_layers()[0].tracks().is_empty());
+        assert!(project.track_layers()[1].tracks().is_empty());
     }
 
     #[test]
@@ -2117,8 +2117,8 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        assert_eq!(project.track_layers()[0].tracks().len(), 1);
-        assert_eq!(project.track_layers()[0].tracks()[0].id(), track_id);
+        assert_eq!(project.track_layers()[1].tracks().len(), 1);
+        assert_eq!(project.track_layers()[1].tracks()[0].id(), track_id);
     }
 
     #[test]
@@ -2180,7 +2180,7 @@ mod tests {
             )
             .unwrap();
 
-        assert!(project.waypoint_layers()[0].waypoints().is_empty());
+        assert!(project.waypoint_layers()[1].waypoints().is_empty());
     }
 
     #[test]
@@ -2214,8 +2214,8 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        assert_eq!(project.waypoint_layers()[0].waypoints().len(), 1);
-        let restored = &project.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(project.waypoint_layers()[1].waypoints().len(), 1);
+        let restored = &project.waypoint_layers()[1].waypoints()[0];
         assert_eq!(restored.id(), waypoint_id);
         assert_eq!(restored.name(), "Camp");
         assert_eq!(restored.latitude(), 53.9);
@@ -2282,7 +2282,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            project.waypoint_layers()[0].waypoints()[0].name(),
+            project.waypoint_layers()[1].waypoints()[0].name(),
             "Base camp"
         );
     }
@@ -2318,7 +2318,7 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].name(), "Camp");
+        assert_eq!(project.waypoint_layers()[1].waypoints()[0].name(), "Camp");
     }
 
     #[test]
@@ -2356,7 +2356,7 @@ mod tests {
             )
             .unwrap();
 
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 2);
     }
 
@@ -2396,7 +2396,7 @@ mod tests {
             .unwrap();
 
         assert!(history.undo(&mut project));
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 5);
         assert_eq!(points[1].id(), TrackPointId::new(2));
         assert_eq!(points[3].id(), TrackPointId::new(4));
@@ -2435,7 +2435,7 @@ mod tests {
             )
             .unwrap();
 
-        let points = project.track_layers()[0].tracks()[0].segments()[0].points();
+        let points = project.track_layers()[1].tracks()[0].segments()[0].points();
         assert_eq!(points.len(), 3);
     }
 
@@ -2561,7 +2561,7 @@ mod tests {
             )
             .unwrap();
 
-        let tracks = project.track_layers()[0].tracks();
+        let tracks = project.track_layers()[1].tracks();
         assert_eq!(tracks.len(), 1);
         assert_eq!(tracks[0].id(), TrackId::new(1));
         assert_eq!(tracks[0].name(), "New Track");
@@ -2587,11 +2587,11 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(project.track_layers()[0].tracks().len(), 1);
+        assert_eq!(project.track_layers()[1].tracks().len(), 1);
 
         history.undo(&mut project);
 
-        assert_eq!(project.track_layers()[0].tracks().len(), 0);
+        assert_eq!(project.track_layers()[1].tracks().len(), 0);
     }
 
     #[test]

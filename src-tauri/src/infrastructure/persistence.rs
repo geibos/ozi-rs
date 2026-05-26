@@ -51,7 +51,13 @@ pub fn save_project(project: &Project, path: &Path) -> Result<(), PersistenceErr
 
 pub fn load_project(path: &Path) -> Result<Project, PersistenceError> {
     let json = std::fs::read_to_string(path).map_err(PersistenceError::Io)?;
-    serde_json::from_str(&json).map_err(PersistenceError::Json)
+    let mut project: Project = serde_json::from_str(&json).map_err(PersistenceError::Json)?;
+    // Normalize legacy projects to satisfy the default-layers invariant
+    // declared by the `layers` capability. Existing layers are preserved
+    // and only missing kinds get a default appended (in memory only —
+    // the file on disk is not rewritten by load).
+    project.ensure_default_layers();
+    Ok(project)
 }
 
 pub fn save_app_session(
@@ -144,15 +150,123 @@ mod tests {
 
     #[test]
     fn empty_project_round_trips_all_layer_types() {
+        // `Project::untitled()` already contains one default track layer and
+        // one default waypoint layer (default-layers invariant). Adding extra
+        // layers with non-conflicting IDs verifies they survive the round
+        // trip alongside the defaults.
         let mut project = Project::untitled();
-        project.add_track_layer(TrackLayer::new(LayerId::new(1), "Tracks"));
-        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(2), "Waypoints"));
+        project.add_track_layer(TrackLayer::new(LayerId::new(20), "Extra Tracks"));
+        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(30), "Extra Waypoints"));
 
         let path = temp_path("ozp");
         save_project(&project, &path).expect("save");
         let loaded = load_project(&path).expect("load");
 
+        assert_eq!(loaded.track_layers().len(), 2);
+        assert_eq!(loaded.waypoint_layers().len(), 2);
+        assert!(
+            loaded
+                .track_layers()
+                .iter()
+                .any(|l| l.id() == LayerId::new(20) && l.name() == "Extra Tracks")
+        );
+        assert!(
+            loaded
+                .waypoint_layers()
+                .iter()
+                .any(|l| l.id() == LayerId::new(30) && l.name() == "Extra Waypoints")
+        );
+    }
+
+    fn write_raw_ozp(path: &std::path::Path, json: &str) {
+        std::fs::write(path, json).expect("write raw ozp");
+    }
+
+    #[test]
+    fn load_legacy_ozp_with_no_layers_appends_defaults() {
+        // Legacy file format: no track or waypoint layers at all.
+        let raw = r#"{
+            "id": 1,
+            "name": "Legacy Project",
+            "map_layers": [],
+            "track_layers": [],
+            "waypoint_layers": []
+        }"#;
+
+        let path = temp_path("ozp");
+        write_raw_ozp(&path, raw);
+
+        let loaded = load_project(&path).expect("load");
+
         assert_eq!(loaded.track_layers().len(), 1);
+        assert_eq!(loaded.track_layers()[0].name(), "Tracks");
         assert_eq!(loaded.waypoint_layers().len(), 1);
+        assert_eq!(loaded.waypoint_layers()[0].name(), "Waypoints");
+    }
+
+    #[test]
+    fn load_ozp_with_existing_layers_does_not_append_defaults() {
+        // A project with one track layer and two waypoint layers (none of
+        // them at id=1) must not gain any extra "default" layers on load.
+        let raw = r#"{
+            "id": 1,
+            "name": "Already-Normalized",
+            "map_layers": [],
+            "track_layers": [
+                {"id": 11, "name": "Recorded", "tracks": []}
+            ],
+            "waypoint_layers": [
+                {"id": 21, "name": "Camps", "waypoints": []},
+                {"id": 22, "name": "Hazards", "waypoints": []}
+            ]
+        }"#;
+
+        let path = temp_path("ozp");
+        write_raw_ozp(&path, raw);
+
+        let loaded = load_project(&path).expect("load");
+
+        assert_eq!(loaded.track_layers().len(), 1);
+        assert_eq!(loaded.track_layers()[0].name(), "Recorded");
+        assert_eq!(loaded.waypoint_layers().len(), 2);
+        assert!(
+            loaded
+                .waypoint_layers()
+                .iter()
+                .any(|l| l.name() == "Camps")
+        );
+        assert!(
+            loaded
+                .waypoint_layers()
+                .iter()
+                .any(|l| l.name() == "Hazards")
+        );
+    }
+
+    #[test]
+    fn legacy_load_then_save_persists_normalized_layers() {
+        // Regression: a legacy file (no layers) is loaded → in-memory state
+        // gains defaults via the invariant → re-saved file now contains the
+        // defaults explicitly → a fresh load returns the same project.
+        let legacy_raw = r#"{
+            "id": 1,
+            "name": "Legacy Project",
+            "map_layers": [],
+            "track_layers": [],
+            "waypoint_layers": []
+        }"#;
+        let legacy_path = temp_path("legacy.ozp");
+        write_raw_ozp(&legacy_path, legacy_raw);
+
+        let loaded_once = load_project(&legacy_path).expect("load legacy");
+
+        let normalized_path = temp_path("normalized.ozp");
+        save_project(&loaded_once, &normalized_path).expect("save normalized");
+
+        let loaded_twice = load_project(&normalized_path).expect("re-load normalized");
+
+        assert_eq!(loaded_once, loaded_twice);
+        assert_eq!(loaded_twice.track_layers().len(), 1);
+        assert_eq!(loaded_twice.waypoint_layers().len(), 1);
     }
 }

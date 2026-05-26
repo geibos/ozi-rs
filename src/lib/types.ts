@@ -70,6 +70,12 @@ export interface AppStateDto {
   current_project: LizaProjectDto | null;
   active_map: ActiveMapDto | null;
   diagnostics: DiagnosticDto[];
+  // Invariant (layers spec, `auto-create-default-layers` change): whenever
+  // `current_project` is non-null, both arrays contain at least one entry —
+  // a default "Tracks" / "Waypoints" layer is appended by the backend at
+  // project construction and load-path normalization. Frontend handlers
+  // that run only while a project is open MAY treat the derived
+  // `activeTrackLayerId` / `activeWaypointLayerId` stores as non-null.
   track_layers: LayerSummaryDto[];
   waypoint_layers: LayerSummaryDto[];
   track_layer_count: number;

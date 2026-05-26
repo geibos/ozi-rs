@@ -373,12 +373,29 @@ pub struct Project {
 
 impl Project {
     pub fn untitled() -> Self {
-        Self {
+        let mut project = Self {
             id: ProjectId::new(1),
             name: "Untitled Project".to_owned(),
             map_layers: Vec::new(),
             track_layers: Vec::new(),
             waypoint_layers: Vec::new(),
+        };
+        project.ensure_default_layers();
+        project
+    }
+
+    /// Enforce the invariant declared by the `layers` capability: an open
+    /// project always has at least one track layer and one waypoint layer.
+    /// Idempotent — existing layers are not modified or reordered; only
+    /// missing kinds get a single default layer appended.
+    pub fn ensure_default_layers(&mut self) {
+        if self.track_layers.is_empty() {
+            self.track_layers
+                .push(TrackLayer::new(LayerId::new(1), "Tracks"));
+        }
+        if self.waypoint_layers.is_empty() {
+            self.waypoint_layers
+                .push(WaypointLayer::new(LayerId::new(1), "Waypoints"));
         }
     }
 
@@ -770,13 +787,50 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     #[test]
-    fn untitled_project_starts_with_independent_empty_layer_collections() {
+    fn untitled_project_satisfies_default_layers_invariant() {
         let project = Project::untitled();
 
         assert_eq!(project.name(), "Untitled Project");
         assert!(project.map_layers().is_empty());
-        assert!(project.track_layers().is_empty());
-        assert!(project.waypoint_layers().is_empty());
+        assert_eq!(project.track_layers().len(), 1);
+        assert_eq!(project.track_layers()[0].name(), "Tracks");
+        assert_eq!(project.waypoint_layers().len(), 1);
+        assert_eq!(project.waypoint_layers()[0].name(), "Waypoints");
+    }
+
+    #[test]
+    fn default_project_satisfies_default_layers_invariant() {
+        let project = Project::default();
+
+        assert_eq!(project.track_layers().len(), 1);
+        assert_eq!(project.track_layers()[0].name(), "Tracks");
+        assert_eq!(project.waypoint_layers().len(), 1);
+        assert_eq!(project.waypoint_layers()[0].name(), "Waypoints");
+    }
+
+    #[test]
+    fn ensure_default_layers_is_idempotent_and_appends_only_missing_kinds() {
+        let mut project = Project {
+            id: super::ProjectId::new(1),
+            name: "Test".to_owned(),
+            map_layers: Vec::new(),
+            track_layers: vec![TrackLayer::new(LayerId::new(42), "Recorded")],
+            waypoint_layers: Vec::new(),
+        };
+
+        project.ensure_default_layers();
+
+        // Existing track layer kept untouched, default waypoint layer appended.
+        assert_eq!(project.track_layers().len(), 1);
+        assert_eq!(project.track_layers()[0].id(), LayerId::new(42));
+        assert_eq!(project.track_layers()[0].name(), "Recorded");
+        assert_eq!(project.waypoint_layers().len(), 1);
+        assert_eq!(project.waypoint_layers()[0].name(), "Waypoints");
+
+        // Running again does not duplicate.
+        project.ensure_default_layers();
+        assert_eq!(project.track_layers().len(), 1);
+        assert_eq!(project.waypoint_layers().len(), 1);
     }
 
     #[test]
@@ -785,15 +839,27 @@ mod tests {
 
         project.add_map_layer(MapLayer::new(LayerId::new(10), "Base map"));
         project.add_track_layer(TrackLayer::new(LayerId::new(20), "Recorded tracks"));
-        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(30), "Waypoints"));
+        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(30), "Extra Waypoints"));
 
+        // Tracks and waypoint collections each carry their default layer
+        // plus the explicitly-added one.
         assert_eq!(project.map_layers().len(), 1);
-        assert_eq!(project.track_layers().len(), 1);
-        assert_eq!(project.waypoint_layers().len(), 1);
+        assert_eq!(project.track_layers().len(), 2);
+        assert_eq!(project.waypoint_layers().len(), 2);
         assert_eq!(project.map_layers()[0].name(), "Base map");
         assert!(project.map_layers()[0].source_path().is_none());
-        assert_eq!(project.track_layers()[0].name(), "Recorded tracks");
-        assert_eq!(project.waypoint_layers()[0].name(), "Waypoints");
+        assert!(
+            project
+                .track_layers()
+                .iter()
+                .any(|l| l.id() == LayerId::new(20) && l.name() == "Recorded tracks")
+        );
+        assert!(
+            project
+                .waypoint_layers()
+                .iter()
+                .any(|l| l.id() == LayerId::new(30) && l.name() == "Extra Waypoints")
+        );
     }
 
     #[test]
@@ -844,11 +910,13 @@ mod tests {
 
         project.add_track_to_layer(layer_id, track).unwrap();
 
-        assert_eq!(project.track_layers()[0].tracks().len(), 1);
-        assert_eq!(
-            project.track_layers()[0].tracks()[0].name(),
-            "Morning route"
-        );
+        let layer = project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("added layer present");
+        assert_eq!(layer.tracks().len(), 1);
+        assert_eq!(layer.tracks()[0].name(), "Morning route");
     }
 
     #[test]
@@ -937,13 +1005,18 @@ mod tests {
     fn project_adds_waypoint_to_matching_waypoint_layer() {
         let mut project = Project::untitled();
         let layer_id = LayerId::new(30);
-        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Extra Waypoints"));
         let waypoint = Waypoint::new(WaypointId::new(4), "Camp", 53.9, 27.5667);
 
         project.add_waypoint_to_layer(layer_id, waypoint).unwrap();
 
-        assert_eq!(project.waypoint_layers()[0].waypoints().len(), 1);
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].name(), "Camp");
+        let layer = project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("added layer present");
+        assert_eq!(layer.waypoints().len(), 1);
+        assert_eq!(layer.waypoints()[0].name(), "Camp");
     }
 
     #[test]
@@ -951,7 +1024,7 @@ mod tests {
         let mut project = Project::untitled();
         let layer_id = LayerId::new(30);
         let waypoint_id = WaypointId::new(4);
-        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Extra Waypoints"));
         project
             .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667))
             .unwrap();
@@ -960,11 +1033,13 @@ mod tests {
             .move_waypoint_in_layer(layer_id.value(), waypoint_id.value(), 54.1, 27.8)
             .unwrap();
 
-        assert_eq!(project.waypoint_layers()[0].waypoints()[0].latitude(), 54.1);
-        assert_eq!(
-            project.waypoint_layers()[0].waypoints()[0].longitude(),
-            27.8
-        );
+        let layer = project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("added layer present");
+        assert_eq!(layer.waypoints()[0].latitude(), 54.1);
+        assert_eq!(layer.waypoints()[0].longitude(), 27.8);
     }
 
     #[test]
@@ -988,7 +1063,7 @@ mod tests {
         let mut project = Project::untitled();
         let layer_id = LayerId::new(30);
         let waypoint_id = WaypointId::new(4);
-        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Extra Waypoints"));
         project
             .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667))
             .unwrap();
@@ -1014,7 +1089,12 @@ mod tests {
             None
         );
 
-        let waypoint = &project.waypoint_layers()[0].waypoints()[0];
+        let layer = project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("added layer present");
+        let waypoint = &layer.waypoints()[0];
         assert_eq!(waypoint.name(), "Base camp");
         assert_eq!(waypoint.symbol(), Some("Flag"));
     }
