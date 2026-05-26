@@ -3,23 +3,20 @@
    * Maps tab inside the LibraryRail. Lists the active project's maps with
    * the active map highlighted and cached vs non-cached maps badged.
    *
-   * The tab header carries a single "Maps…" button that opens the bundle
-   * loader Sheet through `bundleLoaderOpen` (the Sheet itself is mounted
-   * elsewhere, owned by the shell-layout change).
+   * The bundle-loader Sheet entry that previously sat in this tab's header
+   * was removed in `fix-redesign-visual-affordances` — the Maps tab body
+   * IS the in-project map-switching affordance; switching projects or
+   * loading new bundles is reached via the Cmd-K palette (Switch project
+   * group writes to `bundleLoaderOpen`) and the `/` cold-start route.
    */
-  import MapIcon from "@lucide/svelte/icons/map";
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
-  import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import {
     activeMap,
-    bundleLoaderOpen,
-    busy,
     currentProject,
     downloadingMaps,
     downloadProgress,
   } from "$lib/stores";
-  import { get } from "svelte/store";
   import { openSelectedMap, revealBundle } from "$lib/api";
   import { toast } from "svelte-sonner";
   import LibraryRow from "./LibraryRow.svelte";
@@ -45,32 +42,9 @@
       toast.error("Failed to reveal bundle", { description: String(err) });
     }
   }
-
-  function openLoader() {
-    // Bug 4 fix (fix-redesign-functional-bugs): when a `load_projects` IPC
-    // is already in flight (`$busy === true`), opening the loader would
-    // queue a second `load_projects` behind the first and freeze the UI
-    // for ~5s while the backend serialised the two calls. The Sheet itself
-    // still opens, but we short-circuit if busy as a defence-in-depth
-    // alongside `disabled={$busy}` on the trigger.
-    if (get(busy)) return;
-    bundleLoaderOpen.set(true);
-  }
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
-  <header class="border-border flex items-center justify-between border-b px-2 py-1.5">
-    <Button
-      variant="outline"
-      size="xs"
-      onclick={openLoader}
-      disabled={$busy}
-    >
-      <MapIcon />
-      Maps…
-    </Button>
-  </header>
-
   <div class="flex-1 overflow-y-auto py-1">
     {#if maps.length === 0}
       <div class="text-muted-foreground p-3 text-center text-xs">

@@ -387,33 +387,52 @@ The application SHALL invoke `loadProjects()` exactly once per session start. Th
 
 The project workspace at `/project` SHALL render through a single shell component (`src/components/WorkspaceShell.svelte`) that lays out a 3-pane structure with three named regions:
 
-1. **`library-rail`** — a left rail with a fixed width of 280px, intended to host the library content (project picker, layer tree, tracks list, waypoints list, "Maps…" affordance). In this change the slot SHALL render empty placeholder content; the `library-sidebar` change fills it.
+1. **`library-rail`** — a left rail with a fixed width of 280px, hosting the Library three-tab component (see the library-rail requirement above).
 2. **`canvas`** — a center region of flexible width that hosts `MapView`. `MapView` SHALL continue to be mounted from the root layout (`src/routes/+layout.svelte`); the canvas slot SHALL be the visual region the layout's `MapView` becomes visible inside while the workspace route is active.
-3. **`inspector-rail`** — a right rail with a fixed width of 360px, intended to host selection-driven detail panels. In this change the slot SHALL render empty placeholder content; the `inspector-pane` change fills it. The right rail SHALL be present in the DOM only when its content store is non-empty; when empty, the canvas SHALL grow into the freed horizontal space without shifting the library rail.
+3. **`inspector-rail`** — a right rail mounted unconditionally for the lifetime of the workspace surface. The rail SHALL render at a fixed width of 360px when expanded (selection present OR pinned) and SHALL collapse to an 8px-wide edge-handle strip otherwise. The canvas SHALL claim the freed horizontal space when the rail is collapsed without shifting the library rail.
 
-Above the canvas the shell SHALL render a thin top context-bar containing four mode-chip placeholders labelled View / Draw / Edit / Measure and a single Cmd-K trigger button. Below the canvas the shell SHALL render a status bar of stable height. Neither the mode chips nor the Cmd-K trigger SHALL be wired to any state or behavior in this change — they are visual scaffolding only.
+Above the canvas the shell SHALL render a thin top context-bar containing four mode-chip placeholders labelled View / Draw / Edit / Measure and a single Cmd-K trigger button. Mode chips SHALL be rendered as a visually-distinct cluster from the Cmd-K trigger, separated by a 1px vertical divider in `var(--inner-border)`. The mode chips SHALL render with `aria-disabled="true"`, `tabindex="-1"`, `cursor: not-allowed`, and reduced opacity (≈0.55), so they read as inert scaffolding rather than as peer affordances of the Library tabs. The mode chips SHALL NOT visually resemble the Library `Tabs.Trigger` elements: the chips have no active-state styling, no under-border, and a disabled appearance.
 
-The previous workspace layout (the 2-column `Sidebar.svelte` + 3 floating panels above `MapView` at `src/routes/project/+page.svelte`) SHALL be replaced by the shell. `Sidebar.svelte` MAY remain in the repository tree for the `library-sidebar` change to reuse or delete; it SHALL NOT be mounted from `WorkspaceShell.svelte` in this change.
+The Cmd-K trigger SHALL render as a button-shaped pill that cannot be visually mistaken for an `<input>`: no `--border`-token border in the default state, no fixed `min-width` mimicking an input field, focus styling via a Teal ring (`hsl(var(--ring) / 0.45)` 2px outline) rather than an input-style outline, hover background sourced from `hsl(var(--secondary))`, and the `⌘K` kbd glyph rendered as a pill on the right side. The trigger SHALL be a `<button>` element with `aria-label="Open command palette"`, SHALL NOT carry `role="search"`, and SHALL NOT use `<input>` markup.
 
-#### Scenario: Workspace renders the 3-pane shell with empty rail slots
+Below the canvas the shell SHALL render a status bar of stable height (`--status-bar-height`).
 
-- **WHEN** the user navigates to `/project` with an active map and the rail slots have no content from later changes
-- **THEN** the workspace renders a 280px left rail with empty placeholder, the center canvas with `MapView`, the top context-bar with four mode-chip placeholders and a Cmd-K trigger button, and the bottom status bar with stable height; the right inspector rail is absent from the DOM (its content store is empty)
+The previous workspace layout (the 2-column `Sidebar.svelte` + 3 floating panels above `MapView` at `src/routes/project/+page.svelte`) SHALL be replaced by the shell.
 
-#### Scenario: Right rail appears only when inspector content is present
+#### Scenario: Workspace renders the 3-pane shell with mounted Inspector rail
 
-- **WHEN** a follow-up change populates the inspector content store
-- **THEN** the right rail mounts at 360px and the canvas reflows to leave room for it; **WHEN** the inspector store is cleared, the right rail unmounts and the canvas reclaims the 360px of horizontal space without shifting the library rail
+- **WHEN** the user navigates to `/project` with an active map AND no Library row is selected AND the Inspector is not pinned
+- **THEN** the workspace renders a 280px left rail with the Library, the centre canvas with `MapView`, the top context-bar with four mode chips and the Cmd-K trigger, the bottom status bar, AND an 8px-wide inspector edge handle on the right edge of the workspace; the inspector aside is present in the DOM even when its body is empty
 
-#### Scenario: Mode chips and Cmd-K trigger are inert scaffolding
+#### Scenario: Inspector expands to 360px when a selection arrives
 
-- **WHEN** the user clicks any mode-chip placeholder or the Cmd-K trigger button
-- **THEN** no application state changes and no palette opens (the actual wiring is deferred to `library-sidebar` and `inspector-pane` respectively)
+- **WHEN** the user clicks a Library row of any of the three supported types (Track, Waypoint, Map)
+- **THEN** the inspector rail expands from 8px to 360px AND the canvas reflows to leave room for it without shifting the library rail
+
+#### Scenario: Mode chips are visually distinct from Library tabs
+
+- **WHEN** the user inspects the top context-bar
+- **THEN** the four mode chips render with reduced opacity (≈0.55), `cursor: not-allowed`, no hover-state change, and `aria-disabled="true"` AND they are grouped together AND a 1px vertical divider (`var(--inner-border)`) separates the chip cluster from the Cmd-K trigger; no chip carries any active-state styling resembling the Library tabs' active state
+
+#### Scenario: Mode chips do not respond to clicks
+
+- **WHEN** the user clicks any mode chip
+- **THEN** no application state changes AND focus does not move to the chip AND no console error is emitted (the chips have `tabindex="-1"` and `aria-disabled="true"`)
+
+#### Scenario: Cmd-K trigger reads as a button, not an input
+
+- **WHEN** the user inspects the Cmd-K trigger in the workspace top context-bar
+- **THEN** the trigger is rendered as a `<button>` element AND does NOT carry `role="search"` AND does NOT use any `<input>` markup AND its default state has no border resembling the shadcn `Input` component (`border-transparent`, not `border-input`) AND its focus state renders as a 2px Teal ring rather than an input-style outline AND it does not enforce a min-width that mimics an input field's intrinsic width
+
+#### Scenario: Cmd-K trigger opens the palette on click
+
+- **WHEN** the user clicks the Cmd-K trigger button
+- **THEN** the command palette opens (the `commandPaletteOpen` store flips to `true`); the trigger does not accept text input AND no caret appears inside it
 
 #### Scenario: MapView remains mounted once across the redesign
 
 - **WHEN** the user navigates between `/` and `/project` after this change is implemented
-- **THEN** the same `MapView` instance is reused (the mount-once invariant from the prior `ui-shell` requirement is preserved); the shell component does NOT remount `MapView` on slot changes
+- **THEN** the same `MapView` instance is reused (the mount-once invariant from the prior `ui-shell` requirement is preserved); the shell component does NOT remount `MapView` on slot changes or on inspector expand / collapse
 
 ### Requirement: Design tokens are declared in a dedicated tokens layer with Zinc neutrals and a single Teal accent
 
@@ -503,6 +522,8 @@ The `library-rail` slot of the workspace shell SHALL host a single component `sr
 
 The active tab SHALL be backed by a session-scoped Svelte store (`libraryActiveTab`) holding one of `'maps' | 'tracks' | 'waypoints'`. The store SHALL NOT be persisted to localStorage or to the Rust session file. Default value SHALL be `'maps'` on a fresh app launch.
 
+The active tab trigger SHALL render with a visible active state distinct from the inactive triggers in both light and dark themes: a swap to the accent background token (`hsl(var(--accent))` background, `hsl(var(--accent-foreground))` text) AND a 2px under-border drawn in `hsl(var(--ring))` (the Teal accent) via inset box-shadow so the indicator does not affect layout. Inactive triggers SHALL render with `text-muted-foreground` and a transparent background. The active state SHALL be driven by the rendered `data-state="active"` attribute on the trigger element; no JavaScript polling SHALL be required to apply it.
+
 #### Scenario: Library is mounted in the library-rail slot
 
 - **WHEN** the user is at `/project` with an active map and inspects the workspace shell
@@ -518,13 +539,23 @@ The active tab SHALL be backed by a session-scoped Svelte store (`libraryActiveT
 - **WHEN** the user opens the Tracks tab in one session AND restarts the app
 - **THEN** the next session starts with the Maps tab active (default), not with the Tracks tab the previous session ended on; no localStorage or session-file entry records the choice
 
+#### Scenario: Active tab is visually distinct from inactive tabs
+
+- **WHEN** the workspace renders with any of the three tabs active
+- **THEN** the active trigger has a non-transparent background sourced from `hsl(var(--accent))`, a foreground colour sourced from `hsl(var(--accent-foreground))`, and a 2px Teal under-border drawn via `hsl(var(--ring))`; the other two triggers have a transparent background and `text-muted-foreground` text colour AND no under-border
+
+#### Scenario: Active-tab styling survives a theme switch
+
+- **WHEN** the user toggles between the auto / light / dark Zinc themes
+- **THEN** the active Library tab remains visibly distinct from the inactive tabs in every theme; the contrast is achieved through tokens (`--accent`, `--accent-foreground`, `--ring`) not through hard-coded colours
+
 ### Requirement: Library rows follow a unified visibility / color-or-symbol / name / actions pattern
 
 Every row in the Tracks and Waypoints tabs SHALL be rendered through a shared component `src/components/library/LibraryRow.svelte` exposing four ordered cells:
 
 1. **Visibility toggle** — a shadcn icon `Button` with the Lucide `Eye` or `EyeOff` icon reflecting the row's current visibility. Click SHALL toggle visibility through the existing API (`set_track_visibility` for tracks, the equivalent waypoint API for waypoints). The button SHALL carry an `aria-label` that describes the current state ("Hide track Foo" / "Show track Foo").
 2. **Color swatch (tracks)** OR **Symbol button (waypoints)** — for tracks: a 16x16 circular swatch styled via inline `style="background-color: …"` reading the row's RGBA domain colour. Click SHALL open a shadcn `Popover` containing a native `<input type="color">`. For waypoints: a 16x16 button rendering the waypoint's current symbol glyph. Click SHALL open the existing `SymbolPicker` popover.
-3. **Name (plus optional subline)** — the row's display name, truncated with `text-overflow: ellipsis`. The full name SHALL appear in a shadcn `Tooltip` on hover. Double-click SHALL switch the row into an inline-rename mode (`<input>` bound to a local writable; commit on Enter or blur, cancel on Esc). For Tracks rows only, a second line SHALL render in `text-xs text-muted-foreground font-mono tabular-nums` showing distance / duration / point-count separated by middle-dots (e.g. `12.4 km · 02:31 · 412 pts`).
+3. **Name (plus optional subline)** — the row's display name. The name cell SHALL truncate gracefully when the available horizontal space is smaller than the name's intrinsic width: the name span SHALL apply `white-space: nowrap`, `overflow: hidden`, and `text-overflow: ellipsis`, AND the parent flex item containing the span SHALL set `min-width: 0` so flex shrinkage actually takes effect. The full untruncated name SHALL be set on the `title` attribute of the name span so the browser renders a native tooltip on hover. A shadcn `Tooltip` MAY additionally wrap the name span for typographic consistency; the `title` attribute is the always-present fallback. Double-click SHALL switch the row into an inline-rename mode (`<input>` bound to a local writable; commit on Enter or blur, cancel on Esc). For Tracks rows only, a second line SHALL render in `text-xs text-muted-foreground font-mono tabular-nums` showing distance / duration / point-count separated by middle-dots (e.g. `12.4 km · 02:31 · 412 pts`). The second line SHALL also truncate via the same `text-overflow: ellipsis` rule.
 4. **Actions menu** — a shadcn `DropdownMenu` triggered by a `⋯` icon button. The menu items SHALL be:
    - Tracks: Export GPX, Export PLT, Set line width, Simplify…, Delete.
    - Waypoints: Export WPT, Delete.
@@ -532,6 +563,11 @@ Every row in the Tracks and Waypoints tabs SHALL be rendered through a shared co
 Each menu item SHALL invoke the same API function the legacy floating panel called for the equivalent operation; no operation SHALL be removed, only relocated.
 
 Maps tab rows SHALL diverge from this pattern: no visibility toggle, no color swatch — a "cached" badge SHALL occupy the swatch position when the map's tiles are fully cached locally. The actions menu items SHALL be: Reveal in Finder, Switch to. The active map SHALL be visually highlighted (e.g. a `bg-accent` background on the row).
+
+#### Scenario: Long name truncates with ellipsis and surfaces full text on hover
+
+- **WHEN** a Track row with a long display name ("Спасатель — Поисково-спасательный отряд Лиза Алерт. Очень длинное название") is rendered inside the 280px Library rail
+- **THEN** the visible name text is truncated with a trailing ellipsis (`…`), the row's vertical height remains the single-line row height (no wrap), AND hovering the name span causes the browser to display a native tooltip with the full untruncated text
 
 #### Scenario: Track row toggles visibility on the map
 
@@ -560,7 +596,9 @@ Maps tab rows SHALL diverge from this pattern: no visibility toggle, no color sw
 
 ### Requirement: Library tabs host the active-layer selectors in their headers
 
-The Tracks tab's content panel SHALL render a shadcn `Select` at the top, above the row list, exposing the project's track layers and bound to the active-track-layer ID (`$activeTrackLayerId`). The Waypoints tab's content panel SHALL render the analogous shadcn `Select` bound to `$activeWaypointLayerId`. The Maps tab SHALL NOT contain a layer selector — its header SHALL contain only the "Maps…" button (see the workspace-bundle-loader-Sheet requirement).
+The Tracks tab's content panel SHALL render a shadcn `Select` at the top, above the row list, exposing the project's track layers and bound to the active-track-layer ID (`$activeTrackLayerId`). The Waypoints tab's content panel SHALL render the analogous shadcn `Select` bound to `$activeWaypointLayerId`.
+
+The Maps tab SHALL NOT contain a layer selector. The Maps tab SHALL ALSO NOT contain a header button that opens the bundle-loader Sheet. The Maps tab body alone is the in-project map-switching affordance; the bundle-loader Sheet (for loading new bundles or switching projects) is reached through the Cmd-K command palette (the Switch project group writes to `bundleLoaderOpen`) and through the `/` cold-start route. The Maps-tab-header SHALL be empty (or absent) in this change.
 
 The selectors SHALL change the active layer via the existing `set_active_track_layer` / `set_active_waypoint_layer` API calls. The selectors SHALL NOT modify, hide, or unload any layer; they SHALL only retarget where new edits land, consistent with the `layers` capability's non-destructive-selection invariant.
 
@@ -580,6 +618,16 @@ Clicking a row in the Tracks tab whose owning layer differs from the current act
 
 - **WHEN** the user changes the active track layer via the tab-header `Select` from "A" to "B"
 - **THEN** both layers' track overlays remain rendered on the map; the change is purely a routing change for subsequent edits, consistent with the `layers` non-destructive-selection invariant
+
+#### Scenario: Maps-tab header has no bundle-loader Sheet trigger
+
+- **WHEN** the user opens the Maps tab in the Library
+- **THEN** no header button labelled "Maps…" or an equivalent bundle-loader Sheet trigger renders above the maps list AND the tab body renders only the active project's maps with the active-map highlight and the `cached` badge AND no static scan of `MapsTab.svelte` matches an import of `bundleLoaderOpen` from `$lib/stores`
+
+#### Scenario: Bundle loader remains reachable from Cmd-K
+
+- **WHEN** the user opens the command palette via `⌘K` AND highlights any entry in the Switch project group AND presses Enter
+- **THEN** the bundle-loader Sheet opens (the `bundleLoaderOpen` store flips to `true`); the absence of the Maps-tab-header button does not remove the bundle-loader entry overall
 
 ### Requirement: Project lifecycle and mode toggles do not live in the Library
 
@@ -651,22 +699,29 @@ The data-loading helpers that `TrackPointsPanel.svelte` exposed — functions th
 
 ### Requirement: The workspace `inspector-rail` slot hosts a context-sensitive Inspector that is collapsed by default and slides in on Library selection
 
-The right-side `inspector-rail` slot of the workspace shell (introduced by `redesign-shell-layout`) SHALL be filled by a single component `src/components/InspectorRail.svelte`. The rail SHALL be mounted unconditionally for the lifetime of the workspace surface; only its body content SHALL appear and disappear in response to selection.
+The right-side `inspector-rail` slot of the workspace shell SHALL be filled by a single component `src/components/InspectorRail.svelte`. The rail SHALL be mounted unconditionally for the lifetime of the workspace surface; only its body content SHALL appear and disappear in response to selection.
 
-In its default state (no Library selection), the rail SHALL render only an edge affordance (a thin pinnable handle on the right edge of the viewport) and SHALL occupy zero horizontal width inside the centre pane (i.e. the `MapView` extends to the right edge of the workspace minus the edge affordance's narrow strip).
+In its default state (no Library selection AND not pinned), the rail SHALL render an edge affordance — a thin vertical handle on the right edge of the viewport — and SHALL occupy 8px of horizontal width inside the workspace shell. The handle SHALL be at minimum 8px wide in its idle state and SHALL widen to ≈12px on hover, with `cursor: ew-resize` (or equivalent affordance cursor) to signal that it is the manual open control. The handle SHALL host a pin-toggle button (the same pin affordance the spec already contracts for) reachable in both the collapsed and expanded states.
 
 When the Library selection store transitions from null to a non-null value of any of the three supported types (Track, Waypoint, Map), the rail SHALL slide in from the right edge over 240ms, fade its body content in, and render the appropriate Inspector subcomponent for the selected type. The slide-in animation SHALL respect the motion-intensity-6 tokens established by `redesign-shell-layout`.
 
 When the selection transitions between two non-null values (regardless of whether the types match), the rail SHALL remain open and SHALL swap its body subcomponent via the spring transition (stiffness 100, damping 20) established by `redesign-shell-layout`; the rail itself SHALL NOT re-run its slide-in animation on such transitions.
 
-When the selection transitions back to null AND the rail is not pinned, the rail SHALL slide its body out and return to the collapsed default. When the rail is pinned (the user has clicked the pin affordance on the edge handle), the rail SHALL remain open with an empty body in this case.
+When the selection transitions back to null AND the rail is not pinned, the rail SHALL slide its body out and return to the collapsed default state (8px edge handle, no body). When the rail is pinned (the user has clicked the pin affordance on the edge handle), the rail SHALL remain open with an empty body in this case.
 
 The rail's fixed expanded width SHALL be ~360px, matching the slot dimension reserved by `redesign-shell-layout`. It SHALL NOT be user-resizable in v1.
 
-#### Scenario: Cold workspace — Inspector starts collapsed
+The `inspectorOpen` writable store SHALL reflect the expanded / collapsed state (`true` = expanded, `false` = collapsed) so that the `WorkspaceShell` canvas-inset writer (`writeCanvasInsets`) can set `--canvas-right` to `360px` (expanded) or `8px` (collapsed) without shifting the library rail.
 
-- **WHEN** the user opens a project workspace AND no Library row is selected
-- **THEN** the `inspector-rail` slot renders only the edge affordance, the `MapView` extends to the workspace's right edge minus the edge strip, and no Inspector body is mounted
+#### Scenario: Cold workspace — Inspector renders the edge handle in the collapsed state
+
+- **WHEN** the user opens a project workspace AND no Library row is selected AND the rail is not pinned
+- **THEN** the `inspector-rail` slot is present in the DOM AND renders an 8px-wide edge handle on the right edge of the viewport AND the `MapView` extends to the workspace's right edge minus that 8px strip AND no Inspector body subcomponent is mounted
+
+#### Scenario: User pins the rail open from the edge handle
+
+- **WHEN** the user clicks the pin button on the edge handle in the collapsed state
+- **THEN** the rail expands to 360px AND `$inspectorOpen` becomes `true` AND the rail body renders the empty-state placeholder (no selection yet) AND the rail remains expanded after subsequent selection clears
 
 #### Scenario: Selecting a Track row opens Track Inspector
 
@@ -678,10 +733,10 @@ The rail's fixed expanded width SHALL be ~360px, matching the slot dimension res
 - **WHEN** the rail is open showing a Track Inspector AND the user clicks a Waypoint row in the Library
 - **THEN** the rail itself remains expanded with no slide animation re-fire; the rail's body subcomponent swaps from Track Inspector to Waypoint Inspector via the spring transition
 
-#### Scenario: Clearing selection collapses the rail
+#### Scenario: Clearing selection collapses the rail back to the edge handle
 
 - **WHEN** the rail is open AND the Library selection transitions back to null (no row highlighted) AND the rail is not pinned
-- **THEN** the rail slides its body out and returns to the collapsed default state with only the edge affordance visible
+- **THEN** the rail slides its body out and returns to the collapsed default state with only the 8px edge handle visible; the canvas reclaims the freed horizontal space without shifting the library rail
 
 #### Scenario: Pinning the rail keeps it open across selection changes
 
@@ -944,6 +999,7 @@ The button SHALL be `disabled` when `$activeWaypointLayerId === null`. The butto
 
 - **WHEN** the active project contains zero waypoint layers
 - **THEN** the Add Waypoint button SHALL be absent from the DOM, identical to the existing handling of the waypoint-layer `Select`
+
 ### Requirement: Dev builds expose IPC failures via a structured error toast
 
 In development builds (`import.meta.env.DEV === true`), every IPC call SHALL surface its rejection through a Sonner toast whose root element carries `data-testid="ipc-error"`. The toast SHALL display the IPC command name as its title and the full, JSON-stringified error payload as its description. The toast SHALL be sticky (no auto-dismiss) so the user can read the payload before it disappears.

@@ -23,9 +23,24 @@
     class="flex h-full min-h-0 flex-col"
   >
     <Tabs.List class="bg-card mx-2 mt-2">
-      <Tabs.Trigger value="maps">Maps</Tabs.Trigger>
-      <Tabs.Trigger value="tracks">Tracks</Tabs.Trigger>
-      <Tabs.Trigger value="waypoints">Waypoints</Tabs.Trigger>
+      <Tabs.Trigger
+        value="maps"
+        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+      >
+        Maps
+      </Tabs.Trigger>
+      <Tabs.Trigger
+        value="tracks"
+        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+      >
+        Tracks
+      </Tabs.Trigger>
+      <Tabs.Trigger
+        value="waypoints"
+        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+      >
+        Waypoints
+      </Tabs.Trigger>
     </Tabs.List>
     <Tabs.Content value="maps" class="flex-1 min-h-0 m-0">
       <MapsTab />
