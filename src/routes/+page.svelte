@@ -37,6 +37,7 @@
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
+  import { appendRecentFile } from "../lib/recentFiles";
 
   let projectFilter = $state("");
   // `debouncedProjectFilter` is the value the `filtered` derivation reads.
@@ -147,7 +148,19 @@
       toast.error("Failed to open map", { description: String(error) });
       return;
     }
-    if (get(activeMap)) goto(resolve("/project"));
+    const am = get(activeMap);
+    if (am) {
+      // Append to Cmd-K palette's Recent files list. The helper is silent
+      // on storage failure; we never surface that to the user since this
+      // is pure UX convenience (per `redesign-inspector-pane`).
+      appendRecentFile({
+        projectSlug: am.project_name,
+        mapPath: am.local_path,
+        mapName: am.package_name,
+        openedAt: Date.now(),
+      });
+      goto(resolve("/project"));
+    }
   }
 
   async function handleOpenLocalBundle() {

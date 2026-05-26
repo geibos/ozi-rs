@@ -294,6 +294,29 @@ export const bundleLoaderOpen = writable(false);
  * whenever selection / detail content is present.
  */
 export const inspectorOpen = writable(false);
+
+/**
+ * Cmd-K command palette open/closed flag. Mounted once at the layout level
+ * (`+layout.svelte`) so the palette is reachable from any focus state,
+ * including the cold-start surface. Flipped by the global `⌘K` / `Ctrl+K`
+ * key handler and by the top-context-bar trigger button in
+ * `WorkspaceShell`.
+ */
+export const commandPaletteOpen = writable(false);
+
+/**
+ * "Map info" affordance state for the Library Maps tab → Map Inspector
+ * wiring. When non-null, the Inspector renders `MapInspector` for the
+ * named map. The Library writes this on click; the Inspector clears it
+ * when the selection moves to a track or waypoint. Independent of the
+ * `activeMap` store (the user can preview info for any map without
+ * opening it).
+ */
+export const selectedMapInfo = writable<{
+  projectSlug: string | null;
+  packageName: string;
+  localPath: string;
+} | null>(null);
 export const simplifyState = writable<{
   active: boolean;
   layerId: bigint;

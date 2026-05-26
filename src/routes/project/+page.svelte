@@ -5,6 +5,7 @@
   import { resolve } from "$app/paths";
   import { activeMap } from "../../lib/stores";
   import WorkspaceShell from "../../components/WorkspaceShell.svelte";
+  import InspectorRail from "../../components/InspectorRail.svelte";
 
   onMount(() => {
     if (!get(activeMap)) {
@@ -32,4 +33,8 @@
   and becomes visible inside the canvas region while the workspace route is
   active.
 -->
-<WorkspaceShell />
+<WorkspaceShell>
+  {#snippet inspectorRail()}
+    <InspectorRail />
+  {/snippet}
+</WorkspaceShell>
