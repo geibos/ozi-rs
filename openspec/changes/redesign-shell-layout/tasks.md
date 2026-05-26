@@ -6,7 +6,7 @@
 
 ## 2. Design-token layer
 
-- [ ] 2.1 Create `src/lib/tokens.css` declaring a Tailwind v4 `@theme` block with: a Zinc neutral scale (off-black `#0a0a0a` for the dark surface base), a single Emerald accent (saturation ≤ 70%), `--radius-card` (1.5rem), `--radius-pill` (full), `--shadow-elev-1` / `--shadow-elev-2` / `--shadow-elev-3` (tinted, not flat gray), and an inner-border token (`zinc-200/50` light, `zinc-800/60` dark)
+- [ ] 2.1 Create `src/lib/tokens.css` declaring a Tailwind v4 `@theme` block with: a Zinc neutral scale (off-black `#0a0a0a` for the dark surface base), a single Teal accent (saturation ≤ 70%), `--radius-card` (1.5rem), `--radius-pill` (full), `--shadow-elev-1` / `--shadow-elev-2` / `--shadow-elev-3` (tinted, not flat gray), and an inner-border token (`zinc-200/50` light, `zinc-800/60` dark)
 - [ ] 2.2 Update `src/app.css` to `@import './lib/tokens.css'` and to set `font-sans` and `font-mono` to Geist and Geist Mono respectively; remove any Inter import or font-family declaration if present
 - [ ] 2.3 Confirm that shadcn-svelte semantic-token utilities (`bg-background`, `text-foreground`, `border-border`, `bg-card`, `bg-popover`, etc.) resolve against the new token layer in both light and dark mode
 
@@ -20,7 +20,7 @@
 ## 4. Catppuccin theme pack relocation
 
 - [ ] 4.1 Create `src/lib/themes/catppuccin.css` containing the current Catppuccin `--ctp-*` palette layer and the semantic-token mapping tables (`SEMANTIC_MAP_LIGHT` / `SEMANTIC_MAP_DARK`)
-- [ ] 4.2 Update `src/lib/theme.ts` (or the equivalent theme module) so the Catppuccin layer is loaded only when a Catppuccin flavour is the active theme; the native Zinc + Emerald layer is loaded by default
+- [ ] 4.2 Update `src/lib/theme.ts` (or the equivalent theme module) so the Catppuccin layer is loaded only when a Catppuccin flavour is the active theme; the native Zinc + Teal layer is loaded by default
 - [ ] 4.3 Update the theme selector UI so the top-level theme picker offers Native (Auto / Light / Dark) and a "Catppuccin pack" entry that expands to the four flavours + Catppuccin Auto when enabled
 - [ ] 4.4 Verify: selecting "Mocha" still applies the same palette and semantic tokens as before this change (Catppuccin behavior is preserved, just gated behind the pack toggle)
 - [ ] 4.5 Verify: launching with no prior theme preference uses the native default tracking OS light/dark, NOT Catppuccin
@@ -50,17 +50,17 @@
 
 ## 8. Cold-start route restyling
 
-- [ ] 8.1 Restyle the surfaces of `src/routes/+page.svelte` (the bundle-loader cold-start route) to consume the new tokens: replace any Catppuccin-specific class references with semantic-token utilities; confirm the projects column, maps column, filter input, status-bar region, and progress region all render against the new Zinc + Emerald palette
+- [ ] 8.1 Restyle the surfaces of `src/routes/+page.svelte` (the bundle-loader cold-start route) to consume the new tokens: replace any Catppuccin-specific class references with semantic-token utilities; confirm the projects column, maps column, filter input, status-bar region, and progress region all render against the new Zinc + Teal palette
 - [ ] 8.2 Do NOT change the structural 2-column layout of the cold-start route in this change — that structural redesign is deferred to `library-sidebar` if pursued at all
 - [ ] 8.3 Confirm the bundle-loader status-bar stable-layout contract (from `bundle-loader-non-blocking` and `stream-bundle-file-availability`) is preserved after restyling
 
 ## 9. Smoke verification
 
-- [ ] 9.1 Manual: launch the app with no active map; confirm the cold-start `/` route renders against the new Zinc + Emerald tokens, the project list is interactive, the filter input is responsive, and the status-bar layout remains stable when bundle-progress events arrive
+- [ ] 9.1 Manual: launch the app with no active map; confirm the cold-start `/` route renders against the new Zinc + Teal tokens, the project list is interactive, the filter input is responsive, and the status-bar layout remains stable when bundle-progress events arrive
 - [ ] 9.2 Manual: open a map; confirm the workspace `/project` route renders the 3-pane shell with the 280px library rail empty, the canvas filled by `MapView`, the top context-bar with four mode-chip placeholders and a Cmd-K trigger button, the bottom status bar present, and the right inspector rail absent from the DOM
 - [ ] 9.3 Manual: click any mode-chip placeholder or the Cmd-K trigger button; confirm no state change occurs and no palette opens (inert scaffolding)
 - [ ] 9.4 Manual: round-trip between `/` and `/project`; confirm `MapView` is not re-initialized (mount-once invariant preserved)
-- [ ] 9.5 Manual: enable the Catppuccin pack from settings; select Mocha; confirm the same palette and semantic tokens apply as before this change; select native default again; confirm the Zinc + Emerald palette returns
+- [ ] 9.5 Manual: enable the Catppuccin pack from settings; select Mocha; confirm the same palette and semantic tokens apply as before this change; select native default again; confirm the Zinc + Teal palette returns
 - [ ] 9.6 Manual: in dark mode, sample the workspace background colour with a colour picker; confirm the value is `#0a0a0a` (or its OKLCH equivalent), not `#000000`
 - [ ] 9.7 Capture screenshots: cold-start route under new tokens (light + dark), workspace shell with empty rails (light + dark), Catppuccin Mocha (regression check). Attach to the PR
 - [ ] 9.8 Per the project's verification policy (`docs/agent-verification.md`), if any verification attempt fails twice, stop and hand back a diagnostic dump rather than retrying a third time

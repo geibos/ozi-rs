@@ -24,7 +24,7 @@ This change also supersedes the active `bundle-loader-as-overlay` proposal. The 
 
 **Goals:**
 - Replace the workspace layout primitive with a 3-pane shell that has named slots ready for content from later changes.
-- Replace the default theme with native-feeling Zinc + Emerald tokens; preserve Catppuccin as opt-in.
+- Replace the default theme with native-feeling Zinc + Teal tokens; preserve Catppuccin as opt-in.
 - Switch typography to Geist + Geist Mono; ban Inter.
 - Add the shadcn-svelte primitives (`sheet`, `command`) that the follow-up changes consume.
 - Preserve the MapView "mounted once across route changes" invariant and the status-bar stable-layout invariant from previous changes.
@@ -44,9 +44,9 @@ This change also supersedes the active `bundle-loader-as-overlay` proposal. The 
 
 ### Decision 1: Default theme switches from Catppuccin to native auto/light/dark
 
-The application's default theme SHALL be a native-feeling Zinc + Emerald system that auto-tracks OS light/dark. Catppuccin SHALL move to an opt-in theme pack at `src/lib/themes/catppuccin.css`, selectable from settings.
+The application's default theme SHALL be a native-feeling Zinc + Teal system that auto-tracks OS light/dark. Catppuccin SHALL move to an opt-in theme pack at `src/lib/themes/catppuccin.css`, selectable from settings.
 
-**Rationale**: Catppuccin is a strong, opinionated aesthetic that biases the app toward "developer-friendly tinted dark UI" — fine for an editor, off-key for a SAR tool used on a sunlit laptop screen by users who expect their app to look like Maps or Gaia GPS, not like a code editor. Zinc (slate-tinted-cool) reads as native on both macOS and Windows; Emerald as a single accent stays calm at high luminance and survives projection in field conditions. Catppuccin remains valuable for users who explicitly want it — keeping it as an opt-in pack costs nothing structurally.
+**Rationale**: Catppuccin is a strong, opinionated aesthetic that biases the app toward "developer-friendly tinted dark UI" — fine for an editor, off-key for a SAR tool used on a sunlit laptop screen by users who expect their app to look like Maps or Gaia GPS, not like a code editor. Zinc (slate-tinted-cool) reads as native on both macOS and Windows; a desaturated Teal as a single accent stays calm at high luminance, contrasts cleanly with the OSM/topo greens that dominate map tiles, and survives projection in field conditions. Catppuccin remains valuable for users who explicitly want it — keeping it as an opt-in pack costs nothing structurally.
 
 **Open question to confirm with parent**: should the Catppuccin pack ship enabled-by-default-but-overridden, or fully gated behind a settings toggle? Current proposal assumes fully gated.
 
@@ -65,11 +65,11 @@ The UI font SHALL be Geist (variable), and Geist Mono SHALL be used for numbers 
 - _Inter as the workhorse_: rejected per ban above.
 - _Custom font (e.g. Sohne, Söhne)_: rejected — licensing complexity.
 
-### Decision 3: Single accent (Emerald) with strict saturation ceiling
+### Decision 3: Single accent (Teal) with strict saturation ceiling
 
-The accent palette SHALL be a single hue (Emerald, `oklch(0.7 0.13 152)` or equivalent), with saturation capped at 70%. Multi-accent UIs (purple secondary, blue tertiary, etc.) are out — the app uses Emerald for primary actions and active states, and the neutral Zinc scale for everything else.
+The accent palette SHALL be a single hue (desaturated Teal, `oklch(0.65 0.10 190)` or equivalent — close to `#0d9488`), with saturation capped at 65%. Multi-accent UIs (purple secondary, blue tertiary, etc.) are out — the app uses Teal for primary actions and active states, and the neutral Zinc scale for everything else.
 
-**Rationale**: SAR is high-stakes. A multi-accent palette communicates "casual SaaS dashboard"; a single-accent palette communicates "tool". Emerald specifically: stays readable on both dark and light surfaces, doesn't conflict with map vector colours (which trend toward red/orange/yellow for warnings and tracks), and survives projection.
+**Rationale**: SAR is high-stakes. A multi-accent palette communicates "casual SaaS dashboard"; a single-accent palette communicates "tool". Teal specifically: stays readable on both dark and light surfaces, doesn't conflict with map vector colours (which trend toward red/orange/yellow for warnings and tracks), and survives projection.
 
 **Anti-pattern guard**: the design-token layer SHALL NOT declare a "secondary accent" CSS variable. Any future need for a contrasting colour SHALL be served by a Zinc shade, not a competing hue.
 
@@ -111,7 +111,7 @@ The Cmd-K trigger button in the top context-bar SHALL render in this change but 
 
 ### Decision 8: Tokens live in a dedicated tokens.css, not inlined in app.css
 
-The design-token layer (Zinc, Emerald, radii, shadows, inner-border) SHALL be declared in `src/lib/tokens.css` via Tailwind v4 `@theme`, and imported from `src/app.css`. Catppuccin's existing variables move to `src/lib/themes/catppuccin.css` as an opt-in layer imported only when the user selects a Catppuccin flavour from settings.
+The design-token layer (Zinc, Teal, radii, shadows, inner-border) SHALL be declared in `src/lib/tokens.css` via Tailwind v4 `@theme`, and imported from `src/app.css`. Catppuccin's existing variables move to `src/lib/themes/catppuccin.css` as an opt-in layer imported only when the user selects a Catppuccin flavour from settings.
 
 **Rationale**: splitting tokens from utilities keeps the design-system surface auditable. Future theme packs (high-contrast, color-blind safe, etc.) follow the same `src/lib/themes/<name>.css` pattern.
 
@@ -128,7 +128,7 @@ The design-token layer (Zinc, Emerald, radii, shadows, inner-border) SHALL be de
 ## Open Questions (parent confirmation requested)
 
 - **Q1**: Should the Catppuccin pack be fully gated behind a settings toggle (clean default, advanced opt-in), or shipped as a "Theme: Native (default) / Catppuccin (legacy)" top-level selector visible at first launch? Current proposal assumes fully gated.
-- **Q2**: Emerald specifically vs a slightly desaturated Teal — both meet the "single accent ≤ 70% saturation" criterion. Current proposal locks Emerald per session direction. Parent may want to confirm Emerald reads correctly against the SAR map-tile colour palette (typically OSM-derived oranges and reds) before lock-in.
+- **Q2**: ~~Emerald vs desaturated Teal~~ — resolved. Parent confirmed desaturated Teal (`oklch(0.65 0.10 190)`, ~`#0d9488`, saturation ≈ 60%) for better contrast against OSM-derived map tiles and against trail-coloured tracks. Locked.
 - **Q3**: Is fixed-width-rail acceptable for v1, or does the parent want a resize affordance in scope? Current proposal defers resize.
 - **Q4**: Should `bundle-loader-as-overlay` be archived as "obsolete by supersession" or remain in the active list as a reference for what `library-sidebar` will absorb? Current proposal leaves the housekeeping to the parent.
 
@@ -138,7 +138,7 @@ Implementation order, to keep the working tree shippable at each step:
 
 1. Wait for `consolidate-state-event-flow` to land. Do not start this change until the listener consolidation is merged. Rebase.
 2. Add the `geist` npm package; commit `package.json` + lockfile only, no code changes yet.
-3. Create `src/lib/tokens.css` with the Zinc + Emerald + radii + shadow tokens. Update `src/app.css` to `@import` it and to wire Geist as `font-sans`.
+3. Create `src/lib/tokens.css` with the Zinc + Teal + radii + shadow tokens. Update `src/app.css` to `@import` it and to wire Geist as `font-sans`.
 4. Move the Catppuccin variables out of their current home into `src/lib/themes/catppuccin.css` as an `@layer theme` block. Update the theme selector to import that file only when a Catppuccin flavour is active.
 5. Run `npx shadcn-svelte@latest add sheet` and `npx shadcn-svelte@latest add command`. Commit the generated files.
 6. Create `src/components/WorkspaceShell.svelte` with the 3-pane grid, named slots for `library-rail` and `inspector-rail`, the canvas slot for MapView, the top context-bar scaffolding, and the bottom status-bar scaffolding.

@@ -32,12 +32,12 @@ The previous workspace layout (the 2-column `Sidebar.svelte` + 3 floating panels
 - **WHEN** the user navigates between `/` and `/project` after this change is implemented
 - **THEN** the same `MapView` instance is reused (the mount-once invariant from the prior `ui-shell` requirement is preserved); the shell component does NOT remount `MapView` on slot changes
 
-### Requirement: Design tokens are declared in a dedicated tokens layer with Zinc neutrals and a single Emerald accent
+### Requirement: Design tokens are declared in a dedicated tokens layer with Zinc neutrals and a single Teal accent
 
 The application SHALL declare its design tokens in `src/lib/tokens.css` via Tailwind v4 `@theme`. The token layer SHALL declare:
 
 - **Neutrals**: a Zinc scale (slate-tinted-cool), with the dark surface base set to off-black `#0a0a0a` (never pure `#000`).
-- **Accent**: a single Emerald hue, with saturation capped at 70%. The token layer SHALL NOT declare a secondary accent variable.
+- **Accent**: a single Teal hue, with saturation capped at 70%. The token layer SHALL NOT declare a secondary accent variable.
 - **Radii**: at least `--radius-card` (1.5rem) and `--radius-pill` (full).
 - **Shadow tokens**: at least `--shadow-elev-1`, `--shadow-elev-2`, `--shadow-elev-3` with subtle hue tinting (not flat gray drop shadow).
 - **Inner-border token**: a 1px inner border colour resolving to `zinc-200/50` in light mode and `zinc-800/60` in dark mode.
@@ -49,7 +49,7 @@ Inspector cards (introduced by the `inspector-pane` change) SHALL consume `--rad
 #### Scenario: Token file declares the documented variables
 
 - **WHEN** a static scan of `src/lib/tokens.css` reads its `@theme` block
-- **THEN** the block declares the Zinc neutral scale, the Emerald accent, `--radius-card`, `--radius-pill`, `--shadow-elev-1`, `--shadow-elev-2`, `--shadow-elev-3`, and the inner-border token; the block does NOT declare a secondary accent variable
+- **THEN** the block declares the Zinc neutral scale, the Teal accent, `--radius-card`, `--radius-pill`, `--shadow-elev-1`, `--shadow-elev-2`, `--shadow-elev-3`, and the inner-border token; the block does NOT declare a secondary accent variable
 
 #### Scenario: Off-black is used in place of pure black
 
@@ -118,7 +118,7 @@ This requirement carries forward the stable-layout contract previously specified
 
 ### Requirement: System provides a Catppuccin theme selector with five options
 
-The system SHALL continue to offer the Catppuccin palette family — Auto (follow OS), Latte, Frappé, Macchiato, or Mocha — as an OPT-IN theme pack rather than the default. The default theme of the application SHALL be the native auto/light/dark Zinc + Emerald system declared in `src/lib/tokens.css`; the Catppuccin selector SHALL become reachable from settings rather than being the front-line theme picker.
+The system SHALL continue to offer the Catppuccin palette family — Auto (follow OS), Latte, Frappé, Macchiato, or Mocha — as an OPT-IN theme pack rather than the default. The default theme of the application SHALL be the native auto/light/dark Zinc + Teal system declared in `src/lib/tokens.css`; the Catppuccin selector SHALL become reachable from settings rather than being the front-line theme picker.
 
 When the user enables the Catppuccin pack from settings AND selects a flavour, the application SHALL apply the Catppuccin layers exactly as before this change: a palette layer (`--ctp-<colour>` hex variables for every named colour in `@catppuccin/palette`) and a semantic layer (HSL-triplet variables for shadcn-svelte primitives: `--background`, `--foreground`, `--card`, `--card-foreground`, `--popover`, `--popover-foreground`, `--primary`, `--primary-foreground`, `--secondary`, `--secondary-foreground`, `--muted`, `--muted-foreground`, `--accent`, `--accent-foreground`, `--destructive`, `--destructive-foreground`, `--border`, `--input`, `--ring`). The semantic-layer values SHALL be derived from the active flavour through the same two mapping tables — `SEMANTIC_MAP_LIGHT` for Latte and `SEMANTIC_MAP_DARK` for Frappé / Macchiato / Mocha.
 
@@ -129,7 +129,7 @@ The default native theme SHALL also support auto-tracking OS light/dark and expl
 #### Scenario: Default native theme on first launch
 
 - **WHEN** the user launches the application for the first time after this change is implemented
-- **THEN** the active theme is the native Zinc + Emerald system tracking the OS light/dark preference, AND no Catppuccin variable (`--ctp-*`) is present on the root element
+- **THEN** the active theme is the native Zinc + Teal system tracking the OS light/dark preference, AND no Catppuccin variable (`--ctp-*`) is present on the root element
 
 #### Scenario: User opts into Catppuccin from settings
 
@@ -139,7 +139,7 @@ The default native theme SHALL also support auto-tracking OS light/dark and expl
 #### Scenario: Auto follows OS within the native default
 
 - **WHEN** the active theme is the native default AND the OS toggles between light and dark mode
-- **THEN** the UI switches between the native light Zinc surface and the native dark Zinc surface accordingly, with the Emerald accent re-resolving against the new neutral
+- **THEN** the UI switches between the native light Zinc surface and the native dark Zinc surface accordingly, with the Teal accent re-resolving against the new neutral
 
 #### Scenario: Auto follows OS within the Catppuccin pack
 
@@ -168,7 +168,7 @@ The frontend SHALL provide a `src/lib/components/ui/` directory containing shadc
 #### Scenario: A primitive renders against the active theme
 
 - **WHEN** a shadcn-svelte `Button` is mounted anywhere in the app and the active theme is the native default light
-- **THEN** its computed styles resolve through the semantic CSS variables to the native light Zinc + Emerald palette, with no per-component theme wiring required
+- **THEN** its computed styles resolve through the semantic CSS variables to the native light Zinc + Teal palette, with no per-component theme wiring required
 
 #### Scenario: `cn()` helper is available at `$lib/utils`
 

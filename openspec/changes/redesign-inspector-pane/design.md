@@ -14,7 +14,7 @@ Constraints from the surrounding architecture:
 
 - Edits must go through `ProjectCommand` (see `docs/commands-reference.md`). Inline editors in the Inspector dispatch the same commands the retired panels did.
 - All IPC and stores already exist; no backend work in this change.
-- Motion intensity 6 was locked in change 1 — slide-in 240ms, scale-up for the palette, internal spring transitions inside the rail. Geist / Zinc+Emerald / rounded-`[1.5rem]` cards / tinted shadows all inherit unchanged.
+- Motion intensity 6 was locked in change 1 — slide-in 240ms, scale-up for the palette, internal spring transitions inside the rail. Geist / Zinc+Teal / rounded-`[1.5rem]` cards / tinted shadows all inherit unchanged.
 
 ## Goals / Non-Goals
 
