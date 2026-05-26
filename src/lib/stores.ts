@@ -1,4 +1,4 @@
-import { writable, derived, get } from "svelte/store";
+import { writable, derived } from "svelte/store";
 import type {
   AppStateDto,
   CatalogCachePayload,
@@ -248,20 +248,24 @@ appState.subscribe((state) => {
   activeWaypointLayerId.update((current) => syncActiveLayer(current, state?.waypoint_layers ?? []));
 });
 
-// Write the project catalog cache exactly once per completed refresh.
-// We snapshot the catalog on the `busy: true → false` transition (single
-// coherent moment in time, not per `projects-chunk` event) and only if
-// the in-memory list is non-empty — that gate prevents overwriting a
-// good cache with an empty list when a refresh fails before any data
-// arrives.
-let previousBusy = false;
-appState.subscribe((state) => {
-  const currentBusy = state?.busy ?? false;
-  if (previousBusy && !currentBusy) {
-    const projects = get(projectsStore);
-    if (projects.length > 0) {
-      saveCatalogCache(projects);
-    }
-  }
-  previousBusy = currentBusy;
+// Persist the catalog after the chunk stream stops growing. We can't rely
+// on a `busy: true → false` transition observable from the layout: the
+// backend emits `state-changed` only on refresh completion (after busy is
+// already cleared), and the listener is registered *after* loadProjects()
+// is invoked. Both gaps belong to the `consolidate-state-event-flow`
+// change. To stay independent of that wiring rewrite, we debounce a write
+// off projectsStore itself — every chunk arrival defers the write, and
+// once chunks stop arriving for ~800 ms the snapshot lands.
+//
+// The non-empty gate still applies: a refresh that yields zero items
+// (initial cold cache with the network down) must not overwrite a good
+// previous cache with an empty list.
+let saveCacheTimer: ReturnType<typeof setTimeout> | null = null;
+projectsStore.subscribe((projects) => {
+  if (projects.length === 0) return;
+  if (saveCacheTimer !== null) clearTimeout(saveCacheTimer);
+  saveCacheTimer = setTimeout(() => {
+    saveCatalogCache(projects);
+    saveCacheTimer = null;
+  }, 800);
 });

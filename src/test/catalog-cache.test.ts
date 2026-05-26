@@ -111,101 +111,78 @@ describe("appendProjectsChunk upsert-by-slug (task 3.3)", () => {
   });
 });
 
-describe("cache write on busy: true → false (task 4.3)", () => {
-  it("writes once with the current catalog on the falling edge of busy", async () => {
-    // Fresh module so the previousBusy tracker starts at false.
+describe("cache write debounced off projectsStore (task 4.3)", () => {
+  // The subscriber lives at module scope, so importing the module fresh
+  // ensures the debounce timer starts clean per test.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("writes once after projectsStore stops changing", async () => {
     vi.resetModules();
-
-    // Mock the api module so appState.refresh() can return our shaped DTO
-    // synchronously without an IPC call.
-    let nextBusy = false;
-    const baseState = {
-      project_name: "",
-      project_saved: true,
-      status: "",
-      busy: false,
-      downloading_maps: [],
-      projects: [],
-      current_project: null,
-      active_map: null,
-      diagnostics: [],
-      track_layers: [],
-      waypoint_layers: [],
-      track_layer_count: 0,
-      waypoint_layer_count: 0,
-      tracks: [],
-    };
-    vi.doMock("../lib/api", () => ({
-      getAppState: vi.fn(async () => ({ ...baseState, busy: nextBusy })),
-    }));
-
     const fresh = await import("../lib/stores");
     const setItemSpy = vi.spyOn(localStorage, "setItem");
 
-    // Seed projects so the gate "non-empty list" is satisfied.
-    fresh.projectsStore.set([ALPHA, BRAVO]);
+    fresh.projectsStore.set([ALPHA]);
+    fresh.projectsStore.update((p) => [...p, BRAVO]);
 
-    // busy: false → true (no cache write — only the falling edge writes)
-    nextBusy = true;
-    await fresh.appState.refresh();
-
-    // busy: true → false (this transition should trigger a single write)
-    nextBusy = false;
-    await fresh.appState.refresh();
-
-    const cacheWrites = setItemSpy.mock.calls.filter(
+    // The debounce window has not elapsed — no write yet.
+    vi.advanceTimersByTime(700);
+    const beforeDebounce = setItemSpy.mock.calls.filter(
       ([key]) => key === CACHE_KEY,
     );
-    expect(cacheWrites).toHaveLength(1);
+    expect(beforeDebounce).toHaveLength(0);
 
-    const payload = JSON.parse(cacheWrites[0][1] as string);
+    // Cross the 800 ms mark — the snapshot lands.
+    vi.advanceTimersByTime(200);
+    const writes = setItemSpy.mock.calls.filter(([key]) => key === CACHE_KEY);
+    expect(writes).toHaveLength(1);
+
+    const payload = JSON.parse(writes[0][1] as string);
     expect(payload.items).toEqual([ALPHA, BRAVO]);
     expect(typeof payload.writtenAt).toBe("string");
     expect(new Date(payload.writtenAt).toISOString()).toBe(payload.writtenAt);
-
-    vi.doUnmock("../lib/api");
   });
 
-  it("does not write when projects list is empty on the falling edge", async () => {
+  it("does not write when projectsStore stays empty", async () => {
     vi.resetModules();
-
-    let nextBusy = false;
-    const baseState = {
-      project_name: "",
-      project_saved: true,
-      status: "",
-      busy: false,
-      downloading_maps: [],
-      projects: [],
-      current_project: null,
-      active_map: null,
-      diagnostics: [],
-      track_layers: [],
-      waypoint_layers: [],
-      track_layer_count: 0,
-      waypoint_layer_count: 0,
-      tracks: [],
-    };
-    vi.doMock("../lib/api", () => ({
-      getAppState: vi.fn(async () => ({ ...baseState, busy: nextBusy })),
-    }));
-
     const fresh = await import("../lib/stores");
     const setItemSpy = vi.spyOn(localStorage, "setItem");
 
-    // Leave projectsStore empty (the gate must prevent the write).
     fresh.projectsStore.set([]);
+    vi.advanceTimersByTime(2000);
 
-    nextBusy = true;
-    await fresh.appState.refresh();
-    nextBusy = false;
-    await fresh.appState.refresh();
+    const writes = setItemSpy.mock.calls.filter(([key]) => key === CACHE_KEY);
+    expect(writes).toHaveLength(0);
+  });
 
-    const cacheWrites = setItemSpy.mock.calls.filter(
-      ([key]) => key === CACHE_KEY,
-    );
-    expect(cacheWrites).toHaveLength(0);
+  it("further chunks restart the debounce window — write reflects the final list", async () => {
+    vi.resetModules();
+    const fresh = await import("../lib/stores");
+    const setItemSpy = vi.spyOn(localStorage, "setItem");
 
-    vi.doUnmock("../lib/api");
+    fresh.projectsStore.set([ALPHA]);
+    vi.advanceTimersByTime(500);
+    fresh.projectsStore.update((p) => [...p, BRAVO]);
+    vi.advanceTimersByTime(500);
+    fresh.projectsStore.update((p) => [...p, CHARLIE]);
+    // Total elapsed since first set: 1000 ms — but each change resets the
+    // timer, so still no write yet.
+    expect(
+      setItemSpy.mock.calls.filter(([key]) => key === CACHE_KEY),
+    ).toHaveLength(0);
+
+    vi.advanceTimersByTime(800);
+    const writes = setItemSpy.mock.calls.filter(([key]) => key === CACHE_KEY);
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0][1] as string).items).toEqual([
+      ALPHA,
+      BRAVO,
+      CHARLIE,
+    ]);
   });
 });
