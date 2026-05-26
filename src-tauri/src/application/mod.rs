@@ -1174,14 +1174,36 @@ impl AppState {
             return;
         }
 
-        self.lizaalert.active_map = Some(selection.clone());
-        self.update_status(
-            DiagnosticLevel::Info,
-            format!(
-                "Restored active map: {} / {}",
-                selection.project_name, selection.package_name
-            ),
-        );
+        // Mirror the click-open path (`open_selected_map` /
+        // `apply_map_downloaded` / `open_local_map_selection`) so the
+        // frontend's `MapView` receives an `activeMapRef` change with the
+        // backing map layer already registered. Without this call the
+        // frontend would see `active_map` in `AppStateDto` but no
+        // corresponding tile layer to fit-bounds against, leaving the
+        // viewport at MapLibre's default `{ center: [0,0], zoom: 0 }`.
+        let registration = self.register_active_map_layer(&selection);
+        match registration {
+            Ok(_) => {
+                self.lizaalert.active_map = Some(selection.clone());
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!(
+                        "Restored active map: {} / {}",
+                        selection.project_name, selection.package_name
+                    ),
+                );
+            }
+            Err(error) => {
+                self.lizaalert.active_map = None;
+                self.update_status(
+                    DiagnosticLevel::Error,
+                    format!(
+                        "Session restore failed to register active map {} / {}: {error:?}",
+                        selection.project_name, selection.package_name
+                    ),
+                );
+            }
+        }
     }
 
     fn persist_session_snapshot(&mut self) {
@@ -1408,6 +1430,19 @@ mod tests {
         let active_map = state.active_map().expect("active map restored");
         assert_eq!(active_map.local_path, map_path);
         assert_eq!(active_map.package_name, "demo-map");
+        // Session restore SHALL register the active map layer (parity with
+        // the click-open path), so the frontend's `applyActiveMap` effect
+        // has a registered tile source to fit-bounds against. Without this
+        // assertion, regressions like the cold-start "viewport at zoom 0"
+        // bug from `fix-redesign-functional-bugs` would slip through.
+        assert!(
+            state
+                .project
+                .map_layers()
+                .iter()
+                .any(|layer| layer.source_path() == Some(map_path.as_path())),
+            "expected the restored active map's layer to be registered"
+        );
     }
 
     #[test]
