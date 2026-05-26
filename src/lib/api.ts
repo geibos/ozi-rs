@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invokeIpc } from "./ipc";
 import type {
   AppStateDto,
   OziMetadataDto,
@@ -7,16 +7,21 @@ import type {
   SimplifiedPreview,
 } from "./types";
 
+// Every IPC call goes through `invokeIpc` (see `src/lib/ipc.ts`) so that
+// rejections surface as a sticky `data-testid="ipc-error"` toast in dev
+// builds. In production the wrapper is transparent. User-facing
+// `toast.error("Failed to …")` calls at call sites continue to render.
+
 export async function getAppState(): Promise<AppStateDto> {
-  return invoke("get_app_state");
+  return invokeIpc("get_app_state");
 }
 
 export async function getTracksGeojson(): Promise<GeoJSON.FeatureCollection> {
-  return invoke("get_tracks_geojson");
+  return invokeIpc("get_tracks_geojson");
 }
 
 export async function loadProjects(): Promise<void> {
-  return invoke("load_projects");
+  return invokeIpc("load_projects");
 }
 
 /**
@@ -31,7 +36,7 @@ export async function loadProjects(): Promise<void> {
  * instead so the main thread stays responsive.
  */
 export async function loadProject(slug: string): Promise<string> {
-  return invoke("load_project", { slug });
+  return invokeIpc("load_project", { slug });
 }
 
 /**
@@ -41,46 +46,46 @@ export async function loadProject(slug: string): Promise<string> {
  * resume by fetching only the missing files.
  */
 export async function cancelDownload(downloadId: string): Promise<boolean> {
-  return invoke("cancel_download", { downloadId });
+  return invokeIpc("cancel_download", { downloadId });
 }
 
 export async function openSelectedMap(mapName: string): Promise<void> {
-  return invoke("open_selected_map", { mapName });
+  return invokeIpc("open_selected_map", { mapName });
 }
 
 export async function openLocalBundle(dir: string): Promise<string> {
-  return invoke("open_local_bundle", { dir });
+  return invokeIpc("open_local_bundle", { dir });
 }
 
 export async function setBundlesRoot(path: string): Promise<void> {
-  return invoke("set_bundles_root", { path });
+  return invokeIpc("set_bundles_root", { path });
 }
 
 export async function saveProject(path: string): Promise<void> {
-  return invoke("save_project", { path });
+  return invokeIpc("save_project", { path });
 }
 
 export async function loadProjectFile(path: string): Promise<void> {
-  return invoke("load_project_file", { path });
+  return invokeIpc("load_project_file", { path });
 }
 
 export async function importGpx(path: string): Promise<string> {
-  return invoke("import_gpx", { path });
+  return invokeIpc("import_gpx", { path });
 }
 
 export async function importPlt(path: string): Promise<string> {
-  return invoke("import_plt", { path });
+  return invokeIpc("import_plt", { path });
 }
 
 export async function exportGpx(layerId: bigint, path: string): Promise<void> {
-  return invoke("export_gpx", { layerId, path });
+  return invokeIpc("export_gpx", { layerId, path });
 }
 
 export async function getTrackExportDefaultPath(
   trackName: string,
   extension: "gpx" | "plt"
 ): Promise<string | null> {
-  return invoke("get_track_export_default_path", { trackName, extension });
+  return invokeIpc("get_track_export_default_path", { trackName, extension });
 }
 
 export async function exportTrackPlt(
@@ -88,28 +93,28 @@ export async function exportTrackPlt(
   trackId: bigint,
   path: string
 ): Promise<void> {
-  return invoke("export_track_plt", { layerId, trackId, path });
+  return invokeIpc("export_track_plt", { layerId, trackId, path });
 }
 
 export async function exportWptWaypoints(
   layerId: bigint,
   path: string
 ): Promise<void> {
-  return invoke("export_wpt_waypoints", { layerId, path });
+  return invokeIpc("export_wpt_waypoints", { layerId, path });
 }
 
 export async function getWptExportDefaultPath(
   layerId: bigint
 ): Promise<string | null> {
-  return invoke("get_wpt_export_default_path", { layerId });
+  return invokeIpc("get_wpt_export_default_path", { layerId });
 }
 
 export async function undo(): Promise<void> {
-  return invoke("undo");
+  return invokeIpc("undo");
 }
 
 export async function redo(): Promise<void> {
-  return invoke("redo");
+  return invokeIpc("redo");
 }
 
 export async function renameTrack(
@@ -117,7 +122,7 @@ export async function renameTrack(
   trackId: bigint,
   newName: string
 ): Promise<void> {
-  return invoke("rename_track", { layerId, trackId, newName });
+  return invokeIpc("rename_track", { layerId, trackId, newName });
 }
 
 export async function setTrackColor(
@@ -125,29 +130,29 @@ export async function setTrackColor(
   trackId: bigint,
   color: [number, number, number, number]
 ): Promise<void> {
-  return invoke("set_track_color", { layerId, trackId, color });
+  return invokeIpc("set_track_color", { layerId, trackId, color });
 }
 
 export async function toggleTrackVisible(
   layerId: bigint,
   trackId: bigint
 ): Promise<void> {
-  return invoke("toggle_track_visible", { layerId, trackId });
+  return invokeIpc("toggle_track_visible", { layerId, trackId });
 }
 
 export async function toggleWaypointVisible(
   layerId: bigint,
   waypointId: bigint
 ): Promise<void> {
-  return invoke("toggle_waypoint_visible", { layerId, waypointId });
+  return invokeIpc("toggle_waypoint_visible", { layerId, waypointId });
 }
 
 export async function revealBundle(): Promise<void> {
-  return invoke("reveal_bundle");
+  return invokeIpc("reveal_bundle");
 }
 
 export async function getOziMetadata(mapPath: string): Promise<OziMetadataDto> {
-  return invoke("get_ozi_metadata", { mapPath });
+  return invokeIpc("get_ozi_metadata", { mapPath });
 }
 
 /** Return raw tile bytes from SQLite bundle. Used by sqlite-protocol.ts. */
@@ -158,7 +163,7 @@ export async function getSqliteTile(
   x: number,
   y: number
 ): Promise<ArrayBuffer> {
-  return invoke("get_sqlite_tile", { path, baseZoom, z, x, y });
+  return invokeIpc("get_sqlite_tile", { path, baseZoom, z, x, y });
 }
 
 /** Return PNG-encoded tile bytes from OZF2 file. Used by ozi-protocol.ts. */
@@ -168,7 +173,7 @@ export async function getOziTile(
   tileX: number,
   tileY: number
 ): Promise<ArrayBuffer> {
-  return invoke("get_ozi_tile", { mapPath, level, tileX, tileY });
+  return invokeIpc("get_ozi_tile", { mapPath, level, tileX, tileY });
 }
 
 /** Return a 256×256 PNG for Web Mercator tile (tx, ty, tz) reprojected from OZF2. */
@@ -178,7 +183,7 @@ export async function getOziTileProjected(
   ty: number,
   tz: number,
 ): Promise<ArrayBuffer> {
-  return invoke("get_ozi_tile_projected", { mapPath, tx, ty, tz });
+  return invokeIpc("get_ozi_tile_projected", { mapPath, tx, ty, tz });
 }
 
 export async function moveTrackPoint(
@@ -188,7 +193,7 @@ export async function moveTrackPoint(
   pointId: bigint,
   position: [number, number]
 ): Promise<void> {
-  return invoke("move_track_point", { layerId, trackId, segmentId, pointId, position });
+  return invokeIpc("move_track_point", { layerId, trackId, segmentId, pointId, position });
 }
 
 export async function deleteTrackPoint(
@@ -197,7 +202,7 @@ export async function deleteTrackPoint(
   segmentId: bigint,
   pointId: bigint
 ): Promise<void> {
-  return invoke("delete_track_point", { layerId, trackId, segmentId, pointId });
+  return invokeIpc("delete_track_point", { layerId, trackId, segmentId, pointId });
 }
 
 export async function insertTrackPoint(
@@ -207,7 +212,7 @@ export async function insertTrackPoint(
   index: number,
   position: [number, number]
 ): Promise<void> {
-  return invoke("insert_track_point", { layerId, trackId, segmentId, index, position });
+  return invokeIpc("insert_track_point", { layerId, trackId, segmentId, index, position });
 }
 
 export async function splitSegment(
@@ -216,7 +221,7 @@ export async function splitSegment(
   segmentId: bigint,
   pointId: bigint
 ): Promise<void> {
-  return invoke("split_segment", { layerId, trackId, segmentId, pointId });
+  return invokeIpc("split_segment", { layerId, trackId, segmentId, pointId });
 }
 
 export async function joinSegments(
@@ -225,15 +230,15 @@ export async function joinSegments(
   segIdA: bigint,
   segIdB: bigint
 ): Promise<void> {
-  return invoke("join_segments", { layerId, trackId, segIdA, segIdB });
+  return invokeIpc("join_segments", { layerId, trackId, segIdA, segIdB });
 }
 
 export async function deleteTrack(layerId: bigint, trackId: bigint): Promise<void> {
-  return invoke("delete_track", { layerId, trackId });
+  return invokeIpc("delete_track", { layerId, trackId });
 }
 
 export async function deleteWaypoint(layerId: bigint, waypointId: bigint): Promise<void> {
-  return invoke("delete_waypoint", { layerId, waypointId });
+  return invokeIpc("delete_waypoint", { layerId, waypointId });
 }
 
 export async function renameWaypoint(
@@ -241,7 +246,7 @@ export async function renameWaypoint(
   waypointId: bigint,
   newName: string
 ): Promise<void> {
-  return invoke("rename_waypoint", { layerId, waypointId, newName });
+  return invokeIpc("rename_waypoint", { layerId, waypointId, newName });
 }
 
 export async function setWaypointSymbol(
@@ -249,7 +254,7 @@ export async function setWaypointSymbol(
   waypointId: bigint,
   symbol: string | null
 ): Promise<void> {
-  return invoke("set_waypoint_symbol", { layerId, waypointId, symbol });
+  return invokeIpc("set_waypoint_symbol", { layerId, waypointId, symbol });
 }
 
 export async function simplifyTrack(
@@ -257,7 +262,7 @@ export async function simplifyTrack(
   trackId: bigint,
   tolerance: number
 ): Promise<void> {
-  return invoke("simplify_track", { layerId, trackId, tolerance });
+  return invokeIpc("simplify_track", { layerId, trackId, tolerance });
 }
 
 export async function setTrackLineWidth(
@@ -265,14 +270,14 @@ export async function setTrackLineWidth(
   trackId: bigint,
   width: number
 ): Promise<void> {
-  return invoke("set_track_line_width", { layerId, trackId, width });
+  return invokeIpc("set_track_line_width", { layerId, trackId, width });
 }
 
 export async function getTrackDetail(
   layerId: bigint,
   trackId: bigint
 ): Promise<TrackDetail> {
-  return invoke("get_track_detail", { layerId, trackId });
+  return invokeIpc("get_track_detail", { layerId, trackId });
 }
 
 export async function addWaypoint(
@@ -281,7 +286,7 @@ export async function addWaypoint(
   lon: number,
   name: string,
 ): Promise<void> {
-  return invoke("add_waypoint", { layerId, lat, lon, name });
+  return invokeIpc("add_waypoint", { layerId, lat, lon, name });
 }
 
 export async function moveWaypoint(
@@ -289,11 +294,11 @@ export async function moveWaypoint(
   waypointId: bigint,
   position: [number, number]
 ): Promise<void> {
-  return invoke("move_waypoint", { layerId, waypointId, position });
+  return invokeIpc("move_waypoint", { layerId, waypointId, position });
 }
 
 export async function getWaypoints(layerId: bigint): Promise<WaypointData[]> {
-  return invoke("get_waypoints", { layerId });
+  return invokeIpc("get_waypoints", { layerId });
 }
 
 export async function getSimplifiedPreview(
@@ -301,12 +306,12 @@ export async function getSimplifiedPreview(
   trackId: bigint,
   tolerance: number
 ): Promise<SimplifiedPreview> {
-  return invoke("get_simplified_preview", { layerId, trackId, tolerance });
+  return invokeIpc("get_simplified_preview", { layerId, trackId, tolerance });
 }
 
 export async function createEmptyTrack(
   layerId: bigint,
   name: string
 ): Promise<bigint> {
-  return invoke("create_empty_track", { layerId, name });
+  return invokeIpc("create_empty_track", { layerId, name });
 }

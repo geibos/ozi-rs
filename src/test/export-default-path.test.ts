@@ -14,7 +14,9 @@ const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
 describe("track export dialog default paths", () => {
   it("uses a typed API wrapper to request backend-built export defaults", () => {
     expect(apiSource).toContain("getTrackExportDefaultPath");
-    expect(apiSource).toContain('invoke("get_track_export_default_path"');
+    // `api.ts` now routes through the `invokeIpc` wrapper from
+    // `src/lib/ipc.ts` so dev IPC failures surface as a structured toast.
+    expect(apiSource).toContain('invokeIpc("get_track_export_default_path"');
   });
 
   it("passes backend GPX and PLT defaults into save dialogs", () => {
