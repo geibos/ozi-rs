@@ -11,14 +11,19 @@
    * Visibility is per-waypoint, not per-layer: each row stores its own
    * `visible` flag, toggled through `toggle_waypoint_visible`.
    */
+  import { buttonVariants } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Select from "$lib/components/ui/select";
+  import * as Tooltip from "$lib/components/ui/tooltip";
   import {
     activeWaypointLayerId,
+    addWaypointMode,
     appState,
+    drawingModeActive,
     selectedWaypointId,
   } from "$lib/stores";
+  import MapPinIcon from "@lucide/svelte/icons/map-pin";
   import {
     deleteWaypoint,
     exportWptWaypoints,
@@ -144,24 +149,52 @@
   <header class="border-border border-b px-2 py-1.5">
     {#if waypointLayers.length > 0}
       <Label class="text-muted-foreground text-[10px]">Waypoint layer</Label>
-      <Select.Root
-        type="single"
-        value={waypointLayerSelectValue}
-        onValueChange={(v) => v && activeWaypointLayerId.set(BigInt(v))}
-      >
-        <Select.Trigger aria-label="Waypoint layer" size="sm" class="w-full">
-          {waypointLayers.find(
-            (l) => String(l.id) === waypointLayerSelectValue,
-          )?.name ?? "Pick layer"}
-        </Select.Trigger>
-        <Select.Content>
-          {#each waypointLayers as layer (layer.id)}
-            <Select.Item value={String(layer.id)} label={layer.name}>
-              {layer.name}
-            </Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
+      <div class="flex items-center gap-1">
+        <Select.Root
+          type="single"
+          value={waypointLayerSelectValue}
+          onValueChange={(v) => v && activeWaypointLayerId.set(BigInt(v))}
+        >
+          <Select.Trigger
+            aria-label="Waypoint layer"
+            size="sm"
+            class="min-w-0 flex-1"
+          >
+            {waypointLayers.find(
+              (l) => String(l.id) === waypointLayerSelectValue,
+            )?.name ?? "Pick layer"}
+          </Select.Trigger>
+          <Select.Content>
+            {#each waypointLayers as layer (layer.id)}
+              <Select.Item value={String(layer.id)} label={layer.name}>
+                {layer.name}
+              </Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
+
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class={buttonVariants({
+              variant: $addWaypointMode ? "default" : "ghost",
+              size: $addWaypointMode ? "sm" : "icon-sm",
+            })}
+            aria-label={$addWaypointMode ? "Cancel" : "Add waypoint"}
+            aria-pressed={$addWaypointMode}
+            disabled={$drawingModeActive || $activeWaypointLayerId === null}
+            onclick={() => addWaypointMode.update((v) => !v)}
+            data-testid="library-add-waypoint"
+          >
+            <MapPinIcon strokeWidth={1.5} />
+            {#if $addWaypointMode}
+              <span class="text-xs">Cancel</span>
+            {/if}
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            {$addWaypointMode ? "Cancel add waypoint" : "Add waypoint"}
+          </Tooltip.Content>
+        </Tooltip.Root>
+      </div>
     {/if}
   </header>
 
