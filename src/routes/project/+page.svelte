@@ -3,8 +3,11 @@
   import { get } from "svelte/store";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
-  import { activeMap } from "../../lib/stores";
+  import { activeMap, bundleLoaderOpen } from "../../lib/stores";
   import WorkspaceShell from "../../components/WorkspaceShell.svelte";
+  import LibraryRail from "../../components/LibraryRail.svelte";
+  import BundleLoader from "../../components/BundleLoader.svelte";
+  import * as Sheet from "$lib/components/ui/sheet";
 
   onMount(() => {
     if (!get(activeMap)) {
@@ -22,14 +25,28 @@
 </script>
 
 <!--
-  The 2-column `Sidebar.svelte` + floating `TracksPanel` / `TrackPointsPanel`
-  / `WaypointsPanel` mount has been replaced by the 3-pane WorkspaceShell.
-  Those components stay in the repository tree for the follow-up
-  `library-sidebar` and `inspector-pane` changes to reuse or delete; this
-  page no longer mounts any of them. The `library-rail` and `inspector-rail`
-  slots are intentionally empty here — they receive content from the next
-  two changes. `MapView` continues to be mounted from `src/routes/+layout.svelte`
-  and becomes visible inside the canvas region while the workspace route is
-  active.
+  Workspace shell. The library rail hosts the three-tab `LibraryRail`
+  (Maps / Tracks / Waypoints). The canvas is the visual region into which
+  `MapView` (mounted once in `src/routes/+layout.svelte`) shows. The
+  inspector rail is owned by the follow-up `redesign-inspector-pane`
+  change.
+
+  The bundle-loader Sheet is mounted alongside the shell so the Maps tab
+  header's "Maps…" button can toggle it via the `bundleLoaderOpen` store.
+  Cold-start at `/` still owns its own full-window loader; this Sheet only
+  appears once the user is in the workspace.
 -->
-<WorkspaceShell />
+<WorkspaceShell>
+  {#snippet libraryRail()}
+    <LibraryRail />
+  {/snippet}
+</WorkspaceShell>
+
+<Sheet.Root bind:open={$bundleLoaderOpen}>
+  <Sheet.Content
+    side="right"
+    class="w-[480px] max-w-[480px] sm:max-w-[480px] p-0"
+  >
+    <BundleLoader onCloseRequest={() => bundleLoaderOpen.set(false)} />
+  </Sheet.Content>
+</Sheet.Root>

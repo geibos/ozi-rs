@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const tracksPanelSource = readFileSync(
-  join(__dirname, "../components/TracksPanel.svelte"),
+// Track export wiring now lives in the Library Tracks tab. The legacy
+// `TracksPanel.svelte` was deleted by `redesign-library-sidebar`.
+const tracksTabSource = readFileSync(
+  join(__dirname, "../components/library/TracksTab.svelte"),
   "utf-8"
 );
 
@@ -16,16 +18,16 @@ describe("track export dialog default paths", () => {
   });
 
   it("passes backend GPX and PLT defaults into save dialogs", () => {
-    expect(tracksPanelSource).toContain("getTrackExportDefaultPath");
-    expect(tracksPanelSource).toContain('await getTrackExportDefaultPath(track.name, "gpx")');
-    expect(tracksPanelSource).toContain('await getTrackExportDefaultPath(track.name, "plt")');
-    expect(tracksPanelSource).toContain('defaultPath: defaultPath ?? `${track.name}.gpx`');
-    expect(tracksPanelSource).toContain('defaultPath: defaultPath ?? `${track.name}.plt`');
+    expect(tracksTabSource).toContain("getTrackExportDefaultPath");
+    expect(tracksTabSource).toContain('await getTrackExportDefaultPath(t.name, "gpx")');
+    expect(tracksTabSource).toContain('await getTrackExportDefaultPath(t.name, "plt")');
+    expect(tracksTabSource).toContain('defaultPath: defaultPath ?? `${t.name}.gpx`');
+    expect(tracksTabSource).toContain('defaultPath: defaultPath ?? `${t.name}.plt`');
   });
 
   it("keeps export dialogs behind API wrappers without direct invoke calls", () => {
-    expect(tracksPanelSource).not.toContain("invoke(");
-    expect(tracksPanelSource).toContain("exportGpx");
-    expect(tracksPanelSource).toContain("exportTrackPlt");
+    expect(tracksTabSource).not.toContain("invoke(");
+    expect(tracksTabSource).toContain("exportGpx");
+    expect(tracksTabSource).toContain("exportTrackPlt");
   });
 });

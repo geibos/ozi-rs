@@ -269,8 +269,14 @@ export const currentDownload = writable<DownloadProgressPayload | null>(null);
 
 // UI-only state (not persisted)
 export const consoleOpen = writable(false);
-export const tracksPanelOpen = writable(true);
-export const waypointsPanelOpen = writable(false);
+/**
+ * Active LibraryRail tab. Session-scoped only — NOT persisted to
+ * localStorage or the Rust session file. Default `'maps'`. Reopening the
+ * app starts on Maps regardless of where the previous session ended.
+ */
+export const libraryActiveTab = writable<"maps" | "tracks" | "waypoints">(
+  "maps",
+);
 export const addWaypointMode = writable(false);
 export const activeTrackLayerId = writable<bigint | null>(null);
 export const activeWaypointLayerId = writable<bigint | null>(null);
@@ -280,7 +286,6 @@ export const drawingTrackId = writable<bigint | null>(null);
 export const drawingPointCount = writable(0);
 export const drawingFinishRequested = writable(false);
 export const drawingSegmentId = writable<bigint | null>(null);
-export const trackPointsPanelOpen = writable(false);
 export const editModeActive = writable(false);
 export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | null>(null);
 export const selectedWaypointId: import("svelte/store").Writable<bigint | null> = writable(null);

@@ -3,21 +3,21 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { formatTrackStats } from "../lib/track-stats";
 
+// Track-stats rendering moved from the floating `TracksPanel.svelte` to
+// the `LibraryRail` Tracks tab (`redesign-library-sidebar`).
 const source = readFileSync(
-  join(__dirname, "../components/TracksPanel.svelte"),
+  join(__dirname, "../components/library/TracksTab.svelte"),
   "utf-8"
 );
 
-describe("TracksPanel statistics formatter", () => {
+describe("Library Tracks tab statistics formatter", () => {
   it("renders distance, duration, and point count joined by · when timestamps are present", () => {
-    // 12.3 km, 1h 24m = 5040s, 156 pts → matches the spec scenario verbatim.
     expect(formatTrackStats(12.3, 5040, 156)).toBe("12.3 km · 1h 24m · 156 pts");
   });
 
   it("omits the duration segment (and its separator) when duration is null", () => {
     const formatted = formatTrackStats(12.3, null, 156);
     expect(formatted).toBe("12.3 km · 156 pts");
-    // No `<m>m` or `<h>h <m>m` token sneaks in when duration is missing.
     expect(formatted).not.toMatch(/\d+h\s\d+m/);
     expect(formatted).not.toMatch(/·\s\d+m\s·/);
   });
@@ -27,7 +27,6 @@ describe("TracksPanel statistics formatter", () => {
   });
 
   it("shows minutes-only when the duration is under one hour", () => {
-    // 45 * 60 = 2700s
     expect(formatTrackStats(3.2, 2700, 50)).toBe("3.2 km · 45m · 50 pts");
   });
 
@@ -37,12 +36,9 @@ describe("TracksPanel statistics formatter", () => {
   });
 });
 
-describe("TracksPanel statistics rendering", () => {
+describe("Library Tracks tab statistics rendering", () => {
   it("imports the formatter and exposes a track-stats element", () => {
     expect(source).toContain('import { formatTrackStats }');
-    // The `class="track-stats"` selector is gone (chrome moved to Tailwind
-    // utilities reading semantic tokens); the test-only data-testid hook is
-    // still the contract for downstream UI/E2E assertions.
     expect(source).toContain('data-testid="track-stats"');
   });
 
@@ -57,14 +53,12 @@ describe("TracksPanel statistics rendering", () => {
 
   it("passes the loaded statistics through formatTrackStats", () => {
     expect(source).toContain("formatTrackStats(");
-    expect(source).toContain("track.distanceKm");
-    expect(source).toContain("track.durationSeconds");
-    expect(source).toContain("track.pointCount");
+    expect(source).toContain("t.distanceKm");
+    expect(source).toContain("t.durationSeconds");
+    expect(source).toContain("t.pointCount");
   });
 
   it("treats null/undefined duration as missing so the segment is hidden", () => {
-    // The mapping converts null/undefined raw duration into null on the model,
-    // which formatTrackStats then drops from the rendered output.
     expect(source).toContain("rawDuration === null || rawDuration === undefined");
   });
 });
