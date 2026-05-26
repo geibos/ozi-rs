@@ -9,15 +9,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { listen } from "@tauri-apps/api/event";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import {
     activeDownloadId,
     activeMap,
     appState,
-    appendProjectsChunk,
+    bundleProgress,
     busy,
+    currentDownload,
     currentProject,
     downloadProgress,
     downloadingMaps,
@@ -26,7 +26,6 @@
     resetBundleDownloadState,
     status,
     syncProjectsFromAppState,
-    updateDownloadProgress,
   } from "../lib/stores";
   import {
     cancelDownload,
@@ -38,16 +37,15 @@
   } from "../lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
-  import type {
-    BundleProgressPayload,
-    DownloadProgressPayload,
-    LizaProjectSummaryDto,
-  } from "../lib/types";
 
   let projectFilter = $state("");
+  // `debouncedProjectFilter` is the value the `filtered` derivation reads.
+  // Fast typing keeps re-arming the timer (see effect below); the list
+  // re-filters at most once per 150ms quiet window. 150ms sits inside the
+  // perceptual-instantaneity envelope while comfortably absorbing a normal
+  // typing burst. Spec floor is 120ms (`consolidate-state-event-flow`).
+  let debouncedProjectFilter = $state("");
   let selectedSlug = $state("");
-  let bundleProgress = $state<BundleProgressPayload | null>(null);
-  let currentDownload = $state<DownloadProgressPayload | null>(null);
   let transientStatus = $state<string | null>(null);
 
   $effect(() => {
@@ -55,57 +53,45 @@
     syncProjectsFromAppState(s);
     if (s && !s.busy) {
       projectsLoading.set(false);
-      bundleProgress = null;
+      bundleProgress.set(null);
     }
   });
 
+  // Debounce the filter input. The teardown clears any pending timer so a
+  // late flush after navigation can't whack a fresh store value.
+  $effect(() => {
+    const value = projectFilter;
+    const handle = setTimeout(() => {
+      debouncedProjectFilter = value;
+    }, 150);
+    return () => clearTimeout(handle);
+  });
+
   onMount(() => {
+    // The layout owns every Tauri event listener and the startup
+    // `loadProjects()` call (single-source rule, `consolidate-state-event-flow`).
+    // The only page-level startup concern is the cold-start auto-redirect
+    // into /project when a project is already open (e.g., after reload).
+    if (initialRedirectChecked) return;
+    initialRedirectChecked = true;
     let cancelled = false;
-    const cleanups: Array<() => void> = [];
 
     (async () => {
-      if (!initialRedirectChecked) {
-        initialRedirectChecked = true;
-        await appState.refresh();
-        if (cancelled) return;
-        if (get(activeMap)) {
-          goto(resolve("/project"));
-          return;
-        }
+      await appState.refresh();
+      if (cancelled) return;
+      if (get(activeMap)) {
+        goto(resolve("/project"));
       }
-
-      const subscribers: Array<Promise<() => void>> = [
-        listen<DownloadProgressPayload>("download-progress", (e) => {
-          updateDownloadProgress(e.payload);
-          currentDownload = e.payload;
-        }),
-        listen<BundleProgressPayload>("bundle-progress", (e) => {
-          bundleProgress = e.payload;
-        }),
-        listen<LizaProjectSummaryDto[]>("projects-chunk", (e) =>
-          appendProjectsChunk(e.payload),
-        ),
-      ];
-
-      const fns = await Promise.all(subscribers);
-      if (cancelled) {
-        fns.forEach((fn) => fn());
-        return;
-      }
-      cleanups.push(...fns);
-
-      loadProjects().catch(() => {});
     })();
 
     return () => {
       cancelled = true;
-      cleanups.forEach((fn) => fn());
     };
   });
 
   const filtered = $derived(
     $projects.filter((p) =>
-      p.name.toLowerCase().includes(projectFilter.toLowerCase()),
+      p.name.toLowerCase().includes(debouncedProjectFilter.toLowerCase()),
     ),
   );
 
@@ -142,7 +128,7 @@
 
     // Clear the per-bundle progress UI without touching activeDownloadId.
     downloadProgress.set(new Map());
-    currentDownload = null;
+    currentDownload.set(null);
 
     try {
       const id = await loadProject(slug);
@@ -192,19 +178,16 @@
   }
 
   const bundlePercent = $derived(
-    bundleProgress?.total
-      ? Math.round(((bundleProgress.completed ?? 0) / bundleProgress.total) * 100)
+    $bundleProgress?.total
+      ? Math.round((($bundleProgress.completed ?? 0) / $bundleProgress.total) * 100)
       : null,
   );
 
   const currentFileLabel = $derived.by(() => {
-    if (!currentDownload) return null;
-    if (
-      currentDownload.file_index == null ||
-      currentDownload.file_count == null
-    )
-      return null;
-    return `${currentDownload.file_index + 1} / ${currentDownload.file_count} — ${currentDownload.package_name}`;
+    const c = $currentDownload;
+    if (!c) return null;
+    if (c.file_index == null || c.file_count == null) return null;
+    return `${c.file_index + 1} / ${c.file_count} — ${c.package_name}`;
   });
 
 </script>
@@ -318,7 +301,7 @@
       {#if $busy || transientStatus}
         <span class="spinner"></span>
       {/if}
-      <span class="status-text">{transientStatus ?? bundleProgress?.message ?? $status ?? ""}</span>
+      <span class="status-text">{transientStatus ?? $bundleProgress?.message ?? $status ?? ""}</span>
     </div>
 
     <div class="current-file-slot">
@@ -330,7 +313,7 @@
     </div>
 
     <div class="progress-slot">
-      {#if currentDownload && currentDownload.total_bytes == null && currentDownload.downloaded_bytes > 0}
+      {#if $currentDownload && $currentDownload.total_bytes == null && $currentDownload.downloaded_bytes > 0}
         <div class="bundle-track" data-testid="indeterminate-bar">
           <div class="bundle-fill indeterminate-bar"></div>
         </div>
@@ -344,13 +327,13 @@
     </div>
 
     <div class="meta-slot">
-      {#if bundleProgress?.total != null}
-        <span>{bundleProgress.completed ?? 0}/{bundleProgress.total}</span>
+      {#if $bundleProgress?.total != null}
+        <span>{$bundleProgress.completed ?? 0}/{$bundleProgress.total}</span>
       {/if}
-      {#if bundleProgress?.downloaded_bytes != null}
+      {#if $bundleProgress?.downloaded_bytes != null}
         <span>
-          {formatBytes(bundleProgress.downloaded_bytes)}
-          {bundleProgress.total_bytes ? `/ ${formatBytes(bundleProgress.total_bytes)}` : ""}
+          {formatBytes($bundleProgress.downloaded_bytes)}
+          {$bundleProgress.total_bytes ? `/ ${formatBytes($bundleProgress.total_bytes)}` : ""}
         </span>
       {/if}
     </div>

@@ -6,6 +6,10 @@ const loaderSource = readFileSync(
   join(__dirname, "../routes/+page.svelte"),
   "utf-8"
 );
+const layoutSource = readFileSync(
+  join(__dirname, "../routes/+layout.svelte"),
+  "utf-8"
+);
 const storesSource = readFileSync(
   join(__dirname, "../lib/stores.ts"),
   "utf-8"
@@ -24,9 +28,12 @@ describe("bundle loader per-file progress UI", () => {
     expect(loaderSource).toContain("file_index");
     expect(loaderSource).toContain("file_count");
     expect(loaderSource).toContain("data-testid=\"current-file-label\"");
-    // Source of truth: `currentDownload` mutated inside the
-    // `download-progress` listener.
-    expect(loaderSource).toContain("currentDownload = e.payload");
+    // Source of truth: the `download-progress` listener now lives in
+    // `+layout.svelte` (single-owner rule, `consolidate-state-event-flow`)
+    // and writes the payload into the `currentDownload` store; the page
+    // reads `$currentDownload`.
+    expect(layoutSource).toMatch(/currentDownload\.set\(event\.payload\)/);
+    expect(loaderSource).toContain("$currentDownload");
   });
 
   it("per-file readiness streams into AppStateDto live (stream-bundle-file-availability)", () => {
@@ -53,7 +60,7 @@ describe("bundle loader per-file progress UI", () => {
   it("renders an indeterminate animation when total_bytes is missing", () => {
     expect(loaderSource).toContain("data-testid=\"indeterminate-bar\"");
     expect(loaderSource).toContain("indeterminate-bar");
-    expect(loaderSource).toContain("currentDownload.total_bytes == null");
+    expect(loaderSource).toContain("$currentDownload.total_bytes == null");
   });
 
   it("exposes a cancel button wired to cancelDownload(activeDownloadId)", () => {

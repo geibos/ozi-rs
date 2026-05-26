@@ -1,10 +1,13 @@
 import { writable, derived } from "svelte/store";
 import type {
   AppStateDto,
+  BundleProgressPayload,
   CatalogCachePayload,
   DownloadProgressPayload,
+  LayerSummaryDto,
   LizaProjectSummaryDto,
   SimplifiedPreview,
+  TrackSummary,
 } from "./types";
 import { getAppState } from "./api";
 import { selectVisibleWaypointLayers } from "./waypoint-layers";
@@ -107,6 +110,69 @@ export const visibleWaypointLayers = derived(appState, ($s) =>
 );
 export const downloadingMaps = derived(appState, ($s) => new Set($s?.downloading_maps ?? []));
 
+/**
+ * Slice indicator for the active raster map. Changes only when the active
+ * map's `local_path` changes — typing in the filter or download progress
+ * events do NOT mutate this value.
+ */
+export const activeMapRef = derived(appState, ($s) => $s?.active_map?.local_path ?? null);
+
+/**
+ * Build a stable string fingerprint describing every field that
+ * `MapView`'s tracks layer re-renders against: layer set + per-track
+ * id, color, line width, visibility, and point count. Order-stable
+ * regardless of layer/track insertion order in the source list.
+ *
+ * Exposed for unit testing in `src/test/fingerprints.test.ts` so that
+ * forgetting to include a render-relevant field surfaces as a failed
+ * assertion rather than a stale map.
+ */
+export function fingerprintTracks(
+  layers: LayerSummaryDto[] | null | undefined,
+  tracks: TrackSummary[] | null | undefined,
+): string {
+  const layerPart = (layers ?? [])
+    .map((l) => `${l.id}:${l.visible === false ? 0 : 1}`)
+    .sort()
+    .join(",");
+  const trackPart = (tracks ?? [])
+    .map(
+      (t) =>
+        `${t.layer_id}:${t.track_id}:${t.color}:${t.line_width}:${
+          t.visible ? 1 : 0
+        }:${t.point_count}`,
+    )
+    .sort()
+    .join("|");
+  return `L[${layerPart}]T[${trackPart}]`;
+}
+
+/**
+ * Stable string fingerprint over the waypoint-layer slice. AppStateDto
+ * does NOT carry individual waypoint geometry/symbols — those are
+ * fetched on demand via `getWaypoints(layerId)`. Per-waypoint diffing
+ * is done by the incremental reconciler in MapView, so this fingerprint
+ * only needs to invalidate when the layer set or per-layer visibility
+ * changes. Download-progress events do not mutate `waypoint_layers`,
+ * so this value is stable through a download burst.
+ */
+export function fingerprintWaypoints(
+  layers: LayerSummaryDto[] | null | undefined,
+): string {
+  return (layers ?? [])
+    .map((l) => `${l.id}:${l.visible === false ? 0 : 1}`)
+    .sort()
+    .join(",");
+}
+
+export const tracksFingerprint = derived(appState, ($s) =>
+  fingerprintTracks($s?.track_layers, $s?.tracks),
+);
+
+export const waypointsFingerprint = derived(appState, ($s) =>
+  fingerprintWaypoints($s?.waypoint_layers),
+);
+
 function syncActiveLayer(
   current: bigint | null,
   layers: Array<{ id: number }>
@@ -180,7 +246,26 @@ export const activeDownloadId = writable<string | null>(null);
 export function resetBundleDownloadState(downloadId: string | null) {
   activeDownloadId.set(downloadId);
   downloadProgress.set(new Map());
+  currentDownload.set(null);
+  bundleProgress.set(null);
 }
+
+/**
+ * Aggregate bundle-level progress (file count, byte totals, phase label).
+ * Written by the layout-level `bundle-progress` listener; read by the
+ * bundle-loader status bar. Promoted from a page-local `$state` because
+ * the listener that feeds it lives in `+layout.svelte` — see the
+ * `consolidate-state-event-flow` change for the single-owner rule.
+ */
+export const bundleProgress = writable<BundleProgressPayload | null>(null);
+
+/**
+ * Last per-file download-progress payload, used by the bundle-loader
+ * status bar to render the "N / M — package_name" current-file label
+ * and the indeterminate progress bar fallback. Layout-level writer,
+ * page-level reader.
+ */
+export const currentDownload = writable<DownloadProgressPayload | null>(null);
 
 // UI-only state (not persisted)
 export const consoleOpen = writable(false);
