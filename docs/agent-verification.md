@@ -69,7 +69,20 @@ Step 0 is **not verified**. Do not write "works."
 
 ### Step 4 — Stop and attach evidence
 
-`stop_app`. Then, in your response or PR description, list the absolute paths of
+End every run — pass OR fail — with this cleanup, in this order:
+
+1. **`appium_stop_session`** (if a Tier 2 session was opened). Mac2 keeps the
+   accessibility / screen-recording grants attached to the session; leaving it
+   open visibly dims the user's screen long after the turn ends.
+2. **`stop_app`**. Quits the launched `ozi-rs.app`. If
+   `.sisyphus/evidence/native-qa/session.json` still reports `running: true` a
+   couple of seconds later, hard-kill with
+   `pgrep -f "ozi-rs/Contents/MacOS" | xargs -I{} kill -9 {}`.
+3. **Verify cleanup**: `pgrep -f "ozi-rs/Contents/MacOS"` returns nothing AND
+   `curl -s http://127.0.0.1:4723/sessions` returns an empty list before you
+   write the report.
+
+Then, in your response or PR description, list the absolute paths of
 all artefacts produced (screenshots, logs). Do not paraphrase — link the paths.
 A reviewer must be able to open them.
 
