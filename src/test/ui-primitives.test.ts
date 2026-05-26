@@ -5,6 +5,7 @@ import { afterEach } from "vitest";
 
 import * as Button from "$lib/components/ui/button";
 import * as Card from "$lib/components/ui/card";
+import * as Command from "$lib/components/ui/command";
 import * as Dialog from "$lib/components/ui/dialog";
 import * as Input from "$lib/components/ui/input";
 import * as Label from "$lib/components/ui/label";
@@ -12,6 +13,7 @@ import * as Popover from "$lib/components/ui/popover";
 import * as ScrollArea from "$lib/components/ui/scroll-area";
 import * as Select from "$lib/components/ui/select";
 import * as Separator from "$lib/components/ui/separator";
+import * as Sheet from "$lib/components/ui/sheet";
 import * as Slider from "$lib/components/ui/slider";
 import * as Sonner from "$lib/components/ui/sonner";
 import * as Switch from "$lib/components/ui/switch";
@@ -53,6 +55,11 @@ describe("shadcn-svelte primitives", () => {
     ["tabs", Tabs.Root],
     ["tabs-list", Tabs.List],
     ["tooltip", Tooltip.Root],
+    ["sheet", Sheet.Root],
+    ["sheet-content", Sheet.Content],
+    ["command", Command.Root],
+    ["command-input", Command.Input],
+    ["command-list", Command.List],
   ];
 
   for (const [name, exportRef] of cases) {

@@ -299,11 +299,47 @@ export const simplifyState = writable<{
   tolerance: 10,
   preview: null,
 });
+/**
+ * Active theme identifier. Default `"native-auto"` (Zinc + Teal tracking OS
+ * light/dark). Persisted in `localStorage["theme"]`. Catppuccin flavour
+ * values (`auto` / `latte` / `frappe` / `macchiato` / `mocha`) implicitly
+ * enable the Catppuccin pack — see `selectedTheme.subscribe` below.
+ */
 export const selectedTheme = writable<string>(
-  localStorage.getItem("theme") ?? "auto"
+  localStorage.getItem("theme") ?? "native-auto"
 );
 
 selectedTheme.subscribe((v) => localStorage.setItem("theme", v));
+
+const CATPPUCCIN_THEME_VALUES = new Set([
+  "auto",
+  "latte",
+  "frappe",
+  "macchiato",
+  "mocha",
+]);
+
+/**
+ * Whether the user has opted into the Catppuccin theme pack. When false,
+ * the theme picker only offers the native auto/light/dark entries; when
+ * true the picker exposes the four Catppuccin flavours + Catppuccin Auto.
+ *
+ * The flag is implicitly turned ON the first time the user selects any
+ * Catppuccin flavour — keeping the existing single-store API surface
+ * (selecting "Mocha" still applies Mocha, no separate enable step).
+ */
+export const catppuccinPackEnabled = writable<boolean>(
+  localStorage.getItem("catppuccinPackEnabled") === "1" ||
+    CATPPUCCIN_THEME_VALUES.has(localStorage.getItem("theme") ?? ""),
+);
+
+catppuccinPackEnabled.subscribe((v) =>
+  localStorage.setItem("catppuccinPackEnabled", v ? "1" : "0"),
+);
+
+selectedTheme.subscribe((v) => {
+  if (CATPPUCCIN_THEME_VALUES.has(v)) catppuccinPackEnabled.set(true);
+});
 
 appState.subscribe((state) => {
   activeTrackLayerId.update((current) => syncActiveLayer(current, state?.track_layers ?? []));

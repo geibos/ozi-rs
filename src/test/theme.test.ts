@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { FlavorName } from "@catppuccin/palette";
 import {
   SEMANTIC_MAP_DARK,
   SEMANTIC_MAP_LIGHT,
@@ -7,7 +8,6 @@ import {
   applyTheme,
   formatHslTriplet,
   installAutoThemeListener,
-  type ResolvedTheme,
   type SemanticToken,
 } from "../lib/theme";
 
@@ -52,7 +52,7 @@ describe("formatHslTriplet", () => {
 });
 
 describe("applySemanticTokens", () => {
-  const flavours: ResolvedTheme[] = ["latte", "frappe", "macchiato", "mocha"];
+  const flavours: FlavorName[] = ["latte", "frappe", "macchiato", "mocha"];
 
   for (const flavour of flavours) {
     it(`emits HSL-triplet values for every semantic token (${flavour})`, () => {
@@ -77,7 +77,7 @@ describe("applySemanticTokens", () => {
 });
 
 describe("applyTheme auto + matchMedia", () => {
-  it("re-resolves dark/light when matchMedia flips under auto", () => {
+  it("re-resolves dark/light when matchMedia flips under auto", async () => {
     const listeners = new Set<(e: MediaQueryListEvent) => void>();
     let prefersDark = false;
     const mql: MediaQueryList = {
@@ -111,7 +111,7 @@ describe("applyTheme auto + matchMedia", () => {
       length: 0,
     });
 
-    applyTheme("auto");
+    await applyTheme("auto");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
 
     const unlisten = installAutoThemeListener();
@@ -120,12 +120,18 @@ describe("applyTheme auto + matchMedia", () => {
     for (const l of listeners) {
       l({ matches: true, media: mql.media } as MediaQueryListEvent);
     }
+    // Catppuccin Auto re-resolves through an async dynamic import; flush the
+    // microtask queue before reading the class state.
+    await Promise.resolve();
+    await Promise.resolve();
     expect(document.documentElement.classList.contains("dark")).toBe(true);
 
     prefersDark = false;
     for (const l of listeners) {
       l({ matches: false, media: mql.media } as MediaQueryListEvent);
     }
+    await Promise.resolve();
+    await Promise.resolve();
     expect(document.documentElement.classList.contains("dark")).toBe(false);
 
     unlisten();
