@@ -21,7 +21,11 @@
  *     references / BigInt and falls back to `String(error)`. A second
  *     uncaught exception MUST NOT escape.
  */
-import { invoke, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
+import {
+  invoke,
+  type InvokeArgs,
+  type InvokeOptions,
+} from "@tauri-apps/api/core";
 import { toast } from "svelte-sonner";
 
 /**
@@ -51,6 +55,44 @@ function stringifyError(error: unknown): string {
   }
 }
 
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+
+function isPlainObject(value: object): boolean {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * HOTFIX (until tauri-specta lands in Milestone 1): Tauri 2 serializes
+ * `invoke` args with `JSON.stringify`, which throws
+ * `TypeError: Do not know how to serialize a BigInt` — so bigint IDs from
+ * `api.ts` would reject every ID-carrying command before it reached Rust.
+ * Recursively convert bigint → number in plain objects/arrays. IDs here are
+ * small u64 counters; a bigint outside the safe-integer range must never be
+ * silently truncated, so it throws a descriptive error instead.
+ */
+function toIpcSafeValue(value: unknown): unknown {
+  if (typeof value === "bigint") {
+    if (value > MAX_SAFE_BIGINT || value < MIN_SAFE_BIGINT) {
+      throw new Error(
+        `IPC argument bigint ${value.toString()} exceeds Number.MAX_SAFE_INTEGER ` +
+          "and cannot be losslessly converted to a JSON number",
+      );
+    }
+    return Number(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(toIpcSafeValue);
+  }
+  if (typeof value === "object" && value !== null && isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, toIpcSafeValue(entry)]),
+    );
+  }
+  return value;
+}
+
 /**
  * Drop-in wrapper around Tauri's `invoke` that surfaces rejections via the
  * dev IPC-error toast. Call sites do not need to change their `try/catch`
@@ -62,13 +104,15 @@ export async function invokeIpc<T>(
   options?: InvokeOptions,
 ): Promise<T> {
   try {
+    const safeArgs =
+      args === undefined ? undefined : (toIpcSafeValue(args) as InvokeArgs);
     // Forward the call shape Tauri's `invoke` was already receiving from
     // `api.ts` — pass `options` only when caller-provided so the existing
     // 2-arg call site signature is preserved for mock-based tests that
     // assert `toHaveBeenCalledWith(cmd, args)` strictly.
     return options === undefined
-      ? await invoke<T>(command, args)
-      : await invoke<T>(command, args, options);
+      ? await invoke<T>(command, safeArgs)
+      : await invoke<T>(command, safeArgs, options);
   } catch (error) {
     if (import.meta.env.DEV) {
       try {

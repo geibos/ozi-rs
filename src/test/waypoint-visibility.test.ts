@@ -6,17 +6,17 @@ import { join } from "path";
 // shared `LibraryRow.svelte` row primitive after `redesign-library-sidebar`.
 const tabSource = readFileSync(
   join(__dirname, "../components/library/WaypointsTab.svelte"),
-  "utf-8"
+  "utf-8",
 );
 
 const rowSource = readFileSync(
   join(__dirname, "../components/library/LibraryRow.svelte"),
-  "utf-8"
+  "utf-8",
 );
 
 const mapViewSource = readFileSync(
   join(__dirname, "../components/MapView.svelte"),
-  "utf-8"
+  "utf-8",
 );
 
 const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
@@ -46,19 +46,21 @@ describe("Library Waypoints tab visibility toggle", () => {
 
 describe("MapView waypoint visibility filter", () => {
   it("filters waypoints by the `visible` flag before placing markers", () => {
-    expect(mapViewSource).toContain("waypoints.filter((w) => w.visible !== false)");
+    expect(mapViewSource).toContain(
+      "waypoints.filter((w) => w.visible !== false)",
+    );
   });
 });
 
 describe("api.ts wrapper for toggle_waypoint_visible", () => {
   it("exposes toggleWaypointVisible(layerId, waypointId)", () => {
     expect(apiSource).toContain(
-      "export async function toggleWaypointVisible(\n  layerId: bigint,\n  waypointId: bigint\n)"
+      "export async function toggleWaypointVisible(\n  layerId: bigint,\n  waypointId: bigint,\n)",
     );
     // `api.ts` now routes through the `invokeIpc` wrapper from
     // `src/lib/ipc.ts` so dev IPC failures surface as a structured toast.
     expect(apiSource).toContain(
-      'invokeIpc("toggle_waypoint_visible", { layerId, waypointId })'
+      'invokeIpc("toggle_waypoint_visible", { layerId, waypointId })',
     );
   });
 });
@@ -86,9 +88,12 @@ describe("toggleWaypointVisible IPC contract", () => {
     await api.toggleWaypointVisible(7n, 42n);
 
     expect(invokeSpy).toHaveBeenCalledOnce();
+    // `invokeIpc` converts bigint IDs to plain numbers at the IPC boundary —
+    // Tauri 2 serializes invoke args with JSON.stringify, which throws on
+    // BigInt (see src/lib/ipc.ts and src/test/ipc-bigint-args.test.ts).
     expect(invokeSpy).toHaveBeenCalledWith("toggle_waypoint_visible", {
-      layerId: 7n,
-      waypointId: 42n,
+      layerId: 7,
+      waypointId: 42,
     });
   });
 });
