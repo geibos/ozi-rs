@@ -1,5 +1,11 @@
 # Roadmap
 
+> Last verified against code: 2026-07-15
+
+Phase statuses below are historical records of what was completed at the time.
+The binding scope declaration is ADR-0020 (`docs/adr/adr-0020-mvp-scope.md`);
+"What's Next" lists the ADR-0020 must-have items that are still **not implemented**.
+
 ## Phase 0 — Kickoff
 
 Status: **complete**
@@ -66,7 +72,9 @@ Status: **complete**
 
 - Migrated from egui/eframe to Tauri 2 + Svelte 5 + MapLibre GL 4 (ADR-0016)
 - Catppuccin theme with Auto/Latte/Frappé/Macchiato/Mocha picker, persisted
+  (the picker lost its mount point in the 2026-05-26 workspace redesign — see "What's Next")
 - Sidebar with project management, import/export, mode toggles
+  (replaced on 2026-05-26 by `WorkspaceShell` + `LibraryRail` tabs + `InspectorRail` + Cmd-K palette)
 - Developer console toggled with backtick
 - Structured logging via `tracing` / `RUST_LOG`
 
@@ -80,6 +88,8 @@ Status: **complete**
 - Move track point by drag on map (edit mode with coalesced undo)
 - Delete and insert track points via right-click context menu
 - Split segment at point, join adjacent segments
+  (`split_segment` / `join_segments` backend + `api.ts` wrappers remain, but the UI entry
+  point was lost in the 2026-05-26 workspace redesign — see "What's Next")
 - Create track from scratch (drawing mode on map)
 - All edits flow through CommandStack with full undo/redo
 
@@ -110,16 +120,46 @@ Status: **partially complete**
 Done:
 - PLT export with OLE date format, COLORREF BGR encoding
 - Round-trip tested (import → export → re-import)
+- WPT waypoint export (ADR-0022)
 
-Deferred:
-- Print map view with tracks and waypoints to PDF or image
+Not done:
+- Waypoint export to GPX and PLT (ADR-0020 must — see "What's Next")
+
+Map printing is **not planned** (ADR-0023) and is intentionally absent from this roadmap.
 
 ## What's Next
 
-Remaining work before 1.0:
+ADR-0020 must-have items that are **not implemented** (no backend command and/or no UI),
+verified against `src-tauri/src/lib.rs::generate_handler!` and `src/components/`:
 
-- Print/export map view to PDF or image (configurable scale, paper size)
-- Sort track points by timestamp (fix out-of-order GPS recordings)
+- **Sort track points by timestamp** — no backend command, no UI (required per ADR-0020;
+  `docs/requirements.md` tracks it as required, not deferred)
+- **Crop track** by current map extent / time range / selected points — no backend, no UI
+- **On-map tools** (ADR-0020 section "On-map tools") — none exist:
+  - Distance measurement
+  - Circle with center at point/cursor and explicit radius
+  - Place waypoint by projection (azimuth + distance) from a selected point
+- **Waypoint export to GPX and PLT** — no commands (`export_gpx` exports track layers only;
+  an unwired `build_waypoint_gpx_xml` helper sits in `infrastructure/export/gpx.rs`);
+  only WPT export is implemented
+- **Open LizaAlert bundle by URL** — no URL input; only catalog browsing and local folders
+- **ZIP archive import via UI** — backend classifies ZIPs, but the import pickers filter
+  to `.gpx`/`.plt` only
+- **Track point walkthrough** — points are click-selectable, but there are no
+  next/previous controls
+- **Recent projects list** — only recent *map opens* exist (frontend localStorage in the
+  Cmd-K palette), not recent `.ozp` projects
+
+Regressions from the 2026-05-26 workspace redesign:
+
+- **Split/join segment UI** — `split_segment`/`join_segments` backend and `api.ts`
+  wrappers exist, but no component calls them
+- **Theme picker** — `ThemePicker.svelte` is not mounted anywhere; theme cannot be
+  changed from the UI (ADR-0020 lists Catppuccin themes as in-scope)
+- **Undo/redo keyboard shortcuts** — no Ctrl+Z/Ctrl+Y bindings; palette entries only
+
+Other remaining work before 1.0:
+
 - KML import/export (low priority, no current user demand)
 - Full layer management UI (create, rename, delete, reorder); backend supports multiple layers and the UI currently surfaces active-layer selection only
 

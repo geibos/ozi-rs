@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> Last verified against code: 2026-07-15
+
 Project instructions for AI coding agents. Read this file first when working on this repository.
 
 ## Session startup context
@@ -9,7 +11,7 @@ For maximum context in every new session:
 1. Read this `AGENTS.md` first.
 2. Read `docs/project-map.md` for the file/responsibility navigator and onboarding read order.
 3. Read `docs/feature-status.md` to understand what is implemented in backend, surfaced in UI, documented, or still planned.
-4. Read `docs/adr/adr-0019-doc-audit-reconciliation.md` for the latest audit decisions and non-goals.
+4. Read `docs/adr/adr-0020-mvp-scope.md` (binding MVP scope), `docs/adr/adr-0023-no-map-printing.md` (printing is not planned), and `docs/adr/adr-0024-playwright-not-for-desktop-qa.md` (QA policy); `docs/adr/adr-0019-doc-audit-reconciliation.md` has the earlier audit decisions.
 5. For architecture-sensitive work, also read `docs/architecture.md`, `docs/frontend-architecture.md`, `docs/commands-reference.md`, and `docs/conventions.md` (coordinate order, IDs, encodings) before changing code.
 6. For session/project/map behavior, read `docs/persistence-session.md`.
 7. For native desktop QA, read `docs/native-qa-mcp.md` (the project-local MCP server replaces Playwright as the default) and `docs/agent-verification.md` (binding verification protocol — read before claiming any desktop fix or feature works).
@@ -54,6 +56,8 @@ All common tasks are in `justfile` (requires `just`). Run `just` to list recipes
 | Type-check (Rust + Svelte) | `just check` |
 | Lint (frontend) | `just lint` |
 | Run all CI gates locally | `just ci` |
+| Debug app bundle (for E2E) | `just build` |
+| E2E smoke gate (GUI-seizing) | `just smoke` |
 
 Clippy is strict: `cargo clippy -- -D warnings`. All warnings must be fixed, not suppressed.
 
@@ -89,19 +93,24 @@ src-tauri/src/
 src/
   app.html         # SvelteKit HTML shell (replaces the old root index.html)
   app.d.ts         # SvelteKit ambient types
-  app.css          # Global styles (Catppuccin custom properties, base resets)
+  app.css          # Global styles (semantic tokens, base resets)
   routes/
-    +layout.svelte # Persistent app shell: mounts MapView and Console, hosts <slot />
+    +layout.svelte # Persistent app shell: mounts MapView (once), Console,
+                   # CommandPalette (Cmd-K), Toaster; hosts route children
     +layout.ts     # ssr = false; prerender = true (adapter-static + Tauri)
-    +page.svelte   # `/` — BundleLoaderView (welcome / load surface)
+    +page.svelte   # `/` — bundle loader page (hosts BundleLoader.svelte)
     project/
-      +page.svelte # `/project` — Sidebar + Tracks/TrackPoints/Waypoints panels
-  components/      # Svelte 5 components (MapView, Sidebar, panels, pickers)
+      +page.svelte # `/project` — WorkspaceShell + LibraryRail + InspectorRail
+                   # + Sheet-hosted BundleLoader (`bundleLoaderOpen` store)
+  components/      # WorkspaceShell, LibraryRail, InspectorRail, CommandPalette,
+                   # MapView, BundleLoader, Console, SymbolPicker
+    library/       # MapsTab, TracksTab, WaypointsTab, LibraryRow
+    inspector/     # MapInspector, TrackInspector, TrackSegmentsTable, WaypointInspector
   lib/
     api.ts         # Typed Tauri IPC wrappers — ONLY way to call backend
     stores.ts      # Svelte stores (app state + UI-only state)
     types.ts       # TypeScript interfaces matching Rust structs (manual sync)
-    theme.ts       # Catppuccin CSS custom properties
+    theme.ts       # Native + Catppuccin themes (CSS custom properties)
     maplibre/      # Tile protocols (sqlite://, ozi://), track rendering
 ```
 
@@ -150,8 +159,8 @@ Track names must follow `YYYYMMDD_Callsign` (e.g. `20240601_Иванов`). The 
 
 - **State**: Svelte stores in `src/lib/stores.ts`
 - **API calls**: typed wrappers in `src/lib/api.ts` (never call `invoke` directly)
-- **Theming**: Catppuccin palette via CSS custom properties (`--ctp-*`); applied by `src/lib/theme.ts`
-- **Theme options**: Auto (OS), Latte, Frappé, Macchiato, Mocha
+- **Theming**: Native + Catppuccin themes via CSS custom properties; applied by `src/lib/theme.ts`, persisted in `localStorage["theme"]` (default `native-auto`)
+- **Theme options**: Native — Auto (default), Catppuccin Auto / Latte / Frappé / Macchiato / Mocha. Note: `ThemePicker.svelte` is currently not mounted anywhere — theme switching has no UI entry point (see `docs/feature-status.md`)
 - **Interaction modes**: drawing (track creation), editing (point drag), waypoint placement, simplification preview
 
 Details: `docs/frontend-architecture.md`.
@@ -168,6 +177,26 @@ Details: `docs/frontend-architecture.md`.
 
 Verification: `just test` (all), `just clippy` (strict linting).
 
+## E2E gate: `just smoke`
+
+`just smoke` runs `tools/ozi-rs-mcp/tests/smoke_core_workflow.rs` — an end-to-end smoke
+test that drives the **real** bundled app via Appium Mac2: launch → workspace renders
+(Library tabs visible in the AX tree) → Tracks tab → "Create track" → 3 map clicks
+(paced above the 220 ms drawing debounce; the "Done (3 points)" label is the
+end-to-end proof) → Esc cancels and the scratch track row disappears.
+
+- **Mandatory pre-merge gate for any change that touches the app** (frontend, backend,
+  IPC). `just ci` alone is not sufficient for app-touching changes.
+- Preconditions (the test fails loudly when unmet, no silent skips): a `just build`
+  artifact at `target/debug/bundle/macos/ozi-rs.app` and a running Appium server with
+  the Mac2 driver at `127.0.0.1:4723`.
+- The test is `#[ignore]`d so plain `cargo test` / `just test` stays GUI-free.
+- **Owner's rule: batch GUI-seizing runs at the END of a work block**, not after every
+  change. While a Mac2 session is active it owns the screen (recording indicator,
+  dimmed UI), so do all non-GUI verification first (`just ci`), then run `just smoke`
+  once. Clean-up duties after every run are in `CLAUDE.md` (stop session, quit app,
+  verify with `pgrep`).
+
 ## Documentation
 
 - `docs/project-map.md` — single-page navigator: where things live, common-task entry points, onboarding read order
@@ -183,4 +212,4 @@ Verification: `just test` (all), `just clippy` (strict linting).
 - `docs/roadmap.md` — phase status and remaining work
 - `docs/testing-strategy.md` — test layers and quality gates
 - `docs/ci.md` — GitHub Actions CI / release workflows, toolchain pinning, audit ignore policy
-- `docs/adr/` — 19 architecture decision records
+- `docs/adr/` — 24 architecture decision records
