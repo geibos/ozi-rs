@@ -1,5 +1,7 @@
 # ozi-rs
 
+> Last verified against code: 2026-07-15
+
 `ozi-rs` is a Tauri 2 desktop map editor for raster maps, tracks, and waypoints, built for
 [LizaAlert](https://lizaalert.org) search-and-rescue volunteers.
 
@@ -50,7 +52,7 @@ Press `` ` `` (backtick) to open the in-app developer console.
 - Reveal active bundle in Finder / Explorer
 
 ### Tracks
-- Import GPX and PLT files (including ZIP archives)
+- Import GPX and PLT files (ZIP archives supported by the backend; the UI file picker currently filters to `.gpx`/`.plt` only)
 - Display tracks on all map types
 - Per-track visibility, color picker, line width
 - Track name editing with warning-only LizaAlert OK-standard validation (`YYYYMMDD_Callsign`)
@@ -60,12 +62,12 @@ Press `` ` `` (backtick) to open the in-app developer console.
 - `10-Tracks/` subfolder suggestion on GPX/PLT export when an active bundle is known
 
 ### Track Editing
-- Track point list panel with segment hierarchy
+- Per-segment track point table in the Inspector rail (select a track to open it)
 - Move track points by drag on map (edit mode)
 - Delete and insert track points (right-click context menu)
-- Split segment at point, join adjacent segments
-- Create new tracks by drawing on map (click to add points, double-click to finish)
-- Douglas-Peucker track simplification with live preview and tolerance slider
+- Split/join segments — backend commands exist; no UI entry point at the moment (lost in the 2026-05-26 workspace redesign)
+- Create new tracks by drawing on map (click to add points, double-click or Enter to finish, Esc to cancel)
+- Douglas-Peucker track simplification with live preview and tolerance control
 
 ### Waypoints
 - Add waypoints by clicking on map
@@ -81,12 +83,13 @@ Press `` ` `` (backtick) to open the in-app developer console.
 - Viewport, selected entities, panels, undo history, theme, and unsaved edits are not restored by the Rust session file
 
 ### UI
-- Catppuccin theme (Auto / Latte / Frappé / Macchiato / Mocha), persisted
-- Sidebar with project controls, active-layer selection, import/export, drawing/waypoint mode toggles
-- Panels: Tracks, Track Points, Waypoints, Simplify
+- Workspace shell: Library rail with Maps / Tracks / Waypoints tabs (left), map canvas (center), Inspector rail for the selected map/track/waypoint (right)
+- Cmd/Ctrl+K command palette: open/save project, switch project/map, undo/redo, find track/waypoint, exports, recent files
+- Bundle loader on the `/` route and as an in-workspace overlay ("Maps…")
+- Theme engine (Native Auto default + Catppuccin palette, persisted); the theme picker is currently not mounted in the redesigned shell
 - Developer console toggled with `` ` ``
 - FPS counter (F3)
-- Keyboard shortcuts: Ctrl+Z/Y (undo/redo), Enter/Esc (drawing mode)
+- Keyboard shortcuts: Cmd/Ctrl+K (palette), Enter/Esc (drawing mode); undo/redo is reachable via the palette — no Ctrl+Z/Y bindings yet
 
 ## Map Bundle vs Project
 
@@ -104,13 +107,23 @@ warning on tracks whose names do not match this pattern.
 
 ## Remaining Work
 
-- Print map with tracks and waypoints to PDF or image
+ADR-0020 must-have items not yet implemented (see `docs/roadmap.md` for the full list):
+
 - Sort track points by timestamp
+- Crop track (by map extent, time range, selected points)
+- On-map tools: distance measurement, circle with explicit radius, waypoint by projection (azimuth + distance)
+- Waypoint export to GPX and PLT (WPT export is implemented)
+- ZIP import via the UI file picker; open LizaAlert bundle by URL
+- Re-expose split/join segments and the theme picker in the redesigned UI
+
+Other:
+
 - KML import/export
 - Full layer management UI for create/rename/delete/reorder; current UI surfaces active-layer selection only
 
 ## Explicit Non-Goals
 
+- Map printing to PDF or image (ADR-0023 — deliberate decision, not a deferral)
 - Datum management
 - Advanced geodesy and projection features beyond immediate needs
 - GPS device sync and live telemetry
@@ -148,7 +161,7 @@ and testable without the UI runtime.
 - `docs/native-qa-mcp.md` — native desktop QA via the project-local MCP
 - `docs/testing-strategy.md` — test layers and quality gates
 - `docs/roadmap.md` — phases and status
-- `docs/adr/` — architecture decision records (19 ADRs)
+- `docs/adr/` — architecture decision records (24 ADRs)
 
 ## Credits
 

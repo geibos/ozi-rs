@@ -478,11 +478,21 @@ impl ProjectCommand {
 
                     segment
                         .split_at_point(point_id.value(), *new_segment_id)
-                        .map_err(|_| ProjectLayerError::MissingTrackPoint {
-                            layer_id: layer_id.value(),
-                            track_id: track_id.value(),
-                            segment_id: segment_id.value(),
-                            point_id: point_id.value(),
+                        .map_err(|err| match err {
+                            ProjectLayerError::InvalidSegmentOperation {
+                                segment_id, reason, ..
+                            } => ProjectLayerError::InvalidSegmentOperation {
+                                layer_id: layer_id.value(),
+                                track_id: track_id.value(),
+                                segment_id,
+                                reason,
+                            },
+                            _ => ProjectLayerError::MissingTrackPoint {
+                                layer_id: layer_id.value(),
+                                track_id: track_id.value(),
+                                segment_id: segment_id.value(),
+                                point_id: point_id.value(),
+                            },
                         })?
                 };
 
@@ -1868,7 +1878,104 @@ mod tests {
         assert!(history.undo(&mut project));
         let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 1);
-        assert_eq!(segments[0].points().len(), 4);
+        let ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
+        assert_eq!(ids, vec![10, 11, 12]);
+    }
+
+    #[test]
+    fn split_segment_apply_does_not_duplicate_points() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(10), 53.9, 27.5));
+        segment.add_point(TrackPoint::new(TrackPointId::new(11), 54.0, 27.6));
+        segment.add_point(TrackPoint::new(TrackPointId::new(12), 54.1, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::split_segment(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(11),
+                    TrackSegmentId::new(99),
+                ),
+            )
+            .unwrap();
+
+        let segments = project.track_layers()[1].tracks()[0].segments();
+        assert_eq!(segments.len(), 2);
+        let left_ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
+        let right_ids: Vec<u64> = segments[1].points().iter().map(|p| p.id().value()).collect();
+        assert_eq!(left_ids, vec![10, 11]);
+        assert_eq!(right_ids, vec![12]);
+    }
+
+    #[test]
+    fn split_undo_redo_undo_remains_stable() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
+            .unwrap();
+
+        let mut track = Track::new(track_id, "Morning route");
+        let mut segment = TrackSegment::new(segment_id);
+        segment.add_point(TrackPoint::new(TrackPointId::new(10), 53.9, 27.5));
+        segment.add_point(TrackPoint::new(TrackPointId::new(11), 54.0, 27.6));
+        segment.add_point(TrackPoint::new(TrackPointId::new(12), 54.1, 27.7));
+        track.add_segment(segment);
+
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::split_segment(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(11),
+                    TrackSegmentId::new(99),
+                ),
+            )
+            .unwrap();
+
+        assert!(history.undo(&mut project));
+        assert!(history.redo(&mut project));
+        assert!(history.undo(&mut project));
+
+        let segments = project.track_layers()[1].tracks()[0].segments();
+        assert_eq!(segments.len(), 1);
+        let ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
+        assert_eq!(ids, vec![10, 11, 12]);
     }
 
     #[test]
@@ -2011,6 +2118,10 @@ mod tests {
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].id(), TrackSegmentId::new(10));
         assert_eq!(segments[1].id(), TrackSegmentId::new(20));
+        let a_ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
+        let b_ids: Vec<u64> = segments[1].points().iter().map(|p| p.id().value()).collect();
+        assert_eq!(a_ids, vec![1, 2]);
+        assert_eq!(b_ids, vec![3, 4]);
     }
 
     #[test]

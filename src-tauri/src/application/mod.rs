@@ -99,6 +99,7 @@ impl std::error::Error for OpenLocalMapError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DiagnosticLevel {
     Info,
+    Warning,
     Error,
 }
 
@@ -199,9 +200,14 @@ impl AppState {
         }
     }
 
-    pub fn new_with_session_path(session_path: PathBuf) -> Self {
+    /// Runtime constructor: both locations are resolved by the caller
+    /// (Tauri's path resolver in `lib.rs`) and injected, so this module
+    /// never derives paths from environment variables itself. A `None`
+    /// session path disables session persistence for this run.
+    pub fn new_with_paths(session_path: Option<PathBuf>, bundles_root: PathBuf) -> Self {
         let mut state = Self::new();
-        state.session_path = Some(session_path);
+        state.bundles_root = bundles_root;
+        state.session_path = session_path;
         state.restore_session();
         state
     }
@@ -550,16 +556,18 @@ impl AppState {
 
     // ── Mutations ──
 
-    pub fn save_project_to(&mut self, path: PathBuf) {
+    pub fn save_project_to(&mut self, path: PathBuf) -> Result<(), persistence::PersistenceError> {
         match persistence::save_project(&self.project, &path) {
             Ok(()) => {
                 let display = path.display().to_string();
                 self.project_path = Some(path);
                 self.update_status(DiagnosticLevel::Info, format!("Saved: {display}"));
                 self.persist_session_snapshot();
+                Ok(())
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, format!("Save failed: {error}"));
+                Err(error)
             }
         }
     }
@@ -1230,6 +1238,13 @@ impl AppState {
         &mut self,
         selection: &ActiveMapSelection,
     ) -> Result<bool, CommandError> {
+        // All map-open paths (click-open, download completion, local .map,
+        // session restore) funnel through this method, so the datum warning
+        // fires exactly once per open — never per tile.
+        if selection.kind == ActiveMapKind::OziRaster {
+            self.warn_on_non_wgs84_datum(&selection.local_path);
+        }
+
         if self
             .project
             .map_layers()
@@ -1253,6 +1268,23 @@ impl AppState {
         Ok(true)
     }
 
+    /// Push a warning diagnostic when the OZI `.map` at `map_path` is
+    /// calibrated in a datum outside the WGS-84 family. Georeferencing uses
+    /// calibration coordinates as-is (no datum transformation), so such maps
+    /// shift ~100–150 m against GPS tracks. Read/parse failures are ignored
+    /// here: the open and tile-serving paths report them on their own.
+    fn warn_on_non_wgs84_datum(&mut self, map_path: &Path) {
+        let Ok(contents) = read_ozi_map_text(map_path) else {
+            return;
+        };
+        let Ok(metadata) = parse_ozi_map_metadata(map_path, &contents) else {
+            return;
+        };
+        if let Some(warning) = datum_shift_warning(metadata.datum_name()) {
+            self.push_diagnostic(DiagnosticLevel::Warning, warning);
+        }
+    }
+
     fn update_status(&mut self, level: DiagnosticLevel, message: impl Into<String>) {
         let message = message.into();
         self.lizaalert.status = message.clone();
@@ -1262,6 +1294,7 @@ impl AppState {
     fn push_diagnostic(&mut self, level: DiagnosticLevel, message: String) {
         match level {
             DiagnosticLevel::Error => tracing::error!("{message}"),
+            DiagnosticLevel::Warning => tracing::warn!("{message}"),
             DiagnosticLevel::Info => tracing::info!("{message}"),
         }
         while self.lizaalert.diagnostics.len() >= MAX_DIAGNOSTICS {
@@ -1281,11 +1314,28 @@ pub enum OpenMapRequest {
     Download(ActiveMapSelection),
 }
 
+/// Placeholder used by `AppState::new()` (tests and `Default` only). The
+/// runtime constructor `new_with_paths` receives the platform-resolved
+/// directory from `lib.rs` instead of deriving it here.
 fn default_bundles_root() -> PathBuf {
-    if let Ok(home) = std::env::var("HOME") {
-        return PathBuf::from(home).join("Documents").join("LizaAlert Maps");
-    }
     PathBuf::from("bundles")
+}
+
+/// Returns a user-facing warning when `datum_name` is not in the WGS-84
+/// family ("WGS 84", "WGS84", "WGS-84" in any case), `None` otherwise.
+fn datum_shift_warning(datum_name: &str) -> Option<String> {
+    let normalized: String = datum_name
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if normalized == "WGS84" {
+        return None;
+    }
+    Some(format!(
+        "Карта откалибрована в датуме {datum_name}: возможно смещение ~100–150 м \
+         относительно WGS-84 (треки/GPS). Преобразование датума пока не поддерживается."
+    ))
 }
 
 fn persisted_active_map_from_selection(selection: &ActiveMapSelection) -> PersistedActiveMap {
@@ -1399,6 +1449,32 @@ mod tests {
     }
 
     #[test]
+    fn save_project_to_propagates_error_and_reports_diagnostic() {
+        let dir = temp_session_dir("save-project-error");
+        // A directory at the target path makes the save fail
+        // deterministically without touching permissions.
+        let target = dir.join("blocked.ozp");
+        std::fs::create_dir_all(&target).expect("create blocking dir");
+
+        let mut state = AppState::new();
+        let result = state.save_project_to(target);
+
+        assert!(
+            result.is_err(),
+            "save into a directory path must propagate the error to the caller"
+        );
+        assert!(
+            state.lizaalert.status.starts_with("Save failed:"),
+            "failure diagnostic must still be reported, got: {}",
+            state.lizaalert.status
+        );
+        assert!(
+            state.project_file_path().is_none(),
+            "a failed save must not update the current project path"
+        );
+    }
+
+    #[test]
     fn session_restore_valid_restores_project_path_and_active_map() {
         let dir = temp_session_dir("session-restore-valid");
         let project_path = dir.join("search.ozp");
@@ -1424,7 +1500,7 @@ mod tests {
         )
         .expect("save session");
 
-        let state = AppState::new_with_session_path(session_path);
+        let state = AppState::new_with_paths(Some(session_path), dir.join("bundles"));
 
         assert_eq!(state.project_file_path(), Some(project_path.as_path()));
         let active_map = state.active_map().expect("active map restored");
@@ -1467,7 +1543,7 @@ mod tests {
         )
         .expect("save session");
 
-        let state = AppState::new_with_session_path(session_path);
+        let state = AppState::new_with_paths(Some(session_path), dir.join("bundles"));
 
         assert_eq!(state.project_file_path(), None);
         assert_eq!(state.active_map(), None);
@@ -1480,6 +1556,54 @@ mod tests {
                         .contains("Session restore skipped missing project")),
             "expected missing-project diagnostic"
         );
+    }
+
+    #[test]
+    fn new_with_paths_uses_injected_bundles_root() {
+        let dir = temp_session_dir("injected-bundles-root");
+        let bundles_root = dir.join("Injected Bundles");
+
+        let state = AppState::new_with_paths(None, bundles_root.clone());
+
+        assert_eq!(state.bundles_root(), bundles_root.as_path());
+    }
+
+    #[test]
+    fn new_with_paths_restores_session_from_injected_path() {
+        let dir = temp_session_dir("injected-session-restore");
+        let project_path = dir.join("mission.ozp");
+        let session_path = dir.join("nested").join("session.json");
+        persistence::save_project(&Project::untitled(), &project_path).expect("save project");
+        persistence::save_app_session(
+            &PersistedAppSession {
+                last_project_path: Some(project_path.clone()),
+                active_map: None,
+            },
+            &session_path,
+        )
+        .expect("save session");
+
+        let state = AppState::new_with_paths(Some(session_path), dir.join("bundles"));
+
+        assert_eq!(state.project_file_path(), Some(project_path.as_path()));
+    }
+
+    #[test]
+    fn new_with_paths_saves_session_to_injected_path() {
+        let dir = temp_session_dir("injected-session-save");
+        let session_path = dir.join("nested").join("session.json");
+        let project_path = dir.join("mission.ozp");
+
+        let mut state =
+            AppState::new_with_paths(Some(session_path.clone()), dir.join("bundles"));
+        state
+            .save_project_to(project_path.clone())
+            .expect("save project");
+
+        let session = persistence::load_app_session(&session_path)
+            .expect("read session file")
+            .expect("session snapshot written on save");
+        assert_eq!(session.last_project_path, Some(project_path));
     }
 
     #[test]
@@ -1823,6 +1947,65 @@ mod tests {
                     .join("10-Tracks")
                     .join("20240601_Test.gpx")
             )
+        );
+    }
+
+    // ── Datum warning on map open ──
+
+    fn write_temp_ozi_map(dir: &Path, datum_name: &str) -> PathBuf {
+        let path = dir.join("calibration.map");
+        let contents = format!(
+            "OziExplorer Map Data File Version 2.2\nField calibration\nmaps/base.ozf2\n1 ,Map Code,\n{datum_name},,   0.0000,   0.0000,WGS 84\nReserved 1\nReserved 2\nMagnetic Variation,,,E\nMap Projection,Mercator,PolyCal,No,AutoCalOnly,No,BSBUseWPX,No\nPoint01,xy,100,200,in, deg,54,30.000,N,48,24.000,E, grid, , , ,N\nPoint02,xy,300,400,in, deg,54,31.000,N,48,25.000,E, grid, , , ,N\n"
+        );
+        std::fs::write(&path, contents).expect("write temp ozi map");
+        path
+    }
+
+    #[test]
+    fn open_local_ozi_map_warns_about_non_wgs84_datum() {
+        let dir = temp_session_dir("datum-warning");
+        let map_path = write_temp_ozi_map(&dir, "Pulkovo 1942");
+
+        let mut state = AppState::new();
+        state.open_local_ozi_map(&map_path).expect("open ozi map");
+
+        let warning = state
+            .recent_diagnostics()
+            .find(|entry| entry.message().contains("Pulkovo 1942"));
+        assert!(
+            warning.is_some(),
+            "expected datum warning diagnostic, got: {:?}",
+            state.recent_diagnostics().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            warning.map(DiagnosticEntry::level),
+            Some(DiagnosticLevel::Warning)
+        );
+    }
+
+    #[test]
+    fn datum_shift_warning_accepts_wgs84_family_spellings() {
+        assert!(datum_shift_warning("WGS 84").is_none());
+        assert!(datum_shift_warning("WGS84").is_none());
+        assert!(datum_shift_warning("wgs-84").is_none());
+        assert!(datum_shift_warning("Pulkovo 1942").is_some());
+        assert!(datum_shift_warning("WGS 72").is_some());
+    }
+
+    #[test]
+    fn open_local_ozi_map_does_not_warn_for_wgs84_datum() {
+        let dir = temp_session_dir("datum-no-warning");
+        let map_path = write_temp_ozi_map(&dir, "WGS 84");
+
+        let mut state = AppState::new();
+        state.open_local_ozi_map(&map_path).expect("open ozi map");
+
+        assert!(
+            state
+                .recent_diagnostics()
+                .all(|entry| !entry.message().contains("датум")),
+            "unexpected datum warning for WGS 84 map: {:?}",
+            state.recent_diagnostics().collect::<Vec<_>>()
         );
     }
 }

@@ -38,10 +38,22 @@ run:
 # `openspec/specs/build-tooling/spec.md` and `scripts/dev-build-frontend.sh`.
 # The canonical bundled path (`just release`, `just build`) still uses
 # `npm run tauri build` and is unaffected.
+# `--features custom-protocol` is load-bearing: Tauri 2 embeds production
+# assets only under that feature (the tauri CLI enables it implicitly).
+# Without it the context is "dev" and, with `devUrl` set, embeds an EMPTY
+# asset set — the app launches into a blank white window.
 run-release:
     @./scripts/dev-build-frontend.sh
-    cargo build --release --manifest-path src-tauri/Cargo.toml
+    cargo build --release --manifest-path src-tauri/Cargo.toml --features custom-protocol
     ./target/release/ozi-rs
+
+# E2E smoke gate: drives the real bundled app through the core workflow
+# (launch → Tracks tab → draw 3 points → cancel) via Appium Mac2. This is the
+# pre-merge gate for any change touching the app: run it before merging.
+# Requires a `just build` artifact and a running Appium server
+# (`appium --address 127.0.0.1 --port 4723`, driver: `appium driver install mac2`).
+smoke:
+    cargo test --manifest-path tools/ozi-rs-mcp/Cargo.toml --test smoke_core_workflow -- --ignored --nocapture
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 

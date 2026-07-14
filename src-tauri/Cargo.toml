@@ -7,6 +7,13 @@ edition = "2024"
 name = "ozi_rs_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# Tauri 2 gates production asset embedding on this feature (the CLI enables it
+# for `tauri build`/`tauri dev` bundles). A bare `cargo build --release`
+# without it generates a dev context with EMPTY embedded assets — the window
+# opens blank (tauri-codegen context.rs: `dev && dev_url.is_some()`).
+custom-protocol = ["tauri/custom-protocol"]
+
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
@@ -36,6 +43,9 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 # Encoding detection for PLT import (cp1251 / UTF-8 / UTF-16 BOM)
 chardetng = "0.1"
+specta = { version = "=2.0.0-rc.22", features = ["serde_json"] }
+specta-typescript = "=0.0.9"
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 
 [dev-dependencies]
 wiremock = "0.6"

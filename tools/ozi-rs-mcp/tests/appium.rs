@@ -1,12 +1,15 @@
 use ozi_rs_mcp::appium::{
     AppiumCommandOutput, AppiumDoctorState, AppiumProbe, DEFAULT_APPIUM_SERVER_URL,
-    appium_click_with_session, appium_click_with_session_id, appium_doctor_for_state,
-    appium_doctor_with_availability, appium_doctor_with_probe,
+    appium_click_element_offsets_with_session_id, appium_click_with_session,
+    appium_click_with_session_id, appium_doctor_for_state, appium_doctor_with_availability,
+    appium_doctor_with_probe, appium_launch_session_with_app_path,
     appium_launch_session_with_availability, appium_launch_session_with_options,
-    appium_launch_session_with_server, appium_screenshot_with_fake_image,
+    appium_launch_session_with_server,
+    appium_page_source_with_session_id, appium_press_key_with_session_id,
+    appium_screenshot_with_fake_image,
     appium_screenshot_with_session, appium_screenshot_with_session_id,
     appium_stop_session_with_session, appium_stop_session_with_session_id,
-    appium_type_text_with_session, appium_type_text_with_session_id,
+    appium_type_text_with_session, appium_type_text_with_session_id, decode_screenshot_body,
 };
 use std::{
     io::{Read, Write},
@@ -167,6 +170,133 @@ fn appium_launch_session_includes_bundle_id_capability() {
         posted.contains("\"appium:bundleId\":\"ru.lizaalert.ozi-rs\""),
         "POST body missing bundleId capability: {posted}",
     );
+}
+
+#[test]
+fn appium_launch_session_sets_long_new_command_timeout() {
+    // The Mac2 default of 60s kills the session during any think-pause between
+    // driver commands; the capability must be pinned high for agent-paced QA.
+    let server = FakeWebDriverServer::with_bodies(vec![FakeResponse::json(
+        200,
+        r#"{"value":{"sessionId":"session-timeout","capabilities":{}}}"#,
+    )]);
+
+    let result = appium_launch_session_with_options(true, &server.url(), None);
+
+    assert!(result.ok, "{result:?}");
+    let bodies = server.bodies();
+    let posted = bodies.first().expect("at least one POST body");
+    assert!(
+        posted.contains("\"appium:newCommandTimeout\":600"),
+        "POST body missing newCommandTimeout capability: {posted}",
+    );
+}
+
+#[test]
+fn decode_screenshot_body_decodes_base64_value_to_png_bytes() {
+    // 1x1 transparent PNG, base64-encoded — the exact payload shape Mac2 returns.
+    let body = r#"{"value":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}"#;
+
+    let bytes = decode_screenshot_body(body).expect("valid base64 screenshot payload");
+
+    assert_eq!(
+        &bytes[..8],
+        &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n'],
+        "decoded bytes must start with the PNG magic, not base64 text",
+    );
+}
+
+#[test]
+fn decode_screenshot_body_rejects_non_base64_payload() {
+    assert!(decode_screenshot_body(r#"{"value":"not base64!!!"}"#).is_none());
+    assert!(decode_screenshot_body("plain text, no json").is_none());
+}
+
+#[test]
+fn appium_page_source_returns_xml_value() {
+    let server = FakeWebDriverServer::new(vec![FakeResponse::json(
+        200,
+        r#"{"value":"<AppiumAUT><XCUIElementTypeApplication label=\"ozi-rs\"/></AppiumAUT>"}"#,
+    )]);
+
+    let source = appium_page_source_with_session_id(&server.url(), "sid-src")
+        .expect("page source succeeds");
+
+    assert!(source.contains("XCUIElementTypeApplication"), "{source}");
+    assert_eq!(server.requests(), vec!["GET /session/sid-src/source"]);
+}
+
+#[test]
+fn appium_click_element_offsets_posts_pointer_actions() {
+    let server = FakeWebDriverServer::new(vec![
+        FakeResponse::json(200, r#"{"value":{"ELEMENT":"map-eid"}}"#),
+        FakeResponse::json(200, r#"{"value":null}"#),
+        FakeResponse::json(200, r#"{"value":null}"#),
+    ]);
+
+    let result = appium_click_element_offsets_with_session_id(
+        &server.url(),
+        "sid-map",
+        "//XCUIElementTypeGroup[@label=\"Map canvas\"]",
+        &[(-40, -20), (35, 25)],
+    );
+
+    assert!(result.ok, "{result:?}");
+    let bodies = server.bodies();
+    let first_actions = bodies.get(1).expect("first actions body");
+    assert!(
+        first_actions.contains("\"pointerDown\"") && first_actions.contains("\"x\":-40"),
+        "first actions body must click at (-40,-20): {first_actions}",
+    );
+    let requests = server.requests();
+    assert_eq!(requests[0], "POST /session/sid-map/element");
+    assert_eq!(requests[1], "POST /session/sid-map/actions");
+    assert_eq!(requests[2], "POST /session/sid-map/actions");
+}
+
+#[test]
+fn appium_launch_session_with_app_path_sends_app_path_capability() {
+    // Launching by bundleId requires LaunchServices registration, which a
+    // debug bundle does not have — XCUITest then hangs forever. appPath
+    // launches the bundle directly and must be forwarded verbatim.
+    let server = FakeWebDriverServer::with_bodies(vec![FakeResponse::json(
+        200,
+        r#"{"value":{"sessionId":"session-apppath","capabilities":{}}}"#,
+    )]);
+
+    let result = appium_launch_session_with_app_path(
+        true,
+        &server.url(),
+        "/tmp/some workspace/ozi-rs.app",
+    );
+
+    assert!(result.ok, "{result:?}");
+    let bodies = server.bodies();
+    let posted = bodies.first().expect("at least one POST body");
+    assert!(
+        posted.contains("\"appium:appPath\":\"/tmp/some workspace/ozi-rs.app\""),
+        "POST body missing appPath capability: {posted}",
+    );
+    assert!(
+        posted.contains("\"appium:newCommandTimeout\":600"),
+        "appPath launch must keep the long newCommandTimeout: {posted}",
+    );
+}
+
+#[test]
+fn appium_press_key_posts_key_actions() {
+    let server = FakeWebDriverServer::new(vec![FakeResponse::json(200, r#"{"value":null}"#)]);
+
+    let result = appium_press_key_with_session_id(&server.url(), "sid-key", '\u{E00C}');
+
+    assert!(result.ok, "{result:?}");
+    let bodies = server.bodies();
+    let body = bodies.first().expect("actions body");
+    assert!(
+        body.contains("\"keyDown\"") && body.contains("\"keyUp\"") && body.contains("\u{E00C}"),
+        "key actions body must press and release the key: {body}",
+    );
+    assert_eq!(server.requests(), vec!["POST /session/sid-key/actions"]);
 }
 
 #[test]

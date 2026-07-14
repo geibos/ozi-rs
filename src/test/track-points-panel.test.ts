@@ -42,15 +42,27 @@ describe("track-points module", () => {
   });
 
   it("formats coordinates to five decimal places", () => {
-    const point: PointDetail = { id: 1, lat: 55.7558123, lon: 37.6173456 };
+    const point: PointDetail = {
+      id: 1,
+      lat: 55.7558123,
+      lon: 37.6173456,
+      elevation: null,
+      timestamp: null,
+    };
     expect(formatCoordinates(point)).toBe("55.75581, 37.61735");
   });
 
   it("formats elevation when present and returns null when missing", () => {
-    expect(formatElevation({ id: 1, lat: 0, lon: 0, elevation: 123.456 })).toBe(
+    expect(formatElevation({
+        id: 1,
+        lat: 0,
+        lon: 0,
+        elevation: 123.456,
+        timestamp: null,
+      })).toBe(
       "123.5m"
     );
-    expect(formatElevation({ id: 1, lat: 0, lon: 0 })).toBeNull();
+    expect(formatElevation({ id: 1, lat: 0, lon: 0, elevation: null, timestamp: null })).toBeNull();
   });
 
   it("renders timestamps verbatim, never inventing placeholder text", () => {
@@ -59,10 +71,11 @@ describe("track-points module", () => {
         id: 1,
         lat: 0,
         lon: 0,
+        elevation: null,
         timestamp: "2024-06-01T10:00:00Z",
       })
     ).toBe("2024-06-01T10:00:00Z");
-    expect(formatTimestamp({ id: 1, lat: 0, lon: 0 })).toBeNull();
+    expect(formatTimestamp({ id: 1, lat: 0, lon: 0, elevation: null, timestamp: null })).toBeNull();
   });
 
   it("paginates a single segment to the initial limit until expanded", () => {
@@ -70,6 +83,8 @@ describe("track-points module", () => {
       id: i,
       lat: 0,
       lon: 0,
+      elevation: null,
+      timestamp: null,
     }));
     const segment: SegmentDetail = { id: 7, points };
     const collapsed = paginateSegment(segment, false);
@@ -91,6 +106,8 @@ describe("track-points module", () => {
             id: i,
             lat: 0,
             lon: 0,
+            elevation: null,
+            timestamp: null,
           })),
         },
         {
@@ -99,6 +116,8 @@ describe("track-points module", () => {
             id: i,
             lat: 0,
             lon: 0,
+            elevation: null,
+            timestamp: null,
           })),
         },
       ],

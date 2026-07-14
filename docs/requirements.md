@@ -1,5 +1,7 @@
 # Requirements
 
+> Last verified against code: 2026-07-15
+
 ## Product Goal
 
 Build a Tauri 2 desktop application for LizaAlert search-and-rescue volunteers to work with
@@ -101,14 +103,14 @@ Track names must follow the pattern `YYYYMMDD_Callsign`
 
 These requirements came from direct user input:
 
-- **Import**: GPX (single file and ZIP archive), PLT (including Windows-1251 encoding) — done
+- **Import**: GPX (single file and ZIP archive), PLT (including Windows-1251 encoding) — backend done; the UI import pickers filter to `.gpx`/`.plt` only, so ZIP archives cannot be selected
 - **Export**: GPX with Garmin color extension, PLT with OLE dates and COLORREF BGR — done
 - **Display**: name, color, line width, visibility, opacity per track — done
 - **Simplification**: Douglas-Peucker with configurable tolerance and live preview — done
 - **Point list**: all properties per point (lat/lon, elevation, timestamp, segment) — done
-- **Sort by timestamp**: fix out-of-order GPS recordings — deferred
+- **Sort by timestamp**: fix out-of-order GPS recordings — **required per ADR-0020 (MVP must-have), not implemented** (no backend command, no UI)
 - **Edit mode**: move points by drag on map, delete/insert via context menu — done
-- **Segment ops**: split at point, join adjacent segments — done
+- **Segment ops**: split at point, join adjacent segments — backend done (`split_segment`/`join_segments`); the UI entry point was removed in the 2026-05-26 workspace redesign and has not been re-exposed
 - **Drawing mode**: create track from scratch on map — done
 - **Undo/redo**: track geometry, track/waypoint CRUD, waypoint moves/renames/symbols, drawing, and simplification are reversible via delta-based command stack; track style changes remain immediate non-undoable mutations — done
 - **Statistics**: total distance (km), duration (h/m), point count — done
@@ -123,7 +125,7 @@ These requirements came from direct user input:
 - Project save/load (JSON `.ozp`) — done
 - GPX and PLT import/export — done
 - LizaAlert project browser and bundle management — done
-- Track editing (move, delete, insert, split, join, draw) — done
+- Track editing (move, delete, insert, draw) — done; split/join backend done but currently without UI entry point
 - Track simplification with preview — done
 - Waypoint editing UI with undoable symbols — done
 
@@ -137,7 +139,7 @@ These requirements came from direct user input:
 - Append-only editing models copied from legacy GIS workflows
 - Polygon / search sector drawing (post-MVP)
 - Multi-device coordination
-- Print to PDF (deferred to post-MVP)
+- Map printing (to PDF, image, or any rendered output) — not planned (ADR-0023)
 
 ## Functional Requirements
 

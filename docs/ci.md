@@ -8,14 +8,14 @@ Two workflows live under `.github/workflows/`:
 
 | File | Triggers | Purpose |
 |------|----------|---------|
-| `ci.yml` | `pull_request` → `main`, `push` → `main`, `workflow_dispatch` | All correctness gates: lint, type-check, tests, OpenSpec validation, security audit, cross-platform smoke build |
+| `ci.yml` | `pull_request` → `main`, `push` → `main`, `workflow_dispatch` | All correctness gates: lint, type-check, tests, OpenSpec validation, security audit, cross-platform smoke build, Windows NSIS bundle build |
 | `release.yml` | `push` of tag matching `v*` | Build signed-but-not-notarized Tauri bundles for macOS (universal) + Windows and attach them to a **draft** GitHub Release |
 
 Both workflows pin the Rust toolchain via `rust-toolchain.toml` and Node.js via `.nvmrc`, so local and CI environments resolve to the same versions.
 
 ## `ci.yml` jobs
 
-All four jobs run in parallel. Concurrency is `ci-${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true` — pushing a new commit to a PR cancels the older run.
+All five jobs run in parallel. Concurrency is `ci-${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true` — pushing a new commit to a PR cancels the older run.
 
 ### 1. `lint-and-test` (ubuntu-latest)
 
@@ -37,12 +37,16 @@ Installs the `@fission-ai/openspec` CLI from npm and runs `openspec validate <ch
 
 ### 3. `security-audit` (ubuntu-latest)
 
-- **Rust:** `cargo audit --file src-tauri/Cargo.lock`. Vulnerabilities (severity advisories) fail the job; informational warnings (unmaintained, unsound) do **not** — they would otherwise produce dozens of unfixable noise from transitive Tauri / gtk-rs dependencies. To ignore a specific advisory, see [Adding an ignored advisory](#adding-an-ignored-advisory).
+- **Rust:** `cargo audit --file Cargo.lock` — the workspace lockfile at the repo root, the only Rust lockfile in the repo (a stale `src-tauri/Cargo.lock` left over from before the workspace was created used to shadow it and has been deleted). Vulnerabilities (severity advisories) fail the job; informational warnings (unmaintained, unsound) do **not** — they would otherwise produce dozens of unfixable noise from transitive Tauri / gtk-rs dependencies. To ignore a specific advisory, see [Adding an ignored advisory](#adding-an-ignored-advisory).
 - **Frontend:** `npm audit --omit=dev --audit-level=high`. Only production dependencies are considered, only high / critical advisories block. Dev dependencies (eslint, vitest, …) are not shipped to users.
 
 ### 4. `tauri-build-smoke` (ubuntu, macos, windows)
 
 Matrix build of `npm run tauri build -- --no-bundle` on all three runner OSes with `fail-fast: false`. This catches platform-specific linkage / compile errors (WebView2 on Windows, WKWebView on macOS, webkit2gtk on Linux) without paying the cost of a full bundle on every PR.
+
+### 5. `build-windows` (windows-latest)
+
+Builds the Windows installer on every PR: `npm run tauri build -- --bundles nsis` (unsigned). Unlike the `--no-bundle` smoke build, this exercises the NSIS bundling step end-to-end and uploads the resulting `*-setup.exe` from `target/release/bundle/nsis/` as a workflow artifact (`ozi-rs-windows-nsis-<sha>`, 7-day retention) so a reviewer can install-test a PR build by hand. No code signing — the installer triggers the SmartScreen unknown-publisher prompt, same as release builds.
 
 ## `release.yml`
 
@@ -82,6 +86,7 @@ After the workflows land on `main`, configure branch protection in **Settings �
    - `Tauri smoke build (ubuntu-latest)`
    - `Tauri smoke build (macos-latest)`
    - `Tauri smoke build (windows-latest)`
+   - `Windows build (NSIS bundle)`
 2. **Require branches to be up to date** before merging (catches integration regressions).
 3. **Require linear history** (matches the OpenSpec workflow expectation that archives are atomic commits).
 4. **Do not allow bypassing** the above for administrators unless absolutely needed.
@@ -130,7 +135,7 @@ If `cargo audit` fails on a transitive vulnerability with no available fix:
 3. Include a comment that explains:
    - **Why** the advisory cannot be addressed (no upstream fix; dependency pinned by Tauri; etc.).
    - **When** the entry should be reconsidered (next Tauri / reqwest / rustls bump, specific date, or upstream issue URL).
-4. Re-run `cargo audit --file src-tauri/Cargo.lock` locally — exit code must be 0.
+4. Re-run `cargo audit --file Cargo.lock` locally (from the repo root) — exit code must be 0.
 5. At every dependency bump, revisit the file and remove entries whose upstream is now fixed.
 
 Example block at the time of writing:
@@ -170,6 +175,7 @@ On cached runs, target wall-clock:
 | `tauri-build-smoke` (Linux) | 4–7 min | 12 min |
 | `tauri-build-smoke` (macOS) | 6–10 min | 15 min |
 | `tauri-build-smoke` (Windows) | 8–12 min | 20 min |
+| `build-windows` (NSIS bundle) | 10–15 min | 25 min |
 | `release.yml` (per platform, full bundle) | 12–18 min | 35 min |
 
 Jobs run in parallel, so total PR wall-clock is dominated by the slowest job (usually `tauri-build-smoke (windows-latest)`).

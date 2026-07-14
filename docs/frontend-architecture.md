@@ -1,5 +1,7 @@
 # Frontend Architecture
 
+> Last verified against code: 2026-07-15
+
 ## Stack
 
 | Layer | Technology |
@@ -23,17 +25,29 @@ classes that read semantic tokens (`bg-popover`, `text-popover-foreground`,
 line width, MapLibre marker DOM) stay on inline `style=` or `:global()`
 rules.
 
-| Component | Primitives | Native control retained | Purpose |
-|-----------|-----------|------------------------|---------|
-| `MapView.svelte` | wrapper-only — Tailwind utility wrapper around MapLibre canvas; `:global()` rules retained for `.track-point-marker` / `.waypoint-marker` because MapLibre creates those DOM elements outside this template | none | Main map canvas. MapLibre init, track/waypoint rendering, drawing mode, drag editing, FPS counter, context menus. Internals kept under `@ts-nocheck` and explicitly out of scope of `migrate-panels-to-shadcn` |
-| `Sidebar.svelte` | `Button`, `Select`, `Separator`, `ScrollArea`, `Tooltip` | none | Left sidebar (w-56). Project controls, active layer selectors, import/export, undo/redo, mode toggles. Theme picker mounted in header. NOTE: `Tabs.Root` was deliberately skipped — the user requires Tracks / Waypoints / Track Points to remain independent floating panels that can be visible simultaneously, incompatible with Tabs' one-active-tab semantics |
-| `TracksPanel.svelte` | `Button`, `Separator`, `Tooltip`; independent floating window | `<input type="color">`, `<input type="range">` | Track list. Visibility, rename, native colour swatch (binds to `TrackStyle.color` RGBA via `setTrackColor` — never to a theme token), line-width range, GPX/PLT export, Simplify launcher |
-| `TrackPointsPanel.svelte` | `Table`, `ScrollArea`, `Button`, `Tooltip` | none | Per-segment point rows in a `Table`; `data-state="selected"` rings the active row; Edit Mode toggle in header |
-| `WaypointsPanel.svelte` | `Button`, `Separator`, `Tooltip`, `Dialog` (delete confirm) | none today (waypoint colour not yet exposed; same D6 rule will apply if added) | Waypoint list. Visibility checkbox, rename, symbol via SymbolPicker, delete via Dialog confirm, WPT export in header |
-| `SimplifyPanel.svelte` | `Slider`, `Switch`, `Label`, `Button` | none | Douglas–Peucker tolerance `Slider` (1–1000m), `Switch` for live preview, stats chip, `Button` (default/outline) confirm/cancel; debounced preview effect unchanged |
-| `SymbolPicker.svelte` | `Popover`, `Button` (via `buttonVariants`), `Tooltip` | none | 5-col grid of domain emoji symbols — the `SYMBOLS` array stays as-is |
-| `ThemePicker.svelte` | `Select` | none | Catppuccin flavour selector (Auto / Latte / Frappé / Macchiato / Mocha) |
-| `Console.svelte` | `Card`, `ScrollArea`, `Button` (close) | none | Top-fixed `Card` overlay for diagnostics; `ScrollArea` viewport powers autoscroll-on-new-message |
+The floating-panels UI (`Sidebar.svelte`, `TracksPanel.svelte`, `TrackPointsPanel.svelte`,
+`WaypointsPanel.svelte`, `SimplifyPanel.svelte`) was **removed on 2026-05-26** and replaced
+by a rail-based workspace shell. The current tree:
+
+| Component | Purpose |
+|-----------|---------|
+| `WorkspaceShell.svelte` | Workspace layout grid: Library rail (left), map canvas (center), Inspector rail (right), status bar (bottom). Writes canvas inset CSS variables so `MapView` (mounted in the layout) aligns with the free canvas area. Hosts the Cmd-K trigger |
+| `LibraryRail.svelte` | Left rail. Three persistent shadcn `Tabs`: Maps / Tracks / Waypoints; active tab held in the `libraryActiveTab` store |
+| `library/MapsTab.svelte` | Bundle map list: switch active map (`openSelectedMap`), reveal in Finder (`revealBundle`), per-map download progress; opens the bundle loader via `bundleLoaderOpen` |
+| `library/TracksTab.svelte` | Track rows (via `LibraryRow`): visibility toggle, inline rename with OK-standard warning, colour swatch `Popover` (binds to `TrackStyle.color` RGBA via `setTrackColor` — never to a theme token), ⋯ menu with Export GPX, Export PLT, Set line width, Simplify… (debounced live preview), Delete; Import GPX / Import PLT buttons; “Create track” drawing toggle |
+| `library/WaypointsTab.svelte` | Waypoint rows: visibility (Show/Hide), double-click rename, symbol via `SymbolPicker`, ⋯ menu with Export WPT and Delete; “Add waypoint” toggle |
+| `library/LibraryRow.svelte` | Shared selectable row primitive for the three tabs |
+| `InspectorRail.svelte` | Right rail; renders one inspector based on selection: `$selectedTrack` → `TrackInspector`, `$selectedWaypointId` → `WaypointInspector`, `$selectedMapInfo` → `MapInspector` |
+| `inspector/TrackInspector.svelte` | Track statistics (distance/duration/points), line-width input, visibility, Export GPX/PLT, Simplify, Delete; embeds `TrackSegmentsTable` |
+| `inspector/TrackSegmentsTable.svelte` | Paged per-segment point rows in a `Table`; click selects a point (`selectedPointId`); Edit Mode toggle |
+| `inspector/WaypointInspector.svelte` | Waypoint name input, lat/lon, symbol picker, Move on map, visibility, Export WPT, Delete |
+| `inspector/MapInspector.svelte` | Active map metadata (projection, datum, tile source) |
+| `CommandPalette.svelte` | Cmd/Ctrl+K palette (cmdk): open/save project, switch project/map, undo/redo, find track/waypoint, exports, recent files, settings stubs. With the palette open, Cmd/Ctrl+E exports the highlighted track (GPX) or waypoint layer (WPT); Cmd/Ctrl+R reveals the highlighted map |
+| `BundleLoader.svelte` | Project list + map list, download progress, cached badges, bundles-root picker. Rendered by the `/` route on cold start and inside a `Sheet` overlay on `/project` (driven by `bundleLoaderOpen`) |
+| `MapView.svelte` | Main map canvas. MapLibre init, track/waypoint rendering, drawing mode, drag editing, FPS counter (F3), context menus. `:global()` rules retained for `.track-point-marker` / `.waypoint-marker` because MapLibre creates those DOM elements outside this template |
+| `SymbolPicker.svelte` | `Popover` grid of domain emoji symbols — the `SYMBOLS` array stays as-is |
+| `ThemePicker.svelte` | Theme selector (Native — Auto, Catppuccin Auto / Latte / Frappé / Macchiato / Mocha). **Currently not mounted anywhere** — the workspace redesign removed its host; theme switching is not reachable from the UI |
+| `Console.svelte` | Backtick-toggled diagnostics overlay |
 
 The `<Toaster />` host and a single `Tooltip.Provider` live in
 `src/routes/+layout.svelte`; panels surface user-visible failures via
@@ -43,20 +57,21 @@ Routes (`src/routes/`):
 
 | Route | File | Purpose |
 |-------|------|---------|
-| `/` | `+page.svelte` | Bundle loader — project list + map list, download progress, cached badges. Lands here when no active map; redirects to `/project` via client-side `onMount(goto)` when an active map is restored from session |
-| `/project` | `project/+page.svelte` | Workspace: `Sidebar` + open floating panels. `MapView` is mounted once in `+layout.svelte` and shown only on this route |
+| `/` | `+page.svelte` | Bundle loader (hosts `BundleLoader.svelte`). Lands here when no active map; a module-level cold-start guard redirects to `/project` via client-side `onMount(goto)` only on the first mount when an active map is restored from session — later visits to `/` are intentional and do not bounce back |
+| `/project` | `project/+page.svelte` | Workspace: `WorkspaceShell` with `LibraryRail` + `InspectorRail`, plus a `Sheet`-hosted `BundleLoader` (opened via the `bundleLoaderOpen` store). Redirects back to `/` if the active map is cleared. `MapView` is mounted once in `+layout.svelte` and shown only on this route |
 
 ## Routing & layout
 
 `src/routes/+layout.svelte` is the single host for global UI surfaces:
 
-- The `Sidebar` + per-route `+page.svelte` content render through `{@render children?.()}`.
+- Per-route `+page.svelte` content renders through `{@render children?.()}`.
 - `MapView` is mounted **once** at layout level so navigating between `/` and `/project`
   does not destroy or re-create the MapLibre map; visibility is toggled by route
   (visible on `/project`, `display: none` on `/`).
-- `<Console />` (backtick-toggled developer overlay), `<Toaster />` (`svelte-sonner`), and a
-  single `<Tooltip.Provider delayDuration={300}>` wrap the whole tree — feature panels never
-  mount their own provider.
+- `<Console />` (backtick-toggled developer overlay), `<CommandPalette />` (opened by a
+  global Cmd/Ctrl+K keydown handler in the layout), `<Toaster />` (`svelte-sonner`), and a
+  single `<Tooltip.Provider delayDuration={300}>` wrap the whole tree — feature components
+  never mount their own provider.
 - `applyStoredTheme()` runs synchronously at layout module top, and `installAutoThemeListener()`
   is registered on mount so the `prefers-color-scheme` media query keeps Auto mode in sync.
 
@@ -81,19 +96,22 @@ select the active layer for existing workflows without implementing full layer m
 
 | Store | Type | Purpose |
 |-------|------|---------|
-| `consoleOpen` | `Writable<boolean>` | Console panel visibility |
-| `tracksPanelOpen` | `Writable<boolean>` | Tracks panel visibility |
-| `waypointsPanelOpen` | `Writable<boolean>` | Waypoints panel visibility |
-| `trackPointsPanelOpen` | `Writable<boolean>` | Track points panel visibility |
+| `consoleOpen` | `Writable<boolean>` | Console overlay visibility |
+| `libraryActiveTab` | Writable | Active Library rail tab (maps / tracks / waypoints) |
+| `bundleLoaderOpen` | `Writable<boolean>` | Bundle-loader `Sheet` visibility on `/project` |
+| `inspectorOpen` | `Writable<boolean>` | Inspector rail visibility |
+| `commandPaletteOpen` | `Writable<boolean>` | Cmd-K palette visibility |
 | `editModeActive` | `Writable<boolean>` | Map point drag editing |
 | `addWaypointMode` | `Writable<boolean>` | Click-to-add waypoint mode |
-| `drawingModeActive` | `Writable<boolean>` | Track drawing mode |
+| `drawingModeActive`, `drawingFinishRequested` | `Writable<boolean>` | Track drawing mode / finish signal |
 | `activeTrackLayerId`, `activeWaypointLayerId` | `Writable<bigint \| null>` | Active-layer selection for current track and waypoint workflows; synchronized from backend layer summaries |
 | `drawingTrackId`, `drawingSegmentId`, `drawingTrackLayerId`, `drawingPointCount` | Writable | Drawing session state; drawing captures the active track layer at creation time |
-| `selectedTrack` | `Writable<{layerId, trackId}>` | Currently selected track |
-| `selectedWaypointId` | `Writable<bigint \| null>` | Selected waypoint |
+| `selectedTrack` | `Writable<{layerId, trackId}>` | Currently selected track (drives `TrackInspector`) |
+| `selectedWaypointId` | `Writable<bigint \| null>` | Selected waypoint (drives `WaypointInspector`) |
+| `selectedPointId` | Writable | Selected track point in `TrackSegmentsTable` |
+| `selectedMapInfo` | Writable | Selected map (drives `MapInspector`) |
 | `simplifyState` | `Writable<{active, layerId, trackId, tolerance, preview}>` | Simplification session |
-| `selectedTheme` | `Writable<string>` | Catppuccin theme, persisted to localStorage |
+| `selectedTheme` | `Writable<string>` | Theme name, persisted to localStorage (default `native-auto`) |
 
 ## API Layer
 
@@ -104,9 +122,9 @@ Categories:
 - **File I/O**: `saveProject(path)`, `loadProjectFile(path)`, `importGpx(path)`, `importPlt(path)`
 - **Track mutations**: `renameTrack()`, `setTrackColor()`, `setTrackLineWidth()`, `moveTrackPoint()`, `deleteTrackPoint()`, `insertTrackPoint()`, `splitSegment()`, `joinSegments()`, `deleteTrack()`, `createEmptyTrack()`, `simplifyTrack()`
 - **Waypoint mutations**: `addWaypoint()`, `moveWaypoint()`, `deleteWaypoint()`, `renameWaypoint()`, `setWaypointSymbol()`
-- **Export**: `getTrackExportDefaultPath(trackName, extension)`, `exportGpx(layerId, path)`, `exportTrackPlt(layerId, trackId, path)`
+- **Export**: `getTrackExportDefaultPath(trackName, extension)`, `exportGpx(layerId, path)`, `exportTrackPlt(layerId, trackId, path)`, `exportWptWaypoints(layerId, path)`, `getWptExportDefaultPath(layerId)`
 - **History**: `undo()`, `redo()`
-- **Maps**: `openSelectedMap()`, `openLocalBundle()`, `getOziMetadata()`
+- **Maps**: `openSelectedMap()`, `openLocalBundle()`, `setBundlesRoot()`, `revealBundle()`, `cancelDownload()`, `getOziMetadata()`
 
 ## Tile Protocols
 
@@ -149,7 +167,7 @@ Two coexisting CSS custom-property layers are written to the root element on eve
 
 Semantic values come from two mapping tables — `SEMANTIC_MAP_LIGHT` for Latte and `SEMANTIC_MAP_DARK` for Frappé / Macchiato / Mocha — so surface semantics stay correct in both light and dark modes (e.g. `--popover` resolves to `base` in light and `surface0` in dark). The root element also carries the `dark` class whenever the resolved flavour is not Latte so Tailwind's `dark:` variant utilities apply.
 
-Themes: Auto (follows OS), Latte, Frappé, Macchiato, Mocha. Auto mode listens to `prefers-color-scheme: dark` and re-applies both layers on every change. Selection is persisted to `localStorage`.
+Themes: Native — Auto (fresh-install default) plus the Catppuccin pack — Auto (follows OS), Latte, Frappé, Macchiato, Mocha. Auto modes listen to `prefers-color-scheme: dark` and re-apply both layers on every change. Selection is persisted to `localStorage["theme"]`. Note: `ThemePicker.svelte` is currently not mounted anywhere, so the theme cannot be changed from the UI (see `docs/feature-status.md`).
 
 Migrated panels almost exclusively read the **semantic layer** through Tailwind utility classes (`bg-popover`, `text-card-foreground`, `border-border`, …). Direct `--ctp-*` reads survive only where load-bearing for MapLibre marker DOM (see the `:global()` rules in `MapView.svelte`) and where palette colour is needed without a semantic analogue (the FPS counter overlay uses `text-emerald-400` against `bg-black/55`, which is Quake-style convention and intentionally outside theme).
 
@@ -172,7 +190,7 @@ Migrated panels almost exclusively read the **semantic layer** through Tailwind 
 
 ### Simplification Preview
 
-1. Click simplify button → `simplifyState.active = true`
+1. `TracksTab` ⋯ menu → Simplify… (or `TrackInspector`) → `simplifyState.active = true`
 2. Slider change (debounced 300ms) → `getSimplifiedPreview()` → stats + orange overlay
 3. Confirm → `simplifyTrack()` | Cancel → clear preview
 
@@ -181,7 +199,7 @@ Migrated panels almost exclusively read the **semantic layer** through Tailwind 
 1. User chooses an active waypoint layer, then toggles "Add Waypoint" → `addWaypointMode = true`
 2. Click map → `addWaypoint(activeLayerId, lat, lon, defaultName)`
 3. Drag marker → `moveWaypoint(activeLayerId, waypointId, lat, lon)`
-4. Symbol picker in WaypointsPanel → `setWaypointSymbol()`
+4. Symbol picker in `WaypointsTab` / `WaypointInspector` → `setWaypointSymbol()`
 
 ## Event-Driven Updates
 
@@ -198,9 +216,13 @@ The frontend uses Tauri events for real-time backend communication:
 
 | Key | Action |
 |-----|--------|
-| Ctrl+Z | Undo |
-| Ctrl+Y | Redo |
+| Cmd/Ctrl+K | Open command palette |
+| Cmd/Ctrl+E | (palette open) Export highlighted track (GPX) or waypoint layer (WPT) |
+| Cmd/Ctrl+R | (palette open) Reveal highlighted map in Finder |
 | Enter | Finish drawing |
-| Escape | Cancel drawing (undo all) |
+| Escape | Cancel drawing (undo all) / close map context menu |
 | `` ` `` | Toggle developer console |
 | F3 | Toggle FPS counter |
+
+There are **no Ctrl+Z / Ctrl+Y bindings** — undo/redo is reachable only through the
+command palette (Undo / Redo entries).

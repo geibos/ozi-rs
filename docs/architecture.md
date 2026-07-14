@@ -1,5 +1,7 @@
 # Architecture
 
+> Last verified against code: 2026-07-15
+
 ## Overview
 
 The system is organized around a small, explicit core that keeps domain rules independent from UI concerns. The UI is a Tauri 2 desktop app with a Svelte 5 frontend and MapLibre GL 4 for map rendering.
@@ -70,7 +72,7 @@ Constraints:
 
 Owns:
 - Map rendering via MapLibre GL 4 with custom tile protocols
-- Svelte 5 components: Sidebar, panels, pickers
+- Svelte 5 components: `WorkspaceShell` with Library rail (Maps/Tracks/Waypoints tabs) and Inspector rail, Cmd-K command palette, bundle loader, pickers
 - Interaction modes: drawing, editing, waypoint placement
 - Svelte stores for reactive state management
 - `api.ts` — typed wrappers for Tauri IPC (never call `invoke` directly in components)
@@ -116,13 +118,15 @@ src-tauri/src/
   main.rs            # Windows entry point
 
 src/
-  components/        # Svelte 5 components (see frontend-architecture.md)
-  views/             # Page-level views
+  components/        # Svelte 5 components: WorkspaceShell, LibraryRail (+ library/ tabs),
+                     # InspectorRail (+ inspector/), CommandPalette, MapView, BundleLoader
+                     # (see frontend-architecture.md)
+  routes/            # SvelteKit routes: `/` (bundle loader), `/project` (workspace)
   lib/
     api.ts           # Typed Tauri IPC wrappers
     stores.ts        # Svelte stores (app state, UI state)
     types.ts         # TypeScript interfaces matching Rust structs
-    theme.ts         # Catppuccin CSS custom properties
+    theme.ts         # Native + Catppuccin themes (CSS custom properties)
     maplibre/        # MapLibre integration
       sqlite-protocol.ts   # sqlite:// tile protocol handler
       ozi-protocol.ts      # ozi:// tile protocol handler

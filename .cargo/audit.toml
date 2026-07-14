@@ -1,6 +1,6 @@
 # cargo-audit configuration for the ozi-rs Tauri backend.
 #
-# CI invokes `cargo audit --file src-tauri/Cargo.lock` (no `--deny warnings`):
+# CI invokes `cargo audit --file Cargo.lock` (workspace root; no `--deny warnings`):
 #   - RUSTSEC vulnerabilities (severity advisories) FAIL the build.
 #   - RUSTSEC warnings (unmaintained / unsound informational) DO NOT fail
 #     the build, because most of them come from transitive Tauri 2 / gtk-rs
@@ -29,4 +29,13 @@ ignore = [
     "RUSTSEC-2026-0098",
     "RUSTSEC-2026-0099",
     "RUSTSEC-2026-0104",
+
+    # quick-xml 0.39.x — two advisories (2026-07); the fix requires
+    # quick-xml >=0.41.0. Pulled in via tauri 2.10.3 -> plist 1.9.0 ->
+    # quick-xml ^0.39; no plist release on 0.41 exists yet, so ozi-rs
+    # cannot bump it directly. quick-xml here parses plist files shipped
+    # inside the app bundle, not attacker-controlled input. Recheck on
+    # every Tauri / plist bump.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
 ]

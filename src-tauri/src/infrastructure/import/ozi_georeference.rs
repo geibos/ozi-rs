@@ -1,6 +1,9 @@
 /// Affine georeference derived from OZI calibration points.
 ///
-/// Converts between WGS-84 lat/lon (decimal degrees) and raster pixel coordinates.
+/// Converts between lat/lon (decimal degrees) and raster pixel coordinates in
+/// the map's native datum. No datum transformation is applied: for maps
+/// calibrated in a non-WGS-84 datum (e.g. Pulkovo 1942) positions keep the
+/// datum shift (~100–150 m) relative to WGS-84 GPS data.
 #[derive(Debug, Clone)]
 pub struct OziGeoreference {
     lon_x: f64,
@@ -39,6 +42,10 @@ impl OziGeoreference {
 }
 
 /// Parse OZI calibration point strings into an `OziGeoreference`.
+///
+/// The datum declared in the `.map` file is NOT transformed — calibration
+/// lat/lon values are used verbatim, so the resulting georeference stays in
+/// the map's native datum.
 ///
 /// Returns `None` if fewer than two valid calibration points are found or the
 /// calibration points are degenerate (all at the same latitude or longitude).

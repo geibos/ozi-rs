@@ -54,7 +54,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: ". -> target"
 
       - name: Set up Node.js (from .nvmrc)
         uses: actions/setup-node@v4
@@ -147,7 +147,7 @@ jobs:
           tool: cargo-audit
 
       - name: cargo audit (vulnerabilities fail; warnings informational)
-        run: cargo audit --file src-tauri/Cargo.lock
+        run: cargo audit --file Cargo.lock
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -197,7 +197,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: ". -> target"
           key: tauri-smoke
 
       - name: Set up Node.js
@@ -212,3 +212,41 @@ jobs:
 
       - name: Tauri build (no bundle)
         run: npm run tauri build -- --no-bundle
+
+  build-windows:
+    name: Windows build (NSIS bundle)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Tauri build (NSIS bundle, unsigned)
+        run: npm run tauri build -- --bundles nsis
+
+      - name: Upload NSIS installer (build evidence)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozi-rs-windows-nsis-${{ github.sha }}
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 7
