@@ -17,6 +17,7 @@ use crate::{config, evidence::EvidencePaths};
 
 pub const DEFAULT_APPIUM_SERVER_URL: &str = "http://127.0.0.1:4723";
 pub const DEFAULT_APPIUM_BUNDLE_ID: &str = "ru.lizaalert.ozi-rs";
+pub const APPIUM_NEW_COMMAND_TIMEOUT_SECS: u32 = 600;
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema, PartialEq, Eq)]
 pub struct AppiumToolResult {
@@ -221,6 +222,39 @@ pub fn appium_launch_session_with_options(
     server_url: &str,
     bundle_id: Option<&str>,
 ) -> AppiumToolResult {
+    let resolved_bundle = bundle_id.unwrap_or(DEFAULT_APPIUM_BUNDLE_ID);
+    appium_launch_session_with_capabilities(
+        appium_available,
+        server_url,
+        json!({ "appium:bundleId": resolved_bundle }),
+        resolved_bundle,
+    )
+}
+
+/// Launch a session for the app bundle at an explicit filesystem path.
+///
+/// Required for DEBUG bundles: they are not registered with LaunchServices,
+/// so an `appium:bundleId` launch hangs inside XCUITest until the proxy
+/// timeout. `appium:appPath` launches the bundle directly.
+pub fn appium_launch_session_with_app_path(
+    appium_available: bool,
+    server_url: &str,
+    app_path: &str,
+) -> AppiumToolResult {
+    appium_launch_session_with_capabilities(
+        appium_available,
+        server_url,
+        json!({ "appium:appPath": app_path }),
+        app_path,
+    )
+}
+
+fn appium_launch_session_with_capabilities(
+    appium_available: bool,
+    server_url: &str,
+    app_capabilities: serde_json::Value,
+    app_description: &str,
+) -> AppiumToolResult {
     if !appium_available {
         return appium_missing_result(
             "appium_launch_session",
@@ -228,18 +262,31 @@ pub fn appium_launch_session_with_options(
         );
     }
 
-    let resolved_bundle = bundle_id.unwrap_or(DEFAULT_APPIUM_BUNDLE_ID);
-    let body = json!({
-        "capabilities": {
-            "alwaysMatch": {
-                "platformName": "Mac",
-                "appium:automationName": "Mac2",
-                "appium:bundleId": resolved_bundle
-            }
-        }
+    let mut always_match = json!({
+        "platformName": "Mac",
+        "appium:automationName": "Mac2",
+        // Mac2 defaults to 60s: any agent think-pause between commands
+        // silently kills the session ("invalid session id").
+        "appium:newCommandTimeout": APPIUM_NEW_COMMAND_TIMEOUT_SECS
     });
+    if let (Some(target), Some(extra)) = (always_match.as_object_mut(), app_capabilities.as_object())
+    {
+        for (key, value) in extra {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    let body = json!({ "capabilities": { "alwaysMatch": always_match } });
+    let resolved_bundle = app_description;
 
-    match webdriver_request("POST", server_url, "/session", Some(&body)) {
+    // Cold-start budget: first session after an Appium/WDA restart triggers
+    // an xcodebuild of WebDriverAgentMac (60-180s observed).
+    match webdriver_request_with_timeout(
+        "POST",
+        server_url,
+        "/session",
+        Some(&body),
+        Duration::from_secs(240),
+    ) {
         Ok(response) if response.status_code < 400 => {
             let session_id = extract_session_id(&response.body);
             if let Some(session_id) = session_id {
@@ -646,6 +693,246 @@ pub fn appium_type_text_with_session_id(
     }
 }
 
+/// GET `/session/{sid}/source` and return the accessibility-tree XML.
+///
+/// This is the smoke-test poll primitive: assertions about UI state are made
+/// against the returned XML instead of screenshots.
+#[allow(clippy::result_large_err)]
+pub fn appium_page_source_with_session_id(
+    server_url: &str,
+    session_id: &str,
+) -> Result<String, AppiumToolResult> {
+    match webdriver_request(
+        "GET",
+        server_url,
+        &format!("/session/{session_id}/source"),
+        None,
+    ) {
+        Ok(response) if response.status_code < 400 => {
+            serde_json::from_str::<serde_json::Value>(&response.body)
+                .ok()
+                .and_then(|value| value.get("value")?.as_str().map(str::to_owned))
+                .ok_or_else(|| {
+                    appium_failure_result(
+                        "appium_page_source",
+                        "webdriver_error",
+                        format!(
+                            "Page source response is not a string payload (body: {})",
+                            truncate(&response.body, 200),
+                        ),
+                    )
+                })
+        }
+        Ok(response) => Err(appium_failure_result(
+            "appium_page_source",
+            "webdriver_error",
+            format!(
+                "Page source failed with HTTP {}: {}",
+                response.status_code,
+                truncate(&response.body, 400),
+            ),
+        )),
+        Err(error) => Err(webdriver_request_error_result(
+            "appium_page_source",
+            server_url,
+            &error,
+        )),
+    }
+}
+
+/// Resolve `selector` to an element, then click at each `(dx, dy)` offset from
+/// the element's center via W3C pointer actions — one `/actions` POST per
+/// offset so the app sees distinct, pace-able clicks (map drawing needs them).
+pub fn appium_click_element_offsets_with_session_id(
+    server_url: &str,
+    session_id: &str,
+    selector: &str,
+    offsets: &[(i32, i32)],
+) -> AppiumToolResult {
+    let (using, value) = parse_selector(selector);
+    let eid = match find_wd_element(
+        "appium_click_element_offsets",
+        server_url,
+        session_id,
+        using,
+        &value,
+        selector,
+    ) {
+        Ok(id) => id,
+        Err(result) => return result,
+    };
+
+    for &(dx, dy) in offsets {
+        let body = json!({
+            "actions": [{
+                "type": "pointer",
+                "id": "mouse",
+                "parameters": { "pointerType": "mouse" },
+                "actions": [
+                    {
+                        "type": "pointerMove",
+                        "duration": 100,
+                        "origin": { "element-6066-11e4-a52e-4f735466cecf": eid, "ELEMENT": eid },
+                        "x": dx,
+                        "y": dy
+                    },
+                    { "type": "pointerDown", "button": 0 },
+                    { "type": "pause", "duration": 50 },
+                    { "type": "pointerUp", "button": 0 }
+                ]
+            }]
+        });
+        match webdriver_request(
+            "POST",
+            server_url,
+            &format!("/session/{session_id}/actions"),
+            Some(&body),
+        ) {
+            Ok(response) if response.status_code < 400 => {}
+            Ok(response) => {
+                return appium_failure_result(
+                    "appium_click_element_offsets",
+                    "webdriver_error",
+                    format!(
+                        "Pointer actions at offset ({dx},{dy}) failed with HTTP {}: {}",
+                        response.status_code,
+                        truncate(&response.body, 400),
+                    ),
+                );
+            }
+            Err(error) => {
+                return webdriver_request_error_result(
+                    "appium_click_element_offsets",
+                    server_url,
+                    &error,
+                );
+            }
+        }
+    }
+
+    AppiumToolResult {
+        ok: true,
+        tool: "appium_click_element_offsets".to_owned(),
+        available: true,
+        error_kind: None,
+        missing: Vec::new(),
+        message: Some(format!(
+            "Clicked {} offset(s) on element matching \"{selector}\" in session {session_id}",
+            offsets.len(),
+        )),
+        session_id: Some(session_id.to_owned()),
+        install_hints: Vec::new(),
+        artifact_paths: Vec::new(),
+    }
+}
+
+/// Press and release a single key via W3C key actions. `key` is either a
+/// literal character or a WebDriver key codepoint (e.g. `'\u{E00C}'` = Escape,
+/// `'\u{E007}'` = Enter).
+pub fn appium_press_key_with_session_id(
+    server_url: &str,
+    session_id: &str,
+    key: char,
+) -> AppiumToolResult {
+    let key_text = key.to_string();
+    let body = json!({
+        "actions": [{
+            "type": "key",
+            "id": "keyboard",
+            "actions": [
+                { "type": "keyDown", "value": key_text },
+                { "type": "keyUp", "value": key_text }
+            ]
+        }]
+    });
+    match webdriver_request(
+        "POST",
+        server_url,
+        &format!("/session/{session_id}/actions"),
+        Some(&body),
+    ) {
+        Ok(response) if response.status_code < 400 => AppiumToolResult {
+            ok: true,
+            tool: "appium_press_key".to_owned(),
+            available: true,
+            error_kind: None,
+            missing: Vec::new(),
+            message: Some(format!(
+                "Pressed key U+{:04X} in session {session_id}",
+                key as u32
+            )),
+            session_id: Some(session_id.to_owned()),
+            install_hints: Vec::new(),
+            artifact_paths: Vec::new(),
+        },
+        Ok(response) => appium_failure_result(
+            "appium_press_key",
+            "webdriver_error",
+            format!(
+                "Key actions failed with HTTP {}: {}",
+                response.status_code,
+                truncate(&response.body, 400),
+            ),
+        ),
+        Err(error) => {
+            webdriver_request_error_result("appium_press_key", server_url, &error)
+        }
+    }
+}
+
+/// Decode the WebDriver screenshot payload (`{"value":"<base64>"}`) into raw
+/// image bytes. Returns `None` when the body is not the expected shape or the
+/// base64 payload is invalid — callers must not write undecodable payloads to
+/// a `.png` evidence path.
+pub fn decode_screenshot_body(body: &str) -> Option<Vec<u8>> {
+    let encoded = serde_json::from_str::<serde_json::Value>(body)
+        .ok()?
+        .get("value")?
+        .as_str()?
+        .to_owned();
+    decode_base64(encoded.trim())
+}
+
+/// Minimal standard-alphabet base64 decoder (RFC 4648, `=`-padded). Kept
+/// dependency-free: the payload is machine-generated by Appium, so lenient
+/// variants (URL-safe, missing padding) are deliberately not accepted.
+fn decode_base64(input: &str) -> Option<Vec<u8>> {
+    fn value(byte: u8) -> Option<u32> {
+        match byte {
+            b'A'..=b'Z' => Some(u32::from(byte - b'A')),
+            b'a'..=b'z' => Some(u32::from(byte - b'a') + 26),
+            b'0'..=b'9' => Some(u32::from(byte - b'0') + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            _ => None,
+        }
+    }
+
+    let stripped: Vec<u8> = input
+        .bytes()
+        .filter(|byte| !byte.is_ascii_whitespace())
+        .collect();
+    if stripped.is_empty() || !stripped.len().is_multiple_of(4) {
+        return None;
+    }
+
+    let mut output = Vec::with_capacity(stripped.len() / 4 * 3);
+    for chunk in stripped.chunks_exact(4) {
+        let padding = chunk.iter().filter(|&&byte| byte == b'=').count();
+        if padding > 2 || chunk[..4 - padding].contains(&b'=') {
+            return None;
+        }
+        let mut acc: u32 = 0;
+        for &byte in &chunk[..4 - padding] {
+            acc = (acc << 6) | value(byte)?;
+        }
+        acc <<= 6 * padding as u32;
+        let bytes = acc.to_be_bytes();
+        output.extend_from_slice(&bytes[1..4 - padding]);
+    }
+    Some(output)
+}
+
 pub fn appium_screenshot_with_session_id(server_url: &str, session_id: &str) -> AppiumToolResult {
     match webdriver_request(
         "GET",
@@ -654,16 +941,17 @@ pub fn appium_screenshot_with_session_id(server_url: &str, session_id: &str) -> 
         None,
     ) {
         Ok(response) if response.status_code < 400 => {
-            let bytes = serde_json::from_str::<serde_json::Value>(&response.body)
-                .ok()
-                .and_then(|value| {
-                    value
-                        .get("value")
-                        .and_then(|value| value.as_str())
-                        .map(str::to_owned)
-                })
-                .unwrap_or(response.body)
-                .into_bytes();
+            let Some(bytes) = decode_screenshot_body(&response.body) else {
+                return appium_failure_result(
+                    "appium_screenshot",
+                    "webdriver_error",
+                    format!(
+                        "Appium screenshot returned a payload that is not base64 image data \
+                         (body: {})",
+                        truncate(&response.body, 200),
+                    ),
+                );
+            };
             match config::repo_root()
                 .and_then(|root| appium_screenshot_with_fake_image(&root, &bytes))
             {
@@ -818,14 +1106,25 @@ fn webdriver_request(
     path: &str,
     body: Option<&serde_json::Value>,
 ) -> Result<HttpResponse, WebDriverRequestError> {
+    webdriver_request_with_timeout(method, server_url, path, body, Duration::from_secs(60))
+}
+
+fn webdriver_request_with_timeout(
+    method: &str,
+    server_url: &str,
+    path: &str,
+    body: Option<&serde_json::Value>,
+    read_timeout: Duration,
+) -> Result<HttpResponse, WebDriverRequestError> {
     let (host, port) = parse_http_url(server_url).map_err(WebDriverRequestError::unavailable)?;
     let mut stream =
         TcpStream::connect((host.as_str(), port)).map_err(WebDriverRequestError::unavailable)?;
-    // Mac2 session creation can take 15-30s while the driver attaches to the
-    // app and probes Accessibility; quick endpoints return instantly, so a
-    // generous read budget is safe.
+    // Quick endpoints return instantly, so a generous read budget is safe.
+    // Session creation gets its own multi-minute budget from the caller: a
+    // cold Mac2 driver first runs `xcodebuild build-for-testing` for
+    // WebDriverAgentMac, which takes well over a minute.
     stream
-        .set_read_timeout(Some(Duration::from_secs(60)))
+        .set_read_timeout(Some(read_timeout))
         .map_err(WebDriverRequestError::unresponsive)?;
     stream
         .set_write_timeout(Some(Duration::from_secs(10)))

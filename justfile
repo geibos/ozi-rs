@@ -47,6 +47,14 @@ run-release:
     cargo build --release --manifest-path src-tauri/Cargo.toml --features custom-protocol
     ./target/release/ozi-rs
 
+# E2E smoke gate: drives the real bundled app through the core workflow
+# (launch → Tracks tab → draw 3 points → cancel) via Appium Mac2. This is the
+# pre-merge gate for any change touching the app: run it before merging.
+# Requires a `just build` artifact and a running Appium server
+# (`appium --address 127.0.0.1 --port 4723`, driver: `appium driver install mac2`).
+smoke:
+    cargo test --manifest-path tools/ozi-rs-mcp/Cargo.toml --test smoke_core_workflow -- --ignored --nocapture
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 
 # Build the full Tauri app (debug)
