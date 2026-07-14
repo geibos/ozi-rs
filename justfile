@@ -38,9 +38,13 @@ run:
 # `openspec/specs/build-tooling/spec.md` and `scripts/dev-build-frontend.sh`.
 # The canonical bundled path (`just release`, `just build`) still uses
 # `npm run tauri build` and is unaffected.
+# `--features custom-protocol` is load-bearing: Tauri 2 embeds production
+# assets only under that feature (the tauri CLI enables it implicitly).
+# Without it the context is "dev" and, with `devUrl` set, embeds an EMPTY
+# asset set — the app launches into a blank white window.
 run-release:
     @./scripts/dev-build-frontend.sh
-    cargo build --release --manifest-path src-tauri/Cargo.toml
+    cargo build --release --manifest-path src-tauri/Cargo.toml --features custom-protocol
     ./target/release/ozi-rs
 
 # ── Build ─────────────────────────────────────────────────────────────────────

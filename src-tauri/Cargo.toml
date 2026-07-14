@@ -7,6 +7,13 @@ edition = "2024"
 name = "ozi_rs_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# Tauri 2 gates production asset embedding on this feature (the CLI enables it
+# for `tauri build`/`tauri dev` bundles). A bare `cargo build --release`
+# without it generates a dev context with EMPTY embedded assets — the window
+# opens blank (tauri-codegen context.rs: `dev && dev_url.is_some()`).
+custom-protocol = ["tauri/custom-protocol"]
+
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
