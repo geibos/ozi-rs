@@ -8,6 +8,9 @@ use ozi_rs_mcp::{
 static SMOKE_BUNDLE_AND_MAPS_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
+#[ignore = "superseded by smoke_core_workflow (`just smoke`): performs no UI interactions, \
+            launches by bundleId (hangs on unregistered debug bundles) and seizes the GUI \
+            during plain `cargo test`; kept only as an evidence-collection reference"]
 fn smoke_bundle_and_maps() {
     let _guard = SMOKE_BUNDLE_AND_MAPS_LOCK
         .lock()
