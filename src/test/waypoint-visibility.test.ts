@@ -57,17 +57,25 @@ describe("api.ts wrapper for toggle_waypoint_visible", () => {
     expect(apiSource).toContain(
       "export async function toggleWaypointVisible(\n  layerId: bigint,\n  waypointId: bigint,\n)",
     );
-    // `api.ts` now routes through the `invokeIpc` wrapper from
-    // `src/lib/ipc.ts` so dev IPC failures surface as a structured toast.
-    expect(apiSource).toContain(
-      'invokeIpc("toggle_waypoint_visible", { layerId, waypointId })',
-    );
+    // `api.ts` delegates to the generated tauri-specta bindings; the
+    // wire shape (invoke("toggle_waypoint_visible", {layerId, waypointId}))
+    // is asserted behaviorally in the IPC-contract test below.
+    expect(apiSource).toContain("commands.toggleWaypointVisible(");
   });
 });
 
 describe("WaypointData type", () => {
   it("includes a required visible boolean field", () => {
-    expect(typesSource).toMatch(/visible:\s*boolean/);
+    // The wire shape is generated (WaypointDto in bindings.ts) and
+    // re-exported by types.ts under the historical WaypointData name.
+    const bindingsSource = readFileSync(
+      join(__dirname, "../lib/bindings.ts"),
+      "utf-8",
+    );
+    expect(bindingsSource).toMatch(
+      /export type WaypointDto = \{[^}]*visible: boolean/,
+    );
+    expect(typesSource).toContain("WaypointDto as WaypointData");
   });
 });
 

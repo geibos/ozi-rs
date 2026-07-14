@@ -140,15 +140,15 @@ Concrete checklist when introducing a new undoable edit. Each step has tests inl
 
 5. **`AppState` adapter** in `application/mod.rs`. Add an `apply_<your_command>` method that fetches any pre-state needed for the inverse and calls `self.history.apply(...)` (or `apply_or_merge` for drag commands). Map errors to `ProjectLayerError`.
 
-6. **Tauri handler** in `src-tauri/src/commands/mod.rs`. Add `#[tauri::command] pub fn your_command(...)` that locks state, calls the AppState adapter, emits `state-changed`, and converts errors to `String`.
+6. **Tauri handler** in `src-tauri/src/commands/mod.rs`. Add `#[tauri::command]` + `#[specta::specta]` `pub fn your_command(...)` that locks state, calls the AppState adapter, emits `state-changed`, and converts errors to `String`. Any DTO it returns or accepts derives `specta::Type` alongside `serde::Serialize`.
 
-7. **Register** in `src-tauri/src/lib.rs::generate_handler!`. The build fails fast if you forget — but the failure is far from the change, so save yourself the round-trip.
+7. **Register** in `src-tauri/src/lib.rs::specta_builder()` (`collect_commands![]`). This single registration feeds both the runtime invoke handler and the generated TypeScript bindings.
 
-8. **Typed wrapper** in `src/lib/api.ts`. Mirror the parameter list using `bigint` for IDs, named arguments matching Rust `snake_case` → TypeScript `camelCase` (Tauri auto-converts).
+8. **Regenerate bindings**: `cargo test --manifest-path src-tauri/Cargo.toml typescript_bindings` rewrites `src/lib/bindings.ts` (the test fails once while the file is stale — commit the regenerated file). Frontend contract drift is now a compile error, not a runtime surprise; there is no manual `api.ts`/`types.ts` mirroring step. Exception: commands returning raw bytes (`tauri::ipc::Response`, i.e. tiles) stay outside specta on the plain handler in `lib.rs` and keep hand-written `invokeIpc` wrappers.
 
-9. **DTO sync** if the command returns or accepts a struct. Update `src/lib/types.ts` and the Rust DTO in `commands/mod.rs` together. There is no codegen.
+9. **Thin wrapper** in `src/lib/api.ts`: delegate to `commands.yourCommand(...)` from `./bindings`, converting `bigint` IDs to `Number` at this boundary and unwrapping the generated `Result` (throw on `status: "error"`).
 
-10. **UI hookup.** Call the wrapper from the relevant component or store. Never call `invoke()` directly. Update Svelte stores if state shape changes.
+10. **UI hookup.** Call the wrapper from the relevant component or store. Never call `invoke()` or `bindings.commands` directly from components. Update Svelte stores if state shape changes.
 
 11. **Update this file.** Add the variant to the table above and the IPC command to the relevant subsection. Update `docs/feature-status.md` if user-visible behavior changes.
 

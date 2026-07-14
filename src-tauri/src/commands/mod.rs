@@ -56,13 +56,13 @@ fn lock_app_state<'a>(
 
 // ── Serializable DTOs ────────────────────────────────────────────────────────
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 pub struct DiagnosticDto {
     pub level: &'static str,
     pub message: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct AppStateDto {
     pub project_name: String,
     pub project_saved: bool,
@@ -80,7 +80,7 @@ pub struct AppStateDto {
     pub tracks: Vec<TrackSummaryDto>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 pub struct LayerSummaryDto {
     pub id: u64,
     pub name: String,
@@ -91,7 +91,7 @@ pub struct LayerSummaryDto {
 /// Includes derived statistics (distance, duration, point count) computed
 /// from the domain `Track` so the frontend can render them without re-walking
 /// the segment data.
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 pub struct TrackSummaryDto {
     pub layer_id: u64,
     pub track_id: u64,
@@ -104,13 +104,13 @@ pub struct TrackSummaryDto {
     pub point_count: u32,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 pub struct LizaProjectSummaryDto {
     pub slug: String,
     pub name: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct LizaProjectDto {
     pub name: String,
     pub center_lat: f64,
@@ -118,14 +118,14 @@ pub struct LizaProjectDto {
     pub maps: Vec<LizaMapPackageDto>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct LizaMapPackageDto {
     pub name: String,
     pub base_zoom: u8,
     pub downloaded: bool,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct ActiveMapDto {
     pub kind: &'static str,
     pub project_name: String,
@@ -174,7 +174,7 @@ fn to_project_summary_dtos(projects: &[LizaProjectSummary]) -> Vec<LizaProjectSu
 }
 
 // Events
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 struct DownloadProgressPayload {
     download_id: String,
     package_name: String,
@@ -186,7 +186,7 @@ struct DownloadProgressPayload {
     file_count: Option<usize>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 struct BundleProgressPayload {
     download_id: String,
     message: String,
@@ -197,7 +197,7 @@ struct BundleProgressPayload {
     total_bytes: Option<u64>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, specta::Type, Clone)]
 struct BundleFileReadyPayload {
     download_id: String,
     package_name: String,
@@ -209,6 +209,7 @@ struct BundleFileReadyPayload {
 // ── State snapshot ────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
     let s = lock_app_state(state.inner())?;
 
@@ -312,6 +313,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
 // ── Track GeoJSON ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value, String> {
     let s = lock_app_state(state.inner())?;
     let mut features = Vec::new();
@@ -363,6 +365,7 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
 // ── LizaAlert project loading ─────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
     let Some(bundles_root) = lock_app_state(state.inner())?.begin_load_projects() else {
         return Ok(());
@@ -403,6 +406,7 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn load_project(
     slug: String,
     state: State<SharedState>,
@@ -526,6 +530,7 @@ pub fn load_project(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn cancel_download(
     download_id: String,
     downloads: State<SharedDownloads>,
@@ -534,6 +539,7 @@ pub fn cancel_download(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn open_selected_map(
     map_name: String,
     state: State<SharedState>,
@@ -590,6 +596,7 @@ pub fn open_selected_map(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn open_local_bundle(
     dir: String,
     state: State<SharedState>,
@@ -634,6 +641,7 @@ pub fn open_local_bundle(
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_bundles_root(
     path: String,
     state: State<SharedState>,
@@ -647,6 +655,7 @@ pub fn set_bundles_root(
 // ── Project persistence ───────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn save_project(path: String, state: State<SharedState>, app: AppHandle) -> Result<(), String> {
     let result = lock_app_state(state.inner())?.save_project_to(PathBuf::from(path));
     // Emit even on failure so the diagnostics panel picks up the error entry.
@@ -655,6 +664,7 @@ pub fn save_project(path: String, state: State<SharedState>, app: AppHandle) -> 
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn load_project_file(
     path: String,
     state: State<SharedState>,
@@ -668,6 +678,7 @@ pub fn load_project_file(
 // ── Import / export ───────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_gpx(
     path: String,
     state: State<SharedState>,
@@ -685,6 +696,7 @@ pub fn import_gpx(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn import_plt(
     path: String,
     state: State<SharedState>,
@@ -702,6 +714,7 @@ pub fn import_plt(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn export_gpx(
     layer_id: u64,
     path: String,
@@ -715,6 +728,7 @@ pub fn export_gpx(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_track_export_default_path(
     track_name: String,
     extension: String,
@@ -726,6 +740,7 @@ pub fn get_track_export_default_path(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn export_wpt_waypoints(
     layer_id: u64,
     path: String,
@@ -740,6 +755,7 @@ pub fn export_wpt_waypoints(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_wpt_export_default_path(
     layer_id: u64,
     state: State<SharedState>,
@@ -751,6 +767,7 @@ pub fn get_wpt_export_default_path(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn export_track_plt(
     layer_id: u64,
     track_id: u64,
@@ -792,6 +809,7 @@ pub fn export_track_plt(
 // ── Undo / redo ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn undo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
     lock_app_state(state.inner())?.undo();
     let _ = app.emit("state-changed", ());
@@ -799,6 +817,7 @@ pub fn undo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn redo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
     lock_app_state(state.inner())?.redo();
     let _ = app.emit("state-changed", ());
@@ -808,6 +827,7 @@ pub fn redo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
 // ── Track mutations ───────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn rename_track(
     layer_id: u64,
     track_id: u64,
@@ -823,6 +843,7 @@ pub fn rename_track(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_track_color(
     layer_id: u64,
     track_id: u64,
@@ -838,6 +859,7 @@ pub fn set_track_color(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_waypoint_symbol(
     layer_id: u64,
     waypoint_id: u64,
@@ -855,6 +877,7 @@ pub fn set_waypoint_symbol(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn toggle_track_visible(
     layer_id: u64,
     track_id: u64,
@@ -869,6 +892,7 @@ pub fn toggle_track_visible(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn toggle_waypoint_visible(
     layer_id: u64,
     waypoint_id: u64,
@@ -885,6 +909,7 @@ pub fn toggle_waypoint_visible(
 // ── Track point and track mutations ───────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn move_track_point(
     state: State<SharedState>,
     app: AppHandle,
@@ -911,6 +936,7 @@ pub fn move_track_point(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_track_point(
     state: State<SharedState>,
     app: AppHandle,
@@ -934,6 +960,7 @@ pub fn delete_track_point(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn insert_track_point(
     state: State<SharedState>,
     app: AppHandle,
@@ -960,6 +987,7 @@ pub fn insert_track_point(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn split_segment(
     state: State<SharedState>,
     app: AppHandle,
@@ -983,6 +1011,7 @@ pub fn split_segment(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn join_segments(
     state: State<SharedState>,
     app: AppHandle,
@@ -1006,6 +1035,7 @@ pub fn join_segments(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_track(
     state: State<SharedState>,
     app: AppHandle,
@@ -1024,6 +1054,7 @@ pub fn delete_track(
 // ── Waypoint mutations ────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn delete_waypoint(
     state: State<SharedState>,
     app: AppHandle,
@@ -1040,6 +1071,7 @@ pub fn delete_waypoint(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn rename_waypoint(
     state: State<SharedState>,
     app: AppHandle,
@@ -1061,6 +1093,7 @@ pub fn rename_waypoint(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn move_waypoint(
     state: State<SharedState>,
     app: AppHandle,
@@ -1083,6 +1116,7 @@ pub fn move_waypoint(
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn add_waypoint(
     state: State<SharedState>,
     app: AppHandle,
@@ -1103,6 +1137,7 @@ pub fn add_waypoint(
 // ── Track simplification ──────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn simplify_track(
     state: State<SharedState>,
     app: AppHandle,
@@ -1122,6 +1157,7 @@ pub fn simplify_track(
 // ── Track style ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_track_line_width(
     state: State<SharedState>,
     app: AppHandle,
@@ -1138,7 +1174,7 @@ pub fn set_track_line_width(
 
 // ── Read endpoints ────────────────────────────────────────────────────────────
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct PointDetailDto {
     pub id: u64,
     pub lat: f64,
@@ -1147,13 +1183,13 @@ pub struct PointDetailDto {
     pub timestamp: Option<String>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct SegmentDetailDto {
     pub id: u64,
     pub points: Vec<PointDetailDto>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct TrackDetailDto {
     pub id: u64,
     pub name: String,
@@ -1161,6 +1197,7 @@ pub struct TrackDetailDto {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_track_detail(
     state: State<SharedState>,
     layer_id: u64,
@@ -1209,7 +1246,7 @@ pub fn get_track_detail(
     })
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct WaypointDto {
     pub id: u64,
     pub name: String,
@@ -1220,6 +1257,7 @@ pub struct WaypointDto {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_waypoints(state: State<SharedState>, layer_id: u64) -> Result<Vec<WaypointDto>, String> {
     use crate::domain::LayerId;
     let app_state = lock_app_state(state.inner())?;
@@ -1247,7 +1285,7 @@ pub fn get_waypoints(state: State<SharedState>, layer_id: u64) -> Result<Vec<Way
     Ok(waypoints)
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct SimplifiedSegmentDto {
     pub id: u64,
     pub original_count: usize,
@@ -1255,7 +1293,7 @@ pub struct SimplifiedSegmentDto {
     pub kept_points: Vec<PointDetailDto>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, specta::Type)]
 pub struct SimplifiedPreviewDto {
     pub original_count: usize,
     pub simplified_count: usize,
@@ -1263,6 +1301,7 @@ pub struct SimplifiedPreviewDto {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_simplified_preview(
     state: State<SharedState>,
     layer_id: u64,
@@ -1330,6 +1369,7 @@ pub fn get_simplified_preview(
 // ── Open-in-finder ────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn reveal_bundle(state: State<SharedState>) -> Result<(), String> {
     lock_app_state(state.inner())?.reveal_active_bundle();
     Ok(())
@@ -1338,6 +1378,7 @@ pub fn reveal_bundle(state: State<SharedState>) -> Result<(), String> {
 // ── Track creation ────────────────────────────────────────────────────────────
 
 #[tauri::command]
+#[specta::specta]
 pub fn create_empty_track(
     state: State<SharedState>,
     app: AppHandle,

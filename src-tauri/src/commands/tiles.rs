@@ -54,6 +54,7 @@ fn load_ozi_context(map_path: &str) -> Result<CachedOziMapContext, String> {
 /// Zoom range metadata comes from table `info`, columns `minzoom`/`maxzoom`.
 /// `base_zoom` is the web zoom level corresponding to db zoom 0 (highest detail).
 #[tauri::command]
+#[specta::specta]
 pub fn get_sqlite_tile(
     path: String,
     base_zoom: u32,
@@ -96,6 +97,7 @@ pub fn get_sqlite_tile(
 /// Return a PNG-encoded tile from an OZF2 file given the `.map` metadata path,
 /// zoom level index, and tile grid coordinates.
 #[tauri::command]
+#[specta::specta]
 pub fn get_ozi_tile(
     map_path: String,
     level: usize,
@@ -118,6 +120,7 @@ pub fn get_ozi_tile(
 
 /// Return tile grid metadata for an OZF2 map (levels, dimensions, georeference coefficients).
 #[tauri::command]
+#[specta::specta]
 pub fn get_ozi_metadata(map_path: String) -> Result<serde_json::Value, String> {
     let context = load_ozi_context(&map_path)?;
     let metadata = &context.metadata;
@@ -225,6 +228,7 @@ fn web_to_db_zoom(web_z: u32, db_min: u32, db_max: u32, base_zoom: u32) -> Optio
 /// 5. Nearest-neighbour scale the scratch buffer into a 256×256 output image.
 /// 6. Return the output as a PNG.
 #[tauri::command]
+#[specta::specta]
 pub fn get_ozi_tile_projected(
     map_path: String,
     tx: u32,

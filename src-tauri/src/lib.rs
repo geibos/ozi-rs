@@ -57,6 +57,57 @@ fn legacy_session_path(_app: &tauri::AppHandle) -> Option<PathBuf> {
     None
 }
 
+/// The single registry of IPC commands, shared by the runtime invoke handler
+/// and the TypeScript bindings export (`src/lib/bindings.ts`). Adding a
+/// command here is the ONLY registration step; the generated bindings make
+/// frontend drift a compile error instead of a runtime surprise.
+fn specta_builder() -> tauri_specta::Builder {
+    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
+        commands::get_app_state,
+        commands::get_tracks_geojson,
+        commands::load_projects,
+        commands::load_project,
+        commands::cancel_download,
+        commands::open_selected_map,
+        commands::open_local_bundle,
+        commands::set_bundles_root,
+        commands::save_project,
+        commands::load_project_file,
+        commands::import_gpx,
+        commands::import_plt,
+        commands::export_gpx,
+        commands::get_track_export_default_path,
+        commands::undo,
+        commands::redo,
+        commands::rename_track,
+        commands::set_track_color,
+        commands::toggle_track_visible,
+        commands::toggle_waypoint_visible,
+        commands::move_track_point,
+        commands::delete_track_point,
+        commands::insert_track_point,
+        commands::split_segment,
+        commands::join_segments,
+        commands::delete_track,
+        commands::add_waypoint,
+        commands::move_waypoint,
+        commands::delete_waypoint,
+        commands::rename_waypoint,
+        commands::set_waypoint_symbol,
+        commands::simplify_track,
+        commands::set_track_line_width,
+        commands::get_track_detail,
+        commands::get_waypoints,
+        commands::get_simplified_preview,
+        commands::reveal_bundle,
+        commands::export_track_plt,
+        commands::export_wpt_waypoints,
+        commands::get_wpt_export_default_path,
+        commands::create_empty_track,
+        commands::tiles::get_ozi_metadata,
+    ])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -77,53 +128,62 @@ pub fn run() {
             Ok(())
         })
         .manage(downloads)
-        .invoke_handler(tauri::generate_handler![
-            commands::get_app_state,
-            commands::get_tracks_geojson,
-            commands::load_projects,
-            commands::load_project,
-            commands::cancel_download,
-            commands::open_selected_map,
-            commands::open_local_bundle,
-            commands::set_bundles_root,
-            commands::save_project,
-            commands::load_project_file,
-            commands::import_gpx,
-            commands::import_plt,
-            commands::export_gpx,
-            commands::get_track_export_default_path,
-            commands::undo,
-            commands::redo,
-            commands::rename_track,
-            commands::set_track_color,
-            commands::toggle_track_visible,
-            commands::toggle_waypoint_visible,
-            commands::move_track_point,
-            commands::delete_track_point,
-            commands::insert_track_point,
-            commands::split_segment,
-            commands::join_segments,
-            commands::delete_track,
-            commands::add_waypoint,
-            commands::move_waypoint,
-            commands::delete_waypoint,
-            commands::rename_waypoint,
-            commands::set_waypoint_symbol,
-            commands::simplify_track,
-            commands::set_track_line_width,
-            commands::get_track_detail,
-            commands::get_waypoints,
-            commands::get_simplified_preview,
-            commands::reveal_bundle,
-            commands::export_track_plt,
-            commands::export_wpt_waypoints,
-            commands::get_wpt_export_default_path,
-            commands::create_empty_track,
-            commands::tiles::get_sqlite_tile,
-            commands::tiles::get_ozi_tile,
-            commands::tiles::get_ozi_tile_projected,
-            commands::tiles::get_ozi_metadata,
-        ])
+        .invoke_handler({
+            // Tile commands return raw bytes (`tauri::ipc::Response`), which
+            // specta cannot type — they stay on a plain handler, consumed by
+            // the MapLibre protocol layer rather than typed app code.
+            let typed = specta_builder().invoke_handler();
+            let tiles: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                commands::tiles::get_sqlite_tile,
+                commands::tiles::get_ozi_tile,
+                commands::tiles::get_ozi_tile_projected,
+            ];
+            move |invoke: tauri::ipc::Invoke<tauri::Wry>| match invoke.message.command() {
+                "get_sqlite_tile" | "get_ozi_tile" | "get_ozi_tile_projected" => tiles(invoke),
+                _ => typed(invoke),
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running ozi-rs");
+}
+
+#[cfg(test)]
+mod bindings_tests {
+    use super::specta_builder;
+
+    /// Regenerates `src/lib/bindings.ts` and fails when the committed file
+    /// was stale — the same role a codegen-diff CI check would play, but it
+    /// runs with plain `cargo test`. On failure the file HAS been rewritten:
+    /// review the diff and commit it.
+    #[test]
+    fn typescript_bindings_are_up_to_date() {
+        let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("workspace root")
+            .join("src/lib/bindings.ts");
+        let before = std::fs::read_to_string(&bindings_path).unwrap_or_default();
+
+        specta_builder()
+            .export(
+                specta_typescript::Typescript::default()
+                    // The generated file carries unused event plumbing and
+                    // `any`-typed glue when no events are registered; exempt
+                    // it from the strict project tsconfig and eslint (its
+                    // exported types stay checked at every use site).
+                    .header("/* eslint-disable */\n// @ts-nocheck")
+                    // Wire format is serde_json: u64 IDs travel as JSON
+                    // numbers. Frontend stores use bigint by convention and
+                    // convert explicitly at the api.ts boundary.
+                    .bigint(specta_typescript::BigIntExportBehavior::Number),
+                &bindings_path,
+            )
+            .expect("failed to export typescript bindings");
+
+        let after = std::fs::read_to_string(&bindings_path).expect("bindings written");
+        assert_eq!(
+            before, after,
+            "src/lib/bindings.ts was stale; it has just been regenerated — \
+             review the diff and commit the updated file",
+        );
+    }
 }

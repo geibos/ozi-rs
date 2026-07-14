@@ -6,7 +6,7 @@ import { join } from "path";
 // `TracksPanel.svelte` was deleted by `redesign-library-sidebar`.
 const tracksTabSource = readFileSync(
   join(__dirname, "../components/library/TracksTab.svelte"),
-  "utf-8"
+  "utf-8",
 );
 
 const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
@@ -14,17 +14,25 @@ const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
 describe("track export dialog default paths", () => {
   it("uses a typed API wrapper to request backend-built export defaults", () => {
     expect(apiSource).toContain("getTrackExportDefaultPath");
-    // `api.ts` now routes through the `invokeIpc` wrapper from
-    // `src/lib/ipc.ts` so dev IPC failures surface as a structured toast.
-    expect(apiSource).toContain('invokeIpc("get_track_export_default_path"');
+    // `api.ts` delegates to the generated tauri-specta bindings; dev IPC
+    // failures surface via `reportIpcError` inside the Result unwrap.
+    expect(apiSource).toContain("commands.getTrackExportDefaultPath(");
   });
 
   it("passes backend GPX and PLT defaults into save dialogs", () => {
     expect(tracksTabSource).toContain("getTrackExportDefaultPath");
-    expect(tracksTabSource).toContain('await getTrackExportDefaultPath(t.name, "gpx")');
-    expect(tracksTabSource).toContain('await getTrackExportDefaultPath(t.name, "plt")');
-    expect(tracksTabSource).toContain('defaultPath: defaultPath ?? `${t.name}.gpx`');
-    expect(tracksTabSource).toContain('defaultPath: defaultPath ?? `${t.name}.plt`');
+    expect(tracksTabSource).toContain(
+      'await getTrackExportDefaultPath(t.name, "gpx")',
+    );
+    expect(tracksTabSource).toContain(
+      'await getTrackExportDefaultPath(t.name, "plt")',
+    );
+    expect(tracksTabSource).toContain(
+      "defaultPath: defaultPath ?? `${t.name}.gpx`",
+    );
+    expect(tracksTabSource).toContain(
+      "defaultPath: defaultPath ?? `${t.name}.plt`",
+    );
   });
 
   it("keeps export dialogs behind API wrappers without direct invoke calls", () => {

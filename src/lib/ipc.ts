@@ -1,9 +1,18 @@
 /**
- * IPC wrapper around `@tauri-apps/api/core::invoke` that surfaces backend
- * rejections in dev builds as a sticky Sonner toast carrying
- * `data-testid="ipc-error"` so the next regression of the "frontend sent the
- * wrong payload shape" kind is visible from a screenshot, not buried as
- * `[object Object]`.
+ * Dev-toast IPC error reporting shared by the typed command surface and the
+ * raw-byte fallback path. Backend rejections surface in dev builds as a
+ * sticky Sonner toast carrying `data-testid="ipc-error"` so the next
+ * regression of the "frontend sent the wrong payload shape" kind is visible
+ * from a screenshot, not buried as `[object Object]`.
+ *
+ * Two consumers:
+ *
+ *   - `src/lib/api.ts` — every typed wrapper delegates to the generated
+ *     tauri-specta bindings (`src/lib/bindings.ts`) and calls
+ *     `reportIpcError` before rethrowing when the `Result` unwrap fails.
+ *   - `invokeIpc` below — kept ONLY for the three raw-byte tile commands
+ *     (`get_sqlite_tile`, `get_ozi_tile`, `get_ozi_tile_projected`) that are
+ *     intentionally not in the generated bindings.
  *
  * Design notes (from `fix-redesign-functional-bugs`):
  *
@@ -55,6 +64,24 @@ function stringifyError(error: unknown): string {
   }
 }
 
+/**
+ * Report an IPC command failure via the dev-only sticky toast. No-op in
+ * production builds. Used by `invokeIpc` below and by the `Result`-unwrap
+ * path in `src/lib/api.ts` so both transports surface failures identically.
+ */
+export function reportIpcError(command: string, error: unknown): void {
+  if (!import.meta.env.DEV) return;
+  try {
+    toast.error(command, {
+      description: stringifyError(error),
+      duration: Number.POSITIVE_INFINITY,
+      class: IPC_ERROR_CLASS,
+    });
+  } catch {
+    // A toast that itself throws MUST NOT mask the original rejection.
+  }
+}
+
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 
@@ -64,13 +91,17 @@ function isPlainObject(value: object): boolean {
 }
 
 /**
- * HOTFIX (until tauri-specta lands in Milestone 1): Tauri 2 serializes
- * `invoke` args with `JSON.stringify`, which throws
- * `TypeError: Do not know how to serialize a BigInt` — so bigint IDs from
- * `api.ts` would reject every ID-carrying command before it reached Rust.
- * Recursively convert bigint → number in plain objects/arrays. IDs here are
- * small u64 counters; a bigint outside the safe-integer range must never be
- * silently truncated, so it throws a descriptive error instead.
+ * Safety net for the untyped `invokeIpc` path: Tauri 2 serializes `invoke`
+ * args with `JSON.stringify`, which throws
+ * `TypeError: Do not know how to serialize a BigInt` — a bigint arg would
+ * reject the command before it reached Rust. The typed command surface now
+ * goes through the generated tauri-specta bindings (`src/lib/bindings.ts`)
+ * and converts bigint IDs explicitly in `api.ts`; `invokeIpc` remains only
+ * for the raw-byte tile commands, whose args carry no bigint today. Keep the
+ * recursive bigint → number conversion anyway so a future arg change cannot
+ * silently reintroduce the rejection. IDs here are small u64 counters; a
+ * bigint outside the safe-integer range must never be silently truncated, so
+ * it throws a descriptive error instead.
  */
 function toIpcSafeValue(value: unknown): unknown {
   if (typeof value === "bigint") {
@@ -97,6 +128,11 @@ function toIpcSafeValue(value: unknown): unknown {
  * Drop-in wrapper around Tauri's `invoke` that surfaces rejections via the
  * dev IPC-error toast. Call sites do not need to change their `try/catch`
  * blocks — the wrapper rethrows after surfacing.
+ *
+ * Only the three raw-byte tile commands (`get_sqlite_tile`, `get_ozi_tile`,
+ * `get_ozi_tile_projected`) still route through here — they return raw
+ * bytes and are intentionally excluded from the generated bindings. All
+ * other commands go through `commands.*` in `src/lib/bindings.ts`.
  */
 export async function invokeIpc<T>(
   command: string,
@@ -114,17 +150,7 @@ export async function invokeIpc<T>(
       ? await invoke<T>(command, safeArgs)
       : await invoke<T>(command, safeArgs, options);
   } catch (error) {
-    if (import.meta.env.DEV) {
-      try {
-        toast.error(command, {
-          description: stringifyError(error),
-          duration: Number.POSITIVE_INFINITY,
-          class: IPC_ERROR_CLASS,
-        });
-      } catch {
-        // A toast that itself throws MUST NOT mask the original rejection.
-      }
-    }
+    reportIpcError(command, error);
     throw error;
   }
 }
