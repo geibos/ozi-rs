@@ -26,6 +26,12 @@ pub enum ProjectLayerError {
         segment_id: u64,
         point_id: u64,
     },
+    InvalidSegmentOperation {
+        layer_id: u64,
+        track_id: u64,
+        segment_id: u64,
+        reason: &'static str,
+    },
 }
 
 impl fmt::Display for ProjectLayerError {
@@ -68,6 +74,16 @@ impl fmt::Display for ProjectLayerError {
                 f,
                 "missing track point with id {} in segment {} in track {} in layer {}",
                 point_id, segment_id, track_id, layer_id
+            ),
+            Self::InvalidSegmentOperation {
+                layer_id,
+                track_id,
+                segment_id,
+                reason,
+            } => write!(
+                f,
+                "invalid segment operation on segment {} in track {} in layer {}: {}",
+                segment_id, track_id, layer_id, reason
             ),
         }
     }
@@ -761,12 +777,20 @@ impl Project {
         seg_id_b: u64,
     ) -> Result<TrackSegment, ProjectLayerError> {
         let track = self.track_mut(layer_id, track_id)?;
-        track.join_segments(seg_id_a, seg_id_b).map_err(|_| {
-            ProjectLayerError::MissingTrackSegment {
+        track.join_segments(seg_id_a, seg_id_b).map_err(|err| match err {
+            ProjectLayerError::InvalidSegmentOperation {
+                segment_id, reason, ..
+            } => ProjectLayerError::InvalidSegmentOperation {
+                layer_id,
+                track_id,
+                segment_id,
+                reason,
+            },
+            _ => ProjectLayerError::MissingTrackSegment {
                 layer_id,
                 track_id,
                 segment_id: seg_id_b,
-            }
+            },
         })
     }
 }

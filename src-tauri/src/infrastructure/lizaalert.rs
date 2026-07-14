@@ -340,7 +340,32 @@ where
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
 
-    let mut file = File::create(&selection.local_path).map_err(|err| err.to_string())?;
+    // Stream into a sibling `.part` file and atomically rename on success
+    // (mirrors `download_to_path_async`) so an interrupted download never
+    // leaves a truncated file at the canonical path — the cached-map listing
+    // treats any file at that path as a fully downloaded map.
+    let tmp_path = selection.local_path.with_extension("part");
+    if let Err(err) = stream_response_to_file(&mut response, &tmp_path, &mut on_progress) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(err);
+    }
+    if let Err(err) = fs::rename(&tmp_path, &selection.local_path) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(err.to_string());
+    }
+
+    Ok(selection)
+}
+
+fn stream_response_to_file<F>(
+    response: &mut reqwest::blocking::Response,
+    path: &Path,
+    on_progress: &mut F,
+) -> Result<(), String>
+where
+    F: FnMut(DownloadProgress),
+{
+    let mut file = File::create(path).map_err(|err| err.to_string())?;
     let total_bytes = response.content_length();
     let mut downloaded_bytes = 0u64;
     let mut buffer = [0u8; 16 * 1024];
@@ -360,7 +385,7 @@ where
         });
     }
 
-    Ok(selection)
+    file.sync_all().map_err(|err| err.to_string())
 }
 
 pub fn build_active_map_selection(
@@ -637,25 +662,46 @@ pub async fn open_project_async(
     concurrency: usize,
     tx: mpsc::UnboundedSender<DownloadNotification>,
 ) -> Result<LizaProject, String> {
-    if !is_project_cached(&summary.slug, &root) {
-        let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
-            format!("Downloading project bundle: {}", summary.name),
-            ProjectOpenPhase::Downloading,
-        )));
-        let source_root = project_source_root(&root, &summary.slug);
-        fs::create_dir_all(&source_root).map_err(|err| err.to_string())?;
-        let cfg = BundleDownloadConfig {
-            concurrency,
-            url: summary.url.clone(),
-            local_dir: source_root,
-            cancel: cancel.clone(),
-        };
-        download_bundle_concurrent(cfg, tx.clone()).await?;
-    } else {
-        let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
-            format!("Opening cached project bundle: {}", summary.name),
-            ProjectOpenPhase::Downloading,
-        )));
+    // Probe the remote listing first. While it is reachable we always run the
+    // concurrent download: its resume logic skips files already on disk, so a
+    // fully cached bundle costs only the listing fetches, while a partially
+    // cached one (cancelled or failed mid-download earlier) gets its missing
+    // files back. Gating on `is_project_cached` alone would freeze a partial
+    // bundle forever, because `2-Coordinates.txt` — the cache marker — lands
+    // on disk within the first seconds of a download. The cached-only branch
+    // is reserved for the offline case.
+    let listing_probe = tokio::task::spawn_blocking({
+        let url = summary.url.clone();
+        move || fetch_text(&url).map(|_| ())
+    })
+    .await
+    .map_err(|err| err.to_string())?;
+
+    match listing_probe {
+        Ok(()) => {
+            let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
+                format!("Downloading project bundle: {}", summary.name),
+                ProjectOpenPhase::Downloading,
+            )));
+            let source_root = project_source_root(&root, &summary.slug);
+            fs::create_dir_all(&source_root).map_err(|err| err.to_string())?;
+            let cfg = BundleDownloadConfig {
+                concurrency,
+                url: summary.url.clone(),
+                local_dir: source_root,
+                cancel: cancel.clone(),
+            };
+            download_bundle_concurrent(cfg, tx.clone()).await?;
+        }
+        Err(err) => {
+            if !is_project_cached(&summary.slug, &root) {
+                return Err(err);
+            }
+            let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
+                format!("Opening cached project bundle: {}", summary.name),
+                ProjectOpenPhase::Downloading,
+            )));
+        }
     }
 
     if cancel.is_cancelled() {
@@ -1175,10 +1221,41 @@ fn is_ozi_archive_file(path: &Path) -> Result<bool, String> {
 }
 
 fn extract_cached_archive(archive_path: &Path, destination: &Path) -> Result<(), String> {
+    // Extract into a sibling staging directory and rename into place on
+    // success, so the `dest.exists()` skip check in
+    // `materialize_cached_ozi_archives` can only ever observe fully-extracted
+    // archives — a failed or interrupted extraction leaves nothing behind and
+    // the next open retries it.
+    let staging = staging_destination_for_archive(destination)?;
+    if staging.exists() {
+        // Stale leftover from a previous interrupted run.
+        fs::remove_dir_all(&staging).map_err(|err| err.to_string())?;
+    }
+
     let file = File::open(archive_path).map_err(|err| err.to_string())?;
-    extract_zip_entries_to_directory(BufReader::new(file), destination)
-        .map_err(|err| err.to_string())?;
+    if let Err(err) = extract_zip_entries_to_directory(BufReader::new(file), &staging) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(err.to_string());
+    }
+
+    if let Err(err) = fs::rename(&staging, destination) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(err.to_string());
+    }
     Ok(())
+}
+
+fn staging_destination_for_archive(destination: &Path) -> Result<PathBuf, String> {
+    let name = destination
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            format!(
+                "invalid archive extraction destination: {}",
+                destination.display()
+            )
+        })?;
+    Ok(destination.with_file_name(format!("{name}.extracting")))
 }
 
 fn extraction_destination_for_archive(extracted_root: &Path, archive_path: &Path) -> PathBuf {
@@ -1294,6 +1371,115 @@ mod tests {
                 .to_string_lossy()
                 .contains("extracted/5-Ozi(Win&Android)_Topo/Maps/demo.map")
         );
+    }
+
+    #[test]
+    fn download_map_failure_leaves_no_file_at_final_path() {
+        use super::download_map;
+        use crate::application::{ActiveMapKind, ActiveMapSelection, MapCenter};
+        use std::io::Read;
+        use std::net::TcpListener;
+
+        // Raw TCP server that announces 1000 body bytes but sends only 100
+        // and then drops the connection — a deterministic mid-body failure.
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut request = [0u8; 1024];
+            let _ = stream.read(&mut request);
+            let _ = stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1000\r\nConnection: close\r\n\r\n");
+            let _ = stream.write_all(&[0xABu8; 100]);
+        });
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let local_path = dir.path().join("demo_z16.sqlitedb");
+        let selection = ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: "demo".to_owned(),
+            package_name: "demo_z16.sqlitedb".to_owned(),
+            remote_url: format!("http://{addr}/demo_z16.sqlitedb"),
+            local_path: local_path.clone(),
+            center: MapCenter {
+                lat: 54.0,
+                lon: 48.0,
+            },
+            base_zoom: 16,
+        };
+
+        let result = download_map(selection, |_| {});
+        server.join().expect("server thread");
+
+        assert!(result.is_err(), "truncated download must fail");
+        assert!(
+            !local_path.exists(),
+            "interrupted download must not leave a truncated file at the final path"
+        );
+        assert!(
+            !local_path.with_extension("part").exists(),
+            "interrupted download must clean up its .part file"
+        );
+    }
+
+    #[test]
+    fn failed_archive_extraction_leaves_no_destination_and_allows_retry() {
+        let root = write_cached_project_corrupt_zip_fixture();
+        let dest = root.join("2026-03-29_demo/extracted/5-Ozi(Win&Android)_Topo");
+
+        let result = materialize_cached_ozi_archives(&root, "2026-03-29_demo", &mut |_| {});
+
+        assert!(result.is_err(), "corrupt archive extraction must fail");
+        assert!(
+            !dest.exists(),
+            "failed extraction must not leave a partial destination directory"
+        );
+
+        // Repair the archive; the retry must actually extract instead of
+        // treating the previous partial output as already extracted.
+        fs::write(
+            root.join("2026-03-29_demo/5-Ozi(Win&Android)_Topo.zip"),
+            build_archive(&[
+                ("Maps/demo.map", sample_ozi_map().as_bytes(), false),
+                ("Maps/demo.ozf2", b"ozf-placeholder".as_slice(), false),
+            ]),
+        )
+        .expect("write repaired zip");
+        materialize_cached_ozi_archives(&root, "2026-03-29_demo", &mut |_| {})
+            .expect("retry extraction");
+        assert!(dest.join("Maps/demo.map").exists());
+        assert!(dest.join("Maps/demo.ozf2").exists());
+    }
+
+    fn write_cached_project_corrupt_zip_fixture() -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("ozi-rs-lizaalert-corrupt-zip-{unique}"));
+        let bundle_dir = root.join("2026-03-29_demo");
+        fs::create_dir_all(&bundle_dir).expect("create bundle dir");
+        fs::write(
+            bundle_dir.join("2-Coordinates.txt"),
+            "N 54.32821 E 048.40917",
+        )
+        .expect("write coordinates");
+
+        // Valid central directory and first entry, but the second entry's
+        // stored payload is corrupted so its CRC check fails mid-extraction —
+        // after the first entry has already been written to disk.
+        let payload = b"ozf2-corruptible-payload-0123456789";
+        let mut zip_bytes = build_archive(&[
+            ("Maps/demo.map", sample_ozi_map().as_bytes(), false),
+            ("Maps/demo.ozf2", payload.as_slice(), false),
+        ]);
+        let position = zip_bytes
+            .windows(payload.len())
+            .position(|window| window == payload)
+            .expect("stored payload bytes present in zip");
+        zip_bytes[position + 4] ^= 0xFF;
+        fs::write(bundle_dir.join("5-Ozi(Win&Android)_Topo.zip"), zip_bytes).expect("write zip");
+        root
     }
 
     #[test]
@@ -1902,6 +2088,136 @@ mod bundle_download_tests {
             "missing file should be fetched exactly once"
         );
         assert!(tmp.path().join("99-slow.bin").exists());
+    }
+
+    fn sample_ozi_map_text() -> &'static str {
+        "OziExplorer Map Data File Version 2.2\nDemo topo\ndemo.ozf2\n1 ,Map Code,\nWGS 84\nReserved 1\nReserved 2\nMagnetic Variation,,,E\nMap Projection,Latitude/Longitude,PolyCal,No,AutoCalOnly,No,BSBUseWPX,No\nPoint01,xy,10,20,in, deg,54,30.000,N,48,24.000,E, grid, , , ,N\nProjection Setup,,,,,,,,,,\n"
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn open_project_async_fetches_missing_files_for_partially_cached_bundle() {
+        use super::open_project_async;
+        use crate::application::LizaProjectSummary;
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("2-Coordinates.txt", false),
+                ("demo.map", false),
+            ])))
+            .mount(&server)
+            .await;
+
+        let coordinates_hits = Arc::new(AtomicUsize::new(0));
+        let map_hits = Arc::new(AtomicUsize::new(0));
+        let coordinates_hits_clone = coordinates_hits.clone();
+        let map_hits_clone = map_hits.clone();
+        Mock::given(method("GET"))
+            .and(path("/bundle/2-Coordinates.txt"))
+            .respond_with(move |_: &Request| {
+                coordinates_hits_clone.fetch_add(1, Ordering::SeqCst);
+                ResponseTemplate::new(200).set_body_bytes(b"N 54.32821 E 048.40917".to_vec())
+            })
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/demo.map"))
+            .respond_with(move |_: &Request| {
+                map_hits_clone.fetch_add(1, Ordering::SeqCst);
+                ResponseTemplate::new(200).set_body_bytes(sample_ozi_map_text().as_bytes().to_vec())
+            })
+            .mount(&server)
+            .await;
+
+        // Interrupted earlier download: the coordinates marker landed on disk
+        // but the map file did not.
+        let tmp = tempdir();
+        let bundle_dir = tmp.path().join("2026-03-29_demo");
+        std::fs::create_dir_all(&bundle_dir).expect("create bundle dir");
+        std::fs::write(
+            bundle_dir.join("2-Coordinates.txt"),
+            "N 54.32821 E 048.40917",
+        )
+        .expect("write coordinates");
+
+        let summary = LizaProjectSummary {
+            slug: "2026-03-29_demo".to_owned(),
+            name: "2026-03-29 demo".to_owned(),
+            url: format!("{}/bundle/", server.uri()),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let open = tokio::spawn(open_project_async(
+            summary,
+            tmp.path().to_path_buf(),
+            CancelToken::new(),
+            DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            tx,
+        ));
+        let _ = collect_notifications(rx).await;
+        let project = open.await.expect("join").expect("open project");
+
+        assert!(
+            bundle_dir.join("demo.map").exists(),
+            "missing bundle file must be downloaded on open while the remote listing is reachable"
+        );
+        assert_eq!(
+            map_hits.load(Ordering::SeqCst),
+            1,
+            "missing file should be fetched exactly once"
+        );
+        assert_eq!(
+            coordinates_hits.load(Ordering::SeqCst),
+            0,
+            "already-cached file must not be re-fetched"
+        );
+        assert!(
+            project.maps.iter().any(|m| m.name == "OZI: Demo topo"),
+            "recovered map must be indexed; got {:?}",
+            project.maps
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn open_project_async_opens_cached_bundle_when_remote_unreachable() {
+        use super::open_project_async;
+        use crate::application::LizaProjectSummary;
+
+        let tmp = tempdir();
+        let bundle_dir = tmp.path().join("2026-03-29_demo");
+        std::fs::create_dir_all(&bundle_dir).expect("create bundle dir");
+        std::fs::write(
+            bundle_dir.join("2-Coordinates.txt"),
+            "N 54.32821 E 048.40917",
+        )
+        .expect("write coordinates");
+        std::fs::write(bundle_dir.join("demo.map"), sample_ozi_map_text()).expect("write map");
+
+        let summary = LizaProjectSummary {
+            slug: "2026-03-29_demo".to_owned(),
+            name: "2026-03-29 demo".to_owned(),
+            // Nothing listens on port 9 (discard); the connection is refused.
+            url: "http://127.0.0.1:9/bundle/".to_owned(),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let open = tokio::spawn(open_project_async(
+            summary,
+            tmp.path().to_path_buf(),
+            CancelToken::new(),
+            DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            tx,
+        ));
+        let _ = collect_notifications(rx).await;
+        let project = open
+            .await
+            .expect("join")
+            .expect("cached bundle must open offline");
+
+        assert!(
+            project.maps.iter().any(|m| m.name == "OZI: Demo topo"),
+            "cached map must be indexed offline; got {:?}",
+            project.maps
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

@@ -254,6 +254,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         .map(|d| DiagnosticDto {
             level: match d.level() {
                 DiagnosticLevel::Info => "info",
+                DiagnosticLevel::Warning => "warning",
                 DiagnosticLevel::Error => "error",
             },
             message: d.message().to_owned(),
@@ -647,9 +648,10 @@ pub fn set_bundles_root(
 
 #[tauri::command]
 pub fn save_project(path: String, state: State<SharedState>, app: AppHandle) -> Result<(), String> {
-    lock_app_state(state.inner())?.save_project_to(PathBuf::from(path));
+    let result = lock_app_state(state.inner())?.save_project_to(PathBuf::from(path));
+    // Emit even on failure so the diagnostics panel picks up the error entry.
     let _ = app.emit("state-changed", ());
-    Ok(())
+    result.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

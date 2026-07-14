@@ -44,9 +44,35 @@ impl std::error::Error for PersistenceError {
     }
 }
 
+/// Atomic write-and-rename: contents go to a sibling `<name>.tmp` file,
+/// are fsynced, and the temp file is renamed over the target. A failed
+/// save therefore never truncates or corrupts an existing file at `path`
+/// (same pattern as `download_to_path_async` in `infrastructure/lizaalert.rs`).
+fn write_atomic(path: &Path, contents: &str) -> Result<(), PersistenceError> {
+    fn write_and_rename(tmp_path: &Path, target: &Path, contents: &str) -> std::io::Result<()> {
+        use std::io::Write;
+        let mut file = std::fs::File::create(tmp_path)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(tmp_path, target)
+    }
+
+    let mut tmp_name = path.as_os_str().to_owned();
+    tmp_name.push(".tmp");
+    let tmp_path = PathBuf::from(tmp_name);
+
+    if let Err(error) = write_and_rename(&tmp_path, path, contents) {
+        // Best-effort cleanup of the temp file; the write error is what matters.
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(PersistenceError::Io(error));
+    }
+    Ok(())
+}
+
 pub fn save_project(project: &Project, path: &Path) -> Result<(), PersistenceError> {
     let json = serde_json::to_string_pretty(project).map_err(PersistenceError::Json)?;
-    std::fs::write(path, json).map_err(PersistenceError::Io)
+    write_atomic(path, &json)
 }
 
 pub fn load_project(path: &Path) -> Result<Project, PersistenceError> {
@@ -68,7 +94,7 @@ pub fn save_app_session(
         std::fs::create_dir_all(parent).map_err(PersistenceError::Io)?;
     }
     let json = serde_json::to_string_pretty(session).map_err(PersistenceError::Json)?;
-    std::fs::write(path, json).map_err(PersistenceError::Io)
+    write_atomic(path, &json)
 }
 
 pub fn load_app_session(path: &Path) -> Result<Option<PersistedAppSession>, PersistenceError> {
@@ -81,20 +107,29 @@ pub fn load_app_session(path: &Path) -> Result<Option<PersistedAppSession>, Pers
     }
 }
 
-pub fn default_app_session_path() -> PathBuf {
-    if let Ok(home) = std::env::var("HOME") {
-        return PathBuf::from(home)
-            .join("Library")
-            .join("Application Support")
-            .join("ozi-rs")
-            .join("session.json");
+/// Chooses where the app session file lives. Both candidate locations are
+/// resolved by the caller (via Tauri's platform path resolver), so this
+/// module never derives paths from environment variables.
+///
+/// An existing `preferred` file always wins. Otherwise an existing `legacy`
+/// file (the pre-path-resolver macOS location) keeps being used, so
+/// upgrading users do not lose their session. When neither file exists yet,
+/// the `preferred` location is chosen for new sessions.
+pub fn resolve_session_path(
+    preferred: Option<PathBuf>,
+    legacy: Option<PathBuf>,
+) -> Option<PathBuf> {
+    let existing_legacy = legacy.filter(|path| path.exists());
+    match preferred {
+        Some(path) if path.exists() => Some(path),
+        Some(path) => Some(existing_legacy.unwrap_or(path)),
+        None => existing_legacy,
     }
-    PathBuf::from("session.json")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{load_project, save_project};
+    use super::{load_project, resolve_session_path, save_project};
     use crate::domain::{LayerId, Project, TrackLayer, Waypoint, WaypointId, WaypointLayer};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -180,6 +215,157 @@ mod tests {
 
     fn write_raw_ozp(path: &std::path::Path, json: &str) {
         std::fs::write(path, json).expect("write raw ozp");
+    }
+
+    /// Unique per-test directory under the system temp dir.
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "ozi-rs-persistence-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create test dir");
+        dir
+    }
+
+    fn tmp_sibling(path: &std::path::Path) -> std::path::PathBuf {
+        let mut name = path.as_os_str().to_owned();
+        name.push(".tmp");
+        std::path::PathBuf::from(name)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn failed_save_keeps_existing_file_intact() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Failure simulation: the parent directory is made read-only
+        // (0o555), so the sibling `.tmp` file cannot be created. A
+        // truncate-in-place implementation is NOT affected by this —
+        // overwriting an existing file needs no directory write
+        // permission — so it would silently replace the original.
+        let dir = temp_dir("readonly-parent");
+        let path = dir.join("project.ozp");
+
+        let mut original = Project::untitled();
+        let layer_id = LayerId::new(30);
+        original.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+        original
+            .add_waypoint_to_layer(
+                layer_id,
+                Waypoint::new(WaypointId::new(1), "Campsite", 55.75, 37.61),
+            )
+            .unwrap();
+        save_project(&original, &path).expect("initial save");
+
+        let different = Project::untitled();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555))
+            .expect("make dir read-only");
+        let result = save_project(&different, &path);
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755))
+            .expect("restore dir permissions");
+
+        assert!(
+            result.is_err(),
+            "save into a read-only directory must fail instead of \
+             truncating the target in place"
+        );
+        let on_disk = load_project(&path).expect("original must still load");
+        assert_eq!(on_disk, original, "failed save must not touch the target");
+        assert!(!tmp_sibling(&path).exists(), "no stale temp file after failure");
+    }
+
+    #[test]
+    fn successful_save_leaves_no_tmp_sibling() {
+        let dir = temp_dir("no-tmp-sibling");
+        let path = dir.join("project.ozp");
+
+        save_project(&Project::untitled(), &path).expect("save");
+
+        assert!(path.exists());
+        assert!(
+            !tmp_sibling(&path).exists(),
+            "temp file must be renamed away on success"
+        );
+    }
+
+    #[test]
+    fn failed_rename_cleans_up_tmp_sibling() {
+        // A directory at the target path makes the final rename fail
+        // deterministically; the temp file must not be left behind.
+        let dir = temp_dir("rename-blocked");
+        let path = dir.join("blocked.ozp");
+        std::fs::create_dir_all(&path).expect("create blocking dir");
+
+        let result = save_project(&Project::untitled(), &path);
+
+        assert!(result.is_err(), "saving over a directory must fail");
+        assert!(!tmp_sibling(&path).exists(), "no stale temp file after failure");
+    }
+
+    fn touch(path: &std::path::Path) {
+        let parent = path.parent().expect("session file has a parent dir");
+        std::fs::create_dir_all(parent).expect("create parent dir");
+        std::fs::write(path, "{}").expect("write session placeholder");
+    }
+
+    #[test]
+    fn resolve_session_path_prefers_existing_preferred_file() {
+        let dir = temp_dir("resolve-preferred-wins");
+        let preferred = dir.join("new").join("session.json");
+        let legacy = dir.join("legacy").join("session.json");
+        touch(&preferred);
+        touch(&legacy);
+
+        let resolved = resolve_session_path(Some(preferred.clone()), Some(legacy));
+
+        assert_eq!(resolved, Some(preferred));
+    }
+
+    #[test]
+    fn resolve_session_path_falls_back_to_existing_legacy_file() {
+        let dir = temp_dir("resolve-legacy-fallback");
+        let preferred = dir.join("new").join("session.json");
+        let legacy = dir.join("legacy").join("session.json");
+        touch(&legacy);
+
+        let resolved = resolve_session_path(Some(preferred), Some(legacy.clone()));
+
+        assert_eq!(resolved, Some(legacy));
+    }
+
+    #[test]
+    fn resolve_session_path_uses_preferred_when_neither_file_exists() {
+        let dir = temp_dir("resolve-fresh-install");
+        let preferred = dir.join("new").join("session.json");
+        let legacy = dir.join("legacy").join("session.json");
+
+        let resolved = resolve_session_path(Some(preferred.clone()), Some(legacy));
+
+        assert_eq!(resolved, Some(preferred));
+    }
+
+    #[test]
+    fn resolve_session_path_without_preferred_uses_existing_legacy() {
+        let dir = temp_dir("resolve-no-preferred");
+        let legacy = dir.join("legacy").join("session.json");
+        touch(&legacy);
+
+        let resolved = resolve_session_path(None, Some(legacy.clone()));
+
+        assert_eq!(resolved, Some(legacy));
+    }
+
+    #[test]
+    fn resolve_session_path_returns_none_when_nothing_is_available() {
+        let dir = temp_dir("resolve-nothing");
+        let legacy = dir.join("legacy").join("session.json");
+
+        assert_eq!(resolve_session_path(None, Some(legacy)), None);
+        assert_eq!(resolve_session_path(None, None), None);
     }
 
     #[test]

@@ -209,7 +209,9 @@ impl TrackSegment {
     }
 
     /// Split segment at the given point. Left segment retains original ID and points `0..=split`.
-    /// Returns the new right segment (new ID) containing points `split..end` (split point shared).
+    /// Returns the new right segment (new ID) containing the points strictly after the split
+    /// point. No point is duplicated, so `Track::join_segments` is the exact inverse (undo-safe).
+    /// Splitting at the last point is rejected — the right segment would be empty.
     pub fn split_at_point(
         &mut self,
         point_id: u64,
@@ -224,8 +226,16 @@ impl TrackSegment {
                 point_id,
             },
         )?;
+        if split_index + 1 == self.points.len() {
+            return Err(crate::domain::ProjectLayerError::InvalidSegmentOperation {
+                layer_id: 0,
+                track_id: 0,
+                segment_id: self.id.value(),
+                reason: "cannot split at the last point of a segment",
+            });
+        }
 
-        let right_points = self.points[split_index..].to_vec();
+        let right_points = self.points[split_index + 1..].to_vec();
         self.points.truncate(split_index + 1);
 
         let mut right = TrackSegment::new(new_segment_id);
@@ -350,6 +360,8 @@ impl Track {
 
     /// Join two adjacent segments: append all points from B into A, then remove B.
     /// B must immediately follow A in the segments list (`index_b == index_a + 1`).
+    /// Both segments must be non-empty so that the exact inverse exists (undo joins by
+    /// splitting at the last point of A, which must restore B verbatim).
     /// Returns the removed segment B so undo can split or reinsert it.
     pub fn join_segments(
         &mut self,
@@ -381,6 +393,17 @@ impl Track {
                 track_id: self.id.value(),
                 segment_id: seg_id_b,
             });
+        }
+
+        for (index, seg_id) in [(index_a, seg_id_a), (index_b, seg_id_b)] {
+            if self.segments[index].points().is_empty() {
+                return Err(crate::domain::ProjectLayerError::InvalidSegmentOperation {
+                    layer_id: 0,
+                    track_id: self.id.value(),
+                    segment_id: seg_id,
+                    reason: "cannot join an empty segment",
+                });
+            }
         }
 
         // Remove B first (higher index), then drain its points into A.
@@ -631,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn split_at_point_left_keeps_id_and_points_up_to_split() {
+    fn split_at_point_moves_points_after_split_to_right_without_duplication() {
         let mut seg = make_segment_with_points();
         let original_id = seg.id();
 
@@ -642,9 +665,21 @@ mod tests {
         assert_eq!(seg.points()[0].id(), TrackPointId::new(10));
         assert_eq!(seg.points()[1].id(), TrackPointId::new(11));
         assert_eq!(right.id(), TrackSegmentId::new(99));
-        assert_eq!(right.points().len(), 2);
-        assert_eq!(right.points()[0].id(), TrackPointId::new(11));
-        assert_eq!(right.points()[1].id(), TrackPointId::new(12));
+        assert_eq!(right.points().len(), 1);
+        assert_eq!(right.points()[0].id(), TrackPointId::new(12));
+    }
+
+    #[test]
+    fn split_at_point_errors_on_last_point() {
+        let mut seg = make_segment_with_points();
+
+        let err = seg.split_at_point(12, TrackSegmentId::new(99)).unwrap_err();
+
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::InvalidSegmentOperation { .. }
+        ));
+        assert_eq!(seg.points().len(), 3);
     }
 
     #[test]
@@ -723,6 +758,55 @@ mod tests {
             err,
             crate::domain::ProjectLayerError::MissingTrackSegment { segment_id: 30, .. }
         ));
+    }
+
+    #[test]
+    fn join_segments_errors_when_either_segment_is_empty() {
+        let mut track = Track::new(TrackId::new(1), "Route");
+        let mut seg_a = TrackSegment::new(TrackSegmentId::new(10));
+        seg_a.add_point(pt(1, 55.0, 37.0));
+        track.add_segment(seg_a);
+        track.add_segment(TrackSegment::new(TrackSegmentId::new(20)));
+
+        let err = track.join_segments(10, 20).unwrap_err();
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::InvalidSegmentOperation { .. }
+        ));
+        assert_eq!(track.segments().len(), 2);
+
+        let mut track = Track::new(TrackId::new(1), "Route");
+        track.add_segment(TrackSegment::new(TrackSegmentId::new(10)));
+        let mut seg_b = TrackSegment::new(TrackSegmentId::new(20));
+        seg_b.add_point(pt(2, 55.1, 37.1));
+        track.add_segment(seg_b);
+
+        let err = track.join_segments(10, 20).unwrap_err();
+        assert!(matches!(
+            err,
+            crate::domain::ProjectLayerError::InvalidSegmentOperation { .. }
+        ));
+    }
+
+    #[test]
+    fn split_then_join_restores_original_points_exactly() {
+        let mut track = Track::new(TrackId::new(1), "Route");
+        let mut seg = TrackSegment::new(TrackSegmentId::new(10));
+        seg.add_point(pt(1, 55.0, 37.0));
+        seg.add_point(pt(2, 55.1, 37.1));
+        seg.add_point(pt(3, 55.2, 37.2));
+        track.add_segment(seg);
+        let original = track.clone();
+
+        let right = track
+            .segment_mut(TrackSegmentId::new(10))
+            .unwrap()
+            .split_at_point(2, TrackSegmentId::new(99))
+            .unwrap();
+        track.insert_segment_at(1, right);
+        track.join_segments(10, 99).unwrap();
+
+        assert_eq!(track, original);
     }
 
     fn pt(id: u64, lat: f64, lon: f64) -> TrackPoint {

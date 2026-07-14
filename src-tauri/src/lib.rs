@@ -4,7 +4,58 @@ mod domain;
 mod infrastructure;
 
 use commands::{DownloadRegistry, SharedDownloads, SharedState};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tauri::Manager;
+
+/// Resolves the session-file and bundles-root locations through Tauri's
+/// path resolver (portable across macOS, Windows and Linux) and injects
+/// them into `AppState`, so no layer below this derives paths from
+/// environment variables.
+fn build_app_state(app: &tauri::AppHandle) -> application::AppState {
+    let preferred_session = match app.path().app_data_dir() {
+        Ok(dir) => Some(dir.join("session.json")),
+        Err(error) => {
+            tracing::warn!("app data dir unavailable, session may not persist: {error}");
+            None
+        }
+    };
+    let session_path = infrastructure::persistence::resolve_session_path(
+        preferred_session,
+        legacy_session_path(app),
+    );
+
+    let bundles_root = match app.path().document_dir() {
+        Ok(documents) => documents.join("LizaAlert Maps"),
+        Err(error) => {
+            tracing::warn!("documents dir unavailable, using relative bundles dir: {error}");
+            PathBuf::from("bundles")
+        }
+    };
+
+    application::AppState::new_with_paths(session_path, bundles_root)
+}
+
+/// Releases before the path-resolver switch stored the session under a
+/// literal `ozi-rs` directory in `~/Library/Application Support` (macOS was
+/// the only working target). That file keeps being used until a session
+/// exists at the new `app_data_dir()` location, so upgrading users do not
+/// lose their session.
+#[cfg(target_os = "macos")]
+fn legacy_session_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let home = app.path().home_dir().ok()?;
+    Some(
+        home.join("Library")
+            .join("Application Support")
+            .join("ozi-rs")
+            .join("session.json"),
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
+fn legacy_session_path(_app: &tauri::AppHandle) -> Option<PathBuf> {
+    None
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,15 +66,16 @@ pub fn run() {
         )
         .init();
 
-    let state: SharedState = Arc::new(Mutex::new(application::AppState::new_with_session_path(
-        infrastructure::persistence::default_app_session_path(),
-    )));
     let downloads: SharedDownloads = Arc::new(DownloadRegistry::default());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        .manage(state)
+        .setup(|app| {
+            let state: SharedState = Arc::new(Mutex::new(build_app_state(app.handle())));
+            app.manage(state);
+            Ok(())
+        })
         .manage(downloads)
         .invoke_handler(tauri::generate_handler![
             commands::get_app_state,

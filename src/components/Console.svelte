@@ -47,6 +47,7 @@
           <div
             class="whitespace-pre-wrap"
             class:text-foreground={entry.level === "info"}
+            class:text-amber-500={entry.level === "warning"}
             class:text-destructive={entry.level === "error"}
           >
             {entry.message}

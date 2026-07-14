@@ -1,7 +1,7 @@
 // DTOs mirroring Rust structs in src-tauri/src/commands/mod.rs
 
 export interface DiagnosticDto {
-  level: "info" | "error";
+  level: "info" | "warning" | "error";
   message: string;
 }
 
