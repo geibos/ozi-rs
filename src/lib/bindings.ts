@@ -262,6 +262,42 @@ async simplifyTrack(layerId: number, trackId: number, tolerance: number) : Promi
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * CJ-4: sort every segment's points by timestamp (untimed first, stable).
+ * One undoable step; a no-op when the track is already ordered.
+ */
+async sortTrackPoints(layerId: number, trackId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("sort_track_points", { layerId, trackId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * CJ-4: crop the track to a lat/lon extent (the current map view). Returns
+ * how many points were removed; refuses to remove every point.
+ */
+async cropTrackToExtent(layerId: number, trackId: number, extent: ExtentDto) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("crop_track_to_extent", { layerId, trackId, extent }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * CJ-4: crop the track to a time range (ISO-8601 UTC bounds, either side
+ * optional). Untimed points are always kept. Returns removed-point count.
+ */
+async cropTrackToTime(layerId: number, trackId: number, from: string | null, to: string | null) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("crop_track_to_time", { layerId, trackId, from, to }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async setTrackLineWidth(layerId: number, trackId: number, width: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_track_line_width", { layerId, trackId, width }) };
@@ -358,8 +394,22 @@ async getOziMetadata(mapPath: string) : Promise<Result<JsonValue, string>> {
 /** user-defined types **/
 
 export type ActiveMapDto = { kind: string; project_name: string; package_name: string; local_path: string; center_lat: number; center_lon: number; base_zoom: number }
-export type AppStateDto = { project_name: string; project_saved: boolean; status: string; busy: boolean; downloading_maps: string[]; projects: LizaProjectSummaryDto[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
+export type AppStateDto = { project_name: string; project_saved: boolean; 
+/**
+ * True when the project has edits not yet persisted to disk (drives the
+ * dirty indicator and the close guard, CJ-7).
+ */
+project_dirty: boolean; 
+/**
+ * Current .ozp path when the project has been saved/loaded; lets the
+ * frontend quick-save (Cmd+S) without a dialog.
+ */
+project_path: string | null; status: string; busy: boolean; downloading_maps: string[]; projects: LizaProjectSummaryDto[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
 export type DiagnosticDto = { level: string; message: string }
+/**
+ * Lat/lon bounding box for extent crops — the current map viewport.
+ */
+export type ExtentDto = { min_lat: number; min_lon: number; max_lat: number; max_lon: number }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LayerSummaryDto = { id: number; name: string }
 export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: boolean }

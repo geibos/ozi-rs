@@ -50,11 +50,10 @@
     getWptExportDefaultPath,
     loadProjectFile,
     openSelectedMap,
-    redo,
     revealBundle,
-    saveProject,
-    undo,
   } from "$lib/api";
+  import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import { t, toggleLocale } from "$lib/i18n";
   import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { appendRecentFile, getRecentFiles } from "$lib/recentFiles";
   import { toast } from "svelte-sonner";
@@ -172,34 +171,28 @@
     }
   }
 
-  async function handleProjectSave() {
+  // Save / undo / redo delegate to the shared CJ-7 actions in
+  // `$lib/actions/project` — the same code path the global keyboard chords
+  // and the workspace-shell buttons use (toasts and dialog fallback live
+  // there, not here).
+  function handleProjectSave() {
     close();
-    try {
-      const path = await saveDialog({
-        filters: [{ name: "OziRS project", extensions: ["json"] }],
-      });
-      if (path) await saveProject(path);
-    } catch (error) {
-      toast.error("Failed to save project", { description: String(error) });
-    }
+    void quickSave();
   }
 
-  async function handleUndo() {
+  function handleUndo() {
     close();
-    try {
-      await undo();
-    } catch (error) {
-      toast.error("Undo failed", { description: String(error) });
-    }
+    void doUndo();
   }
 
-  async function handleRedo() {
+  function handleRedo() {
     close();
-    try {
-      await redo();
-    } catch (error) {
-      toast.error("Redo failed", { description: String(error) });
-    }
+    void doRedo();
+  }
+
+  function handleLanguageToggle() {
+    toggleLocale();
+    close();
   }
 
   function handleThemeSetting() {
@@ -401,16 +394,16 @@
         {#if !isColdStart}
           <Command.Group heading="Project actions">
             <Command.Item value="action:open" onSelect={handleProjectOpen}>
-              <span class="flex-1">Open project…</span>
+              <span class="flex-1">{$t("palette.openProject")}</span>
             </Command.Item>
             <Command.Item value="action:save" onSelect={handleProjectSave}>
-              <span class="flex-1">Save project…</span>
+              <span class="flex-1">{$t("palette.saveProject")}</span>
             </Command.Item>
             <Command.Item value="action:undo" onSelect={handleUndo}>
-              <span class="flex-1">Undo</span>
+              <span class="flex-1">{$t("palette.undo")}</span>
             </Command.Item>
             <Command.Item value="action:redo" onSelect={handleRedo}>
-              <span class="flex-1">Redo</span>
+              <span class="flex-1">{$t("palette.redo")}</span>
             </Command.Item>
           </Command.Group>
         {/if}
@@ -418,6 +411,12 @@
         <Command.Group heading="Settings">
           <Command.Item value="setting:theme" onSelect={handleThemeSetting}>
             <span class="flex-1">Theme</span>
+          </Command.Item>
+          <!-- The `palette.language` key renders the OTHER language (the
+               toggle target), e.g. "Language: Русский" while English is
+               active. -->
+          <Command.Item value="setting:language" onSelect={handleLanguageToggle}>
+            <span class="flex-1">{$t("palette.language")}</span>
           </Command.Item>
           <Command.Item value="setting:units" onSelect={handleUnitsSetting}>
             <span class="flex-1">Units</span>

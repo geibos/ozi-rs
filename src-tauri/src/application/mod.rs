@@ -131,6 +131,14 @@ pub struct AppState {
     session_path: Option<PathBuf>,
     bundles_root: PathBuf,
     lizaalert: LizaAlertState,
+    /// Revision of non-undoable project mutations (style/visibility setters
+    /// that bypass the CommandStack per ADR-0017). Together with
+    /// `CommandStack::mutation_count` this is the complete mutation signal
+    /// for dirty tracking.
+    style_revision: u64,
+    /// `(history.mutation_count(), style_revision)` at the last successful
+    /// save / load / restore. `project_dirty()` compares against it.
+    saved_mutation_state: (u64, u64),
 }
 
 #[derive(Debug)]
@@ -182,6 +190,8 @@ impl AppState {
             project,
             project_path: None,
             session_path: None,
+            style_revision: 0,
+            saved_mutation_state: (0, 0),
             bundles_root: default_bundles_root(),
             lizaalert: LizaAlertState {
                 projects: Vec::new(),
@@ -556,11 +566,28 @@ impl AppState {
 
     // ── Mutations ──
 
+    /// True when the project has mutations that are not persisted to disk.
+    /// Structural inputs: `CommandStack::mutation_count` (all undoable edits,
+    /// undo, redo) plus `style_revision` (non-undoable setters). Cleared by
+    /// `mark_project_saved` on save / load / session restore.
+    pub fn project_dirty(&self) -> bool {
+        (self.history.mutation_count(), self.style_revision) != self.saved_mutation_state
+    }
+
+    fn mark_project_saved(&mut self) {
+        self.saved_mutation_state = (self.history.mutation_count(), self.style_revision);
+    }
+
+    fn mark_style_mutation(&mut self) {
+        self.style_revision += 1;
+    }
+
     pub fn save_project_to(&mut self, path: PathBuf) -> Result<(), persistence::PersistenceError> {
         match persistence::save_project(&self.project, &path) {
             Ok(()) => {
                 let display = path.display().to_string();
                 self.project_path = Some(path);
+                self.mark_project_saved();
                 self.update_status(DiagnosticLevel::Info, format!("Saved: {display}"));
                 self.persist_session_snapshot();
                 Ok(())
@@ -579,6 +606,7 @@ impl AppState {
                 self.project = project;
                 self.project_path = Some(path);
                 self.history = CommandStack::default();
+                self.mark_project_saved();
                 self.lizaalert.active_map = None;
                 self.update_status(DiagnosticLevel::Info, format!("Opened: {display}"));
                 self.persist_session_snapshot();
@@ -638,6 +666,7 @@ impl AppState {
     pub fn set_track_color(&mut self, layer_id: LayerId, track_id: TrackId, color: [u8; 4]) {
         if let Ok(track) = self.project.track_mut(layer_id.value(), track_id.value()) {
             track.style_mut().color = color;
+            self.mark_style_mutation();
         }
     }
 
@@ -652,6 +681,7 @@ impl AppState {
             .unwrap_or(true);
         self.project
             .set_track_visible_in_layer(layer_id, track_id, !visible);
+        self.mark_style_mutation();
     }
 
     /// Flip a waypoint's visibility flag. Non-undoable — mirrors
@@ -661,9 +691,13 @@ impl AppState {
         layer_id: LayerId,
         waypoint_id: crate::domain::WaypointId,
     ) {
-        let _ = self
+        if self
             .project
-            .toggle_waypoint_visible_in_layer(layer_id, waypoint_id);
+            .toggle_waypoint_visible_in_layer(layer_id, waypoint_id)
+            .is_some()
+        {
+            self.mark_style_mutation();
+        }
     }
 
     pub fn rename_track(&mut self, layer_id: LayerId, track_id: TrackId, new_name: String) {
@@ -955,6 +989,136 @@ impl AppState {
             })
     }
 
+    /// CJ-4 sort: reorder every segment's points by timestamp (untimed
+    /// first, stable). No-op — and no undo entry — when already sorted.
+    pub fn apply_sort_track_points(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+    ) -> Result<(), ProjectLayerError> {
+        let (current, sorted) = {
+            let track = self
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+                .ok_or(ProjectLayerError::MissingTrack {
+                    layer_id: layer_id.value(),
+                    track_id: track_id.value(),
+                })?;
+            let current: Vec<(u64, Vec<u64>)> = track
+                .segments()
+                .iter()
+                .map(|s| {
+                    (
+                        s.id().value(),
+                        s.points().iter().map(|p| p.id().value()).collect(),
+                    )
+                })
+                .collect();
+            let sorted = crate::domain::sorted_point_order_by_time(track.segments());
+            (current, sorted)
+        };
+        if current == sorted {
+            return Ok(());
+        }
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::reorder_track_points(layer_id, track_id, sorted),
+            )
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
+    /// CJ-4 crop: keep only points inside the bbox. No-op when nothing falls
+    /// outside; error (from the command) when everything would be removed.
+    pub fn apply_crop_track_to_extent(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        min_lat: f64,
+        min_lon: f64,
+        max_lat: f64,
+        max_lon: f64,
+    ) -> Result<usize, ProjectLayerError> {
+        self.apply_crop_with(layer_id, track_id, |p| {
+            p.latitude() < min_lat
+                || p.latitude() > max_lat
+                || p.longitude() < min_lon
+                || p.longitude() > max_lon
+        })
+    }
+
+    /// CJ-4 crop by time range (either bound optional). Untimed points are
+    /// always KEPT — cropping must not silently destroy data that carries no
+    /// timestamp to judge by.
+    pub fn apply_crop_track_to_time(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        from: Option<chrono::DateTime<chrono::Utc>>,
+        to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<usize, ProjectLayerError> {
+        self.apply_crop_with(layer_id, track_id, |p| match p.timestamp() {
+            None => false,
+            Some(ts) => from.is_some_and(|f| ts < f) || to.is_some_and(|t| ts > t),
+        })
+    }
+
+    /// Shared crop plumbing: collect points matching `remove`, apply one
+    /// undoable CropTrackPoints. Returns how many points were removed.
+    fn apply_crop_with(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        remove: impl Fn(&crate::domain::TrackPoint) -> bool,
+    ) -> Result<usize, ProjectLayerError> {
+        let doomed: Vec<(TrackSegmentId, Vec<TrackPointId>)> = {
+            let track = self
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+                .ok_or(ProjectLayerError::MissingTrack {
+                    layer_id: layer_id.value(),
+                    track_id: track_id.value(),
+                })?;
+            track
+                .segments()
+                .iter()
+                .map(|segment| {
+                    (
+                        segment.id(),
+                        segment
+                            .points()
+                            .iter()
+                            .filter(|p| remove(p))
+                            .map(|p| p.id())
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .filter(|(_, ids)| !ids.is_empty())
+                .collect()
+        };
+        let removed: usize = doomed.iter().map(|(_, ids)| ids.len()).sum();
+        if removed == 0 {
+            return Ok(0);
+        }
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::crop_track_points(layer_id, track_id, doomed),
+            )
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })?;
+        Ok(removed)
+    }
+
     pub fn apply_simplify_track(
         &mut self,
         layer_id: LayerId,
@@ -972,6 +1136,7 @@ impl AppState {
     pub fn set_track_line_width(&mut self, layer_id: LayerId, track_id: TrackId, width: f32) {
         if let Ok(track) = self.project.track_mut(layer_id.value(), track_id.value()) {
             track.style_mut().line_width = width.clamp(0.5, 20.0);
+            self.mark_style_mutation();
         }
     }
 
@@ -1143,6 +1308,7 @@ impl AppState {
                     self.project = project;
                     self.project_path = Some(project_path.clone());
                     self.history = CommandStack::default();
+                    self.mark_project_saved();
                     self.update_status(
                         DiagnosticLevel::Info,
                         format!("Restored project: {}", project_path.display()),
@@ -1413,6 +1579,92 @@ fn reveal_in_file_manager(path: &std::path::Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// CJ-7: the dirty flag must reflect EVERY class of project mutation —
+    /// undoable commands (via CommandStack), undo/redo themselves, and the
+    /// non-undoable style setters that bypass the stack (ADR-0017) — and
+    /// clear on save. A missed site here means the close-guard lies.
+    #[test]
+    fn project_dirty_tracks_all_mutation_classes_and_clears_on_save() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let save_path = dir.path().join("cj7.ozp");
+        let mut state = AppState::new();
+        assert!(!state.project_dirty(), "fresh state must be clean");
+
+        let track_layer = state.project.track_layers()[0].id();
+        let waypoint_layer = state.project.waypoint_layers()[0].id();
+
+        // Undoable command class.
+        let track_id = state
+            .apply_create_empty_track(track_layer, "CJ7".into())
+            .expect("create track");
+        assert!(state.project_dirty(), "undoable command must mark dirty");
+
+        state
+            .save_project_to(save_path.clone())
+            .expect("save clears dirty");
+        assert!(!state.project_dirty(), "save must clear dirty");
+
+        // Undo / redo class.
+        state.undo();
+        assert!(state.project_dirty(), "undo must mark dirty");
+        state.redo();
+        state.save_project_to(save_path.clone()).expect("resave");
+        assert!(!state.project_dirty());
+
+        // Non-undoable style setters (bypass CommandStack, ADR-0017).
+        state.set_track_color(track_layer, track_id, [1, 2, 3, 255]);
+        assert!(state.project_dirty(), "set_track_color must mark dirty");
+        state.save_project_to(save_path.clone()).expect("resave");
+
+        state.set_track_line_width(track_layer, track_id, 3.0);
+        assert!(state.project_dirty(), "set_track_line_width must mark dirty");
+        state.save_project_to(save_path.clone()).expect("resave");
+
+        state.toggle_track_visible(track_layer, track_id);
+        assert!(state.project_dirty(), "toggle_track_visible must mark dirty");
+        state.save_project_to(save_path.clone()).expect("resave");
+
+        state
+            .apply_add_waypoint(waypoint_layer, 55.0, 37.0, "W1".into())
+            .expect("add waypoint");
+        state.save_project_to(save_path.clone()).expect("resave");
+        let waypoint_id = state.project.waypoint_layers()[0].waypoints()[0].id();
+        state.toggle_waypoint_visible(waypoint_layer, waypoint_id);
+        assert!(
+            state.project_dirty(),
+            "toggle_waypoint_visible must mark dirty"
+        );
+
+        // A failed save must NOT clear dirty.
+        let blocked = dir.path().join("blocked.ozp");
+        std::fs::create_dir_all(&blocked).expect("blocking dir");
+        let _ = state.save_project_to(blocked);
+        assert!(state.project_dirty(), "failed save must keep dirty");
+    }
+
+    /// Loading a project (or restoring a session) starts clean: the user has
+    /// not changed anything yet, so the close-guard must not fire.
+    #[test]
+    fn project_dirty_clears_on_load() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let save_path = dir.path().join("load.ozp");
+        let mut state = AppState::new();
+        let track_layer = state.project.track_layers()[0].id();
+        state
+            .apply_create_empty_track(track_layer, "T".into())
+            .expect("create");
+        state.save_project_to(save_path.clone()).expect("save");
+
+        let mut fresh = AppState::new();
+        let fresh_layer = fresh.project.track_layers()[0].id();
+        fresh
+            .apply_create_empty_track(fresh_layer, "X".into())
+            .expect("create");
+        assert!(fresh.project_dirty());
+        fresh.load_project_from(save_path);
+        assert!(!fresh.project_dirty(), "loaded project starts clean");
+    }
     use crate::infrastructure::persistence::{PersistedActiveMap, PersistedAppSession};
     use std::time::{SystemTime, UNIX_EPOCH};
 

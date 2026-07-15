@@ -66,6 +66,12 @@ pub struct DiagnosticDto {
 pub struct AppStateDto {
     pub project_name: String,
     pub project_saved: bool,
+    /// True when the project has edits not yet persisted to disk (drives the
+    /// dirty indicator and the close guard, CJ-7).
+    pub project_dirty: bool,
+    /// Current .ozp path when the project has been saved/loaded; lets the
+    /// frontend quick-save (Cmd+S) without a dialog.
+    pub project_path: Option<String>,
     pub status: String,
     pub busy: bool,
     pub downloading_maps: Vec<String>,
@@ -295,6 +301,10 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
     Ok(AppStateDto {
         project_name: s.project_name().to_owned(),
         project_saved: s.project_file_path().is_some(),
+        project_dirty: s.project_dirty(),
+        project_path: s
+            .project_file_path()
+            .map(|p| p.display().to_string()),
         status: s.lizaalert_status().to_owned(),
         busy: s.lizaalert_busy(),
         downloading_maps: s.downloading_maps().iter().cloned().collect(),
@@ -1152,6 +1162,95 @@ pub fn simplify_track(
         .map_err(|e| format!("{e}"))?;
     let _ = app.emit("state-changed", ());
     Ok(())
+}
+
+/// CJ-4: sort every segment's points by timestamp (untimed first, stable).
+/// One undoable step; a no-op when the track is already ordered.
+#[tauri::command]
+#[specta::specta]
+pub fn sort_track_points(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId};
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state
+        .apply_sort_track_points(LayerId::new(layer_id), TrackId::new(track_id))
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+/// Lat/lon bounding box for extent crops — the current map viewport.
+#[derive(serde::Deserialize, specta::Type)]
+pub struct ExtentDto {
+    pub min_lat: f64,
+    pub min_lon: f64,
+    pub max_lat: f64,
+    pub max_lon: f64,
+}
+
+/// CJ-4: crop the track to a lat/lon extent (the current map view). Returns
+/// how many points were removed; refuses to remove every point.
+#[tauri::command]
+#[specta::specta]
+pub fn crop_track_to_extent(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    extent: ExtentDto,
+) -> Result<u32, String> {
+    use crate::domain::{LayerId, TrackId};
+    let mut app_state = lock_app_state(state.inner())?;
+    let removed = app_state
+        .apply_crop_track_to_extent(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            extent.min_lat,
+            extent.min_lon,
+            extent.max_lat,
+            extent.max_lon,
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(removed as u32)
+}
+
+/// CJ-4: crop the track to a time range (ISO-8601 UTC bounds, either side
+/// optional). Untimed points are always kept. Returns removed-point count.
+#[tauri::command]
+#[specta::specta]
+pub fn crop_track_to_time(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    from: Option<String>,
+    to: Option<String>,
+) -> Result<u32, String> {
+    use crate::domain::{LayerId, TrackId};
+    let parse = |value: Option<String>, bound: &str| -> Result<
+        Option<chrono::DateTime<chrono::Utc>>,
+        String,
+    > {
+        value
+            .map(|raw| {
+                raw.parse::<chrono::DateTime<chrono::Utc>>()
+                    .map_err(|e| format!("invalid {bound} timestamp {raw:?}: {e}"))
+            })
+            .transpose()
+    };
+    let from = parse(from, "from")?;
+    let to = parse(to, "to")?;
+    let mut app_state = lock_app_state(state.inner())?;
+    let removed = app_state
+        .apply_crop_track_to_time(LayerId::new(layer_id), TrackId::new(track_id), from, to)
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(removed as u32)
 }
 
 // ── Track style ───────────────────────────────────────────────────────────────

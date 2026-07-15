@@ -12,6 +12,9 @@
    * All actions dispatch through the existing `ProjectCommand`-shaped
    * endpoints in `src/lib/api.ts`. No direct store mutation. No new IPC.
    */
+  import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
+  import CalendarClockIcon from "@lucide/svelte/icons/calendar-clock";
+  import CropIcon from "@lucide/svelte/icons/crop";
   import DownloadIcon from "@lucide/svelte/icons/download";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
@@ -21,21 +24,28 @@
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import WavesIcon from "@lucide/svelte/icons/waves";
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog";
   import {
     appState,
+    mapViewportBounds,
     selectedTrack,
     simplifyState,
+    tracksGeometryVersion,
   } from "$lib/stores";
   import {
+    cropTrackToExtent,
+    cropTrackToTime,
     deleteTrack,
     exportGpx,
     exportTrackPlt,
     getTrackDetail,
     getTrackExportDefaultPath,
     setTrackLineWidth,
+    sortTrackPoints,
     toggleTrackVisible,
   } from "$lib/api";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { t } from "$lib/i18n";
+  import { confirm as confirmDialog, open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import {
     formatDistanceKm,
@@ -77,7 +87,9 @@
       detailKey = null;
       return;
     }
-    const key = `${sel.layerId}:${sel.trackId}`;
+    // $tracksGeometryVersion is part of the key so cleanup actions
+    // (sort / crop / split / join) invalidate the cached detail.
+    const key = `${sel.layerId}:${sel.trackId}:${$tracksGeometryVersion}`;
     if (key === detailKey) return;
     void loadDetail(sel.layerId, sel.trackId, key);
   });
@@ -170,6 +182,116 @@
       tolerance: 10,
       preview: null,
     });
+  }
+
+  // ── CJ-4 track cleanup: sort by time / crop to view / crop by time ──
+
+  let cropTimeOpen = $state(false);
+  let cropFromDraft = $state("");
+  let cropToDraft = $state("");
+
+  function pointsRemovedToast(removed: number) {
+    toast.success(
+      $t("trackInspector.pointsRemoved").replace("{count}", String(removed)),
+    );
+  }
+
+  async function handleSortByTime() {
+    const sel = $selectedTrack;
+    if (!sel) return;
+    try {
+      await sortTrackPoints(sel.layerId, sel.trackId);
+      tracksGeometryVersion.update((v) => v + 1);
+      toast.success($t("trackInspector.sortDone"));
+    } catch (error) {
+      toast.error($t("trackInspector.sortFailed"), {
+        description: String(error),
+      });
+    }
+  }
+
+  async function handleCropToView() {
+    const sel = $selectedTrack;
+    const bounds = $mapViewportBounds;
+    if (!sel || !bounds) return;
+    const confirmed = await confirmDialog(
+      $t("trackInspector.cropToViewConfirm"),
+      {
+        title: $t("trackInspector.cropTitle"),
+        kind: "warning",
+        okLabel: $t("trackInspector.crop"),
+        cancelLabel: $t("trackInspector.cancel"),
+      },
+    );
+    if (!confirmed) return;
+    try {
+      const removed = await cropTrackToExtent(sel.layerId, sel.trackId, {
+        min_lat: bounds.minLat,
+        min_lon: bounds.minLon,
+        max_lat: bounds.maxLat,
+        max_lon: bounds.maxLon,
+      });
+      tracksGeometryVersion.update((v) => v + 1);
+      pointsRemovedToast(removed);
+    } catch (error) {
+      toast.error($t("trackInspector.cropFailed"), {
+        description: String(error),
+      });
+    }
+  }
+
+  /** Format an epoch-ms instant as a `datetime-local` value (local time). */
+  function toDatetimeLocal(ms: number): string {
+    const d = new Date(ms);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+  }
+
+  /**
+   * `datetime-local` values carry no offset, so `Date.parse` reads them as
+   * local time — exactly what the input shows. Empty input → open bound.
+   */
+  function draftToIsoUtc(draft: string): string | null {
+    if (!draft) return null;
+    const ms = Date.parse(draft);
+    return Number.isNaN(ms) ? null : new Date(ms).toISOString();
+  }
+
+  function openCropByTime() {
+    let first: number | null = null;
+    let last: number | null = null;
+    for (const seg of trackDetail?.segments ?? []) {
+      for (const pt of seg.points) {
+        if (!pt.timestamp) continue;
+        const ms = Date.parse(pt.timestamp);
+        if (Number.isNaN(ms)) continue;
+        if (first === null || ms < first) first = ms;
+        if (last === null || ms > last) last = ms;
+      }
+    }
+    cropFromDraft = first !== null ? toDatetimeLocal(first) : "";
+    cropToDraft = last !== null ? toDatetimeLocal(last) : "";
+    cropTimeOpen = true;
+  }
+
+  async function handleCropByTime() {
+    const sel = $selectedTrack;
+    if (!sel) return;
+    const from = draftToIsoUtc(cropFromDraft);
+    const to = draftToIsoUtc(cropToDraft);
+    cropTimeOpen = false;
+    try {
+      const removed = await cropTrackToTime(sel.layerId, sel.trackId, from, to);
+      tracksGeometryVersion.update((v) => v + 1);
+      pointsRemovedToast(removed);
+    } catch (error) {
+      toast.error($t("trackInspector.cropFailed"), {
+        description: String(error),
+      });
+    }
   }
 
   async function handleDelete() {
@@ -317,11 +439,41 @@
       variant="outline"
       size="sm"
       class="justify-start gap-2"
+      onclick={handleSortByTime}
+      disabled={!summary}
+    >
+      <ArrowUpDownIcon class="size-4" />
+      {$t("trackInspector.sortByTime")}
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="justify-start gap-2"
+      onclick={handleCropToView}
+      disabled={!summary || !$mapViewportBounds}
+    >
+      <CropIcon class="size-4" />
+      {$t("trackInspector.cropToView")}
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="justify-start gap-2"
+      onclick={openCropByTime}
+      disabled={!summary}
+    >
+      <CalendarClockIcon class="size-4" />
+      {$t("trackInspector.cropByTime")}
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="justify-start gap-2"
       onclick={handleSimplify}
       disabled={!summary}
     >
       <WavesIcon class="size-4" />
-      Simplify
+      {$t("trackInspector.simplify")}
     </Button>
     <Button
       variant="outline"
@@ -335,3 +487,48 @@
     </Button>
   </section>
 </div>
+
+<Dialog.Root bind:open={cropTimeOpen}>
+  <Dialog.Content class="max-w-sm">
+    <Dialog.Header>
+      <Dialog.Title>{$t("trackInspector.cropByTime")}</Dialog.Title>
+      <Dialog.Description>
+        {$t("trackInspector.cropByTimeNote")}
+      </Dialog.Description>
+    </Dialog.Header>
+    <div class="flex flex-col gap-3">
+      <label class="flex flex-col gap-1 text-xs">
+        <span class="text-muted-foreground">
+          {$t("trackInspector.cropByTimeFrom")}
+        </span>
+        <input
+          type="datetime-local"
+          bind:value={cropFromDraft}
+          class="border-border bg-background rounded-md border px-2 py-1 text-xs"
+        />
+      </label>
+      <label class="flex flex-col gap-1 text-xs">
+        <span class="text-muted-foreground">
+          {$t("trackInspector.cropByTimeTo")}
+        </span>
+        <input
+          type="datetime-local"
+          bind:value={cropToDraft}
+          class="border-border bg-background rounded-md border px-2 py-1 text-xs"
+        />
+      </label>
+    </div>
+    <Dialog.Footer>
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={() => (cropTimeOpen = false)}
+      >
+        {$t("trackInspector.cancel")}
+      </Button>
+      <Button size="sm" onclick={handleCropByTime}>
+        {$t("trackInspector.crop")}
+      </Button>
+    </Dialog.Footer>
+  </Dialog.Content>
+</Dialog.Root>

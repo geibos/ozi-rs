@@ -1,4 +1,4 @@
-import { commands, type Result } from "./bindings";
+import { commands, type ExtentDto, type Result } from "./bindings";
 import { invokeIpc, reportIpcError } from "./ipc";
 import type {
   AppStateDto,
@@ -358,6 +358,58 @@ export async function joinSegments(
       toIdNumber(trackId),
       toIdNumber(segIdA),
       toIdNumber(segIdB),
+    ),
+  );
+}
+
+/** Sort every segment's points by timestamp (untimed points keep order). */
+export async function sortTrackPoints(
+  layerId: bigint,
+  trackId: bigint,
+): Promise<void> {
+  await unwrap(
+    "sort_track_points",
+    commands.sortTrackPoints(toIdNumber(layerId), toIdNumber(trackId)),
+  );
+}
+
+/**
+ * Remove every point outside `extent` (the current map viewport). Returns
+ * the removed-point count; the backend refuses to remove every point.
+ */
+export async function cropTrackToExtent(
+  layerId: bigint,
+  trackId: bigint,
+  extent: ExtentDto,
+): Promise<number> {
+  return unwrap(
+    "crop_track_to_extent",
+    commands.cropTrackToExtent(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      extent,
+    ),
+  );
+}
+
+/**
+ * Remove points outside the `[from, to]` time range (ISO-8601 UTC strings,
+ * either bound optional). Untimed points are always kept. Returns the
+ * removed-point count.
+ */
+export async function cropTrackToTime(
+  layerId: bigint,
+  trackId: bigint,
+  from: string | null,
+  to: string | null,
+): Promise<number> {
+  return unwrap(
+    "crop_track_to_time",
+    commands.cropTrackToTime(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      from,
+      to,
     ),
   );
 }

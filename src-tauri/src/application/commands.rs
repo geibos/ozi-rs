@@ -90,6 +90,21 @@ pub enum ProjectCommand {
         segment_id_a: TrackSegmentId,
         segment_id_b: TrackSegmentId,
     },
+    /// CJ-4: set an explicit per-segment point order (sort-by-time is the
+    /// main producer). Symmetric: its reverse is another ReorderTrackPoints
+    /// carrying the pre-apply order, so undo/redo are exact inverses.
+    ReorderTrackPoints {
+        layer_id: LayerId,
+        track_id: TrackId,
+        order: Vec<(TrackSegmentId, Vec<TrackPointId>)>,
+    },
+    /// CJ-4: bulk point removal (crop by extent / time range). Reverse is
+    /// RestoreTrackPoints with exact indices captured pre-apply.
+    CropTrackPoints {
+        layer_id: LayerId,
+        track_id: TrackId,
+        points: Vec<(TrackSegmentId, Vec<TrackPointId>)>,
+    },
     DeleteTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -187,6 +202,38 @@ impl ProjectCommand {
 
     pub fn add_track(layer_id: LayerId, track: Track) -> Self {
         Self::AddTrack { layer_id, track }
+    }
+
+    pub fn reorder_track_points(
+        layer_id: LayerId,
+        track_id: TrackId,
+        order: Vec<(u64, Vec<u64>)>,
+    ) -> Self {
+        Self::ReorderTrackPoints {
+            layer_id,
+            track_id,
+            order: order
+                .into_iter()
+                .map(|(seg, ids)| {
+                    (
+                        TrackSegmentId::new(seg),
+                        ids.into_iter().map(TrackPointId::new).collect(),
+                    )
+                })
+                .collect(),
+        }
+    }
+
+    pub fn crop_track_points(
+        layer_id: LayerId,
+        track_id: TrackId,
+        points: Vec<(TrackSegmentId, Vec<TrackPointId>)>,
+    ) -> Self {
+        Self::CropTrackPoints {
+            layer_id,
+            track_id,
+            points,
+        }
     }
 
     pub fn add_waypoint(layer_id: LayerId, waypoint: Waypoint) -> Self {
@@ -519,6 +566,76 @@ impl ProjectCommand {
                 )?;
                 Ok(())
             }
+            Self::ReorderTrackPoints {
+                layer_id,
+                track_id,
+                order,
+            } => {
+                let track = project.track_mut(layer_id.value(), track_id.value())?;
+                for (segment_id, ids) in order {
+                    let segment = track.segment_mut(*segment_id).ok_or(
+                        ProjectLayerError::MissingTrackSegment {
+                            layer_id: layer_id.value(),
+                            track_id: track_id.value(),
+                            segment_id: segment_id.value(),
+                        },
+                    )?;
+                    segment
+                        .reorder_points(ids)
+                        .map_err(|mut err| {
+                            if let ProjectLayerError::MissingTrackPoint {
+                                layer_id: l,
+                                track_id: tk,
+                                ..
+                            } = &mut err
+                            {
+                                *l = layer_id.value();
+                                *tk = track_id.value();
+                            }
+                            err
+                        })?;
+                }
+                Ok(())
+            }
+            Self::CropTrackPoints {
+                layer_id,
+                track_id,
+                points,
+            } => {
+                let track = project.track_mut(layer_id.value(), track_id.value())?;
+                let total: usize = track.segments().iter().map(|s| s.points().len()).sum();
+                let removing: usize = points.iter().map(|(_, ids)| ids.len()).sum();
+                if removing >= total {
+                    return Err(CommandError::ProjectLayer(
+                        ProjectLayerError::InvalidSegmentOperation {
+                            layer_id: layer_id.value(),
+                            track_id: track_id.value(),
+                            segment_id: 0,
+                            reason: "crop would remove every point of the track",
+                        },
+                    ));
+                }
+                for (segment_id, ids) in points {
+                    let segment = track.segment_mut(*segment_id).ok_or(
+                        ProjectLayerError::MissingTrackSegment {
+                            layer_id: layer_id.value(),
+                            track_id: track_id.value(),
+                            segment_id: segment_id.value(),
+                        },
+                    )?;
+                    for point_id in ids {
+                        segment.remove_point(point_id.value()).map_err(|_| {
+                            ProjectLayerError::MissingTrackPoint {
+                                layer_id: layer_id.value(),
+                                track_id: track_id.value(),
+                                segment_id: segment_id.value(),
+                                point_id: point_id.value(),
+                            }
+                        })?;
+                    }
+                }
+                Ok(())
+            }
             Self::DeleteTrack { layer_id, track_id } => {
                 project.remove_track_from_layer(*layer_id, *track_id)?;
                 Ok(())
@@ -640,6 +757,83 @@ impl ProjectCommand {
 
     pub fn reverse(&self, project: &Project) -> ProjectCommand {
         match self {
+            Self::ReorderTrackPoints {
+                layer_id,
+                track_id,
+                order,
+            } => {
+                // Symmetric inverse: capture the CURRENT order of exactly the
+                // segments being reordered.
+                let current = project
+                    .track_layers()
+                    .iter()
+                    .find(|l| l.id() == *layer_id)
+                    .and_then(|l| l.tracks().iter().find(|t| t.id() == *track_id))
+                    .map(|track| {
+                        order
+                            .iter()
+                            .filter_map(|(segment_id, _)| {
+                                track
+                                    .segments()
+                                    .iter()
+                                    .find(|s| s.id() == *segment_id)
+                                    .map(|s| {
+                                        (
+                                            *segment_id,
+                                            s.points().iter().map(|p| p.id()).collect::<Vec<_>>(),
+                                        )
+                                    })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Self::ReorderTrackPoints {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    order: current,
+                }
+            }
+            Self::CropTrackPoints {
+                layer_id,
+                track_id,
+                points,
+            } => {
+                // Capture each removed point with its exact index pre-apply.
+                let restored = project
+                    .track_layers()
+                    .iter()
+                    .find(|l| l.id() == *layer_id)
+                    .and_then(|l| l.tracks().iter().find(|t| t.id() == *track_id))
+                    .map(|track| {
+                        points
+                            .iter()
+                            .flat_map(|(segment_id, ids)| {
+                                track
+                                    .segments()
+                                    .iter()
+                                    .find(|s| s.id() == *segment_id)
+                                    .into_iter()
+                                    .flat_map(move |segment| {
+                                        segment
+                                            .points()
+                                            .iter()
+                                            .enumerate()
+                                            .filter(|(_, point)| ids.contains(&point.id()))
+                                            .map(|(index, point)| {
+                                                (*segment_id, index, point.clone())
+                                            })
+                                            .collect::<Vec<_>>()
+                                    })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Self::RestoreTrackPoints {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    points: restored,
+                }
+            }
             Self::AddMapLayer { id, name } => Self::RemoveMapLayer {
                 layer: MapLayer::new(*id, name.clone()),
             },
@@ -1095,6 +1289,11 @@ struct CommandDelta {
 pub struct CommandStack {
     undo_history: Vec<CommandDelta>,
     redo_history: Vec<CommandDelta>,
+    /// Total successful project mutations routed through this stack (apply,
+    /// merge, undo, redo). Structural dirty-tracking input: every undoable
+    /// edit bumps it HERE, so call sites cannot forget to mark the project
+    /// dirty (see `AppState::project_dirty`).
+    mutation_count: u64,
 }
 
 impl CommandStack {
@@ -1118,11 +1317,13 @@ impl CommandStack {
         {
             command.apply(project)?;
             last_delta.forward = command;
+            self.mutation_count += 1;
             return Ok(());
         }
 
         let reverse = command.reverse(project);
         command.apply(project)?;
+        self.mutation_count += 1;
         self.undo_history.push(CommandDelta {
             forward: command,
             reverse,
@@ -1158,6 +1359,7 @@ impl CommandStack {
             return false;
         }
 
+        self.mutation_count += 1;
         self.redo_history.push(delta);
 
         true
@@ -1173,9 +1375,164 @@ impl CommandStack {
             return false;
         }
 
+        self.mutation_count += 1;
         self.undo_history.push(delta);
 
         true
+    }
+
+    /// See the `mutation_count` field docs; consumed by
+    /// `AppState::project_dirty`.
+    pub fn mutation_count(&self) -> u64 {
+        self.mutation_count
+    }
+}
+
+#[cfg(test)]
+mod cj4_tests {
+    use super::{CommandStack, ProjectCommand};
+    use crate::domain::{
+        LayerId, Project, Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
+    };
+    use chrono::TimeZone;
+
+    fn ts(minute: u32) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc
+            .with_ymd_and_hms(2026, 7, 15, 10, minute, 0)
+            .unwrap()
+    }
+
+    fn project_with_shuffled_track() -> Project {
+        let mut project = Project::untitled();
+        let mut bootstrap_layer = CommandStack::default();
+        bootstrap_layer
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(LayerId::new(20), "Tracks"),
+            )
+            .expect("bootstrap layer");
+        let mut track = Track::new(TrackId::new(1), "Shuffled");
+        let mut seg = TrackSegment::new(TrackSegmentId::new(2));
+        // Timestamps deliberately out of order; point 12 is untimed.
+        seg.add_point(TrackPoint::new(TrackPointId::new(10), 55.0, 37.0).with_timestamp(ts(30)));
+        seg.add_point(TrackPoint::new(TrackPointId::new(11), 55.1, 37.1).with_timestamp(ts(10)));
+        seg.add_point(TrackPoint::new(TrackPointId::new(12), 55.2, 37.2));
+        seg.add_point(TrackPoint::new(TrackPointId::new(13), 55.3, 37.3).with_timestamp(ts(20)));
+        track.add_segment(seg);
+        let mut bootstrap = CommandStack::default();
+        bootstrap
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track(LayerId::new(20), track),
+            )
+            .expect("bootstrap track");
+        project
+    }
+
+    fn shuffled_track(project: &Project) -> &Track {
+        project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == LayerId::new(20))
+            .expect("layer 20")
+            .tracks()
+            .iter()
+            .find(|t| t.id() == TrackId::new(1))
+            .expect("track 1")
+    }
+
+    fn point_ids(project: &Project) -> Vec<u64> {
+        shuffled_track(project).segments()[0]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect()
+    }
+
+    /// CJ-4 sort: reorder is a symmetric command — undo restores the exact
+    /// previous order, redo re-applies. Untimed points sort first, stably.
+    #[test]
+    fn reorder_track_points_applies_and_undoes_exactly() {
+        let mut project = project_with_shuffled_track();
+        let mut history = CommandStack::default();
+
+        let order = crate::domain::sorted_point_order_by_time(shuffled_track(&project).segments());
+        assert_eq!(
+            order,
+            vec![(2_u64, vec![12_u64, 11, 13, 10])],
+            "untimed first (stable), then ascending timestamps",
+        );
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::reorder_track_points(
+                    LayerId::new(20),
+                    TrackId::new(1),
+                    order,
+                ),
+            )
+            .expect("reorder applies");
+        assert_eq!(point_ids(&project), vec![12, 11, 13, 10]);
+
+        assert!(history.undo(&mut project));
+        assert_eq!(point_ids(&project), vec![10, 11, 12, 13], "undo = old order");
+        assert!(history.redo(&mut project));
+        assert_eq!(point_ids(&project), vec![12, 11, 13, 10]);
+    }
+
+    /// CJ-4 crop: removing a point set is undoable with exact positions.
+    #[test]
+    fn crop_track_points_removes_and_undo_restores_positions() {
+        let mut project = project_with_shuffled_track();
+        let mut history = CommandStack::default();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::crop_track_points(
+                    LayerId::new(20),
+                    TrackId::new(1),
+                    vec![(TrackSegmentId::new(2), vec![TrackPointId::new(11), TrackPointId::new(13)])],
+                ),
+            )
+            .expect("crop applies");
+        assert_eq!(point_ids(&project), vec![10, 12]);
+
+        assert!(history.undo(&mut project));
+        assert_eq!(
+            point_ids(&project),
+            vec![10, 11, 12, 13],
+            "undo restores removed points at their exact indices",
+        );
+        assert!(history.redo(&mut project));
+        assert_eq!(point_ids(&project), vec![10, 12]);
+    }
+
+    /// Cropping everything is a user error, not silent track destruction.
+    #[test]
+    fn crop_rejects_removing_every_point_of_a_track() {
+        let mut project = project_with_shuffled_track();
+        let mut history = CommandStack::default();
+
+        let result = history.apply(
+            &mut project,
+            &ProjectCommand::crop_track_points(
+                LayerId::new(20),
+                TrackId::new(1),
+                vec![(
+                    TrackSegmentId::new(2),
+                    vec![
+                        TrackPointId::new(10),
+                        TrackPointId::new(11),
+                        TrackPointId::new(12),
+                        TrackPointId::new(13),
+                    ],
+                )],
+            ),
+        );
+        assert!(result.is_err(), "crop of every point must be rejected");
+        assert_eq!(point_ids(&project), vec![10, 11, 12, 13], "project untouched");
     }
 }
 

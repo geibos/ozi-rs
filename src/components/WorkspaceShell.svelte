@@ -22,11 +22,17 @@
    * the layout's `MapView` shows.
    */
   import { onDestroy, type Snippet } from "svelte";
+  import UndoIcon from "@lucide/svelte/icons/undo-2";
+  import RedoIcon from "@lucide/svelte/icons/redo-2";
+  import SaveIcon from "@lucide/svelte/icons/save";
   import {
     bundleProgress,
     commandPaletteOpen,
     inspectorOpen,
+    projectDirty,
   } from "$lib/stores";
+  import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import { t } from "$lib/i18n";
 
   let {
     libraryRail,
@@ -133,16 +139,66 @@
         `CommandPalette` dialog whose own `cmdk` Command.Input takes
         focus.
       -->
-      <button
-        type="button"
-        class="cmdk-trigger"
-        aria-label="Open command palette"
-        title="Open command palette (⌘K)"
-        onclick={() => commandPaletteOpen.set(true)}
-      >
-        <span class="cmdk-label">Command palette</span>
-        <kbd class="cmdk-glyph">⌘K</kbd>
-      </button>
+      <!--
+        CJ-7 continuity controls: undo / redo / save plus a dirty
+        indicator. All actions run through the shared helpers in
+        `$lib/actions/project` — the same path the global keyboard chords
+        (Cmd+S / Cmd+Z / Cmd+Shift+Z in `+layout.svelte`) and the command
+        palette use. `projectDirty` mirrors `AppStateDto.project_dirty`.
+      -->
+      <div class="bar-actions">
+        <span
+          class="dirty-indicator"
+          class:dirty={$projectDirty}
+          data-testid="dirty-indicator"
+          role="status"
+        >
+          {#if $projectDirty}
+            <span class="dirty-dot" aria-hidden="true"></span>
+            {$t("shell.unsaved")}
+          {:else}
+            {$t("shell.saved")}
+          {/if}
+        </span>
+        <button
+          type="button"
+          class="bar-btn"
+          title={$t("shell.undo")}
+          aria-label={$t("shell.undo")}
+          onclick={() => void doUndo()}
+        >
+          <UndoIcon class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          class="bar-btn"
+          title={$t("shell.redo")}
+          aria-label={$t("shell.redo")}
+          onclick={() => void doRedo()}
+        >
+          <RedoIcon class="size-3.5" />
+        </button>
+        <button
+          type="button"
+          class="bar-btn bar-btn-save"
+          title={`${$t("shell.save")} (⌘S)`}
+          onclick={() => void quickSave()}
+        >
+          <SaveIcon class="size-3.5" />
+          <span>{$t("shell.save")}</span>
+        </button>
+        <span class="chips-divider" aria-hidden="true"></span>
+        <button
+          type="button"
+          class="cmdk-trigger"
+          aria-label="Open command palette"
+          title="Open command palette (⌘K)"
+          onclick={() => commandPaletteOpen.set(true)}
+        >
+          <span class="cmdk-label">Command palette</span>
+          <kbd class="cmdk-glyph">⌘K</kbd>
+        </button>
+      </div>
     </div>
 
     <main class="canvas" aria-label="Map canvas">
@@ -288,6 +344,77 @@
   .chip[aria-disabled="true"]:hover {
     background: transparent;
     color: hsl(var(--muted-foreground));
+  }
+
+  /* CJ-7 continuity controls (right side of the context bar). */
+  .bar-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .bar-btn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    padding: 5px 8px;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease,
+      box-shadow 0.12s ease;
+  }
+
+  .bar-btn:hover {
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+  }
+
+  .bar-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.45);
+  }
+
+  .bar-btn-save {
+    padding: 5px 10px;
+  }
+
+  /* Unobtrusive save-state readout: quiet "Saved" when clean, a warning
+     dot + label while `projectDirty` is true. */
+  .dirty-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: hsl(var(--muted-foreground));
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 4px;
+  }
+
+  .dirty-indicator.dirty {
+    color: hsl(var(--foreground));
+    opacity: 1;
+  }
+
+  .dirty-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(var(--primary));
+    flex-shrink: 0;
   }
 
   /*

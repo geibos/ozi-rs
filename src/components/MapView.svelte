@@ -24,8 +24,10 @@
     drawingPointCount,
     drawingFinishRequested,
     drawingSegmentId,
+    mapViewportBounds,
     simplifyState,
     tracksFingerprint,
+    tracksGeometryVersion,
     visibleWaypointLayers,
     waypointsFingerprint,
   } from "../lib/stores";
@@ -170,14 +172,11 @@
 
   function applyEditModeMapInteraction(active: boolean) {
     if (!map) return;
-    if (active) {
-      map.dragPan.disable();
-      map.getCanvas().style.cursor = "crosshair";
-      return;
-    }
-
-    map.dragPan.enable();
-    map.getCanvas().style.cursor = "";
+    // Panning stays enabled in edit mode (CJ-4): point markers are
+    // draggable maplibregl.Markers whose elements capture their own
+    // pointer events, so marker drag never reaches the map's dragPan
+    // handler — disabling it only made the map feel broken.
+    map.getCanvas().style.cursor = active ? "crosshair" : "";
   }
 
   async function refreshTrackGeometry() {
@@ -571,6 +570,43 @@
     }
   }
 
+  /**
+   * CJ-4: publish the current viewport as lat/lon bounds. Registered on
+   * `moveend` (not per-frame `move`) plus once on load, so the store is
+   * cheap to keep fresh; `null` until the map is ready (crop-to-view
+   * stays disabled until then).
+   */
+  function updateViewportBounds() {
+    if (!map) return;
+    const bounds = map.getBounds();
+    mapViewportBounds.set({
+      minLat: bounds.getSouth(),
+      minLon: bounds.getWest(),
+      maxLat: bounds.getNorth(),
+      maxLon: bounds.getEast(),
+    });
+  }
+
+  /**
+   * CJ-4: select a track by clicking its rendered line. Skipped while a
+   * modal map mode owns clicks (drawing adds points, edit mode drags
+   * points, add-waypoint places a waypoint). Takes the topmost feature of
+   * the `tracks-lines` layer; empty-map clicks do NOT clear the selection.
+   */
+  function handleMapClickForTrackSelect(e: maplibregl.MapMouseEvent) {
+    if ($drawingModeActive || $editModeActive || $addWaypointMode) return;
+    if (!map.getLayer("tracks-lines")) return;
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: ["tracks-lines"],
+    });
+    const props = features[0]?.properties;
+    if (props?.layer_id == null || props?.track_id == null) return;
+    selectedTrack.set({
+      layerId: BigInt(props.layer_id),
+      trackId: BigInt(props.track_id),
+    });
+  }
+
   function handleMapClickForDrawing(e: maplibregl.MapMouseEvent) {
     if (
       !$drawingModeActive
@@ -635,6 +671,21 @@
 
       initTracksLayer(map);
 
+      // Pointer affordance over track lines (CJ-4 click-to-select).
+      // Registered after initTracksLayer so the delegated events bind to
+      // an existing layer. The mode guards keep the crosshair cursors of
+      // drawing / edit / add-waypoint modes untouched.
+      map.on("mouseenter", "tracks-lines", () => {
+        if ($drawingModeActive || $editModeActive || $addWaypointMode) return;
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", "tracks-lines", () => {
+        if ($drawingModeActive || $editModeActive || $addWaypointMode) return;
+        map.getCanvas().style.cursor = "";
+      });
+
+      updateViewportBounds();
+
       // Explicitly refresh tracks and waypoints once map is ready,
       // since $effect may have run before map was initialized
       try {
@@ -646,10 +697,13 @@
       refreshWaypointMarkers();
     });
 
+    map.on("moveend", updateViewportBounds);
+
     map.on("click", (e) => {
       contextMenu = null;
       handleMapClickForWaypoint(e);
       handleMapClickForDrawing(e);
+      handleMapClickForTrackSelect(e);
     });
 
     map.on("dblclick", (e) => {
@@ -668,6 +722,7 @@
       clearPointMarkers();
       clearWaypointMarkers();
       clearDrawingPreview();
+      mapViewportBounds.set(null);
       if (pendingDrawingClickTimeout !== null) {
         window.clearTimeout(pendingDrawingClickTimeout);
         pendingDrawingClickTimeout = null;
@@ -780,13 +835,17 @@
   // `get_tracks_geojson` is no longer called on every per-file `state-changed`
   // emit (`consolidate-state-event-flow` change, Decision 2).
   $effect(() => {
-    const fp = $tracksFingerprint;
+    // Composite slice key: the fingerprint misses geometry-only edits
+    // (sorting reorders points without changing point_count), so track
+    // cleanup actions bump $tracksGeometryVersion to force a re-fetch.
+    const fp = `${$tracksFingerprint}|${$tracksGeometryVersion}`;
     if (!map) return;
     if (fp === appliedTracksFingerprint) return;
 
     if (!map.isStyleLoaded()) {
       map.once("load", async () => {
-        if (fp !== $tracksFingerprint) return; // a newer fingerprint will run
+        // A newer fingerprint/version will schedule its own run.
+        if (fp !== `${$tracksFingerprint}|${$tracksGeometryVersion}`) return;
         const geojson = await getTracksGeojson();
         updateTracksLayer(map, geojson);
         appliedTracksFingerprint = fp;
@@ -885,9 +944,7 @@
       return;
     }
 
-    if (!$editModeActive) {
-      map.dragPan.enable();
-    }
+    map.dragPan.enable();
     map.doubleClickZoom.enable();
     drawingPreviewPoints = [];
     drawingCommandCount = 0;

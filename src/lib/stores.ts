@@ -87,6 +87,14 @@ export const appState = createAppStore();
 export const busy = derived(appState, ($s) => $s?.busy ?? false);
 export const status = derived(appState, ($s) => $s?.status ?? "");
 export const diagnostics = derived(appState, ($s) => $s?.diagnostics ?? []);
+// CJ-7: unsaved-changes signal and the current .ozp path. `projectDirty`
+// drives the shell dirty indicator and the window close-guard; `projectPath`
+// lets Cmd+S quick-save without a dialog once the project has a path.
+export const projectDirty = derived(
+  appState,
+  ($s) => $s?.project_dirty ?? false,
+);
+export const projectPath = derived(appState, ($s) => $s?.project_path ?? null);
 // Seed synchronously from the persisted catalog cache so the bundle loader
 // renders the previous catalog on its first paint without waiting for any
 // IPC round-trip. Falls back to an empty list on first-ever launch or any
@@ -96,9 +104,15 @@ export const projectsStore = writable<LizaProjectSummaryDto[]>(
 );
 export const projects = derived(projectsStore, ($projects) => $projects);
 export const projectsLoading = writable(false);
-export const currentProject = derived(appState, ($s) => $s?.current_project ?? null);
+export const currentProject = derived(
+  appState,
+  ($s) => $s?.current_project ?? null,
+);
 export const activeMap = derived(appState, ($s) => $s?.active_map ?? null);
-export const trackLayerCount = derived(appState, ($s) => $s?.track_layer_count ?? 0);
+export const trackLayerCount = derived(
+  appState,
+  ($s) => $s?.track_layer_count ?? 0,
+);
 /**
  * All waypoint layer summaries from the current project filtered by per-layer
  * `visible` (defaulting to true when absent). Renderers consume this to draw
@@ -108,14 +122,20 @@ export const trackLayerCount = derived(appState, ($s) => $s?.track_layer_count ?
 export const visibleWaypointLayers = derived(appState, ($s) =>
   selectVisibleWaypointLayers($s?.waypoint_layers ?? null),
 );
-export const downloadingMaps = derived(appState, ($s) => new Set($s?.downloading_maps ?? []));
+export const downloadingMaps = derived(
+  appState,
+  ($s) => new Set($s?.downloading_maps ?? []),
+);
 
 /**
  * Slice indicator for the active raster map. Changes only when the active
  * map's `local_path` changes — typing in the filter or download progress
  * events do NOT mutate this value.
  */
-export const activeMapRef = derived(appState, ($s) => $s?.active_map?.local_path ?? null);
+export const activeMapRef = derived(
+  appState,
+  ($s) => $s?.active_map?.local_path ?? null,
+);
 
 /**
  * Build a stable string fingerprint describing every field that
@@ -175,10 +195,13 @@ export const waypointsFingerprint = derived(appState, ($s) =>
 
 function syncActiveLayer(
   current: bigint | null,
-  layers: Array<{ id: number }>
+  layers: Array<{ id: number }>,
 ): bigint | null {
   if (layers.length === 0) return null;
-  if (current !== null && layers.some((layer) => BigInt(layer.id) === current)) {
+  if (
+    current !== null &&
+    layers.some((layer) => BigInt(layer.id) === current)
+  ) {
     return current;
   }
   return BigInt(layers[0].id);
@@ -226,7 +249,9 @@ export function syncProjectsFromAppState(state: AppStateDto | null) {
 }
 
 // Per-package download progress: package_name → { downloaded, total? }
-export const downloadProgress = writable<Map<string, DownloadProgressPayload>>(new Map());
+export const downloadProgress = writable<Map<string, DownloadProgressPayload>>(
+  new Map(),
+);
 
 export function updateDownloadProgress(payload: DownloadProgressPayload) {
   downloadProgress.update((map) => {
@@ -287,9 +312,36 @@ export const drawingPointCount = writable(0);
 export const drawingFinishRequested = writable(false);
 export const drawingSegmentId = writable<bigint | null>(null);
 export const editModeActive = writable(false);
-export const selectedTrack = writable<{ layerId: bigint; trackId: bigint } | null>(null);
-export const selectedWaypointId: import("svelte/store").Writable<bigint | null> = writable(null);
+export const selectedTrack = writable<{
+  layerId: bigint;
+  trackId: bigint;
+} | null>(null);
+export const selectedWaypointId: import("svelte/store").Writable<
+  bigint | null
+> = writable(null);
 export const selectedPointId = writable<bigint | null>(null);
+/**
+ * Current map viewport bounds in lat/lon. Written by `MapView` on `moveend`
+ * (plus once on map load) — deliberately NOT per-frame — and reset to `null`
+ * on map teardown. Consumed by the CJ-4 "crop to map view" action in
+ * `TrackInspector`, which stays disabled while the value is `null`.
+ */
+export const mapViewportBounds = writable<{
+  minLat: number;
+  minLon: number;
+  maxLat: number;
+  maxLon: number;
+} | null>(null);
+/**
+ * Monotonic counter bumped after track edits that `tracksFingerprint`
+ * cannot see: sorting reorders points without changing `point_count`, and
+ * split/join move points between segments. Consumers treat it as a cache
+ * key component — `MapView`'s tracks-slice effect re-fetches GeoJSON when
+ * it changes, and `TrackInspector` / `TrackSegmentsTable` invalidate their
+ * cached `TrackDetail`. Crop actions bump it too so the detail caches
+ * refresh without waiting for the `state-changed` round-trip.
+ */
+export const tracksGeometryVersion = writable(0);
 export const bundleLoaderOpen = writable(false);
 /**
  * Inspector-rail visibility placeholder for the `redesign-shell-layout`
@@ -342,7 +394,7 @@ export const simplifyState = writable<{
  * enable the Catppuccin pack — see `selectedTheme.subscribe` below.
  */
 export const selectedTheme = writable<string>(
-  localStorage.getItem("theme") ?? "native-auto"
+  localStorage.getItem("theme") ?? "native-auto",
 );
 
 selectedTheme.subscribe((v) => localStorage.setItem("theme", v));
@@ -378,8 +430,12 @@ selectedTheme.subscribe((v) => {
 });
 
 appState.subscribe((state) => {
-  activeTrackLayerId.update((current) => syncActiveLayer(current, state?.track_layers ?? []));
-  activeWaypointLayerId.update((current) => syncActiveLayer(current, state?.waypoint_layers ?? []));
+  activeTrackLayerId.update((current) =>
+    syncActiveLayer(current, state?.track_layers ?? []),
+  );
+  activeWaypointLayerId.update((current) =>
+    syncActiveLayer(current, state?.waypoint_layers ?? []),
+  );
 });
 
 // Persist the catalog after the chunk stream stops growing. We can't rely

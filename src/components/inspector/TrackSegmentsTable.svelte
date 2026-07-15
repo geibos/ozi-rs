@@ -20,6 +20,7 @@
     editModeActive,
     selectedPointId,
     selectedTrack,
+    tracksGeometryVersion,
   } from "$lib/stores";
   import {
     formatPointCoords,
@@ -28,8 +29,10 @@
     pageSegmentPoints,
     segmentHeader,
   } from "$lib/track-points";
+  import { joinSegments, splitSegment } from "$lib/api";
+  import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
-  import type { TrackDetail } from "$lib/types";
+  import type { SegmentDetail, TrackDetail } from "$lib/types";
 
   let trackDetail: TrackDetail | null = $state(null);
   let expandedSegments: Record<number, boolean> = $state({});
@@ -44,7 +47,9 @@
     }
     // Cache by composite key so quickly bouncing between rows in the
     // Library does not refetch on every store tick.
-    const key = `${selected.layerId}:${selected.trackId}`;
+    // $tracksGeometryVersion is part of the key so CJ-4 cleanup actions
+    // (sort / crop / split / join) invalidate the cached detail.
+    const key = `${selected.layerId}:${selected.trackId}:${$tracksGeometryVersion}`;
     if (key === lastLoaded) return;
     void loadDetail(selected.layerId, selected.trackId, key);
   });
@@ -71,6 +76,58 @@
   function toggleEditMode() {
     if (!$selectedTrack) return;
     editModeActive.update((current) => !current);
+  }
+
+  // ── CJ-4: split / join segments ──────────────────────────────────────
+
+  /**
+   * The selected point can split its segment when it belongs to this
+   * segment and is not the segment's last point (the backend rejects a
+   * last-point split — we pre-hide only that obvious case, other backend
+   * rejections surface as toasts).
+   */
+  function canSplitAt(segment: SegmentDetail): boolean {
+    const pointId = $selectedPointId;
+    if (pointId === null) return false;
+    const points = segment.points;
+    if (points.length === 0) return false;
+    if (BigInt(points[points.length - 1].id) === pointId) return false;
+    return points.some((p) => BigInt(p.id) === pointId);
+  }
+
+  async function handleSplit(segment: SegmentDetail) {
+    const selected = $selectedTrack;
+    const pointId = $selectedPointId;
+    if (!selected || pointId === null) return;
+    try {
+      await splitSegment(
+        selected.layerId,
+        selected.trackId,
+        BigInt(segment.id),
+        pointId,
+      );
+      // Bumping the version invalidates this table's cache (the $effect
+      // key above) and re-renders the map line via MapView's slice effect.
+      tracksGeometryVersion.update((v) => v + 1);
+    } catch (error) {
+      toast.error($t("points.splitFailed"), { description: String(error) });
+    }
+  }
+
+  async function handleJoin(previous: SegmentDetail, segment: SegmentDetail) {
+    const selected = $selectedTrack;
+    if (!selected) return;
+    try {
+      await joinSegments(
+        selected.layerId,
+        selected.trackId,
+        BigInt(previous.id),
+        BigInt(segment.id),
+      );
+      tracksGeometryVersion.update((v) => v + 1);
+    } catch (error) {
+      toast.error($t("points.joinFailed"), { description: String(error) });
+    }
   }
 </script>
 
@@ -115,11 +172,22 @@
           expandedSegments[segment.id] === true,
         )}
         <div
-          class="bg-muted/50 text-muted-foreground border-border px-3 py-1 text-[10px] font-semibold tracking-wider uppercase"
+          class="bg-muted/50 text-muted-foreground border-border flex items-center justify-between gap-2 px-3 py-1 text-[10px] font-semibold tracking-wider uppercase"
           class:border-t={segIdx > 0}
           class:border-b={true}
         >
-          {segmentHeader(segment)}
+          <span>{segmentHeader(segment)}</span>
+          {#if segIdx > 0}
+            <Button
+              variant="ghost"
+              size="xs"
+              class="shrink-0 normal-case"
+              onclick={() =>
+                handleJoin(trackDetail!.segments[segIdx - 1], segment)}
+            >
+              {$t("points.joinPrevious")}
+            </Button>
+          {/if}
         </div>
         <Table.Root>
           <Table.Body>
@@ -146,6 +214,17 @@
             {/each}
           </Table.Body>
         </Table.Root>
+        {#if canSplitAt(segment)}
+          <div class="border-border border-b px-3 py-1.5">
+            <Button
+              variant="outline"
+              size="xs"
+              onclick={() => handleSplit(segment)}
+            >
+              {$t("points.splitHere")}
+            </Button>
+          </div>
+        {/if}
         {#if paged.hiddenCount > 0}
           <div class="px-3 py-2">
             <Button

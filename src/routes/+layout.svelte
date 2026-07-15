@@ -1,17 +1,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { page } from "$app/state";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
   import {
     appendProjectsChunk,
     appState,
     bundleProgress,
     commandPaletteOpen,
     currentDownload,
+    projectDirty,
     resetBundleDownloadState,
     updateDownloadProgress,
   } from "../lib/stores";
   import { loadProjects } from "../lib/api";
+  import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import { t } from "$lib/i18n";
   import { installIpcErrorToastObserver } from "../lib/ipc";
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
@@ -80,6 +86,36 @@
       loadProjects().catch(() => {});
     })();
 
+    // CJ-7 close guard: intercept a window close while the project has
+    // unsaved changes. `onCloseRequested` defers the close to JS, so the
+    // clean-path (not dirty) simply returns and the wrapper destroys the
+    // window; the dirty path must call `preventDefault()` BEFORE the first
+    // await so the wrapper sees it, then re-close via `destroy()` when the
+    // user confirms quitting without saving.
+    (async () => {
+      try {
+        const unlistenClose = await getCurrentWindow().onCloseRequested(
+          async (event) => {
+            if (!get(projectDirty)) return; // clean — allow the close
+            event.preventDefault();
+            const translate = get(t);
+            const quit = await confirmDialog(translate("closeGuard.message"), {
+              title: translate("closeGuard.title"),
+              kind: "warning",
+              okLabel: translate("closeGuard.quit"),
+              cancelLabel: translate("closeGuard.cancel"),
+            });
+            if (quit) await getCurrentWindow().destroy();
+          },
+        );
+        if (cancelled) unlistenClose();
+        else unlistens.push(unlistenClose);
+      } catch {
+        // Not running inside Tauri (vitest / SSR prerender) — nothing to
+        // guard, and the app-level close flow is unaffected.
+      }
+    })();
+
     return () => {
       cancelled = true;
       unlistens.forEach((fn) => fn());
@@ -93,20 +129,51 @@
   });
 
   /**
-   * Global Cmd-K / Ctrl-K handler — captures from any focus state except
-   * when the palette itself is already open (the bits-ui Command primitive
-   * handles its own key flow inside the dialog). `preventDefault` keeps
-   * the WebView from treating the chord as a text shortcut.
+   * True when the event originates inside a text-editing surface. The CJ-7
+   * chords (Cmd+S / Cmd+Z / Cmd+Shift+Z) must not hijack native text
+   * editing — Cmd+Z while renaming a track stays the input's own undo.
+   */
+  function isEditableTarget(target: EventTarget | null): boolean {
+    const el = target instanceof HTMLElement ? target : null;
+    return Boolean(
+      el?.closest(
+        'input, textarea, select, [contenteditable="true"], [contenteditable=""]',
+      ),
+    );
+  }
+
+  /**
+   * Global keyboard chords (CJ-7):
+   *   - Cmd/Ctrl+K       — toggle the command palette (existing behavior;
+   *     skipped when focus is already inside the palette dialog, whose own
+   *     keydown listeners handle the chord).
+   *   - Cmd/Ctrl+S       — quick-save (no dialog when the project path is
+   *     known).
+   *   - Cmd/Ctrl+Z       — undo; with Shift — redo.
+   * `preventDefault` keeps the WebView from treating the chords as text
+   * shortcuts. Save/undo/redo are backend no-ops without an active project,
+   * so the chords are wired globally rather than per-route.
    */
   function handleGlobalKeydown(event: KeyboardEvent) {
     const mod = event.metaKey || event.ctrlKey;
-    if (!mod || event.key.toLowerCase() !== "k") return;
-    // Skip if focus is already inside the palette dialog (the dialog's
-    // own keydown listeners handle the chord — closing on Esc, etc.).
+    if (!mod) return;
+    const key = event.key.toLowerCase();
     const target = event.target as HTMLElement | null;
-    if (target?.closest('[data-slot="dialog-content"]')) return;
-    event.preventDefault();
-    commandPaletteOpen.update((open) => !open);
+    if (key === "k") {
+      if (target?.closest('[data-slot="dialog-content"]')) return;
+      event.preventDefault();
+      commandPaletteOpen.update((open) => !open);
+      return;
+    }
+    if (isEditableTarget(event.target)) return;
+    if (key === "s" && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      void quickSave();
+    } else if (key === "z" && !event.altKey) {
+      event.preventDefault();
+      if (event.shiftKey) void doRedo();
+      else void doUndo();
+    }
   }
 </script>
 

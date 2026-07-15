@@ -173,6 +173,39 @@ impl TrackSegment {
     }
 
     /// Remove a point by id. Returns `(index, point)` so undo can call `insert_point_at`.
+    /// Reorder this segment's points to exactly the given id sequence.
+    /// The id set must match the current points one-to-one; otherwise the
+    /// segment is left untouched and MissingTrackPoint names the first id
+    /// that does not exist.
+    pub fn reorder_points(
+        &mut self,
+        ids: &[TrackPointId],
+    ) -> Result<(), crate::domain::ProjectLayerError> {
+        if ids.len() != self.points.len() {
+            return Err(crate::domain::ProjectLayerError::MissingTrackPoint {
+                layer_id: 0,
+                track_id: 0,
+                segment_id: self.id.value(),
+                point_id: ids.first().map(|id| id.value()).unwrap_or(0),
+            });
+        }
+        let mut remaining: Vec<TrackPoint> = self.points.clone();
+        let mut reordered = Vec::with_capacity(ids.len());
+        for id in ids {
+            let position = remaining.iter().position(|p| p.id() == *id).ok_or(
+                crate::domain::ProjectLayerError::MissingTrackPoint {
+                    layer_id: 0,
+                    track_id: 0,
+                    segment_id: self.id.value(),
+                    point_id: id.value(),
+                },
+            )?;
+            reordered.push(remaining.remove(position));
+        }
+        self.points = reordered;
+        Ok(())
+    }
+
     pub fn remove_point(
         &mut self,
         point_id: u64,
@@ -413,6 +446,23 @@ impl Track {
 
         Ok(seg_b)
     }
+}
+
+/// Per-segment point order sorted by timestamp (CJ-4 sort). Untimed points
+/// come first, keeping their relative order (stable sort; `Option`'s
+/// ordering places `None` before any `Some`).
+pub fn sorted_point_order_by_time(segments: &[TrackSegment]) -> Vec<(u64, Vec<u64>)> {
+    segments
+        .iter()
+        .map(|segment| {
+            let mut points: Vec<&TrackPoint> = segment.points().iter().collect();
+            points.sort_by_key(|p| p.timestamp());
+            (
+                segment.id().value(),
+                points.iter().map(|p| p.id().value()).collect(),
+            )
+        })
+        .collect()
 }
 
 fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
