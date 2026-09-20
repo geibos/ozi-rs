@@ -176,7 +176,7 @@
           class:border-t={segIdx > 0}
           class:border-b={true}
         >
-          <span>{segmentHeader(segment)}</span>
+          <span class="min-w-0 truncate">{segmentHeader(segment)}</span>
           {#if segIdx > 0}
             <Button
               variant="ghost"

@@ -20,6 +20,7 @@
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
   import LineChartIcon from "@lucide/svelte/icons/line-chart";
+  import LocateIcon from "@lucide/svelte/icons/locate";
   import SlidersHorizontalIcon from "@lucide/svelte/icons/sliders-horizontal";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import WavesIcon from "@lucide/svelte/icons/waves";
@@ -28,6 +29,7 @@
   import {
     appState,
     mapViewportBounds,
+    requestTrackFocus,
     selectedTrack,
     simplifyState,
     tracksGeometryVersion,
@@ -184,6 +186,13 @@
     });
   }
 
+  /** "Show on map" — MapView consumes the request and fits the bounds. */
+  function handleShowOnMap() {
+    const sel = $selectedTrack;
+    if (!sel) return;
+    requestTrackFocus(sel.layerId, sel.trackId);
+  }
+
   // ── CJ-4 track cleanup: sort by time / crop to view / crop by time ──
 
   let cropTimeOpen = $state(false);
@@ -306,7 +315,7 @@
   }
 </script>
 
-<div class="flex h-full flex-col gap-3 overflow-y-auto p-4">
+<div class="flex h-full min-w-0 flex-col gap-3 overflow-x-hidden overflow-y-auto p-4">
   <header class="flex items-start gap-3">
     <span
       class="mt-1 inline-block size-4 shrink-0 rounded-full border border-black/10"
@@ -351,17 +360,26 @@
         class="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 text-xs tabular-nums"
       >
         <dt class="text-muted-foreground">Distance</dt>
-        <dd class="font-mono">{formatDistanceKm(summary!.distance_km)}</dd>
+        <dd class="min-w-0 truncate font-mono">
+          {formatDistanceKm(summary!.distance_km)}
+        </dd>
         <dt class="text-muted-foreground">Duration</dt>
-        <dd class="font-mono">
+        <dd class="min-w-0 truncate font-mono">
           {summary!.duration_seconds !== null
             ? formatDurationSeconds(summary!.duration_seconds!)
             : "—"}
         </dd>
         <dt class="text-muted-foreground">Points</dt>
-        <dd class="font-mono">{formatPointCount(summary!.point_count)}</dd>
+        <dd class="min-w-0 truncate font-mono">
+          {formatPointCount(summary!.point_count)}
+        </dd>
         <dt class="text-muted-foreground">Start time</dt>
-        <dd class="font-mono">{firstTimestamp(trackDetail) ?? "—"}</dd>
+        <dd
+          class="min-w-0 truncate font-mono"
+          title={firstTimestamp(trackDetail) ?? undefined}
+        >
+          {firstTimestamp(trackDetail) ?? "—"}
+        </dd>
       </dl>
     {:else}
       <p class="text-muted-foreground text-xs">No track selected.</p>
@@ -412,78 +430,94 @@
     </div>
   </section>
 
-  <section class="flex flex-col gap-2" aria-label="Track actions">
-    <div class="grid grid-cols-2 gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        class="justify-start gap-2"
-        onclick={handleExportGpx}
-        disabled={!summary}
-      >
-        <DownloadIcon class="size-4" />
-        Export GPX
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        class="justify-start gap-2"
-        onclick={handleExportPlt}
-        disabled={!summary}
-      >
-        <FileOutputIcon class="size-4" />
-        Export PLT
-      </Button>
-    </div>
+  <!--
+    Actions — a single-column stack of full-width, equally sized buttons.
+    The CJ-4 additions made a mixed grid/stack layout overflow the narrow
+    inspector rail; every button now carries `w-full min-w-0` and a
+    truncating label span so long localized labels never push past the
+    rail width.
+  -->
+  <section class="flex min-w-0 flex-col gap-2" aria-label="Track actions">
     <Button
       variant="outline"
       size="sm"
-      class="justify-start gap-2"
+      class="w-full min-w-0 justify-start gap-2"
+      onclick={handleShowOnMap}
+      disabled={!summary}
+      data-testid="inspector-show-on-map"
+    >
+      <LocateIcon class="size-4" />
+      <span class="truncate">{$t("track.showOnMap")}</span>
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="w-full min-w-0 justify-start gap-2"
+      onclick={handleExportGpx}
+      disabled={!summary}
+    >
+      <DownloadIcon class="size-4" />
+      <span class="truncate">Export GPX</span>
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="w-full min-w-0 justify-start gap-2"
+      onclick={handleExportPlt}
+      disabled={!summary}
+    >
+      <FileOutputIcon class="size-4" />
+      <span class="truncate">Export PLT</span>
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="w-full min-w-0 justify-start gap-2"
       onclick={handleSortByTime}
       disabled={!summary}
     >
       <ArrowUpDownIcon class="size-4" />
-      {$t("trackInspector.sortByTime")}
+      <span class="truncate">{$t("trackInspector.sortByTime")}</span>
     </Button>
     <Button
       variant="outline"
       size="sm"
-      class="justify-start gap-2"
+      class="w-full min-w-0 justify-start gap-2"
       onclick={handleCropToView}
       disabled={!summary || !$mapViewportBounds}
     >
       <CropIcon class="size-4" />
-      {$t("trackInspector.cropToView")}
+      <span class="truncate">{$t("trackInspector.cropToView")}</span>
     </Button>
     <Button
       variant="outline"
       size="sm"
-      class="justify-start gap-2"
+      class="w-full min-w-0 justify-start gap-2"
       onclick={openCropByTime}
       disabled={!summary}
     >
       <CalendarClockIcon class="size-4" />
-      {$t("trackInspector.cropByTime")}
+      <span class="truncate">{$t("trackInspector.cropByTime")}</span>
     </Button>
     <Button
       variant="outline"
       size="sm"
-      class="justify-start gap-2"
+      class="w-full min-w-0 justify-start gap-2"
       onclick={handleSimplify}
       disabled={!summary}
     >
       <WavesIcon class="size-4" />
-      {$t("trackInspector.simplify")}
+      <span class="truncate">{$t("trackInspector.simplify")}</span>
     </Button>
     <Button
       variant="outline"
       size="sm"
-      class="justify-start gap-2 text-destructive hover:text-destructive"
+      class="text-destructive hover:text-destructive w-full min-w-0 justify-start gap-2"
       onclick={handleDelete}
       disabled={!summary}
     >
       <Trash2Icon class="size-4" />
-      Delete track
+      <span class="truncate">Delete track</span>
     </Button>
   </section>
 </div>

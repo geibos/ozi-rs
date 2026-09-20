@@ -24,6 +24,7 @@
     drawingPointCount,
     drawingFinishRequested,
     drawingSegmentId,
+    mapFocusRequest,
     mapViewportBounds,
     simplifyState,
     tracksFingerprint,
@@ -44,6 +45,8 @@
     undo,
   } from "../lib/api";
   import type { PointDetail, SegmentDetail, TrackDetail } from "../lib/types";
+  import { t as i18n } from "../lib/i18n";
+  import { toast } from "svelte-sonner";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { initTracksLayer, updateTracksLayer } from "../lib/maplibre/tracks-layer";
@@ -180,9 +183,19 @@
   }
 
   async function refreshTrackGeometry() {
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
     const geojson = await getTracksGeojson();
     updateTracksLayer(map, geojson);
+  }
+
+  // Raise track line + label layers above every other layer (notably the
+  // active raster `map-tiles`) so track geometry is never hidden under a
+  // map image. Safe to call repeatedly; missing layers are skipped.
+  function raiseTrackLayers() {
+    if (!map) return;
+    for (const id of ["tracks-lines", "tracks-labels"]) {
+      if (map.getLayer(id)) map.moveLayer(id);
+    }
   }
 
   function openContextMenu(event: MouseEvent, target: PointMenuTarget) {
@@ -503,7 +516,7 @@
   }
 
   function updateDrawingPreview() {
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
 
     const lineFeature: GeoJSON.Feature<GeoJSON.LineString> = {
       type: "Feature",
@@ -650,7 +663,17 @@
         version: 8,
         sources: {},
         layers: [],
-        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+        // No `glyphs` on purpose: the app is offline-first and no SDF glyph
+        // PBFs are bundled yet. A remote glyphs URL here does not just fail to
+        // show labels — it POISONS tiling of any source shared with a symbol
+        // layer. The `tracks` GeoJSON source feeds both `tracks-lines` (line)
+        // and `tracks-labels` (symbol); a source tile only finishes parsing
+        // once every layer's dependencies resolve, and the symbol layer's
+        // glyph fetch hangs offline, so the tile never completes and the LINE
+        // never renders either (owner's "треки не отображаются"). Leaving
+        // glyphs undefined makes `map.getGlyphs()` falsy, so initTracksLayer
+        // skips the symbol layer entirely and the line tiles cleanly. Bundling
+        // SDF glyphs + setting this URL is the follow-up that re-enables labels.
       },
       center: [37.6, 55.75], // Moscow as default
       zoom: 5,
@@ -660,6 +683,11 @@
     map.addControl(new maplibregl.ScaleControl(), "bottom-left");
 
     map.on("load", async () => {
+      // One-shot: MapLibre "load" fires once per map lifetime. All refresh
+      // paths defer to this moment via `mapLoaded` instead of gating on
+      // isStyleLoaded()/once("load"), which silently dropped refreshes
+      // forever when it ran after startup (tracks-never-render bug).
+      mapLoaded = true;
       map.addSource("osm", {
         type: "raster",
         tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
@@ -691,6 +719,7 @@
       try {
         const geojson = await getTracksGeojson();
         updateTracksLayer(map, geojson);
+        raiseTrackLayers();
       } catch {
         // state may not be ready yet
       }
@@ -796,6 +825,14 @@
         tracksLayerId
       );
 
+      // Invariant: track lines/labels must always render ABOVE the active
+      // raster. The beforeId above usually achieves this, but it silently
+      // fails if tracks-lines was recreated after a style change or added in
+      // a different order — the raster JPG then covers the tracks (owner's
+      // "JPG накладывается поверх" report). Re-assert by raising them to the
+      // top; a no-op when already on top.
+      raiseTrackLayers();
+
       if (fitBoundsTarget) {
         map.fitBounds(fitBoundsTarget, { padding: 0, animate: true });
       } else if (am.center_lat !== 0 || am.center_lon !== 0) {
@@ -806,7 +843,7 @@
       }
     }
 
-    if (!map.isStyleLoaded()) {
+    if (!mapLoaded) {
       map.once("load", applyActiveMap);
     } else {
       applyActiveMap();
@@ -819,6 +856,7 @@
    * last run. The empty-string sentinel matches the "no tracks loaded" state
    * before any project is open.
    */
+  let mapLoaded = false;
   let appliedTracksFingerprint: string | null = null;
   /**
    * Last applied waypoints fingerprint (over `waypoint_layers`). The
@@ -842,19 +880,23 @@
     if (!map) return;
     if (fp === appliedTracksFingerprint) return;
 
-    if (!map.isStyleLoaded()) {
+    if (!mapLoaded) {
       map.once("load", async () => {
         // A newer fingerprint/version will schedule its own run.
         if (fp !== `${$tracksFingerprint}|${$tracksGeometryVersion}`) return;
         const geojson = await getTracksGeojson();
         updateTracksLayer(map, geojson);
+        raiseTrackLayers();
         appliedTracksFingerprint = fp;
       });
       return;
     }
 
     appliedTracksFingerprint = fp;
-    getTracksGeojson().then((geojson) => updateTracksLayer(map, geojson));
+    getTracksGeojson().then((geojson) => {
+      updateTracksLayer(map, geojson);
+      raiseTrackLayers();
+    });
   });
 
   // Slice effect: reconcile waypoint markers only when the waypoint-layer
@@ -875,7 +917,7 @@
     if (compositeKey === appliedWaypointsFingerprint) return;
     appliedWaypointsFingerprint = compositeKey;
 
-    if (!map.isStyleLoaded()) {
+    if (!mapLoaded) {
       map.once("load", () => {
         void refreshWaypointMarkers();
       });
@@ -1015,10 +1057,110 @@
       }
     }
 
-    if (!map.isStyleLoaded()) {
+    if (!mapLoaded) {
       map.once("load", updateSimplifyPreview);
     } else {
       updateSimplifyPreview();
+    }
+  });
+
+  // ── "Show on map" (mapFocusRequest consumer) ─────────────────────────
+  //
+  // Library track rows and the Track Inspector write a one-shot request
+  // into `mapFocusRequest` (nonce bumps on every click so repeat clicks on
+  // the same track re-fire). MapView owns the map instance, so it resolves
+  // the request here: fetch the track detail, compute the bbox over ALL
+  // points in ALL segments, fitBounds, and reset the store to null.
+  async function focusTrack(layerId: bigint, trackId: bigint) {
+    try {
+      const detail = await getTrackDetail(layerId, trackId);
+      let minLat = Infinity;
+      let minLon = Infinity;
+      let maxLat = -Infinity;
+      let maxLon = -Infinity;
+      let hasPoints = false;
+      for (const segment of detail.segments) {
+        for (const point of segment.points) {
+          hasPoints = true;
+          if (point.lat < minLat) minLat = point.lat;
+          if (point.lat > maxLat) maxLat = point.lat;
+          if (point.lon < minLon) minLon = point.lon;
+          if (point.lon > maxLon) maxLon = point.lon;
+        }
+      }
+      if (!hasPoints) {
+        toast.message(get(i18n)("track.noPoints"));
+        return;
+      }
+      map.fitBounds(
+        [
+          [minLon, minLat],
+          [maxLon, maxLat],
+        ],
+        { padding: 60, maxZoom: 16 },
+      );
+    } catch (error) {
+      console.error("Failed to focus track on map", error);
+      toast.error(get(i18n)("track.showOnMapFailed"), {
+        description: String(error),
+      });
+    }
+  }
+
+  // Fit the camera to ALL track geometry — used after an import so the newly
+  // added tracks are actually on screen (otherwise they render wherever they
+  // are, off the active raster, and look like they failed to import).
+  async function focusAllTracks() {
+    try {
+      const geojson = await getTracksGeojson();
+      let minLat = Infinity;
+      let minLon = Infinity;
+      let maxLat = -Infinity;
+      let maxLon = -Infinity;
+      let hasPoints = false;
+      const visit = (coords: unknown): void => {
+        if (
+          Array.isArray(coords) &&
+          coords.length === 2 &&
+          typeof coords[0] === "number" &&
+          typeof coords[1] === "number"
+        ) {
+          const [lon, lat] = coords as [number, number];
+          hasPoints = true;
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+          return;
+        }
+        if (Array.isArray(coords)) for (const c of coords) visit(c);
+      };
+      for (const feature of geojson.features) {
+        visit((feature.geometry as { coordinates?: unknown }).coordinates);
+      }
+      if (!hasPoints) return;
+      map.fitBounds(
+        [
+          [minLon, minLat],
+          [maxLon, maxLat],
+        ],
+        { padding: 60, maxZoom: 16 },
+      );
+    } catch (error) {
+      console.error("Failed to fit all tracks", error);
+    }
+  }
+
+  $effect(() => {
+    const request = $mapFocusRequest;
+    if (!request || !map) return;
+    // Consume the request before the async work so a second click during
+    // the fetch registers as a fresh store write (new nonce → new run).
+    mapFocusRequest.set(null);
+    if (request.kind === "track") {
+      void focusTrack(request.layerId, request.trackId);
+    } else if (request.kind === "all-tracks") {
+      void focusAllTracks();
     }
   });
 </script>

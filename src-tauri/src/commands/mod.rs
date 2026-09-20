@@ -415,6 +415,38 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
     Ok(())
 }
 
+/// Preview a bundle: fetch its map list without downloading anything.
+/// Selecting a project in the loader calls this; the actual download starts
+/// only from the explicit open action (`load_project`).
+#[tauri::command]
+#[specta::specta]
+pub fn preview_project(
+    slug: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let data = {
+        let mut s = lock_app_state(state.inner())?;
+        s.preview_data(&slug)
+    };
+    let Some((summary, bundles_root)) = data else {
+        return Ok(());
+    };
+    let _ = app.emit("state-changed", ());
+
+    let state_arc = Arc::clone(&state);
+    let app_handle = app.clone();
+    std::thread::spawn(move || {
+        let result =
+            crate::infrastructure::lizaalert::preview_project(summary, &bundles_root);
+        if let Ok(mut s) = state_arc.lock() {
+            s.apply_project_loaded(result);
+        }
+        let _ = app_handle.emit("state-changed", ());
+    });
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn load_project(
@@ -686,6 +718,40 @@ pub fn load_project_file(
 }
 
 // ── Import / export ───────────────────────────────────────────────────────────
+
+/// CJ-3: recursively import every GPX/PLT under a folder (per-date
+/// subfolders included). Per-file failures are reported, not fatal.
+#[tauri::command]
+#[specta::specta]
+pub fn import_tracks_directory(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let report = lock_app_state(state.inner())?
+        .import_tracks_directory(PathBuf::from(path))?;
+    let _ = app.emit("state-changed", ());
+    let mut message = format!(
+        "Imported {} tracks and {} waypoints from {} files",
+        report.imported_tracks, report.imported_waypoints, report.imported_files,
+    );
+    if !report.skipped.is_empty() {
+        message.push_str(&format!(
+            "; skipped {}: {}",
+            report.skipped.len(),
+            report
+                .skipped
+                .iter()
+                .map(|(p, _)| p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default())
+                .collect::<Vec<_>>()
+                .join(", "),
+        ));
+    }
+    Ok(message)
+}
 
 #[tauri::command]
 #[specta::specta]

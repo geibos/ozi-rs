@@ -610,9 +610,22 @@ pub async fn download_bundle_concurrent(
     }
 
     let mut first_err: Option<String> = None;
+    let mut completed_files: u64 = 0;
     while let Some(joined) = set.join_next().await {
         match joined {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => {
+                // Per-file completion tick so the aggregate progress moves
+                // continuously instead of jumping 0 -> N at the very end.
+                completed_files += 1;
+                let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
+                    message: format!("Downloaded {completed_files} of {total} files"),
+                    phase: ProjectOpenPhase::Downloading,
+                    completed: Some(completed_files),
+                    total: Some(total as u64),
+                    downloaded_bytes: None,
+                    total_bytes: None,
+                }));
+            }
             Ok(Err(e)) => {
                 if first_err.is_none() {
                     first_err = Some(e);
@@ -734,6 +747,54 @@ pub async fn open_project_async(
     .await
     .map_err(|err| err.to_string())??;
     Ok(project)
+}
+
+/// CJ-onboarding: build the map list of a bundle WITHOUT downloading it.
+/// Online: root listing is parsed for sqlite map packages (cached flag from
+/// local file presence) and the center file (a few hundred bytes) is the
+/// only download. Offline: falls back to the fully cached view. OZI rasters
+/// appear in the preview only when already extracted locally — remote OZI
+/// archives are listed after a real open.
+pub fn preview_project(summary: LizaProjectSummary, root: &Path) -> Result<LizaProject, String> {
+    match fetch_text(&summary.url) {
+        Ok(listing) => {
+            let mut maps = parse_map_packages(&listing, &summary.url)?;
+            let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
+            let cached: Vec<LizaMapPackage> = read_cached_sqlite_map_packages(root, &summary.slug, &zoom_regex)?;
+            for map in &mut maps {
+                if let Some(local) = cached.iter().find(|c| c.file_name == map.file_name) {
+                    map.local_path = local.local_path.clone();
+                }
+            }
+            let bundle_dir = project_source_root(root, &summary.slug);
+            let mut ozi = read_cached_ozi_map_packages(&bundle_dir)?;
+            ozi.sort_by(|a, b| a.name.cmp(&b.name));
+            ozi.extend(maps);
+
+            let center_href = Regex::new(r#"href="([^"]*Coordinates\.txt)""#)
+                .map_err(|err| err.to_string())?
+                .captures(&listing)
+                .and_then(|c| c.get(1).map(|m| m.as_str().to_owned()));
+            let center = match center_href {
+                Some(href) => parse_center(&fetch_text(&format!("{}{href}", summary.url))?)?,
+                None => {
+                    let local = project_coordinates_path(root, &summary.slug);
+                    parse_center(&read_text_file_lossy(&local).map_err(|e| e.to_string())?)?
+                }
+            };
+            Ok(LizaProject {
+                summary,
+                center,
+                maps: ozi,
+            })
+        }
+        Err(err) => {
+            if !is_project_cached(&summary.slug, root) {
+                return Err(format!("bundle listing unreachable and not cached: {err}"));
+            }
+            load_cached_project_from_root(summary, root)
+        }
+    }
 }
 
 fn collect_remote_files_rel(

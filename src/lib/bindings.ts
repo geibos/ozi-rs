@@ -38,6 +38,19 @@ async loadProject(slug: string) : Promise<Result<string, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Preview a bundle: fetch its map list without downloading anything.
+ * Selecting a project in the loader calls this; the actual download starts
+ * only from the explicit open action (`load_project`).
+ */
+async previewProject(slug: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("preview_project", { slug }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async cancelDownload(downloadId: string) : Promise<Result<boolean, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("cancel_download", { downloadId }) };
@@ -97,6 +110,18 @@ async importGpx(path: string) : Promise<Result<string, string>> {
 async importPlt(path: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("import_plt", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * CJ-3: recursively import every GPX/PLT under a folder (per-date
+ * subfolders included). Per-file failures are reported, not fatal.
+ */
+async importTracksDirectory(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_tracks_directory", { path }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

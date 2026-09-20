@@ -30,11 +30,11 @@ const waypointsSource = readFileSync(
 );
 
 describe("Library Tracks tab — import / create-track affordances", () => {
-  it("calls importGpx via a handler", () => {
+  it("calls importGpx via the unified import handler", () => {
     expect(tracksSource).toContain("importGpx");
   });
 
-  it("calls importPlt via a handler", () => {
+  it("calls importPlt via the unified import handler", () => {
     expect(tracksSource).toContain("importPlt");
   });
 
@@ -50,12 +50,28 @@ describe("Library Tracks tab — import / create-track affordances", () => {
     expect(tracksSource).toContain("drawingPointCount");
   });
 
-  it("renders the GPX import button", () => {
-    expect(tracksSource).toContain("library-import-gpx");
+  it("renders ONE unified Import button instead of the twin GPX/PLT buttons", () => {
+    expect(tracksSource).toContain("library-import-tracks");
+    expect(tracksSource).not.toContain("library-import-gpx");
+    expect(tracksSource).not.toContain("library-import-plt");
   });
 
-  it("renders the PLT import button", () => {
-    expect(tracksSource).toContain("library-import-plt");
+  it("offers gpx, plt AND zip in the unified file filter (backend unpacks zip archives of gpx)", () => {
+    expect(tracksSource).toContain('extensions: ["gpx", "plt", "zip"]');
+  });
+
+  it("allows multi-select in the unified import dialog", () => {
+    expect(tracksSource).toContain("multiple: true");
+  });
+
+  it("routes .plt files to importPlt by extension", () => {
+    expect(tracksSource).toContain('endsWith(".plt")');
+  });
+
+  it("renders the Import folder button wired to the recursive backend import", () => {
+    expect(tracksSource).toContain("library-import-folder");
+    expect(tracksSource).toContain("importTracksDirectory");
+    expect(tracksSource).toContain("directory: true");
   });
 
   it("renders the Create Track button", () => {

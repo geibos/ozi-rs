@@ -32,8 +32,10 @@ describe("api.ts track-cleanup wrappers", () => {
     expect(apiSource).toMatch(
       /export async function cropTrackToExtent\([^)]*\): Promise<number>/s,
     );
-    expect(apiSource).toContain(
-      "commands.cropTrackToExtent(toIdNumber(layerId), toIdNumber(trackId), extent)",
+    // Whitespace-insensitive: prettier wraps the call across lines once the
+    // argument list exceeds the print width.
+    expect(apiSource).toMatch(
+      /commands\.cropTrackToExtent\(\s*toIdNumber\(layerId\),\s*toIdNumber\(trackId\),\s*extent,?\s*\)/,
     );
   });
 
@@ -41,8 +43,8 @@ describe("api.ts track-cleanup wrappers", () => {
     expect(apiSource).toMatch(
       /export async function cropTrackToTime\([^)]*from: string \| null,\s*to: string \| null,?\s*\): Promise<number>/s,
     );
-    expect(apiSource).toContain(
-      "commands.cropTrackToTime(toIdNumber(layerId), toIdNumber(trackId), from, to)",
+    expect(apiSource).toMatch(
+      /commands\.cropTrackToTime\(\s*toIdNumber\(layerId\),\s*toIdNumber\(trackId\),\s*from,\s*to,?\s*\)/,
     );
   });
 });

@@ -12,6 +12,15 @@
    * bar each have their own). The Tauri event listeners that populate
    * `appState`, `bundleProgress`, `downloadProgress`, and the catalog
    * stream live in `+layout.svelte` (single-owner rule).
+   *
+   * Interaction contract (owner feedback, 2026-07):
+   *   - Row click = PREVIEW only (`previewProject`): fetches the bundle's
+   *     map list without downloading anything.
+   *   - The explicit "Open bundle (download)" button in the maps column
+   *     starts the real download (`loadProject`).
+   *   - The projects column is a manual virtual list — the catalog holds
+   *     ~13k rows and a flat list of that many <button>s makes WebKit
+   *     drop clicks and blank out on scroll.
    */
   import { get } from "svelte/store";
   import { goto } from "$app/navigation";
@@ -20,7 +29,6 @@
     activeDownloadId,
     activeMap,
     busy,
-    currentDownload,
     currentProject,
     downloadProgress,
     downloadingMaps,
@@ -34,8 +42,10 @@
     loadProject,
     openLocalBundle,
     openSelectedMap,
+    previewProject,
     setBundlesRoot,
   } from "../lib/api";
+  import { t } from "../lib/i18n";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import { appendRecentFile } from "../lib/recentFiles";
@@ -64,28 +74,121 @@
     ),
   );
 
+  // ── Manual virtual list over `filtered` ─────────────────────────────
+  // Fixed row height (must match `.list-item.virtual-row` in the styles
+  // below), spacer div of totalHeight, only the visible range ±OVERSCAN
+  // rendered as absolutely-positioned rows. Scroll recompute is
+  // rAF-throttled; the window resets to the top on every filter change.
+  const ROW_HEIGHT = 28;
+  const OVERSCAN = 15;
+
+  let listEl = $state<HTMLDivElement | null>(null);
+  let scrollTop = $state(0);
+  let viewportHeight = $state(0);
+  let scrollRaf = 0;
+
+  function handleListScroll() {
+    if (scrollRaf !== 0) return;
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0;
+      scrollTop = listEl?.scrollTop ?? 0;
+    });
+  }
+
+  $effect(() => {
+    // Reset the scroll window whenever the filtered set changes — a stale
+    // offset past the new (shorter) list would render nothing.
+    void debouncedProjectFilter;
+    scrollTop = 0;
+    if (listEl) listEl.scrollTop = 0;
+  });
+
+  const totalHeight = $derived(filtered.length * ROW_HEIGHT);
+  const startIndex = $derived(
+    Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN),
+  );
+  const endIndex = $derived(
+    Math.min(
+      filtered.length,
+      Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + OVERSCAN,
+    ),
+  );
+  const visibleRows = $derived(
+    filtered.slice(startIndex, endIndex).map((project, i) => ({
+      project,
+      top: (startIndex + i) * ROW_HEIGHT,
+    })),
+  );
+
   async function handleRefresh() {
     projectsLoading.set(true);
     await loadProjects();
   }
 
-  async function handleSelectProject(slug: string) {
-    if (selectedSlug === slug && $activeDownloadId !== null) return;
-    selectedSlug = slug;
-    const previousId = $activeDownloadId;
-    const isSwitching = previousId !== null;
+  // ── Preview on row click ────────────────────────────────────────────
+  // `previewProject` fetches the map list only; the pending hint clears
+  // when the previewed project lands in `currentProject` (state-changed
+  // round-trip) or after a 15 s timeout, whichever comes first.
+  const PREVIEW_TIMEOUT_MS = 15_000;
+  let previewPendingName = $state<string | null>(null);
+  let previewTimer: ReturnType<typeof setTimeout> | null = null;
 
-    if (isSwitching) {
+  function clearPreviewPending() {
+    previewPendingName = null;
+    if (previewTimer !== null) {
+      clearTimeout(previewTimer);
+      previewTimer = null;
+    }
+  }
+
+  async function handleSelectProject(slug: string) {
+    selectedSlug = slug;
+    const name = $projects.find((p) => p.slug === slug)?.name ?? slug;
+    previewPendingName = name;
+    if (previewTimer !== null) clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      previewTimer = null;
+      previewPendingName = null;
+    }, PREVIEW_TIMEOUT_MS);
+    try {
+      await previewProject(slug);
+    } catch {
+      clearPreviewPending();
+    }
+  }
+
+  $effect(() => {
+    if (
+      previewPendingName !== null &&
+      $currentProject?.name === previewPendingName
+    ) {
+      clearPreviewPending();
+    }
+  });
+
+  $effect(() => {
+    return () => {
+      if (scrollRaf !== 0) cancelAnimationFrame(scrollRaf);
+      if (previewTimer !== null) clearTimeout(previewTimer);
+    };
+  });
+
+  // ── Explicit bundle download ────────────────────────────────────────
+  // Cancels any previous download before starting the new one (the
+  // backend never sees overlapping downloads), resets the transient
+  // progress stores, then records the new download_id.
+  async function handleOpenBundle() {
+    const slug = selectedSlug;
+    if (!slug) return;
+    const previousId = $activeDownloadId;
+    if (previousId !== null) {
       try {
         await cancelDownload(previousId);
       } catch {
-        // cancel failures should not block the switch
+        // cancel failures should not block the restart
       }
     }
-
-    downloadProgress.set(new Map());
-    currentDownload.set(null);
-
+    resetBundleDownloadState(null);
     try {
       const id = await loadProject(slug);
       activeDownloadId.set(id || null);
@@ -98,7 +201,7 @@
     try {
       await openSelectedMap(mapName);
     } catch (error) {
-      toast.error("Failed to open map", { description: String(error) });
+      toast.error($t("loader.openMapFailed"), { description: String(error) });
       return;
     }
     const am = get(activeMap);
@@ -144,7 +247,7 @@
 <div class="loader">
   <div class="col">
     <div class="col-header">
-      <span>Projects</span>
+      <span>{$t("loader.projects")}</span>
       <button onclick={handleRefresh} disabled={$busy} class="refresh-btn">
         {$busy ? "…" : "↻"}
       </button>
@@ -154,49 +257,81 @@
       <input
         class="filter-input"
         type="search"
-        placeholder="Filter…"
+        placeholder={$t("loader.filterPlaceholder")}
         bind:value={projectFilter}
       />
-      <span class="filter-count">
-        ({$projects.length})
-        {#if $projectsLoading}
-          <span class="spinner"></span>
-        {/if}
-      </span>
+      <span class="filter-count">({$projects.length})</span>
     </div>
 
-    <div class="list">
-      {#each filtered as p (p.slug)}
-        <button
-          class="list-item"
-          class:active={selectedSlug === p.slug}
-          onclick={() => handleSelectProject(p.slug)}>{p.name}</button
-        >
+    {#if $projectsLoading}
+      <div class="refresh-hint" data-testid="catalog-refreshing">
+        <span class="spinner"></span>
+        {$t("loader.refreshing")}
+      </div>
+    {/if}
+
+    <div
+      class="list virtual-list"
+      data-testid="project-virtual-list"
+      bind:this={listEl}
+      bind:clientHeight={viewportHeight}
+      onscroll={handleListScroll}
+    >
+      {#if filtered.length === 0}
+        <div class="empty">{$t("loader.noMatches")}</div>
       {:else}
-        <div class="empty">No matches</div>
-      {/each}
+        <div class="virtual-spacer" style={`height: ${totalHeight}px`}>
+          {#each visibleRows as row (row.project.slug)}
+            <button
+              class="list-item virtual-row"
+              class:active={selectedSlug === row.project.slug}
+              style={`top: ${row.top}px`}
+              onclick={() => handleSelectProject(row.project.slug)}
+            >
+              {row.project.name}
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <div class="col-footer">
       <button onclick={handleOpenLocalBundle} class="footer-btn">
-        Open local bundle…
+        {$t("loader.openLocalBundle")}
       </button>
       <button onclick={handleSetBundlesRoot} class="footer-btn muted">
-        Set bundles root…
+        {$t("loader.setBundlesRoot")}
       </button>
     </div>
   </div>
 
   <div class="col">
     <div class="col-header">
-      <span>Maps</span>
+      <span>{$t("loader.maps")}</span>
       {#if $currentProject}
         <span class="project-name">{$currentProject.name}</span>
       {/if}
     </div>
 
+    {#if $currentProject && !previewPendingName}
+      <div class="maps-actions">
+        <button
+          class="open-bundle-btn"
+          data-testid="open-bundle"
+          onclick={handleOpenBundle}
+        >
+          {$t("loader.openBundle")}
+        </button>
+      </div>
+    {/if}
+
     <div class="list">
-      {#if $currentProject}
+      {#if previewPendingName}
+        <div class="empty pending" data-testid="maps-pending">
+          <span class="spinner"></span>
+          {$t("loader.loadingMaps")}
+        </div>
+      {:else if $currentProject}
         {#each $currentProject.maps as m (m.name)}
           {@const isDownloading = $downloadingMaps.has(m.name)}
           {@const prog = $downloadProgress.get(m.name)}
@@ -216,7 +351,7 @@
                   {pct != null ? `${pct}%` : "…"}
                 </span>
               {:else if m.downloaded}
-                <span class="badge green">cached</span>
+                <span class="badge green">{$t("loader.cachedBadge")}</span>
               {:else}
                 <span class="badge orange">↓</span>
               {/if}
@@ -242,7 +377,7 @@
           </button>
         {/each}
       {:else}
-        <div class="empty">Select a project on the left</div>
+        <div class="empty">{$t("loader.selectProject")}</div>
       {/if}
     </div>
   </div>
@@ -334,10 +469,30 @@
     flex-shrink: 0;
   }
 
+  .refresh-hint {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px 4px;
+    font-size: 10px;
+    color: hsl(var(--muted-foreground));
+    flex-shrink: 0;
+  }
+
   .list {
     flex: 1;
     overflow-y: auto;
     padding: 2px 0;
+  }
+
+  .virtual-list {
+    position: relative;
+    padding: 0;
+  }
+
+  .virtual-spacer {
+    position: relative;
+    width: 100%;
   }
 
   .list-item {
@@ -356,6 +511,18 @@
     text-overflow: ellipsis;
   }
 
+  /* Fixed-height absolutely-positioned virtual row. The 28px height must
+     stay in sync with ROW_HEIGHT in the script block. */
+  .list-item.virtual-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 28px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+  }
+
   .list-item:hover {
     background: hsl(var(--secondary));
   }
@@ -363,6 +530,28 @@
     background: hsl(var(--border));
     color: hsl(var(--primary));
     font-weight: 500;
+  }
+
+  .maps-actions {
+    padding: 8px 10px;
+    border-bottom: 1px solid hsl(var(--secondary));
+    flex-shrink: 0;
+  }
+
+  .open-bundle-btn {
+    width: 100%;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    background: hsl(var(--primary));
+    color: hsl(var(--background));
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .open-bundle-btn:hover {
+    filter: brightness(1.1);
   }
 
   .map-item {
@@ -495,6 +684,13 @@
     font-size: 12px;
     color: hsl(var(--muted-foreground));
     text-align: center;
+  }
+
+  .empty.pending {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
   }
 
   @keyframes spin {

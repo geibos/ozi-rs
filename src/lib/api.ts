@@ -96,6 +96,17 @@ export async function loadProject(slug: string): Promise<string> {
 }
 
 /**
+ * Fetch a bundle's map list WITHOUT downloading anything. The backend
+ * updates `current_project` and emits `state-changed`; the maps column
+ * re-renders from the `currentProject` store. Works even while the
+ * project catalog itself is still refreshing. The actual download starts
+ * only via {@link loadProject} (the explicit "Open bundle" affordance).
+ */
+export async function previewProject(slug: string): Promise<void> {
+  await unwrap("preview_project", commands.previewProject(slug));
+}
+
+/**
  * Abort an in-flight bundle download. Returns `true` if the download was
  * known and a cancel signal was delivered; files already on disk remain
  * untouched and a subsequent {@link loadProject} for the same bundle will
@@ -131,6 +142,18 @@ export async function importGpx(path: string): Promise<string> {
 
 export async function importPlt(path: string): Promise<string> {
   return unwrap("import_plt", commands.importPlt(path));
+}
+
+/**
+ * Recursively import every GPX/PLT file under `path` (per-date subfolders
+ * included). Returns a human-readable summary string — per-file failures
+ * are folded into the summary, not thrown.
+ */
+export async function importTracksDirectory(path: string): Promise<string> {
+  return unwrap(
+    "import_tracks_directory",
+    commands.importTracksDirectory(path),
+  );
 }
 
 export async function exportGpx(layerId: bigint, path: string): Promise<void> {

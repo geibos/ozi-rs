@@ -104,6 +104,14 @@ export const projectsStore = writable<LizaProjectSummaryDto[]>(
 );
 export const projects = derived(projectsStore, ($projects) => $projects);
 export const projectsLoading = writable(false);
+// Route-independent clear for the "refreshing list…" hint: the catalog
+// refresh flips `lizaalert.busy` back to false on completion, which reaches
+// the frontend via `state-changed` → `appState.refresh()`. Clearing here
+// (instead of in a page-level effect) keeps the hint honest when the
+// BundleLoader is mounted inside the workspace Sheet on `/project`.
+appState.subscribe((s) => {
+  if (s && !s.busy) projectsLoading.set(false);
+});
 export const currentProject = derived(
   appState,
   ($s) => $s?.current_project ?? null,
@@ -245,7 +253,14 @@ export function appendProjectsChunk(chunk: LizaProjectSummaryDto[]) {
 }
 
 export function syncProjectsFromAppState(state: AppStateDto | null) {
-  projectsStore.set(state?.projects ?? []);
+  // Stale-while-revalidate guard: a null state (store not hydrated yet) or
+  // an empty backend list (catalog refresh still in flight on cold start)
+  // must NOT clobber the localStorage-seeded catalog — wiping it here made
+  // the loader render an empty list until the full network refresh landed,
+  // even though a perfectly clickable cached list was already available.
+  const incoming = state?.projects ?? [];
+  if (incoming.length === 0) return;
+  projectsStore.set(incoming);
 }
 
 // Per-package download progress: package_name → { downloaded, total? }
@@ -342,6 +357,42 @@ export const mapViewportBounds = writable<{
  * refresh without waiting for the `state-changed` round-trip.
  */
 export const tracksGeometryVersion = writable(0);
+/**
+ * One-shot "focus the map on this entity" request. Written by the Library
+ * track rows and the Track Inspector ("Show on map"); consumed by `MapView`,
+ * which fetches the track's points, calls `map.fitBounds(...)` over their
+ * bbox, and resets the store to `null`. The monotonically increasing `nonce`
+ * makes repeat clicks on the same track re-fire the effect.
+ */
+export type MapFocusRequest =
+  | { kind: "track"; layerId: bigint; trackId: bigint; nonce: number }
+  | { kind: "all-tracks"; nonce: number };
+
+export const mapFocusRequest = writable<MapFocusRequest | null>(null);
+
+let mapFocusNonce = 0;
+
+/** Request that MapView pans/zooms to fit the given track. */
+export function requestTrackFocus(layerId: bigint, trackId: bigint): void {
+  mapFocusNonce += 1;
+  mapFocusRequest.set({
+    kind: "track",
+    layerId,
+    trackId,
+    nonce: mapFocusNonce,
+  });
+}
+
+/**
+ * Request that MapView fits ALL track geometry into view. Fired after an
+ * import so freshly-added tracks are actually shown — otherwise they render
+ * off-screen (the camera stays wherever the active raster put it) and the
+ * user thinks the import failed.
+ */
+export function requestAllTracksFocus(): void {
+  mapFocusNonce += 1;
+  mapFocusRequest.set({ kind: "all-tracks", nonce: mapFocusNonce });
+}
 export const bundleLoaderOpen = writable(false);
 /**
  * Inspector-rail visibility placeholder for the `redesign-shell-layout`

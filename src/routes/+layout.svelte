@@ -12,6 +12,7 @@
     commandPaletteOpen,
     currentDownload,
     projectDirty,
+    projectsLoading,
     resetBundleDownloadState,
     updateDownloadProgress,
   } from "../lib/stores";
@@ -23,6 +24,7 @@
   import MapView from "../components/MapView.svelte";
   import CommandPalette from "../components/CommandPalette.svelte";
   import Console from "../components/Console.svelte";
+  import DownloadPopup from "../components/DownloadPopup.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import * as Tooltip from "$lib/components/ui/tooltip";
   import type {
@@ -81,9 +83,15 @@
 
       // Initial state pull + single-shot startup catalog load. The
       // listener above is already armed, so the `state-changed` emit
-      // that load_projects fires on completion is caught.
+      // that load_projects fires on completion is caught. The refresh is
+      // strictly background: the loader renders (and keeps clickable) the
+      // cache-seeded catalog immediately, with only the small
+      // "refreshing list…" hint while this runs.
       await appState.refresh();
-      loadProjects().catch(() => {});
+      projectsLoading.set(true);
+      loadProjects().catch(() => {
+        projectsLoading.set(false);
+      });
     })();
 
     // CJ-7 close guard: intercept a window close while the project has
@@ -197,6 +205,9 @@
 
   <Console />
   <CommandPalette />
+  <!-- Per-file bundle-download progress; fixed bottom-right, survives
+       route changes so downloads stay visible while the user works. -->
+  <DownloadPopup />
   <Toaster richColors closeButton position="bottom-right" />
 </Tooltip.Provider>
 

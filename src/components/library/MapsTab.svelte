@@ -3,25 +3,43 @@
    * Maps tab inside the LibraryRail. Lists the active project's maps with
    * the active map highlighted and cached vs non-cached maps badged.
    *
-   * The bundle-loader Sheet entry that previously sat in this tab's header
-   * was removed in `fix-redesign-visual-affordances` — the Maps tab body
-   * IS the in-project map-switching affordance; switching projects or
-   * loading new bundles is reached via the Cmd-K palette (Switch project
-   * group writes to `bundleLoaderOpen`) and the `/` cold-start route.
+   * Owner feedback (first hands-on session): "No maps in this project"
+   * with no visible way forward was a dead end. The tab now carries an
+   * explicit "Open project…" affordance — a small header button that is
+   * always visible, plus a prominent button inside the empty state. Both
+   * reuse the working bundle-loader mechanism from the Cmd-K palette's
+   * "Switch project" group: set `bundleLoaderOpen` and navigate to the
+   * `/` cold-start route where the loader Sheet lives.
    */
   import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
+  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
+  import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import {
     activeMap,
+    bundleLoaderOpen,
     currentProject,
     downloadingMaps,
     downloadProgress,
   } from "$lib/stores";
   import { openSelectedMap, revealBundle } from "$lib/api";
+  import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import LibraryRow from "./LibraryRow.svelte";
 
   const maps = $derived($currentProject?.maps ?? []);
+
+  /**
+   * Open the bundle loader — the same mechanism the command palette's
+   * "Switch project" action uses (`bundleLoaderOpen` + goto "/"). The `/`
+   * route hosts the loader Sheet; `bundleLoaderOpen` keeps it expanded.
+   */
+  function handleOpenProject() {
+    bundleLoaderOpen.set(true);
+    void goto(resolve("/"));
+  }
 
   function isActive(mapName: string): boolean {
     return $activeMap?.package_name === mapName;
@@ -45,10 +63,41 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col">
+  <header
+    class="border-border flex items-center justify-end border-b px-2 py-1.5"
+  >
+    <Button
+      variant="outline"
+      size="xs"
+      class="gap-1.5"
+      onclick={handleOpenProject}
+      data-testid="maps-open-project"
+    >
+      <FolderOpenIcon class="size-3.5" />
+      {$t("mapsTab.openProject")}
+    </Button>
+  </header>
   <div class="flex-1 overflow-y-auto py-1">
     {#if maps.length === 0}
-      <div class="text-muted-foreground p-3 text-center text-xs">
-        No maps in this project
+      <div
+        class="flex flex-col items-center gap-3 p-6 text-center"
+        data-testid="maps-empty-state"
+      >
+        <p class="text-muted-foreground text-xs">
+          {$t("mapsTab.empty")}
+        </p>
+        <p class="text-muted-foreground/70 text-[11px] leading-snug">
+          {$t("mapsTab.emptyHint")}
+        </p>
+        <Button
+          size="sm"
+          class="gap-2"
+          onclick={handleOpenProject}
+          data-testid="maps-empty-open-project"
+        >
+          <FolderOpenIcon class="size-4" />
+          {$t("mapsTab.openProject")}
+        </Button>
       </div>
     {:else}
       {#each maps as m (m.name)}

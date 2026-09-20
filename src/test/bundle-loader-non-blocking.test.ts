@@ -9,16 +9,16 @@ import { join } from "path";
 // component.
 const loaderSource = readFileSync(
   join(__dirname, "../components/BundleLoader.svelte"),
-  "utf-8"
+  "utf-8",
 );
 const pageSource = readFileSync(
   join(__dirname, "../routes/+page.svelte"),
-  "utf-8"
+  "utf-8",
 );
 const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
 const commandsSource = readFileSync(
   join(__dirname, "../../src-tauri/src/commands/mod.rs"),
-  "utf-8"
+  "utf-8",
 );
 
 /**
@@ -33,7 +33,7 @@ const commandsSource = readFileSync(
 describe("bundle loader main-thread responsiveness", () => {
   it("backend load_project returns a download_id immediately and spawns the work async", () => {
     expect(commandsSource).toMatch(
-      /pub fn load_project\([^)]*\)\s*->\s*Result<String,\s*String>/m
+      /pub fn load_project\([^)]*\)\s*->\s*Result<String,\s*String>/m,
     );
     expect(commandsSource).toContain("tauri::async_runtime::spawn");
     expect(commandsSource).toContain("uuid::Uuid::new_v4()");
@@ -43,13 +43,20 @@ describe("bundle loader main-thread responsiveness", () => {
 
   it("loadProject API wrapper returns the download_id string", () => {
     expect(apiSource).toMatch(
-      /export async function loadProject\(slug: string\):\s*Promise<string>/
+      /export async function loadProject\(slug: string\):\s*Promise<string>/,
     );
   });
 
-  it("handleSelectProject cancels any active download before starting a new one", () => {
+  it("open-bundle cancels any active download before starting a new one (row click only previews)", () => {
+    // Since the preview slice, the download entry point is the explicit
+    // "Open bundle (download)" button (handleOpenBundle), not the row
+    // click (handleSelectProject → previewProject). The cancel-before-
+    // restart contract moved with it.
     expect(loaderSource).toMatch(
-      /async\s+function\s+handleSelectProject\(slug:\s*string\)\s*\{/
+      /async\s+function\s+handleSelectProject\(slug:\s*string\)\s*\{/,
+    );
+    expect(loaderSource).toMatch(
+      /async\s+function\s+handleOpenBundle\(\)\s*\{/,
     );
     expect(loaderSource).toMatch(/await\s+cancelDownload\(/);
     expect(loaderSource).toMatch(/loadProject\(slug\)/);
@@ -61,10 +68,10 @@ describe("bundle loader main-thread responsiveness", () => {
     // button keeps its `disabled={$busy}` because that path duplicates an
     // in-flight loadProjects call.
     expect(loaderSource).not.toMatch(
-      /class="list-item"[^>]*disabled=\{\$busy\}/
+      /class="list-item[^"]*"[^>]*disabled=\{\$busy\}/,
     );
     expect(loaderSource).toMatch(
-      /onclick=\{handleRefresh\}[^>]*disabled=\{\$busy\}/
+      /onclick=\{handleRefresh\}[^>]*disabled=\{\$busy\}/,
     );
   });
 
@@ -78,7 +85,7 @@ describe("bundle loader main-thread responsiveness", () => {
   it("download lifecycle state lives in stores so sibling panels stay reactive", () => {
     const storesSource = readFileSync(
       join(__dirname, "../lib/stores.ts"),
-      "utf-8"
+      "utf-8",
     );
     expect(storesSource).toContain("activeDownloadId");
     expect(storesSource).toContain("resetBundleDownloadState");

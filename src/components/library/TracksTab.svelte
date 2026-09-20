@@ -2,12 +2,16 @@
   /**
    * Tracks tab inside the LibraryRail. Lists every track in the active
    * project across all track layers; header carries the active-track-layer
-   * `Select`.
+   * `Select`, a single "Import…" button (GPX/PLT/ZIP, multi-select, routed
+   * by extension — owner feedback: the twin import icon buttons were
+   * indistinguishable), and an "Import folder…" button for recursive
+   * directory import (per-date subfolders included).
    *
    * Each row exposes: visibility toggle, color swatch popover, name (double
-   * click to rename), distance/duration/point-count subline, and a `⋯`
-   * actions menu with Export GPX, Export PLT, Set line width, Simplify…,
-   * Delete.
+   * click to rename), distance/duration/point-count subline, a "Show on
+   * map" locate button (writes `mapFocusRequest`; MapView fits the bounds),
+   * and a `⋯` actions menu with Export GPX, Export PLT, Set line width,
+   * Simplify…, Delete.
    *
    * Clicking a row whose owning layer is not the current active layer
    * switches the active layer first (see `layers` capability extension).
@@ -30,6 +34,8 @@
     drawingTrackId,
     drawingTrackLayerId,
     editModeActive,
+    requestTrackFocus,
+    requestAllTracksFocus,
     selectedTrack,
     simplifyState,
   } from "$lib/stores";
@@ -44,6 +50,7 @@
     getTracksGeojson,
     importGpx,
     importPlt,
+    importTracksDirectory,
     renameTrack,
     setTrackColor,
     setTrackLineWidth,
@@ -53,9 +60,12 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import UploadIcon from "@lucide/svelte/icons/upload";
+  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
+  import LocateIcon from "@lucide/svelte/icons/locate";
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import CheckIcon from "@lucide/svelte/icons/check";
   import { isOkStandardTrackName } from "$lib/track-names";
+  import { t as i18n } from "$lib/i18n";
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
 
@@ -81,6 +91,13 @@
   const trackLayers = $derived($appState?.track_layers ?? []);
   const trackLayerSelectValue = $derived(
     $activeTrackLayerId !== null ? $activeTrackLayerId.toString() : "",
+  );
+  // Import-created layers are named after the source path ("Imported
+  // tracks: /very/long/path.gpx") — the trigger text must truncate, not
+  // overflow the 280px rail; `title` keeps the full name reachable.
+  const activeTrackLayerName = $derived(
+    trackLayers.find((l) => String(l.id) === trackLayerSelectValue)?.name ??
+      null,
   );
 
   $effect(() => {
@@ -211,33 +228,90 @@
     if (path) await exportTrackPlt(t.layerId, t.trackId, path as string);
   }
 
-  async function handleImportGpx() {
+  /** Strip directories from a path for compact failure reporting. */
+  function baseName(path: string): string {
+    const parts = path.split(/[\\/]/);
+    return parts[parts.length - 1] || path;
+  }
+
+  /**
+   * Single "Import…" entry point. One dialog with a combined GPX/PLT/ZIP
+   * filter (`.zip` because the backend GPX importer unpacks zip archives
+   * of gpx — the old twin-button UI wrongly hid that), `multiple: true`.
+   * Routing by extension: `.plt` → importPlt, `.gpx` / `.zip` → importGpx.
+   * Files import sequentially; per-file failures are collected and the
+   * outcome is reported in ONE summary toast.
+   */
+  async function handleImport() {
     try {
-      const path = await open({
-        multiple: false,
+      const selection = await open({
+        multiple: true,
         directory: false,
-        filters: [{ name: "GPX", extensions: ["gpx"] }],
+        filters: [
+          {
+            name: $i18n("tracksTab.importFilterName"),
+            extensions: ["gpx", "plt", "zip"],
+          },
+        ],
       });
-      if (path) {
-        await importGpx(path as string);
+      if (!selection) return;
+      const paths = (
+        Array.isArray(selection) ? selection : [selection]
+      ) as string[];
+
+      let imported = 0;
+      const failed: string[] = [];
+      for (const path of paths) {
+        try {
+          if (path.toLowerCase().endsWith(".plt")) {
+            await importPlt(path);
+          } else {
+            await importGpx(path);
+          }
+          imported += 1;
+        } catch (err) {
+          console.error("Failed to import track file", path, err);
+          failed.push(baseName(path));
+        }
+      }
+
+      const summary = $i18n("tracksTab.importDone")
+        .replace("{count}", String(imported))
+        .replace("{total}", String(paths.length));
+      if (imported > 0) requestAllTracksFocus();
+      if (failed.length === 0) {
+        toast.success(summary);
+      } else {
+        toast.error(summary, {
+          description: $i18n("tracksTab.importFailedFiles").replace(
+            "{files}",
+            failed.join(", "),
+          ),
+        });
       }
     } catch (err) {
-      toast.error("Failed to import GPX", { description: String(err) });
+      toast.error($i18n("tracksTab.importFailed"), {
+        description: String(err),
+      });
     }
   }
 
-  async function handleImportPlt() {
+  /**
+   * "Import folder…" — field archives arrive as a directory with per-date
+   * subfolders. The backend command walks it recursively and returns a
+   * human-readable summary string (per-file failures folded in).
+   */
+  async function handleImportFolder() {
     try {
-      const path = await open({
-        multiple: false,
-        directory: false,
-        filters: [{ name: "PLT", extensions: ["plt"] }],
-      });
-      if (path) {
-        await importPlt(path as string);
-      }
+      const dir = await open({ directory: true, multiple: false });
+      if (!dir) return;
+      const summary = await importTracksDirectory(dir as string);
+      requestAllTracksFocus();
+      toast.success(summary);
     } catch (err) {
-      toast.error("Failed to import PLT", { description: String(err) });
+      toast.error($i18n("tracksTab.importFolderFailed"), {
+        description: String(err),
+      });
     }
   }
 
@@ -350,44 +424,22 @@
             aria-label="Track layer"
             size="sm"
             class="min-w-0 flex-1"
+            title={activeTrackLayerName}
           >
-            {trackLayers.find((l) => String(l.id) === trackLayerSelectValue)
-              ?.name ?? "Pick layer"}
+            <span class="min-w-0 flex-1 truncate text-left">
+              {activeTrackLayerName ?? "Pick layer"}
+            </span>
           </Select.Trigger>
-          <Select.Content>
+          <Select.Content class="max-w-72">
             {#each trackLayers as layer (layer.id)}
               <Select.Item value={String(layer.id)} label={layer.name}>
-                {layer.name}
+                <span class="min-w-0 truncate" title={layer.name}>
+                  {layer.name}
+                </span>
               </Select.Item>
             {/each}
           </Select.Content>
         </Select.Root>
-
-        <Tooltip.Root>
-          <Tooltip.Trigger
-            class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-            aria-label="Import GPX"
-            disabled={$drawingModeActive || $activeTrackLayerId === null}
-            onclick={handleImportGpx}
-            data-testid="library-import-gpx"
-          >
-            <UploadIcon strokeWidth={1.5} />
-          </Tooltip.Trigger>
-          <Tooltip.Content>Import GPX</Tooltip.Content>
-        </Tooltip.Root>
-
-        <Tooltip.Root>
-          <Tooltip.Trigger
-            class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-            aria-label="Import PLT"
-            disabled={$drawingModeActive || $activeTrackLayerId === null}
-            onclick={handleImportPlt}
-            data-testid="library-import-plt"
-          >
-            <UploadIcon strokeWidth={1.5} />
-          </Tooltip.Trigger>
-          <Tooltip.Content>Import PLT</Tooltip.Content>
-        </Tooltip.Root>
 
         <Tooltip.Root>
           <Tooltip.Trigger
@@ -416,6 +468,31 @@
               : "Create track"}
           </Tooltip.Content>
         </Tooltip.Root>
+      </div>
+
+      <div class="mt-1.5 flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="xs"
+          class="min-w-0 flex-1 justify-center gap-1.5"
+          disabled={$drawingModeActive || $activeTrackLayerId === null}
+          onclick={handleImport}
+          data-testid="library-import-tracks"
+        >
+          <UploadIcon class="size-3.5" strokeWidth={1.5} />
+          <span class="truncate">{$i18n("tracksTab.import")}</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="xs"
+          class="min-w-0 flex-1 justify-center gap-1.5"
+          disabled={$drawingModeActive || $activeTrackLayerId === null}
+          onclick={handleImportFolder}
+          data-testid="library-import-folder"
+        >
+          <FolderOpenIcon class="size-3.5" strokeWidth={1.5} />
+          <span class="truncate">{$i18n("tracksTab.importFolder")}</span>
+        </Button>
       </div>
     {/if}
   </header>
@@ -456,7 +533,7 @@
           {#snippet nameSuffix()}
             {#if !isOkStandardTrackName(t.name)}
               <span class="text-[10px] leading-tight text-yellow-500">
-                Use YYYYMMDD_Callsign
+                {$i18n("tracksTab.nameHint")}
               </span>
             {/if}
           {/snippet}
@@ -471,6 +548,19 @@
                 t.pointCount,
               )}
             </span>
+          {/snippet}
+          {#snippet trailingControl()}
+            <Tooltip.Root>
+              <Tooltip.Trigger
+                class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"
+                aria-label={$i18n("track.showOnMap")}
+                onclick={() => requestTrackFocus(t.layerId, t.trackId)}
+                data-testid="track-show-on-map"
+              >
+                <LocateIcon class="size-3.5" strokeWidth={1.5} />
+              </Tooltip.Trigger>
+              <Tooltip.Content>{$i18n("track.showOnMap")}</Tooltip.Content>
+            </Tooltip.Root>
           {/snippet}
           {#snippet actions()}
             <DropdownMenu.Item onSelect={() => handleExportGpx(t)}>

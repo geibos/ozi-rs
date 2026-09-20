@@ -234,6 +234,24 @@ impl AppState {
         Some(self.bundles_root.clone())
     }
 
+    /// Preview lookup: summary + bundles root WITHOUT the busy gate — a
+    /// preview is read-only and must work even while the catalog is still
+    /// streaming in (otherwise a click during startup silently no-ops).
+    pub fn preview_data(&mut self, project_slug: &str) -> Option<(LizaProjectSummary, PathBuf)> {
+        let summary = self
+            .lizaalert
+            .projects
+            .iter()
+            .find(|p| p.slug == project_slug)
+            .cloned()?;
+        self.lizaalert.selected_project_slug = Some(summary.slug.clone());
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!("Loading maps: {}", summary.name),
+        );
+        Some((summary, self.bundles_root.clone()))
+    }
+
     /// Returns `None` if busy or project slug not found; otherwise returns data needed for thread.
     pub fn begin_load_project(
         &mut self,
@@ -615,6 +633,14 @@ impl AppState {
                 self.update_status(DiagnosticLevel::Error, format!("Open failed: {error}"));
             }
         }
+    }
+
+    /// CJ-3: recursive folder import (10-Tracks convention).
+    pub fn import_tracks_directory(
+        &mut self,
+        dir: std::path::PathBuf,
+    ) -> Result<import::DirectoryImportReport, String> {
+        import::import_tracks_directory_into_project(&mut self.project, &mut self.history, &dir)
     }
 
     pub fn import_gpx_file(
@@ -1580,10 +1606,6 @@ fn reveal_in_file_manager(path: &std::path::Path) {
 mod tests {
     use super::*;
 
-    /// CJ-7: the dirty flag must reflect EVERY class of project mutation —
-    /// undoable commands (via CommandStack), undo/redo themselves, and the
-    /// non-undoable style setters that bypass the stack (ADR-0017) — and
-    /// clear on save. A missed site here means the close-guard lies.
     #[test]
     fn project_dirty_tracks_all_mutation_classes_and_clears_on_save() {
         let dir = tempfile::tempdir().expect("tempdir");

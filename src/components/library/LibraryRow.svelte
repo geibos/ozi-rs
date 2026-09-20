@@ -17,6 +17,9 @@
    *   - `subline` snippet — optional second line (Tracks distance/duration/pts).
    *   - `nameSuffix` snippet — optional inline-after-name slot (e.g. the
    *     OK-name warning).
+   *   - `trailingControl` snippet — optional per-row inline button rendered
+   *     between the name cell and the `⋯` actions menu (e.g. the Tracks
+   *     "Show on map" locate button).
    *
    * The visibility toggle, leading control, and actions slot stop event
    * propagation so the body-click `onSelect` does not fire when interacting
@@ -41,6 +44,7 @@
     actions,
     subline,
     nameSuffix,
+    trailingControl,
   }: {
     name: string;
     visible: boolean;
@@ -53,6 +57,7 @@
     actions?: Snippet;
     subline?: Snippet;
     nameSuffix?: Snippet;
+    trailingControl?: Snippet;
   } = $props();
 
   let editing = $state(false);
@@ -170,6 +175,17 @@
       {/if}
     {/if}
   </div>
+
+  <!-- optional inline trailing control (e.g. "Show on map") -->
+  {#if trailingControl}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <span
+      class="flex shrink-0 items-center"
+      onclick={(e) => e.stopPropagation()}
+    >
+      {@render trailingControl()}
+    </span>
+  {/if}
 
   <!-- actions menu -->
   {#if actions}

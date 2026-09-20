@@ -77,6 +77,10 @@
       : null,
   );
 
+  const statusText = $derived(
+    transientStatus ?? $bundleProgress?.message ?? $status ?? "",
+  );
+
   const currentFileLabel = $derived.by(() => {
     const c = $currentDownload;
     if (!c) return null;
@@ -93,7 +97,7 @@
       {#if $busy || transientStatus}
         <span class="spinner"></span>
       {/if}
-      <span class="status-text">{transientStatus ?? $bundleProgress?.message ?? $status ?? ""}</span>
+      <span class="status-text" title={statusText}>{statusText}</span>
     </div>
 
     <div class="current-file-slot">
@@ -155,7 +159,10 @@
     flex-shrink: 0;
     height: var(--bundle-status-bar-height);
     display: grid;
-    grid-template-columns: 1fr auto;
+    /* minmax(0, …): a bare 1fr track's min-size is `auto`, so a long
+       nowrap status line ("Imported …") used to push the grid wider than
+       the window instead of truncating. */
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "status-line   actions"
       "current-file  actions"

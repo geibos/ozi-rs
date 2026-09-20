@@ -86,6 +86,22 @@ pub fn import_gpx_file_into_project(
     history: &mut CommandStack,
     path: &Path,
 ) -> Result<ArchiveImportReport, ArchiveImportError> {
+    // A .zip lands here from the unified Import dialog: route it to the
+    // archive importer (which extracts every .gpx inside) instead of trying
+    // to parse the zip bytes as GPX XML.
+    let is_zip = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("zip"));
+    if is_zip {
+        let file = std::fs::File::open(path).map_err(|source| {
+            ArchiveImportError::GpxImport(ArchivedGpxImportError::ReadArchiveEntryBytes {
+                path: path.display().to_string(),
+                source,
+            })
+        })?;
+        return import_gpx_archive_into_project(project, history, std::io::BufReader::new(file));
+    }
     let import = import_gpx_file(path)?;
     let mut report = ArchiveImportReport::new();
     apply_gpx_import(project, history, import, &mut report)?;
@@ -204,4 +220,186 @@ fn next_layer_id(project: &Project) -> LayerId {
         + 1;
 
     LayerId::new(next)
+}
+
+/// Result of a recursive folder import (CJ-3: the field convention is a
+/// `10-Tracks/` folder with per-date subfolders of GPX/PLT files).
+#[derive(Debug)]
+pub struct DirectoryImportReport {
+    pub imported_files: usize,
+    pub imported_tracks: usize,
+    pub imported_waypoints: usize,
+    /// Files that failed to import, with the reason. A single bad file must
+    /// never abort the rest of the folder.
+    pub skipped: Vec<(std::path::PathBuf, String)>,
+}
+
+/// Recursively import every `.gpx` / `.plt` under `dir` (case-insensitive
+/// extensions, deterministic sorted order). Per-file failures are collected
+/// into the report instead of aborting. Errors only when the directory is
+/// unreadable or contains no candidate files at all.
+pub fn import_tracks_directory_into_project(
+    project: &mut Project,
+    history: &mut CommandStack,
+    dir: &Path,
+) -> Result<DirectoryImportReport, String> {
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    collect_track_files(dir, &mut candidates)
+        .map_err(|e| format!("cannot read folder {}: {e}", dir.display()))?;
+    candidates.sort();
+    if candidates.is_empty() {
+        return Err(format!(
+            "no .gpx or .plt files found under {}",
+            dir.display()
+        ));
+    }
+
+    let mut report = DirectoryImportReport {
+        imported_files: 0,
+        imported_tracks: 0,
+        imported_waypoints: 0,
+        skipped: Vec::new(),
+    };
+    for path in candidates {
+        let extension = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase)
+            .unwrap_or_default();
+        let outcome = match extension.as_str() {
+            "gpx" => import_gpx_file_into_project(project, history, &path)
+                .map(|r| (r.imported_tracks(), r.imported_waypoints()))
+                .map_err(|e| e.to_string()),
+            "plt" => import_plt_file_into_project(project, history, &path)
+                .map(|r| (r.imported_tracks(), r.imported_waypoints()))
+                .map_err(|e| e.to_string()),
+            _ => unreachable!("collect_track_files only yields gpx/plt"),
+        };
+        match outcome {
+            Ok((tracks, waypoints)) => {
+                report.imported_files += 1;
+                report.imported_tracks += tracks;
+                report.imported_waypoints += waypoints;
+            }
+            Err(reason) => report.skipped.push((path, reason)),
+        }
+    }
+    Ok(report)
+}
+
+fn collect_track_files(
+    dir: &Path,
+    into: &mut Vec<std::path::PathBuf>,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            // A broken subfolder should not kill the whole walk.
+            let _ = collect_track_files(&path, into);
+            continue;
+        }
+        let is_track = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| e.eq_ignore_ascii_case("gpx") || e.eq_ignore_ascii_case("plt"));
+        if is_track {
+            into.push(path);
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod directory_import_tests {
+    use super::*;
+    use crate::domain::{LayerId, TrackLayer, WaypointLayer};
+
+    const MINIMAL_GPX: &str = r#"<?xml version="1.0"?>
+<gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>20260709-ЛИСА15</name><trkseg>
+    <trkpt lat="55.0" lon="37.0"></trkpt>
+    <trkpt lat="55.1" lon="37.1"></trkpt>
+  </trkseg></trk>
+</gpx>"#;
+
+    fn project_with_default_layers() -> Project {
+        let mut project = Project::untitled();
+        project.add_track_layer(TrackLayer::new(LayerId::new(1), "Tracks"));
+        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(1), "Waypoints"));
+        project
+    }
+
+    #[test]
+    fn imports_recursively_and_skips_broken_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let by_date = dir.path().join("20260709");
+        std::fs::create_dir_all(&by_date).expect("subdir");
+        std::fs::write(by_date.join("a.gpx"), MINIMAL_GPX).expect("gpx a");
+        std::fs::write(by_date.join("b.GPX"), MINIMAL_GPX).expect("gpx b uppercase");
+        std::fs::write(by_date.join("broken.gpx"), "not xml at all").expect("broken");
+        std::fs::write(dir.path().join("notes.txt"), "ignore me").expect("txt");
+
+        let mut project = project_with_default_layers();
+        let mut history = CommandStack::default();
+        let report =
+            import_tracks_directory_into_project(&mut project, &mut history, dir.path())
+                .expect("directory import succeeds");
+
+        assert_eq!(report.imported_files, 2, "two valid gpx files");
+        assert_eq!(report.imported_tracks, 2);
+        assert_eq!(report.skipped.len(), 1, "broken file skipped, not fatal");
+        assert!(report.skipped[0].0.ends_with("broken.gpx"));
+    }
+
+    #[test]
+    fn errors_when_folder_has_no_track_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("readme.txt"), "x").expect("txt");
+
+        let mut project = project_with_default_layers();
+        let mut history = CommandStack::default();
+        let result =
+            import_tracks_directory_into_project(&mut project, &mut history, dir.path());
+        assert!(result.is_err(), "no candidates must be a clear error");
+    }
+}
+
+#[cfg(test)]
+mod zip_routing_tests {
+    use super::*;
+    use crate::domain::{LayerId, TrackLayer, WaypointLayer};
+    use std::io::Write;
+
+    const MINIMAL_GPX: &str = r#"<?xml version="1.0"?>
+<gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>20260709-ЛИСА15</name><trkseg>
+    <trkpt lat="55.0" lon="37.0"></trkpt>
+    <trkpt lat="55.1" lon="37.1"></trkpt>
+  </trkseg></trk>
+</gpx>"#;
+
+    /// The unified Import dialog sends .zip through the same command as
+    /// .gpx - the file importer must route archives, not parse them as XML.
+    #[test]
+    fn import_gpx_file_routes_zip_archives() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let zip_path = dir.path().join("tracks.zip");
+        let file = std::fs::File::create(&zip_path).expect("create zip");
+        let mut writer = zip::ZipWriter::new(file);
+        writer
+            .start_file::<_, ()>("20260709/a.gpx", zip::write::FileOptions::default())
+            .expect("start entry");
+        writer.write_all(MINIMAL_GPX.as_bytes()).expect("write entry");
+        writer.finish().expect("finish zip");
+
+        let mut project = Project::untitled();
+        project.add_track_layer(TrackLayer::new(LayerId::new(1), "Tracks"));
+        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(1), "Waypoints"));
+        let mut history = CommandStack::default();
+
+        let report = import_gpx_file_into_project(&mut project, &mut history, &zip_path)
+            .expect("zip routed to archive importer");
+        assert_eq!(report.imported_tracks(), 1);
+    }
 }
