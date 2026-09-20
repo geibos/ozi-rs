@@ -28,7 +28,7 @@
     "felte": "^1.3.0",
     "geist": "^1.7.1",
     "lucide-svelte": "^1.0.1",
-    "maplibre-gl": "^4",
+    "maplibre-gl": "^6",
     "mode-watcher": "^1.1.0",
     "svelte-sonner": "^1.1.1",
     "tailwind-merge": "^3.6.0",
@@ -38,7 +38,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.60.1",
+    "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^5",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.3.0",
@@ -60,6 +60,6 @@
     "typescript": "^5",
     "typescript-eslint": "^8.59.3",
     "vite": "^6",
-    "vitest": "^4.1.2"
+    "vitest": "^5.0.1"
   }
 }
