@@ -103,7 +103,7 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Install OpenSpec CLI
-        run: npm install -g @fission-ai/openspec
+        run: npm install -g @fission-ai/openspec@1.13.1
 
       - name: Validate all active changes (strict)
         run: |
@@ -159,8 +159,8 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: npm audit (prod deps, level=high)
-        run: npm audit --omit=dev --audit-level=high
+      - name: npm audit gate (prod deps, high+; documented waivers)
+        run: node scripts/npm-audit-gate.mjs
 
   tauri-build-smoke:
     name: Tauri smoke build (${{ matrix.os }})

@@ -81,7 +81,7 @@ To render a 256×256 Web Mercator tile the backend SHALL project the tile's corn
 
 The system SHALL register a `sqlite://` MapLibre protocol handler that resolves tile URLs of the form `sqlite://<path>/<base_zoom>/{z}/{x}/{y}` by querying the LizaAlert `.sqlitedb` tile database at `<path>` synchronously on each request. The database schema is `tiles(x, y, z, image)` plus `info(minzoom, maxzoom)`. The handler SHALL map the web zoom to the database zoom as `db_z = db_min + (base_zoom - web_z)` (database zoom 0 is the most detailed level, `base_zoom` is the web zoom that corresponds to it) and SHALL pass `x` and `y` through unchanged; no row inversion is applied. Web zooms outside `[base_zoom - (db_max - db_min), base_zoom]` SHALL be rejected as out of range.
 
-#### Scenario: Topo tile request
+#### Scenario: Topo MBTiles tile request
 
 - **WHEN** MapLibre requests `sqlite://<bundle>/15/13/{x}/{y}` for a bundle whose `info` table reports `minzoom = 0`, `maxzoom = 4`
 - **THEN** the backend runs `SELECT image FROM tiles WHERE x=? AND y=? AND z=2` with the requested `x`, `y` and returns the stored image bytes
