@@ -1,7 +1,17 @@
 # layers Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers how a `Project` is composed of `MapLayer`, `TrackLayer` and `WaypointLayer` entities, how one track layer and one waypoint layer are designated active for editing, the invariant that an open project always has both kinds of layer with non-null active IDs, and the rule that changing the active layer never hides, unloads or mutates other layers. Layer identity, visibility and composition are domain data; the active-layer choice is routing state exposed through `AppStateDto`.
+
+### Decision history
+
+- ADR-0001 (2026-03-22, accepted): four-layer architecture with pure domain entities and all edits flowing through explicit commands; rationale: keep the core model testable and free of UI state. Codified as: "Project is composed of independent map, track, and waypoint layers" (layers are domain entities, not UI groupings); the layering rule itself lives in the `architecture` capability.
+- ADR-0013 (2026-03-29, accepted): `TrackStyle` — including the per-track `visible` flag — is stored on the `Track` entity; rationale: user-authored styling must survive save/load and export. Codified as: the per-item visibility flags relied on by "Selecting an active layer is non-destructive"; the entity rule is "`TrackStyle` is part of the `Track` domain entity" in the `architecture` capability.
+- ADR-0014 (2026-03-23, accepted): `LayerId(u64)` is an opaque `#[serde(transparent)]` newtype assigned by the caller (`next_layer_id` = max + 1 over all layers, `src-tauri/src/application/import.rs:199`); rationale: compile-time separation of ID kinds and flat JSON. Codified as: "Active layer IDs are non-null whenever a project is open" (IDs are plain integers on the wire); the ID rule is "Domain identifiers are opaque u64 newtypes assigned by callers" in the `architecture` capability.
+- bootstrap-current-state (2026-05, archived): captured "Project is composed of independent map, track, and waypoint layers", "One track layer and one waypoint layer are designated as active", "Backend exposes layer summaries to the UI", "Selecting an active layer is non-destructive".
+- auto-create-default-layers (2026-05-20, archived): added "An open project always contains at least one track layer and one waypoint layer" and "Active layer IDs are non-null whenever a project is open"; rationale: fresh projects must accept a first track or waypoint without a null-ID early return.
+- fix-non-destructive-waypoint-rendering (archived): extended "Selecting an active layer is non-destructive" with the waypoint-layer scenarios.
+- redesign-library-sidebar (2026-05-26, archived): added "Selecting a Library row activates the row's owning layer".
 ## Requirements
 ### Requirement: Project is composed of independent map, track, and waypoint layers
 

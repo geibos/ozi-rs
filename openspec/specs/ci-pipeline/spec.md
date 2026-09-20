@@ -2,7 +2,13 @@
 
 ## Purpose
 
-Define the automated quality gates and release pipeline that protect `main` and produce distributable artifacts. Covers the GitHub Actions workflows (`ci.yml`, `release.yml`), the cross-platform smoke build matrix, the OpenSpec / security audit gates, the pinned Rust + Node toolchains, the audit-ignore policy, and the documentation contract for keeping CI behavior reproducible between local and runner environments.
+Define the automated quality gates and release pipeline that protect `main` and produce distributable artifacts. Covers the GitHub Actions workflows (`ci.yml`, `release.yml`), the cross-platform smoke build matrix, the OpenSpec / security audit gates, the pinned Rust + Node toolchains, the audit-ignore policy, and the documentation contract for keeping CI behavior reproducible between local and runner environments. Desktop-integration (Appium Mac2) smoke is deliberately outside CI: it runs locally through `just smoke` and is gated by the agent workflow, not by a runner.
+
+### Decision history
+
+- change `add-github-ci` (archived 2026-05-17, implemented): introduce a GitHub Actions workflow with fmt / clippy / check / test / lint / OpenSpec / cross-platform smoke-build gates, security audits, a tag-triggered draft release and pinned toolchains; rationale: local `just ci` and the runner must apply the same gates so a PR cannot merge in a state the repository cannot rebuild. Codified as: Continuous integration pipeline on pull requests and main, Dependency security audit, Release workflow for tagged versions, Reproducible toolchain pinning, CI documentation.
+- `docs/superpowers/specs/2026-04-28-qa-debug-process-design.md` §"CI gate (Future, not now)" (2026-04-28, design accepted): the Appium smoke workflow becomes a required PR check only after automated tests cover the high-risk features and a Mac runner is budgeted; rationale: Appium Mac2 reliability is moderate and a flaky required check would erode trust in the gate. Not codified because: still deferred; `revive-ui-cycle` keeps `just ci` GUI-free (build-tooling) and runs the smoke suite once per session locally (agent-workflow).
+- ADR-0024 (2026-04-28, accepted; wording narrowed by ADR-0025 in `revive-ui-cycle`): Playwright is not evidence for desktop integration, so a browser run in CI can never stand in for the Appium gate; rationale: the browser bypasses Tauri IPC, custom protocols and window lifecycle. Codified as: (revive-ui-cycle) CI verifies fixtures and the screenshot baseline — CI's only Playwright use is the stand's screenshot matrix, and the CI recipe stays GUI-free.
 
 ## Requirements
 ### Requirement: Continuous integration pipeline on pull requests and main

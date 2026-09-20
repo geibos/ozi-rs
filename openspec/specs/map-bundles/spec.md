@@ -1,7 +1,14 @@
 # map-bundles Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers the map bundle as a unit of storage separate from the project: what a bundle directory contains, where bundles live (the bundles root and its per-bundle subdirectories), how a local bundle is opened, how the active map inside a bundle is tracked and switched, and how the bundle catalog and per-map availability behave while a download is in flight. Fetching bundles from `maps.lizaalert.ru` is specified in `lizaalert-integration`; project files are specified in `project-persistence`.
+
+### Decision history
+
+- ADR-0002 (2026-03-29, accepted): map bundle (a directory of georeferenced rasters, downloaded or opened locally, shared by many projects) and project are distinct concepts, and the app keeps a configurable bundles root with one subdirectory per bundle; rationale: earlier versions lost track data when the map changed and had no home for several operations over the same area. Codified as: Map bundle is a directory containing one or more georeferenced raster maps; User can open a local bundle from a chosen directory; Bundles root directory is user-configurable; Active map is tracked per project and is switchable without unloading overlays; Bundles root defaults to Documents and holds one directory per bundle. Reality note: the root chosen via `set_bundles_root` is held in memory only and re-derived from the Documents folder at every start (`src-tauri/src/application/mod.rs:565-567`, `src-tauri/src/lib.rs:28-34`; `PersistedAppSession` has no such field), so the "persists across app restarts" clause of the user-configurable requirement is not met today.
+- Legacy plan `docs/superpowers/plans/2026-04-12-production-bugs-fix.md` (executed): parallel per-file downloads and incremental map availability replaced the monolithic bundle load; rationale: users waited for whole multi-gigabyte bundles before any map could be opened. Codified as: Bundle catalog and cached maps remain interactive during an in-flight download; Per-map availability inside the active bundle streams into the UI live; Bundle download progress is observable from every surface that lists the downloading project's maps. Its "pre-created hidden bundle-loader window" (Task 5) is superseded: the loader is a component mounted on the `/` route (`src/routes/+page.svelte`), and `src/lib/windows.ts` no longer exists.
+- Owner decision (2026-09-19): code is primary. The persistence promise in "Bundles root directory is user-configurable" stands and the in-memory-only implementation is fixed in `revive-ui-cycle` slice 0.3 (bundles root stored in the session file and restored at startup).
+
 ## Requirements
 ### Requirement: Map bundle is a directory containing one or more georeferenced raster maps
 

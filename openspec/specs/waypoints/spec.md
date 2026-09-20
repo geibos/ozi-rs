@@ -1,7 +1,17 @@
 # waypoints Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers waypoint layers as user data: placing, moving, renaming, deleting and hiding waypoints, the optional symbol attached to each waypoint, and exporting a waypoint layer to OziExplorer WPT. Undo semantics come from `undo-redo`; waypoints arriving from GPX files are created by `track-import`.
+
+### Decision history
+
+- ADR-0018 (2026-04-06, accepted): `Waypoint.symbol` is `Option<String>`, the known set lives in the frontend picker and `None` means the default marker; rationale: new symbols without a domain change or project-file migration, and saved projects with unknown symbols degrade gracefully. Codified as: Waypoints support an optional symbol; Waypoint symbol is an open optional string. Not codified: the ADR's emoji table (rendering detail; the current `SymbolPicker` uses different glyphs for `flag`, `camp`, `meeting-point` and `finish`) and map markers — `MapView` draws a plain `waypoint-marker` element, so the glyph appears only in the Waypoints panel.
+- ADR-0022 (2026-04-28, accepted): add OziExplorer WPT export for waypoint layers; rationale: field navigators consume OziExplorer formats and PLT cannot carry waypoints. Codified as: System exports waypoints to OziExplorer WPT (tightened in `codify-architecture-decisions` to the exact 1.1 layout, cp1251/CRLF and the symbol-code fallback). Superseded by the implementation: the ADR's default folder ("the bundle's track folder") — the dialog pre-fills `<bundle>/<layer>.wpt` at the bundle root; "optional elevation and timestamp" — waypoints model neither, WPT writes `-777` and `0`; the ADR's claim that the export menu offers GPX for waypoints — no command or UI wires `build_waypoint_gpx_xml`.
+- Change `add-wpt-waypoint-export` (2026-05-17): removed the mistaken "waypoints to PLT" requirement (PLT is a track format) and introduced the WPT writer.
+- Changes `add-waypoint-visibility-toggle` and `fix-non-destructive-waypoint-rendering`: per-waypoint visibility outside the undo history and non-destructive marker updates; codified as: Multiple waypoints render simultaneously with per-waypoint visibility.
+
+- Owner decision (2026-09-19): "System exports waypoints to GPX" stays as a target requirement even though no command or UI exists yet; implementation is scheduled with CJ-6 (revive-ui-cycle roadmap, phase 4).
+
 ## Requirements
 ### Requirement: User can add a waypoint by clicking on the map
 

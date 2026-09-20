@@ -1,0 +1,221 @@
+## ADDED Requirements
+
+### Requirement: Frontend runs on a browser stand against a mocked Tauri transport
+
+The repository SHALL provide a browser stand, started with `just stand`, that serves the SvelteKit frontend with `@tauri-apps/api/core` `invoke` and `listen` replaced by a mock transport (`src/test/stand/transport.ts`). The mock SHALL answer every command registered in `src/lib/bindings.ts` from fixture data, SHALL support configurable latency and error injection per command, and SHALL replay scripted Tauri events (`state-changed`, `projects-chunk`, `download-progress`, `bundle-progress`, `bundle-file-ready`). A command that has no fixture answer SHALL fail loudly in the stand (visible error toast and console error) rather than resolve to `undefined`.
+
+#### Scenario: Workspace renders on the stand without a Rust backend
+
+- **WHEN** a developer runs `just stand` and opens the printed URL in a browser
+- **THEN** the `/project` workspace renders the Library rail, canvas and status bar populated from the fixture project, with no Rust process running
+
+#### Scenario: Error injection is visible
+
+- **WHEN** the stand is configured to fail `save_project` with "disk full"
+- **THEN** triggering Save in the UI shows the application's error toast with that message and the dirty indicator remains set
+
+#### Scenario: Unmocked command fails loudly
+
+- **WHEN** a component calls a command the fixture set does not answer
+- **THEN** the stand shows an error toast naming the command and logs a console error; the promise rejects instead of resolving to `undefined`
+
+### Requirement: Fixtures are generated from the Rust core, not hand-written
+
+The Rust workspace SHALL provide `just fixtures`, which loads a committed sample `.ozp` project and local bundle metadata through the application layer and writes JSON fixtures to `src/test/fixtures/`: the `AppStateDto` snapshot, the tracks GeoJSON, at least one `TrackDetailDto`, the waypoint list and one `projects-chunk` payload. A frontend test SHALL parse every fixture against the specta-generated TypeScript types and fail when they diverge.
+
+#### Scenario: Fixtures regenerate deterministically
+
+- **WHEN** `just fixtures` runs twice on the same inputs
+- **THEN** the produced files are byte-identical
+
+#### Scenario: Binding drift fails the conformance test
+
+- **WHEN** a Rust DTO field is renamed and bindings are regenerated but fixtures are not
+- **THEN** the fixture conformance test fails naming the fixture file and the field
+
+### Requirement: Screenshot matrix renders every registered screen state
+
+The repository SHALL provide `just shots`, which drives the stand with Playwright and captures one screenshot per entry of a screen registry (`src/test/stand/screens.ts`) crossed with state (`empty`, `loading`, `loaded`, `error`, `overflow`), locale (`ru`, `en`) and theme (`light`, `dark`). Screenshots SHALL be deterministic: fixed viewport, bundled fonts, animations disabled. Output SHALL go to `docs/progress/<date>-<slice>/` when a slice name is given and to a temporary directory otherwise.
+
+#### Scenario: Full matrix for one screen
+
+- **WHEN** `just shots --screen library-tracks` runs
+- **THEN** twenty PNG files are produced (5 states × 2 locales × 2 themes) and each file name encodes screen, state, locale and theme
+
+#### Scenario: Registry entry without a fixture state fails
+
+- **WHEN** a screen registry entry declares the `overflow` state but no fixture provides it
+- **THEN** `just shots` exits non-zero naming the screen and the missing state
+
+### Requirement: Screenshot baseline comparison detects visual regressions
+
+`just shots --compare` SHALL compare the freshly rendered matrix against the committed baseline under `src/test/stand/baseline/` with a per-pixel tolerance and SHALL exit non-zero on any difference, writing diff images next to the report. `just shots --update` SHALL rewrite the baseline and SHALL be run only in a dedicated commit.
+
+#### Scenario: Unintended change is caught
+
+- **WHEN** a change alters the Library row height and `just shots --compare` runs
+- **THEN** the command exits non-zero, lists the affected screenshots and writes diff images
+
+#### Scenario: Intended change is accepted explicitly
+
+- **WHEN** the developer runs `just shots --update` and commits the baseline
+- **THEN** the next `just shots --compare` passes
+
+### Requirement: Visual changes require stand screenshots; desktop integration requires Appium smoke
+
+The evidence policy SHALL be: a change that affects layout, text, icons, locale, theme or any visible state SHALL attach before/after screenshots from the stand; a change that crosses Tauri IPC, custom protocols, native dialogs or window lifecycle SHALL pass the relevant Appium smoke; a change that does both SHALL provide both. Claims of "works" without the required evidence SHALL be rejected in review. The policy SHALL be recorded in this capability's Purpose decision history rather than as a new ADR file; the ADR-0024 stub SHALL point to this requirement, and `docs/agent-verification.md`, `AGENTS.md` and `CLAUDE.md` SHALL reference it.
+
+#### Scenario: UI-only slice
+
+- **WHEN** a slice changes only the Library row layout
+- **THEN** its PR carries stand screenshots for the affected screen states and no Appium run is required
+
+#### Scenario: Slice touching IPC and UI
+
+- **WHEN** a slice adds an import command and its button
+- **THEN** its PR carries stand screenshots and the CJ-3 smoke result
+
+### Requirement: Every Customer Journey has an Appium smoke scenario
+
+`tools/ozi-rs-mcp/tests/` SHALL contain one `#[ignore]`d smoke test per Customer Journey listed in `docs/customer-journeys.md` (CJ-1 … CJ-8), named `smoke_cj<N>_<slug>`, each driving the bundled app through the journey's happy path and asserting on the journey's OUTCOME, not merely on the accessibility tree: a written file that exists and re-imports to equal data (CJ-3, CJ-6), a project that reopens with identical content after save, kill and relaunch (CJ-7, CJ-8), tiles served from disk with networking disabled (CJ-2), a cleaned track whose point count and segment count changed as expected (CJ-4). A smoke test whose only assertions are on UI element presence SHALL be rejected in review. `just smoke` SHALL run all of them; `just smoke <N>` SHALL run one. Smoke tests SHALL kill leftover app and WebDriverAgent processes in preflight and teardown. Until a journey's UI exists, its smoke test SHALL exist and be marked `#[ignore = "pending: <reason>"]` so the gap is visible in the test list.
+
+#### Scenario: Smoke list is complete
+
+- **WHEN** `cargo test --manifest-path tools/ozi-rs-mcp/Cargo.toml -- --list --ignored` runs
+- **THEN** eight `smoke_cj*` tests are listed, each mapped to one CJ
+
+#### Scenario: Teardown leaves no processes
+
+- **WHEN** a smoke test fails mid-journey
+- **THEN** no `ozi-rs.app` or `WebDriverAgentRunner` process remains after the test returns
+
+#### Scenario: Smoke asserts an outcome
+
+- **WHEN** `smoke_cj6_export_roundtrip` exports a track to PLT through the UI
+- **THEN** the test re-imports the written file with the Rust importer and asserts equal point count, segment count and track name; the test does not pass on the presence of an "Exported" toast alone
+
+### Requirement: Appium screenshots are cropped to the application window
+
+`appium_screenshot` in `tools/ozi-rs-mcp` SHALL decode the WebDriver base64 payload to PNG and SHALL crop it to the bounds of the `ozi-rs` window obtained from the window server, so evidence never includes the owner's desktop.
+
+#### Scenario: Screenshot contains only the app window
+
+- **WHEN** `appium_screenshot` is called with the app window occupying a quarter of the screen
+- **THEN** the written PNG has the window's pixel dimensions and no other window or desktop content
+
+### Requirement: Agent-driven desktop verification follows a fixed protocol
+
+When an agent verifies desktop behaviour by driving the app itself (outside the per-CJ smoke tests), it SHALL use `tools/ozi-rs-mcp` in this order: `build_app` (a build already produced in the same session MAY be reused); `launch_app`; `capture_screenshot` and `capture_logs` to record the baseline before any action; `appium_launch_session`; for each step of the feature's smoke document one Appium action (`appium_click`, `appium_type_text`) followed by `appium_screenshot` and a comparison of the observed state with the step's expected outcome; `appium_stop_session`; `stop_app`. A step whose observed outcome differs from the expected outcome SHALL be recorded as failed at that step; the agent SHALL NOT retry the same action inside the run and SHALL NOT report the claim as verified.
+
+#### Scenario: Baseline precedes the first action
+
+- **WHEN** an agent drives a smoke check and reports its evidence
+- **THEN** the report links a baseline screenshot and log capture taken after `launch_app` and before the first `appium_click` or `appium_type_text`
+
+#### Scenario: Mismatched step fails the run
+
+- **WHEN** a step expects a non-empty map list and the screenshot after the click shows an empty list
+- **THEN** the run is recorded as failed at that step, the remaining steps are not used to claim success, and the session and app are still stopped
+
+### Requirement: Recurring regressions are promoted into the owning CJ smoke test
+
+When a feature covered only by a smoke document regresses a second time (a fix landed and a later change reproduced the same failure), the change that fixes the regression SHALL add the failing step as an assertion to the smoke test of the Customer Journey that owns the feature (`smoke_cj<N>_<slug>` under `tools/ozi-rs-mcp/tests/`) so the check runs under `just smoke` instead of relying on manual repetition, and the smoke document SHALL link to that assertion. A step MAY be promoted before a second regression.
+
+#### Scenario: Second regression promotes the step
+
+- **WHEN** a change re-breaks a step of a smoke document that a previous change had already fixed
+- **THEN** the fixing PR adds that step's assertion to the owning `smoke_cj<N>_<slug>` test and the smoke document references the test
+
+### Requirement: Native QA evidence is confined under a fixed root
+
+Every `tools/ozi-rs-mcp` tool that runs a subprocess or produces an artifact SHALL write under `<repo root>/.sisyphus/evidence/native-qa/`, where the repo root is `OZI_RS_PROJECT_ROOT` when set (and rejected when it is not a repo root) or otherwise the nearest ancestor of the working directory containing both `justfile` and `src-tauri/tauri.conf.json`. Per-tool artifacts SHALL live in a subdirectory named after the tool (`<tool>/stdout.txt`, `<tool>/stderr.txt`, `capture_screenshot/screenshot.png`, `appium_screenshot/screenshot.png`); the launched-app state SHALL live in `session.json` at the root and the WebDriver session in `appium/session.json`. A subprocess result SHALL carry an evidence record with `tool`, `started_at`, `duration_ms`, `command`, `exit_code`, `stdout_path`, `stderr_path`, `artifact_paths`, `status` (`passed`, `failed` or `error`) and `error_kind`, and every result SHALL list produced files in `artifact_paths` as repo-relative paths. Path components with traversal, absolute components or symlinked directories SHALL be rejected. Because tools overwrite these fixed paths on every run, artifacts that must outlive the next run SHALL be copied out (for example into `docs/progress/<date>-<slice>/`) before that run.
+
+#### Scenario: Evidence never escapes the root
+
+- **WHEN** a tool is asked to write `../outside/stdout.txt` or through a symlinked evidence directory
+- **THEN** the tool returns an error and nothing is written outside `.sisyphus/evidence/native-qa/`
+
+#### Scenario: Result lists its artifacts
+
+- **WHEN** `appium_screenshot` succeeds
+- **THEN** its result's `artifact_paths` equals `[".sisyphus/evidence/native-qa/appium_screenshot/screenshot.png"]`
+
+#### Scenario: Server started outside the repository
+
+- **WHEN** `ozi-rs-mcp` starts in a directory with no repo-root ancestor and `OZI_RS_PROJECT_ROOT` is unset
+- **THEN** every tool returns `ok: false` with `error_kind` `command_failed` (`repo_root` for `qa_environment`) and a message naming the expected marker files, and no evidence is written elsewhere
+
+### Requirement: The MCP server exposes exactly thirteen tools in canonical order
+
+`ozi-rs-mcp` SHALL register exactly these tools, in this order: `qa_environment`, `build_app`, `launch_app`, `stop_app`, `capture_logs`, `capture_screenshot`, `qa_observe`, `appium_doctor`, `appium_launch_session`, `appium_click`, `appium_type_text`, `appium_screenshot`, `appium_stop_session`. Every tool's input schema SHALL be a JSON object schema. `ozi-rs-mcp --self-check` SHALL print a JSON report with `server_name: "ozi-rs-mcp"`, `stdio_safe: true`, `tool_count: 13` and the tool names above in order, and SHALL exit without starting the stdio server. A router whose registrations differ from the canonical list SHALL fail the crate's test suite.
+
+#### Scenario: Self-check inventory
+
+- **WHEN** `cargo run --manifest-path tools/ozi-rs-mcp/Cargo.toml --bin ozi-rs-mcp -- --self-check` runs
+- **THEN** stdout is one JSON document with `tool_count` 13 and `tools[i].name` equal to the canonical list in order
+
+#### Scenario: Registration drift fails tests
+
+- **WHEN** a fourteenth tool is registered on the router without updating the canonical list
+- **THEN** `cargo test --manifest-path tools/ozi-rs-mcp/Cargo.toml` fails in the tool-inventory tests
+
+### Requirement: QA tools report failures as structured results
+
+An `ozi-rs-mcp` tool SHALL NOT fail the MCP call for an expected operational failure; it SHALL return `ok: false` with a machine-readable `error_kind` and a human-readable `message`. Tier 1 kinds: `exit_code` (subprocess exited non-zero), `artifact_missing` (`launch_app` without a built `ozi-rs.app`; `artifact_paths` points at the `build_app` evidence directory), `already_stopped` (`stop_app` with no running app), `screen_recording_denied`, and `command_failed` (or `repo_root` from `qa_environment`) when the repository root, evidence root or session file cannot be resolved. Tier 2 kinds: `dependency_missing`, `mac2_driver_missing`, `permissions_missing`, `session_missing` (action without a persisted session), `selector_required`, `element_not_found`, `server_unavailable` (Appium socket unreachable), `webdriver_unresponsive` (socket accepted but no valid WebDriver HTTP response) and `webdriver_error` (WebDriver returned a failure status). Missing Appium SHALL be a degraded path: Tier 1 tools keep working while Tier 2 tools return `dependency_missing` with install hints.
+
+#### Scenario: Appium absent
+
+- **WHEN** `appium` is not on `PATH` and `appium_launch_session` is called
+- **THEN** the call returns `ok: false`, `available: false`, `error_kind: "dependency_missing"` and install hints, and `build_app` and `launch_app` remain usable
+
+#### Scenario: Launch without build
+
+- **WHEN** `launch_app` is called and no `ozi-rs.app` exists under `target/{debug,release}/bundle/macos` or `src-tauri/target/{debug,release}/bundle/macos`
+- **THEN** the result has `error_kind: "artifact_missing"` and `artifact_paths` equal to `[".sisyphus/evidence/native-qa/build_app"]`
+
+#### Scenario: Stop is idempotent
+
+- **WHEN** `stop_app` is called twice with no running app
+- **THEN** both calls return `error_kind: "already_stopped"` and the MCP call itself succeeds
+
+### Requirement: Appium sessions attach to the app bundle with a long idle timeout
+
+`appium_launch_session` SHALL create a Mac2 session with `platformName: "Mac"`, `appium:automationName: "Mac2"`, `appium:bundleId` (the `bundle_id` parameter, else `OZI_RS_APPIUM_BUNDLE_ID`, else `ru.lizaalert.ozi-rs`) and `appium:newCommandTimeout: 600`, posted to `OZI_RS_APPIUM_SERVER_URL` or `http://127.0.0.1:4723`, allowing up to 240 s for session creation. On success it SHALL persist the server URL and session id to `appium/session.json` under the evidence root; every other Appium action SHALL read that file and return `session_missing` when it is absent. `appium_stop_session` SHALL send `DELETE /session/{id}` and remove the persisted file on success.
+
+#### Scenario: Default bundle id and timeout
+
+- **WHEN** `appium_launch_session` is called without parameters and without environment overrides
+- **THEN** the `POST /session` body contains `appium:bundleId: "ru.lizaalert.ozi-rs"` and `appium:newCommandTimeout: 600`
+
+#### Scenario: Stop clears the persisted session
+
+- **WHEN** `appium_stop_session` succeeds
+- **THEN** `appium/session.json` no longer exists and a following `appium_click` returns `session_missing`
+
+### Requirement: Appium click and type resolve selectors through W3C endpoints
+
+`appium_click` and `appium_type_text` SHALL require a non-empty `selector` (returning `selector_required` otherwise) and SHALL resolve it with `POST /session/{id}/element` using the strategy implied by its prefix: `~` → `accessibility id` (prefix stripped), `//` or `(/` → `xpath`, `**/` → `-ios class chain`, `name=` → `name` (prefix stripped), anything else → `name`. The resolved element SHALL be acted on through `POST /session/{id}/element/{eid}/click` and `POST /session/{id}/element/{eid}/value`; Mac2-specific `/appium/mac2/*` endpoints SHALL NOT be used. A `no such element` response SHALL map to `element_not_found` with the original selector in the message.
+
+#### Scenario: XPath click
+
+- **WHEN** `appium_click` is called with `selector: "//XCUIElementTypeButton[@title='Maps…']"`
+- **THEN** the server receives `POST /session/{id}/element` with `using: "xpath"` followed by `POST /session/{id}/element/{eid}/click`
+
+#### Scenario: Unknown element
+
+- **WHEN** the selector matches no element
+- **THEN** the result has `ok: false`, `error_kind: "element_not_found"` and a message containing the selector
+
+### Requirement: macOS privacy grants are per-process preconditions
+
+Tier 1 screenshots (`capture_screenshot`) require Screen Recording and Appium Mac2 actions require Accessibility, granted by macOS to the host process that runs `ozi-rs-mcp` (the MCP client), independently of any grant held by the terminal. `qa_environment` SHALL report the platform, repo root, evidence root and whether `just`, `open`, `log`, `screencapture` and `appium` are on `PATH`. `appium_doctor` SHALL distinguish `dependency_missing` (no `appium` on `PATH`), `mac2_driver_missing` (`appium driver list` does not mention `mac2`) and `permissions_missing` (Accessibility not confirmed) from a ready state. When `screencapture` exits non-zero with the message `could not create image from display`, `capture_screenshot` SHALL return `error_kind: "screen_recording_denied"` and a message naming System Settings → Privacy & Security → Screen Recording and asking to restart the MCP client; other non-zero exits SHALL keep `error_kind: "exit_code"`.
+
+#### Scenario: Denied Screen Recording is named
+
+- **WHEN** `capture_screenshot` runs and `screencapture` reports `could not create image from display`
+- **THEN** the result has `ok: false`, `error_kind: "screen_recording_denied"` and a message naming the Screen Recording panel
+
+#### Scenario: Missing Mac2 driver is diagnosed before a session
+
+- **WHEN** `appium` is on `PATH` but `appium driver list` does not mention `mac2`
+- **THEN** `appium_doctor` returns `error_kind: "mac2_driver_missing"` with the install hint `appium driver install mac2`

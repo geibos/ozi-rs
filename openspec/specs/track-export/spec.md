@@ -1,7 +1,14 @@
 # track-export Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers writing tracks out of a project: whole-layer GPX export with the Garmin colour extension, single-track OziExplorer PLT export (layout, text encoding, colour and date encoding), and the default export location under the active bundle. Waypoint export (WPT) is specified in `waypoints`.
+
+### Decision history
+
+- Change `bootstrap-current-state`: GPX layer export with `<gpxx:DisplayColor>`, single-track PLT export with COLORREF BGR colour and OLE dates, and the `<bundle>/10-Tracks/<track>.<ext>` default path; codified as the existing requirements of this spec.
+- Commits 0d17104 (2026-04-28) and f5f44bb (2026-07-14, M0 data-loss fixes): the PLT properties line was rewritten to the ten-field order OziExplorer and `import/plt.rs::parse_track_style` expect (visible, width, COLORREF, name, fixed tail) and the output switched from UTF-8 to Windows-1251 with CRLF, guarded by an export → import round-trip test; rationale: OziExplorer on Russian Windows showed mojibake and misread columns (CJ-6). Codified as: PLT export writes the OziExplorer 2.1 track layout; PLT export text is Windows-1251 with CRLF line endings.
+- ADR-0022 (2026-04-28, accepted): export taxonomy "GPX (tracks/waypoints), PLT (tracks), WPT (waypoints)"; only the taxonomy touches this capability — WPT itself is codified in `waypoints`. Not codified: a waypoint GPX export — `build_waypoint_gpx_xml` exists in `export/gpx.rs` but no command or UI calls it (`export_gpx` exports track layers only).
+
 ## Requirements
 ### Requirement: System exports the active track layer to GPX
 

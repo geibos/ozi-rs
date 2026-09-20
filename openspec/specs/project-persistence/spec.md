@@ -1,7 +1,14 @@
 # project-persistence Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers how a SAR project and the bounded app session reach disk and come back: the `.ozp` JSON project file (its shape, atomic writes, load-time normalization), the app session file that remembers only the last project path and the active map, and the startup restore flow including its degraded states when referenced files are missing. Map data itself is never part of a project file; see `map-bundles`.
+
+### Decision history
+
+- ADR-0004 (2026-03-29, accepted): persist projects as pretty-printed JSON `.ozp` files via `serde_json`, with transparent ID newtypes and `default`/`skip_serializing_if` on optional fields; rationale: human-readable, debuggable without tooling, round-trip stable, no custom parser to maintain. Codified as: Project is persisted as a JSON `.ozp` file; `.ozp` content is pretty-printed JSON with a stable top-level shape; Project load normalizes missing default layers. The ADR's follow-up `version` field was never added — the format has no schema-version field today (tracked separately as CJ-8). Reality note: the project open dialog (`src/components/CommandPalette.svelte:166`) filters on the `json` extension, not `ozp`; the Rust layer accepts any path.
+- ADR-0002 (2026-03-29, accepted): a project is a standalone file that references its active map and does not own the bundle directory; rationale: switching maps must not lose tracks, and bundles of tens of gigabytes must be shared across projects. Codified as: Project model is independent from map bundle data; Missing referenced files degrade to a non-panicking state (the ADR's open follow-up on vanished bundle paths). The ADR's "eframe persistent storage" for the active-map reference is superseded by the JSON session file (`PersistedAppSession` in `src-tauri/src/infrastructure/persistence.rs`).
+- Code, no ADR (2026-07, merged with the m0-data-loss fixes): every project and session write goes through temp file + fsync + rename so a failed save never truncates the existing file; rationale: a failed in-place write previously destroyed the only copy of the project. Codified as: Project and session files are written atomically.
+- Legacy doc `docs/persistence-session.md` (2026-04): session restore is bounded to the last project path and the active map reference; rationale: predictable startup without stale UI state. Codified as: Startup session restore is bounded to last project and active map; Specific UI and history state is intentionally NOT restored; Missing referenced files degrade to a non-panicking state; Session restore registers the active map layer so the workspace lands at calibrated bounds. Not codified: the session-file location (`app_data_dir()/session.json`, with a macOS legacy-path fallback — `src-tauri/src/lib.rs`, `resolve_session_path`) because it is not an ADR decision; the doc itself is stale (it names `default_app_session_path` and `new_with_session_path`, which no longer exist).
 ## Requirements
 ### Requirement: Project is persisted as a JSON `.ozp` file
 

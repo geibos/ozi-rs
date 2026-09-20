@@ -1,7 +1,13 @@
 # lizaalert-integration Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers the integration with `maps.lizaalert.ru`: streaming the project catalog and caching it locally, downloading a project's bundle files concurrently with resume and cancellation, the progress and readiness events the frontend consumes, failure behavior, and the HTTP/TLS stack the client is built on. Where downloaded bundles live and how they are opened is specified in `map-bundles`.
+
+### Decision history
+
+- ADR-0008 (2026-03-28, accepted): use reqwest 0.13 with `default-features = false` and the `rustls` backend; rationale: the endpoint is HTTPS-only and the binary must build without OpenSSL or system TLS on every platform. Codified as: LizaAlert HTTP client uses reqwest with rustls, no native TLS. Partly superseded: the ADR's "blocking API only, no async runtime" no longer holds — tokio is a dependency (`src-tauri/Cargo.toml:33`) and bundle downloads run on the async client with the `stream` feature (`src-tauri/Cargo.toml:26`, `src-tauri/src/infrastructure/lizaalert.rs:543`), while the blocking client remains for listings (`lizaalert.rs:473`). The ADR's remark about the webpki trust store also no longer describes the build: the graph shows reqwest pulling `rustls-platform-verifier` (OS trust store) and no `webpki-roots`.
+- Legacy plan `docs/superpowers/plans/2026-04-12-production-bugs-fix.md` (executed): bounded-concurrency parallel downloads, prefix-ordered scheduling, `completed`/`total` counts on `bundle-progress`; rationale: sequential downloads and a progress bar without data made large bundles unusable. Codified as: Download progress is observable (counts also covered by the `ui-shell` status-bar requirement). Retries were never implemented (no retry or backoff logic in `lizaalert.rs`) and are not codified.
+- Code, no ADR (2026-05 to 2026-07): per-file `.part` write + rename, staged archive extraction, resume of missing files, and offline open of cached bundles; rationale: a cancelled or failed download must never leave a truncated file that the cached-map listing would treat as complete. Codified as: Failed downloads degrade gracefully (modified in this change).
 ## Requirements
 ### Requirement: System fetches the LizaAlert project list as a stream
 

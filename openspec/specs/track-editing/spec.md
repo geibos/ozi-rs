@@ -1,7 +1,17 @@
 # track-editing Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Editing the geometry and structure of tracks that already exist in a project: moving, deleting and inserting points, splitting and joining segments, drawing new tracks point by point, Douglas–Peucker simplification with live preview, sorting points by time and cropping to the map extent or a time range. Every edit is a `ProjectCommand` applied through the `CommandStack`, so this spec states the per-operation behaviour and invariants while the `undo-redo` spec owns the stack itself (coalescing, depth, identifier stability, dirty tracking). Track styling and statistics live in `track-display`.
+
+### Decision history
+
+- ADR-0017 (2026-04-04, accepted): point drags are issued as `MoveTrackPoint` commands and coalesced by `apply_or_merge()`; every edit must carry enough data to compute its reverse at apply time; rationale: snapshot undo could not survive drag streams on large tracks. Codified as: User can move a track point by dragging on the map (the coalescing rule itself lives in `undo-redo`).
+- ADR-0020 (2026-04-28, accepted): MVP scope lists segment splitting, sort by timestamp and crop "by current map extent, by time range, by selected points"; rationale: these are the operations SAR volunteers use to turn a noisy group track into a clean route. Codified as: User can split a segment at a chosen point; User can sort a track's points by time as one undoable step; User can crop a track to the map extent or a time range. Crop by selected points is not codified because it is not implemented (deferred pending multi-select, `docs/customer-journeys.md` CJ-4 status).
+- Commit f5f44bb (2026-07-14, landed): split keeps the split point only in the left half and moves the following points to a new segment inserted right after it; join requires adjacency and non-empty segments so that `SplitSegment` and `JoinSegments` are exact inverses; rationale: the previous split duplicated the split point and every undo/redo cycle grew a phantom point with a duplicate id. Codified as: User can split a segment at a chosen point; User can join two adjacent segments.
+- CJ-4 slice 1.2, commit c60dc6e (2026-07-15, landed; `docs/customer-journeys.md`): `ReorderTrackPoints` (per-segment stable sort, untimed points first, no-op when already sorted) and `CropTrackPoints` (extent or time range, untimed points always kept, all-points crop rejected, removed count reported), split/join UI in the Inspector segments table, track selection by clicking its line; rationale: cleaning a 5000-point track must take minutes and every step must be reversible. Codified as: User can sort a track's points by time as one undoable step; User can crop a track to the map extent or a time range.
+- Drawing mode (as implemented in `src/components/MapView.svelte:129-160, 623-650`): the track is created by `CreateEmptyTrack` when the mode starts, each click is an `InsertTrackPoint` command, and Esc cancels by undoing all of them; no ADR records this. Codified as: User can create new tracks by drawing on the map (modified to describe the command-per-click model; the earlier wording "no project change is committed" did not match the code).
+- Owner decision (2026-09-19): cancelling a draw with Esc discards the draw commands without a redo entry and restores the dirty flag; the previous undo-based cancel (commands left on the redo stack, project marked dirty) is replaced. Codified as the modified "User can create new tracks by drawing on the map"; implemented in `revive-ui-cycle` slice 0.3.
+
 ## Requirements
 ### Requirement: User can move a track point by dragging on the map
 

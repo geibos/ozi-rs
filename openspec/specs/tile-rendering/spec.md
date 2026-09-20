@@ -1,7 +1,15 @@
 # tile-rendering Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+Covers how raster maps reach the MapLibre canvas: LizaAlert `.sqlitedb` tile databases through the `sqlite://` protocol, OziExplorer OZF2 rasters through the `ozi://` protocol, and OpenStreetMap as the online fallback. It fixes where georeferencing and reprojection happen (Rust), how tile bytes cross the Tauri IPC boundary, how missing or out-of-range tiles are answered, what the backend caches, and how OZF2 metadata constrains the source's bounds and zoom range.
+
+### Decision history
+
+- ADR-0010 (2026-03-29, accepted, egui-era): render OZF2 rasters as multi-level tiles with viewport culling, a 256-entry LRU texture cache and a 4096 px oversized-tile guard; rationale: bound GPU memory and avoid driver crashes on huge textures. Codified as: "OZF2 source level is the coarsest with one source pixel per output pixel", "OZF2 map context is opened once per map path and reused" | LRU texture cache, culling and the 4096 px guard not codified because they were egui/glow constructs; `src-tauri/src/commands/tiles.rs` keeps no tile-level cache — MapLibre caches tiles client-side and the backend re-decodes on every request.
+- ADR-0012 (2026-03-23, accepted, egui-era): serve SQLite tiles synchronously on the UI thread behind a 512-entry LRU cache with a `Missing` sentinel; rationale: sub-millisecond reads make a background loader unnecessary. Codified as: "System serves MBTiles via the `sqlite://` custom tile protocol" (synchronous query per request, zoom inversion), "Missing or out-of-range tiles yield an empty response" (the sentinel's job is now the protocol handler's empty `ArrayBuffer`) | the 512-entry LRU not codified because no cache exists: `get_sqlite_tile` opens a fresh `rusqlite::Connection` per request (`tiles.rs:65`).
+- ADR-0016 (2026-03-30, accepted), tile-delivery part: MapLibre `addProtocol` handlers call Tauri commands that return binary blobs, avoiding a local HTTP tile server; rationale: no port, no extra process, reuse of the IPC boundary. Codified as: "System serves MBTiles via the `sqlite://` custom tile protocol", "System serves OZF2 rasters via the `ozi://` custom tile protocol", "Coordinate math for OZI tiles is performed in Rust", "Tiles are delivered as raw IPC byte responses, not over HTTP", "OZF2 metadata command supplies source bounds and zoom range".
+- ADR-0006 (2026-03-29, accepted): OZF2 decoding lives in a separate crate behind the `ozi_raster.rs` adapter; rationale: isolate a reverse-engineered format. Codified in the `architecture` capability ("OZF2 rasters are decoded only through the `ozf2` crate adapter"); the crate is now the crates.io `ozf2 = "0.1"`, not a path sibling.
+- bootstrap-current-state (2026-05, archived): captured the four base requirements of this capability (`sqlite://`, `ozi://`, Rust-side coordinate math, OSM fallback).
 ## Requirements
 ### Requirement: System serves MBTiles via the `sqlite://` custom tile protocol
 

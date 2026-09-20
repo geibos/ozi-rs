@@ -1,7 +1,12 @@
 # track-display Specification
 
 ## Purpose
-TBD - created by archiving change bootstrap-current-state. Update Purpose after archive.
+How tracks are presented once they are in a project: per-track colour, line width, opacity and visibility; per-track statistics; the point-level view with per-point attributes; and the warning-only OK-standard name validation shown next to a track. Import, export and geometry edits belong to `track-import`, `track-export` and `track-editing`; the map engine belongs to `ui-shell` and `tile-rendering`.
+
+### Decision history
+- ADR-0013 (2026-03-29, accepted): `TrackStyle` (colour, width, visibility) is stored inside the `Track` domain entity rather than in a UI-side style table; rationale: style travels with the project file and round-trips through PLT `COLORREF` and GPX Garmin colour. Codified as: "Each track has independently controllable color, line width, opacity, and visibility"; the persistence and encoding details are codified in `project-persistence` and `track-export`.
+- ADR-0019 (2026-04-25, accepted): render existing point timestamps in the point list, expose the existing colour and line-width mutations through compact track controls, show `YYYYMMDD_Callsign` validation as a warning that never blocks rename/save/export; rationale: docs described these as visible while the UI lacked them. Codified as: "Track points panel exposes per-point attributes", "Each track has independently controllable color, line width, opacity, and visibility", "Track name validation surfaces a non-blocking warning for non-conforming names", "Validation pattern is alphabet-agnostic and does not validate calendar dates" | style changes stay outside the undo stack per ADR-0019/ADR-0017 — the undo boundary is codified in `undo-redo`, not here.
+- ADR-0020 (2026-04-28, accepted), Tracks section: many tracks at once, tens of thousands of points per track, per-track colour and line style, point-by-point walkthrough with per-point info, warning-only name validation; rationale: full-day SAR tracks routinely exceed 30k points. Codified as: the requirements above plus "System computes and surfaces per-track statistics" (archived `add-track-statistics-ui`); per-segment delivery is added by the active `revive-ui-cycle` change | next/previous walkthrough controls are not codified — points are click-selectable only (`docs/feature-status.md`, row "Track point walkthrough"); the scope itself is recorded in `product-scope`.
 ## Requirements
 ### Requirement: Each track has independently controllable color, line width, opacity, and visibility
 

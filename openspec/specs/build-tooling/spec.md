@@ -1,7 +1,15 @@
 # build-tooling Specification
 
 ## Purpose
-TBD - created by archiving change fix-dev-release-rebuild. Update Purpose after archive.
+
+Define the `justfile` as the single entry point for developer and agent workflows: building and launching the desktop app (`just build`, `just release`, `just run`, `just run-release`), the pre-merge gate (`just ci` and its parts), the GUI-seizing end-to-end gate (`just smoke`) and, with `revive-ui-cycle`, the browser stand, fixture generation and screenshot matrix (`just stand`, `just fixtures`, `just shots`). The capability fixes which recipes are canonical, which may short-circuit work, and which must never launch a GUI, so that local runs, CI and the native QA MCP server (`tools/ozi-rs-mcp`, whose `build_app` tool shells out to `just build`) all go through the same commands.
+
+### Decision history
+
+- change `fix-dev-release-rebuild` (archived 2026-05-26, implemented): `just run-release` must be a no-op when no input changed while `just build` / `just release` keep going through `npm run tauri build`; rationale: the build-and-launch loop was rebuilding the whole app on every run, and bypassing the Tauri CLI on the bundled path would break parity with the CI smoke build. Codified as: `just run-release` SHALL be a no-op when inputs are unchanged, Canonical bundled build path SHALL remain `npm run tauri build`.
+- ADR-0024 (2026-04-28, accepted; narrowed by ADR-0025 in `revive-ui-cycle`) together with the M1 `just smoke` gate (AGENTS.md "E2E gate"): the end-to-end gate for app-touching changes is an Appium Mac2 smoke run from `tools/ozi-rs-mcp/tests/`, invoked as `just smoke`, and it stays out of `just ci` because it seizes the screen; rationale: Playwright cannot exercise Tauri IPC, protocols or window lifecycle, and GUI-seizing runs must be batched, not run per check. Codified as: (revive-ui-cycle) Stand, fixtures and screenshot recipes are available through `just` — `just smoke [<N>]` runs the per-CJ smokes and `just ci` SHALL NOT include Appium smoke.
+- `docs/native-qa-mcp.md` §"Registering with an MCP client" and `opencode.json` (2026-05, implemented for opencode only): the MCP server is started through `cargo run` so a stale prebuilt binary can never serve a session; rationale: `.mcp.json` still points at `target/release/ozi-rs-mcp`, and that binary (built 2026-05-26) served sessions for months after the July fixes. Codified as: (revive-ui-cycle, agent-workflow) The native QA MCP server is always built from source.
+
 ## Requirements
 ### Requirement: `just run-release` SHALL be a no-op when inputs are unchanged
 
