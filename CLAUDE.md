@@ -10,6 +10,8 @@ Communicate in Russian. Technical terms and code identifiers stay in English.
 
 ## Workflow
 
+- Read `docs/STATE.md` before anything else and update it before you finish
+
 - Before making changes, read the relevant source files
 - For user-visible behavior changes, read `openspec/specs/<capability>/spec.md` and follow the OpenSpec workflow described in `AGENTS.md` ("Behavioral changes via OpenSpec")
 - Run `just ci` (or individually: `just clippy`, `just check`, `just lint`, `just test`) after code changes — GitHub Actions runs the same gates on every PR (see `docs/ci.md`); if any of these fail locally, the PR will be blocked

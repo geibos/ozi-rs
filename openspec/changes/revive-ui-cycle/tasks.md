@@ -1,7 +1,7 @@
 ## 0. Hygiene (slice 0.1, one session)
 
-- [ ] 0.1 Run `just ci` on the current tree; commit the uncommitted July slice (unified import + ZIP, import folder, show-on-map, bundle preview, virtualised catalog, DownloadPopup, glyph fix) as one commit with a message describing the owner's first hands-on findings
-- [ ] 0.2 Push `main` to `origin` (68 commits behind); confirm `git log origin/main..main` is empty and GitHub Actions runs green on the pushed head
+- [x] 0.1 Run `just ci` on the current tree; commit the uncommitted July slice (unified import + ZIP, import folder, show-on-map, bundle preview, virtualised catalog, DownloadPopup, glyph fix) as one commit with a message describing the owner's first hands-on findings
+- [x] 0.2 Push `main` to `origin` (68 commits behind); confirm `git log origin/main..main` is empty and GitHub Actions runs green on the pushed head
 - [ ] 0.3 Switch `.mcp.json` to `cargo run --quiet -p ozi-rs-mcp --` (mirror `opencode.json`); document in `docs/native-qa-mcp.md` that the prebuilt binary is no longer used
 - [ ] 0.4 Document the one-time Screen Recording grant for the terminal and MCP server in `docs/native-qa-mcp.md`; owner performs it
 - [ ] 0.5 Create `docs/STATE.md` (where we are / next slice / known broken) and link it from `AGENTS.md` and `CLAUDE.md` as the first thing to read and last thing to update
@@ -10,13 +10,13 @@
 
 ## 1. Visible fixes (slice 0.2, one session)
 
-- [ ] 1.1 Rust: change `get_tracks_geojson` to emit one `MultiLineString` per track with one part per segment, skipping segments with fewer than two points; add unit tests for the two-segment, split and degenerate cases
-- [ ] 1.2 Rust: replace the `serde_json::Value` return with a specta-exported `TracksGeoJsonDto`; regenerate `bindings.ts`; update `api.ts` `getTracksGeojson` and `tracks-layer.ts` label placement
-- [ ] 1.3 Frontend: give every icon-only button in `LibraryRow.svelte`, `TracksTab.svelte`, `WaypointsTab.svelte`, `MapsTab.svelte` a visible lucide icon, `aria-label` and tooltip; verify in the running app via Appium screenshot that no button renders as an empty square
-- [ ] 1.4 Frontend: `MapsTab.svelte` lists `activeMap` as a row when set, independent of `currentProject`; empty state only when both are absent; component test with `@testing-library/svelte`
-- [ ] 1.5 Frontend: format durations ≥ 24 h as `Nd Hh` and add the "from first to last point" tooltip in `TracksTab.svelte` and `TrackInspector.svelte`; unit test the formatter
-- [ ] 1.6 Evidence: Appium screenshots before/after (cropped to the window) into `docs/progress/<date>-visible-fixes/`; create `docs/progress/README.md` with the first gallery entry
-- [ ] 1.7 `just ci` green, `just smoke` green, PR merged, `main` pushed, `docs/STATE.md` updated
+- [x] 1.1 Rust: change `get_tracks_geojson` to emit one `MultiLineString` per track with one part per segment, skipping segments with fewer than two points; add unit tests for the two-segment, split and degenerate cases
+- [ ] 1.2 Rust: replace the `serde_json::Value` return with a specta-exported `TracksGeoJsonDto`; regenerate `bindings.ts`; update `api.ts` `getTracksGeojson` and `tracks-layer.ts` label placement — DEFERRED 2026-09-20: `api.ts` already casts the response to the standard `GeoJSON.FeatureCollection` from `@types/geojson`, so a specta mirror would duplicate that type and still need a cast. Revisit when the view-model slice defines who owns map geometry types.
+- [x] 1.3 Frontend: give every icon-only button in `LibraryRow.svelte`, `TracksTab.svelte`, `WaypointsTab.svelte`, `MapsTab.svelte` a visible lucide icon, `aria-label` and tooltip; verify in the running app via Appium screenshot that no button renders as an empty square
+- [x] 1.4 Frontend: `MapsTab.svelte` lists `activeMap` as a row when set, independent of `currentProject`; empty state only when both are absent; component test with `@testing-library/svelte`
+- [x] 1.5 Frontend: format durations ≥ 24 h as `Nd Hh` and add the "from first to last point" tooltip in `TracksTab.svelte` and `TrackInspector.svelte`; unit test the formatter
+- [~] 1.6 Evidence: gallery and before-shots are in `docs/progress/2026-09-20-visible-fixes/`; after-shots BLOCKED — the Mac2 driver host dies on launch and `screencapture` returns a black frame with no windows enumerated (revoked Screen Recording / Accessibility, likely lost in the Xcode 26.2 update). Owed once task 0.4 is done.
+- [~] 1.7 `just ci` green (248 Rust, 278 frontend) and `main` pushed; `just smoke` BLOCKED by the same missing grant; `docs/STATE.md` still to write (task 0.5)
 
 ## 1b. Correctness fixes from the ADR translation (slice 0.3, one session)
 

@@ -208,6 +208,8 @@ end-to-end proof) → Esc cancels and the scratch track row disappears.
 - `docs/feature-status.md` — backend / UI / docs / status / evidence matrix
 - `docs/persistence-session.md` — what is and isn't restored at startup
 - `docs/native-qa-mcp.md` — `tools/ozi-rs-mcp` reference for native desktop QA
+- `docs/STATE.md` — **read first, update last**: where the work is, the next slice, what is known broken
+- `docs/progress/README.md` — screenshot gallery, one entry per merged slice
 - `docs/requirements.md` — product goals, user workflows, MVP scope
 - `docs/roadmap.md` — phase status and remaining work
 - `docs/reference/oziexplorer.md` — the original OziExplorer: features, file formats (`.map`/`.plt`/`.wpt`/`.rte`/…), and what we take vs. skip
