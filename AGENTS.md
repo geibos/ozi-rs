@@ -210,6 +210,7 @@ end-to-end proof) → Esc cancels and the scratch track row disappears.
 - `docs/native-qa-mcp.md` — `tools/ozi-rs-mcp` reference for native desktop QA
 - `docs/requirements.md` — product goals, user workflows, MVP scope
 - `docs/roadmap.md` — phase status and remaining work
+- `docs/reference/oziexplorer.md` — the original OziExplorer: features, file formats (`.map`/`.plt`/`.wpt`/`.rte`/…), and what we take vs. skip
 - `docs/testing-strategy.md` — test layers and quality gates
 - `docs/ci.md` — GitHub Actions CI / release workflows, toolchain pinning, audit ignore policy
 - `docs/adr/` — 24 architecture decision records

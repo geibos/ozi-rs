@@ -18,7 +18,8 @@ ozi-rs/
 ├── opencode.json           # Local opencode/MCP config (registers ozi-rs-mcp).
 │
 ├── docs/                   # All design docs (this is your map).
-│   └── adr/                # 24 architecture decision records (ADR-0001..0024).
+│   ├── adr/                # 24 architecture decision records (ADR-0001..0024).
+│   └── reference/          # Reference on external systems (oziexplorer.md — the original).
 │
 ├── src/                    # Svelte 5 + SvelteKit (adapter-static) + MapLibre frontend.
 │   ├── app.css             # Tailwind 4 entry + semantic-token layer.
@@ -159,5 +160,6 @@ just run-release      # Build no-bundle release and run binary.
 10. `docs/adr/adr-0019-doc-audit-reconciliation.md` … `adr-0024-playwright-not-for-desktop-qa.md` —
     the latest audit, MVP-scope (ADR-0020), no-printing (ADR-0023), and QA-policy decisions.
 11. `docs/native-qa-mcp.md` — when you need to drive the desktop app for QA.
+12. `docs/reference/oziexplorer.md` — background: the original OziExplorer, its file formats, and what ozi-rs takes vs. skips.
 
 ADR-0001 + ADR-0017 are the two most load-bearing for understanding the editing model.
