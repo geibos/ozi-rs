@@ -9,6 +9,8 @@ Last merged slice: **0.2 visible fixes** (2026-09-20). `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
 rustfmt, clippy, type-checks, 248 Rust tests and 278 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
+GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
+Windows NSIS bundle and the smoke builds on all three platforms.
 
 The project is working through `openspec/changes/revive-ui-cycle`, which
 rebuilds the UI development cycle rather than the UI: agents that change
