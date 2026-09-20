@@ -777,21 +777,23 @@ impl Project {
         seg_id_b: u64,
     ) -> Result<TrackSegment, ProjectLayerError> {
         let track = self.track_mut(layer_id, track_id)?;
-        track.join_segments(seg_id_a, seg_id_b).map_err(|err| match err {
-            ProjectLayerError::InvalidSegmentOperation {
-                segment_id, reason, ..
-            } => ProjectLayerError::InvalidSegmentOperation {
-                layer_id,
-                track_id,
-                segment_id,
-                reason,
-            },
-            _ => ProjectLayerError::MissingTrackSegment {
-                layer_id,
-                track_id,
-                segment_id: seg_id_b,
-            },
-        })
+        track
+            .join_segments(seg_id_a, seg_id_b)
+            .map_err(|err| match err {
+                ProjectLayerError::InvalidSegmentOperation {
+                    segment_id, reason, ..
+                } => ProjectLayerError::InvalidSegmentOperation {
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    reason,
+                },
+                _ => ProjectLayerError::MissingTrackSegment {
+                    layer_id,
+                    track_id,
+                    segment_id: seg_id_b,
+                },
+            })
     }
 }
 

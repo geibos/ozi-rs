@@ -103,8 +103,12 @@ lint:
 fmt:
     npm exec -- prettier --write .
 
-# Run all CI-equivalent gates locally (clippy + check + lint + test)
-ci: clippy check lint test
+# Check Rust formatting without writing (the same gate CI runs)
+fmt-check:
+    cargo fmt --all --manifest-path src-tauri/Cargo.toml -- --check
+
+# Run all CI-equivalent gates locally (fmt + clippy + check + lint + test)
+ci: fmt-check clippy check lint test
 
 # Run local release warning hygiene gate
 check-release-warnings:

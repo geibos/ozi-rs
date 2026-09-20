@@ -287,10 +287,7 @@ pub fn import_tracks_directory_into_project(
     Ok(report)
 }
 
-fn collect_track_files(
-    dir: &Path,
-    into: &mut Vec<std::path::PathBuf>,
-) -> std::io::Result<()> {
+fn collect_track_files(dir: &Path, into: &mut Vec<std::path::PathBuf>) -> std::io::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -342,9 +339,8 @@ mod directory_import_tests {
 
         let mut project = project_with_default_layers();
         let mut history = CommandStack::default();
-        let report =
-            import_tracks_directory_into_project(&mut project, &mut history, dir.path())
-                .expect("directory import succeeds");
+        let report = import_tracks_directory_into_project(&mut project, &mut history, dir.path())
+            .expect("directory import succeeds");
 
         assert_eq!(report.imported_files, 2, "two valid gpx files");
         assert_eq!(report.imported_tracks, 2);
@@ -359,8 +355,7 @@ mod directory_import_tests {
 
         let mut project = project_with_default_layers();
         let mut history = CommandStack::default();
-        let result =
-            import_tracks_directory_into_project(&mut project, &mut history, dir.path());
+        let result = import_tracks_directory_into_project(&mut project, &mut history, dir.path());
         assert!(result.is_err(), "no candidates must be a clear error");
     }
 }
@@ -390,7 +385,9 @@ mod zip_routing_tests {
         writer
             .start_file::<_, ()>("20260709/a.gpx", zip::write::FileOptions::default())
             .expect("start entry");
-        writer.write_all(MINIMAL_GPX.as_bytes()).expect("write entry");
+        writer
+            .write_all(MINIMAL_GPX.as_bytes())
+            .expect("write entry");
         writer.finish().expect("finish zip");
 
         let mut project = Project::untitled();

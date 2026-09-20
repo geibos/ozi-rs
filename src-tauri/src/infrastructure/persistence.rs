@@ -275,7 +275,10 @@ mod tests {
         );
         let on_disk = load_project(&path).expect("original must still load");
         assert_eq!(on_disk, original, "failed save must not touch the target");
-        assert!(!tmp_sibling(&path).exists(), "no stale temp file after failure");
+        assert!(
+            !tmp_sibling(&path).exists(),
+            "no stale temp file after failure"
+        );
     }
 
     #[test]
@@ -303,7 +306,10 @@ mod tests {
         let result = save_project(&Project::untitled(), &path);
 
         assert!(result.is_err(), "saving over a directory must fail");
-        assert!(!tmp_sibling(&path).exists(), "no stale temp file after failure");
+        assert!(
+            !tmp_sibling(&path).exists(),
+            "no stale temp file after failure"
+        );
     }
 
     fn touch(path: &std::path::Path) {
@@ -415,12 +421,7 @@ mod tests {
         assert_eq!(loaded.track_layers().len(), 1);
         assert_eq!(loaded.track_layers()[0].name(), "Recorded");
         assert_eq!(loaded.waypoint_layers().len(), 2);
-        assert!(
-            loaded
-                .waypoint_layers()
-                .iter()
-                .any(|l| l.name() == "Camps")
-        );
+        assert!(loaded.waypoint_layers().iter().any(|l| l.name() == "Camps"));
         assert!(
             loaded
                 .waypoint_layers()

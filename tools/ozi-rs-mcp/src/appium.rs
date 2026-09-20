@@ -269,7 +269,8 @@ fn appium_launch_session_with_capabilities(
         // silently kills the session ("invalid session id").
         "appium:newCommandTimeout": APPIUM_NEW_COMMAND_TIMEOUT_SECS
     });
-    if let (Some(target), Some(extra)) = (always_match.as_object_mut(), app_capabilities.as_object())
+    if let (Some(target), Some(extra)) =
+        (always_match.as_object_mut(), app_capabilities.as_object())
     {
         for (key, value) in extra {
             target.insert(key.clone(), value.clone());
@@ -874,9 +875,7 @@ pub fn appium_press_key_with_session_id(
                 truncate(&response.body, 400),
             ),
         ),
-        Err(error) => {
-            webdriver_request_error_result("appium_press_key", server_url, &error)
-        }
+        Err(error) => webdriver_request_error_result("appium_press_key", server_url, &error),
     }
 }
 

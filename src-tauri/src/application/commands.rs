@@ -527,7 +527,9 @@ impl ProjectCommand {
                         .split_at_point(point_id.value(), *new_segment_id)
                         .map_err(|err| match err {
                             ProjectLayerError::InvalidSegmentOperation {
-                                segment_id, reason, ..
+                                segment_id,
+                                reason,
+                                ..
                             } => ProjectLayerError::InvalidSegmentOperation {
                                 layer_id: layer_id.value(),
                                 track_id: track_id.value(),
@@ -580,20 +582,18 @@ impl ProjectCommand {
                             segment_id: segment_id.value(),
                         },
                     )?;
-                    segment
-                        .reorder_points(ids)
-                        .map_err(|mut err| {
-                            if let ProjectLayerError::MissingTrackPoint {
-                                layer_id: l,
-                                track_id: tk,
-                                ..
-                            } = &mut err
-                            {
-                                *l = layer_id.value();
-                                *tk = track_id.value();
-                            }
-                            err
-                        })?;
+                    segment.reorder_points(ids).map_err(|mut err| {
+                        if let ProjectLayerError::MissingTrackPoint {
+                            layer_id: l,
+                            track_id: tk,
+                            ..
+                        } = &mut err
+                        {
+                            *l = layer_id.value();
+                            *tk = track_id.value();
+                        }
+                        err
+                    })?;
                 }
                 Ok(())
             }
@@ -1466,17 +1466,17 @@ mod cj4_tests {
         history
             .apply(
                 &mut project,
-                &ProjectCommand::reorder_track_points(
-                    LayerId::new(20),
-                    TrackId::new(1),
-                    order,
-                ),
+                &ProjectCommand::reorder_track_points(LayerId::new(20), TrackId::new(1), order),
             )
             .expect("reorder applies");
         assert_eq!(point_ids(&project), vec![12, 11, 13, 10]);
 
         assert!(history.undo(&mut project));
-        assert_eq!(point_ids(&project), vec![10, 11, 12, 13], "undo = old order");
+        assert_eq!(
+            point_ids(&project),
+            vec![10, 11, 12, 13],
+            "undo = old order"
+        );
         assert!(history.redo(&mut project));
         assert_eq!(point_ids(&project), vec![12, 11, 13, 10]);
     }
@@ -1493,7 +1493,10 @@ mod cj4_tests {
                 &ProjectCommand::crop_track_points(
                     LayerId::new(20),
                     TrackId::new(1),
-                    vec![(TrackSegmentId::new(2), vec![TrackPointId::new(11), TrackPointId::new(13)])],
+                    vec![(
+                        TrackSegmentId::new(2),
+                        vec![TrackPointId::new(11), TrackPointId::new(13)],
+                    )],
                 ),
             )
             .expect("crop applies");
@@ -1532,7 +1535,11 @@ mod cj4_tests {
             ),
         );
         assert!(result.is_err(), "crop of every point must be rejected");
-        assert_eq!(point_ids(&project), vec![10, 11, 12, 13], "project untouched");
+        assert_eq!(
+            point_ids(&project),
+            vec![10, 11, 12, 13],
+            "project untouched"
+        );
     }
 }
 
@@ -2235,7 +2242,11 @@ mod tests {
         assert!(history.undo(&mut project));
         let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 1);
-        let ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
+        let ids: Vec<u64> = segments[0]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect();
         assert_eq!(ids, vec![10, 11, 12]);
     }
 
@@ -2280,8 +2291,16 @@ mod tests {
 
         let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 2);
-        let left_ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
-        let right_ids: Vec<u64> = segments[1].points().iter().map(|p| p.id().value()).collect();
+        let left_ids: Vec<u64> = segments[0]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect();
+        let right_ids: Vec<u64> = segments[1]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect();
         assert_eq!(left_ids, vec![10, 11]);
         assert_eq!(right_ids, vec![12]);
     }
@@ -2331,7 +2350,11 @@ mod tests {
 
         let segments = project.track_layers()[1].tracks()[0].segments();
         assert_eq!(segments.len(), 1);
-        let ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
+        let ids: Vec<u64> = segments[0]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect();
         assert_eq!(ids, vec![10, 11, 12]);
     }
 
@@ -2475,8 +2498,16 @@ mod tests {
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].id(), TrackSegmentId::new(10));
         assert_eq!(segments[1].id(), TrackSegmentId::new(20));
-        let a_ids: Vec<u64> = segments[0].points().iter().map(|p| p.id().value()).collect();
-        let b_ids: Vec<u64> = segments[1].points().iter().map(|p| p.id().value()).collect();
+        let a_ids: Vec<u64> = segments[0]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect();
+        let b_ids: Vec<u64> = segments[1]
+            .points()
+            .iter()
+            .map(|p| p.id().value())
+            .collect();
         assert_eq!(a_ids, vec![1, 2]);
         assert_eq!(b_ids, vec![3, 4]);
     }

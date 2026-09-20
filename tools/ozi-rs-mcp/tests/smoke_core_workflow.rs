@@ -163,9 +163,13 @@ fn smoke_core_workflow_draw_track() {
     let sid = guard.session_id.as_str();
 
     // 1. Workspace rendered: Library tabs present in the accessibility tree.
-    poll_source_until(server, sid, Duration::from_secs(20), "workspace tabs", |s| {
-        s.contains("Tracks") && s.contains("Waypoints")
-    });
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(20),
+        "workspace tabs",
+        |s| s.contains("Tracks") && s.contains("Waypoints"),
+    );
     println!("ok: workspace rendered (tabs visible)");
 
     // 2. Switch to the Tracks tab. WKWebView exposes web content with varying

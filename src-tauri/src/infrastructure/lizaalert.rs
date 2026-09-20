@@ -760,7 +760,8 @@ pub fn preview_project(summary: LizaProjectSummary, root: &Path) -> Result<LizaP
         Ok(listing) => {
             let mut maps = parse_map_packages(&listing, &summary.url)?;
             let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
-            let cached: Vec<LizaMapPackage> = read_cached_sqlite_map_packages(root, &summary.slug, &zoom_regex)?;
+            let cached: Vec<LizaMapPackage> =
+                read_cached_sqlite_map_packages(root, &summary.slug, &zoom_regex)?;
             for map in &mut maps {
                 if let Some(local) = cached.iter().find(|c| c.file_name == map.file_name) {
                     map.local_path = local.local_path.clone();

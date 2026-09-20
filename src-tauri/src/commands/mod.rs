@@ -302,9 +302,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         project_name: s.project_name().to_owned(),
         project_saved: s.project_file_path().is_some(),
         project_dirty: s.project_dirty(),
-        project_path: s
-            .project_file_path()
-            .map(|p| p.display().to_string()),
+        project_path: s.project_file_path().map(|p| p.display().to_string()),
         status: s.lizaalert_status().to_owned(),
         busy: s.lizaalert_busy(),
         downloading_maps: s.downloading_maps().iter().cloned().collect(),
@@ -437,8 +435,7 @@ pub fn preview_project(
     let state_arc = Arc::clone(&state);
     let app_handle = app.clone();
     std::thread::spawn(move || {
-        let result =
-            crate::infrastructure::lizaalert::preview_project(summary, &bundles_root);
+        let result = crate::infrastructure::lizaalert::preview_project(summary, &bundles_root);
         if let Ok(mut s) = state_arc.lock() {
             s.apply_project_loaded(result);
         }
@@ -728,8 +725,7 @@ pub fn import_tracks_directory(
     state: State<SharedState>,
     app: AppHandle,
 ) -> Result<String, String> {
-    let report = lock_app_state(state.inner())?
-        .import_tracks_directory(PathBuf::from(path))?;
+    let report = lock_app_state(state.inner())?.import_tracks_directory(PathBuf::from(path))?;
     let _ = app.emit("state-changed", ());
     let mut message = format!(
         "Imported {} tracks and {} waypoints from {} files",
@@ -1298,10 +1294,9 @@ pub fn crop_track_to_time(
     to: Option<String>,
 ) -> Result<u32, String> {
     use crate::domain::{LayerId, TrackId};
-    let parse = |value: Option<String>, bound: &str| -> Result<
-        Option<chrono::DateTime<chrono::Utc>>,
-        String,
-    > {
+    let parse = |value: Option<String>,
+                 bound: &str|
+     -> Result<Option<chrono::DateTime<chrono::Utc>>, String> {
         value
             .map(|raw| {
                 raw.parse::<chrono::DateTime<chrono::Utc>>()

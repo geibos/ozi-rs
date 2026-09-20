@@ -1640,11 +1640,17 @@ mod tests {
         state.save_project_to(save_path.clone()).expect("resave");
 
         state.set_track_line_width(track_layer, track_id, 3.0);
-        assert!(state.project_dirty(), "set_track_line_width must mark dirty");
+        assert!(
+            state.project_dirty(),
+            "set_track_line_width must mark dirty"
+        );
         state.save_project_to(save_path.clone()).expect("resave");
 
         state.toggle_track_visible(track_layer, track_id);
-        assert!(state.project_dirty(), "toggle_track_visible must mark dirty");
+        assert!(
+            state.project_dirty(),
+            "toggle_track_visible must mark dirty"
+        );
         state.save_project_to(save_path.clone()).expect("resave");
 
         state
@@ -1868,8 +1874,7 @@ mod tests {
         let session_path = dir.join("nested").join("session.json");
         let project_path = dir.join("mission.ozp");
 
-        let mut state =
-            AppState::new_with_paths(Some(session_path.clone()), dir.join("bundles"));
+        let mut state = AppState::new_with_paths(Some(session_path.clone()), dir.join("bundles"));
         state
             .save_project_to(project_path.clone())
             .expect("save project");

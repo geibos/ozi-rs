@@ -4,9 +4,8 @@ use ozi_rs_mcp::appium::{
     appium_click_with_session_id, appium_doctor_for_state, appium_doctor_with_availability,
     appium_doctor_with_probe, appium_launch_session_with_app_path,
     appium_launch_session_with_availability, appium_launch_session_with_options,
-    appium_launch_session_with_server,
-    appium_page_source_with_session_id, appium_press_key_with_session_id,
-    appium_screenshot_with_fake_image,
+    appium_launch_session_with_server, appium_page_source_with_session_id,
+    appium_press_key_with_session_id, appium_screenshot_with_fake_image,
     appium_screenshot_with_session, appium_screenshot_with_session_id,
     appium_stop_session_with_session, appium_stop_session_with_session_id,
     appium_type_text_with_session, appium_type_text_with_session_id, decode_screenshot_body,
@@ -219,8 +218,8 @@ fn appium_page_source_returns_xml_value() {
         r#"{"value":"<AppiumAUT><XCUIElementTypeApplication label=\"ozi-rs\"/></AppiumAUT>"}"#,
     )]);
 
-    let source = appium_page_source_with_session_id(&server.url(), "sid-src")
-        .expect("page source succeeds");
+    let source =
+        appium_page_source_with_session_id(&server.url(), "sid-src").expect("page source succeeds");
 
     assert!(source.contains("XCUIElementTypeApplication"), "{source}");
     assert_eq!(server.requests(), vec!["GET /session/sid-src/source"]);
@@ -264,11 +263,8 @@ fn appium_launch_session_with_app_path_sends_app_path_capability() {
         r#"{"value":{"sessionId":"session-apppath","capabilities":{}}}"#,
     )]);
 
-    let result = appium_launch_session_with_app_path(
-        true,
-        &server.url(),
-        "/tmp/some workspace/ozi-rs.app",
-    );
+    let result =
+        appium_launch_session_with_app_path(true, &server.url(), "/tmp/some workspace/ozi-rs.app");
 
     assert!(result.ok, "{result:?}");
     let bodies = server.bodies();
