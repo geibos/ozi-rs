@@ -515,7 +515,7 @@
           {#snippet leadingControl()}
             <Popover.Root>
               <Popover.Trigger
-                class="border-border size-4 shrink-0 rounded-full border"
+                class="border-border size-4 shrink-0 rounded-full border p-0"
                 style="background-color: {t.color}"
                 aria-label="Track color"
               ></Popover.Trigger>
@@ -541,6 +541,9 @@
             <span
               class="text-muted-foreground truncate font-mono text-[10px] leading-tight tabular-nums"
               data-testid="track-stats"
+              title={t.durationSeconds !== null
+                ? $i18n("track.durationTooltip")
+                : undefined}
             >
               {formatTrackStats(
                 t.distanceKm,
@@ -552,7 +555,7 @@
           {#snippet trailingControl()}
             <Tooltip.Root>
               <Tooltip.Trigger
-                class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"
+                class="text-muted-foreground hover:text-foreground border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
                 aria-label={$i18n("track.showOnMap")}
                 onclick={() => requestTrackFocus(t.layerId, t.trackId)}
                 data-testid="track-show-on-map"
@@ -572,7 +575,7 @@
             <DropdownMenu.Separator />
             <Popover.Root>
               <Popover.Trigger
-                class="hover:bg-accent hover:text-accent-foreground relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-xs"
+                class="hover:bg-accent hover:text-accent-foreground border-0 bg-transparent relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-xs"
                 onclick={(e: Event) => e.stopPropagation()}
               >
                 Set line width

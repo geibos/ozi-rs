@@ -1,9 +1,10 @@
 // Track statistics formatting helpers for the Tracks panel row UI.
 //
 // Mirrors the semantics required by the `track-display` capability:
-// distance is shown to one decimal place in kilometres, duration is shown as
-// `<h>h <m>m` (or `<m>m` when under an hour) and only when timestamps are
-// available, and the point count is shown with a `pts` suffix. The bullet
+// distance is shown to one decimal place in kilometres, duration is the span
+// between the first and last point timestamp, shown as `<d>d <h>h` from a day
+// upwards, `<h>h <m>m` below that, `<m>m` under an hour, and only when
+// timestamps are available, and the point count is shown with a `pts` suffix. The bullet
 // separator joins only the segments that are present, so the duration
 // separator is dropped when `duration_seconds` is null/undefined.
 
@@ -15,6 +16,12 @@ export function formatDurationSeconds(durationSeconds: number): string {
   const totalSeconds = Math.max(0, Math.trunc(durationSeconds));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
+  // A span of a day or more comes from a multi-day recording, not from a
+  // multi-day walk. Printed as hours it reads as an error ("629h 22m" beside
+  // "4.9 km"); printed as days it reads as the date range it is.
+  if (hours >= 24) {
+    return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+  }
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }

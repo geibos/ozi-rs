@@ -116,7 +116,7 @@
     <span onclick={(e) => e.stopPropagation()}>
       <Tooltip.Root>
         <Tooltip.Trigger
-          class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"
+          class="text-muted-foreground hover:text-foreground border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
           onclick={onToggleVisibility}
           aria-label={visibilityLabel ?? (visible ? `Hide ${name}` : `Show ${name}`)}
         >
@@ -196,7 +196,7 @@
     >
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
-          class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm"
+          class="text-muted-foreground hover:text-foreground border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
           aria-label="Actions"
         >
           <MoreHorizontalIcon class="size-3.5" />

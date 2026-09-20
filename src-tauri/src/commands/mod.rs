@@ -320,29 +320,44 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
 
 // ── Track GeoJSON ─────────────────────────────────────────────────────────────
 
-#[tauri::command]
-#[specta::specta]
-pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value, String> {
-    let s = lock_app_state(state.inner())?;
+/// Build the track `FeatureCollection` the map renders.
+///
+/// Each track is one Feature whose geometry is a `MultiLineString` carrying one
+/// part per segment. Segment boundaries are real breaks in the recording — a
+/// different day, a lost fix, a split the user made — so flattening every
+/// segment into a single `LineString` drew a straight line across the map
+/// between the end of one segment and the start of the next, and made `split`
+/// and `join` invisible on the map.
+///
+/// A segment with fewer than two points cannot be drawn as a line and is
+/// skipped; a track left with no parts is omitted rather than emitted with an
+/// empty geometry.
+fn build_tracks_geojson(layers: &[crate::domain::TrackLayer]) -> serde_json::Value {
     let mut features = Vec::new();
 
-    for layer in s.track_layers() {
+    for layer in layers {
         // LayerId has .value(); TrackId is #[serde(transparent)] so it serializes as u64
         let layer_id_val = layer.id().value();
         for track in layer.tracks() {
-            let summary = to_track_summary_dto(layer_id_val, track);
-
-            let coords: Vec<serde_json::Value> = track
+            let parts: Vec<serde_json::Value> = track
                 .segments()
                 .iter()
-                .flat_map(|seg| seg.points())
-                .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
+                .filter(|seg| seg.points().len() >= 2)
+                .map(|seg| {
+                    serde_json::Value::Array(
+                        seg.points()
+                            .iter()
+                            .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
+                            .collect(),
+                    )
+                })
                 .collect();
 
-            if coords.len() < 2 {
+            if parts.is_empty() {
                 continue;
             }
 
+            let summary = to_track_summary_dto(layer_id_val, track);
             features.push(serde_json::json!({
                 "type": "Feature",
                 "properties": {
@@ -357,17 +372,24 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
                     "point_count": summary.point_count,
                 },
                 "geometry": {
-                    "type": "LineString",
-                    "coordinates": coords,
+                    "type": "MultiLineString",
+                    "coordinates": parts,
                 }
             }));
         }
     }
 
-    Ok(serde_json::json!({
+    serde_json::json!({
         "type": "FeatureCollection",
         "features": features,
-    }))
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value, String> {
+    let s = lock_app_state(state.inner())?;
+    Ok(build_tracks_geojson(s.track_layers()))
 }
 
 // ── LizaAlert project loading ─────────────────────────────────────────────────
@@ -1556,7 +1578,7 @@ pub fn create_empty_track(
 
 #[cfg(test)]
 mod tests {
-    use super::{PointDetailDto, SegmentDetailDto, TrackDetailDto};
+    use super::{PointDetailDto, SegmentDetailDto, TrackDetailDto, build_tracks_geojson};
     use crate::domain::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
 
     #[test]
@@ -1605,34 +1627,142 @@ mod tests {
         assert!(dto.segments[0].points[0].timestamp.is_none());
     }
 
+    fn layer_with(tracks: Vec<Track>) -> crate::domain::TrackLayer {
+        let mut layer = crate::domain::TrackLayer::new(crate::domain::LayerId::new(7), "Tracks");
+        for track in tracks {
+            layer.add_track(track);
+        }
+        layer
+    }
+
+    fn segment(id: u64, points: &[(f64, f64)]) -> TrackSegment {
+        let mut seg = TrackSegment::new(TrackSegmentId::new(id));
+        for (i, (lat, lon)) in points.iter().enumerate() {
+            seg.add_point(TrackPoint::new(
+                TrackPointId::new(id * 100 + i as u64),
+                *lat,
+                *lon,
+            ));
+        }
+        seg
+    }
+
+    fn track_with(id: u64, name: &str, segments: Vec<TrackSegment>) -> Track {
+        let mut track = Track::new(TrackId::new(id), name);
+        for seg in segments {
+            track.add_segment(seg);
+        }
+        track
+    }
+
+    /// A recorded track is one Feature with one MultiLineString part per
+    /// segment. Flattening the segments into a single LineString drew a
+    /// straight line across the map between the end of one segment and the
+    /// start of the next.
     #[test]
-    fn get_tracks_geojson_skips_empty_tracks() {
-        use crate::domain::{
-            Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
-        };
+    fn tracks_geojson_emits_one_part_per_segment() {
+        let layer = layer_with(vec![track_with(
+            2,
+            "Two days",
+            vec![
+                segment(1, &[(55.0, 37.0), (55.1, 37.1)]),
+                segment(2, &[(56.0, 38.0), (56.1, 38.1), (56.2, 38.2)]),
+            ],
+        )]);
 
-        // Empty track produces empty coords
-        let empty = Track::new(TrackId::new(1), "Empty");
-        let coords: Vec<serde_json::Value> = empty
-            .segments()
-            .iter()
-            .flat_map(|seg| seg.points())
-            .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
-            .collect();
-        assert!(coords.len() < 2);
+        let geojson = build_tracks_geojson(std::slice::from_ref(&layer));
 
-        // Track with 2 points produces valid coords
-        let mut valid = Track::new(TrackId::new(2), "Valid");
-        let mut seg = TrackSegment::new(TrackSegmentId::new(1));
-        seg.add_point(TrackPoint::new(TrackPointId::new(1), 55.0, 37.0));
-        seg.add_point(TrackPoint::new(TrackPointId::new(2), 55.1, 37.1));
-        valid.add_segment(seg);
-        let coords2: Vec<serde_json::Value> = valid
-            .segments()
-            .iter()
-            .flat_map(|seg| seg.points())
-            .map(|pt| serde_json::json!([pt.longitude(), pt.latitude()]))
-            .collect();
-        assert!(coords2.len() >= 2);
+        let features = geojson["features"].as_array().expect("features array");
+        assert_eq!(features.len(), 1);
+        let geometry = &features[0]["geometry"];
+        assert_eq!(geometry["type"], "MultiLineString");
+        let parts = geometry["coordinates"].as_array().expect("parts");
+        assert_eq!(parts.len(), 2, "one part per segment");
+        assert_eq!(parts[0].as_array().expect("part 0").len(), 2);
+        assert_eq!(parts[1].as_array().expect("part 1").len(), 3);
+        assert_eq!(parts[0][0], serde_json::json!([37.0, 55.0]));
+        assert_eq!(features[0]["properties"]["name"], "Two days");
+        assert_eq!(features[0]["properties"]["track_id"], 2);
+        assert_eq!(features[0]["properties"]["layer_id"], 7);
+    }
+
+    /// Splitting a segment adds a part, which is how a split becomes visible
+    /// on the map at all.
+    #[test]
+    fn tracks_geojson_part_count_follows_segment_count() {
+        let one = layer_with(vec![track_with(
+            1,
+            "Whole",
+            vec![segment(1, &[(55.0, 37.0), (55.1, 37.1), (55.2, 37.2)])],
+        )]);
+        let split = layer_with(vec![track_with(
+            1,
+            "Split",
+            vec![
+                segment(1, &[(55.0, 37.0), (55.1, 37.1)]),
+                segment(2, &[(55.1, 37.1), (55.2, 37.2)]),
+            ],
+        )]);
+
+        let before = build_tracks_geojson(std::slice::from_ref(&one));
+        let after = build_tracks_geojson(std::slice::from_ref(&split));
+
+        assert_eq!(
+            before["features"][0]["geometry"]["coordinates"]
+                .as_array()
+                .expect("parts")
+                .len(),
+            1
+        );
+        assert_eq!(
+            after["features"][0]["geometry"]["coordinates"]
+                .as_array()
+                .expect("parts")
+                .len(),
+            2
+        );
+    }
+
+    /// A one-point segment cannot be drawn as a line; it must not collapse the
+    /// rest of the track or produce a degenerate part.
+    #[test]
+    fn tracks_geojson_skips_segments_shorter_than_two_points() {
+        let layer = layer_with(vec![track_with(
+            3,
+            "Stray point",
+            vec![
+                segment(1, &[(55.0, 37.0)]),
+                segment(2, &[(56.0, 38.0), (56.1, 38.1)]),
+            ],
+        )]);
+
+        let geojson = build_tracks_geojson(std::slice::from_ref(&layer));
+
+        let parts = geojson["features"][0]["geometry"]["coordinates"]
+            .as_array()
+            .expect("parts");
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0].as_array().expect("part 0").len(), 2);
+    }
+
+    /// A track with nothing drawable is omitted entirely rather than emitted
+    /// as an empty geometry.
+    #[test]
+    fn tracks_geojson_omits_tracks_without_drawable_parts() {
+        let layer = layer_with(vec![
+            track_with(4, "Empty", vec![]),
+            track_with(5, "Single point", vec![segment(1, &[(55.0, 37.0)])]),
+            track_with(
+                6,
+                "Drawable",
+                vec![segment(2, &[(55.0, 37.0), (55.1, 37.1)])],
+            ),
+        ]);
+
+        let geojson = build_tracks_geojson(std::slice::from_ref(&layer));
+
+        let features = geojson["features"].as_array().expect("features array");
+        assert_eq!(features.len(), 1);
+        assert_eq!(features[0]["properties"]["name"], "Drawable");
     }
 }

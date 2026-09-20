@@ -364,7 +364,12 @@
           {formatDistanceKm(summary!.distance_km)}
         </dd>
         <dt class="text-muted-foreground">Duration</dt>
-        <dd class="min-w-0 truncate font-mono">
+        <dd
+          class="min-w-0 truncate font-mono"
+          title={summary!.duration_seconds !== null
+            ? $t("track.durationTooltip")
+            : undefined}
+        >
           {summary!.duration_seconds !== null
             ? formatDurationSeconds(summary!.duration_seconds!)
             : "—"}

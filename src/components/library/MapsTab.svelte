@@ -25,11 +25,15 @@
     downloadProgress,
   } from "$lib/stores";
   import { openSelectedMap, revealBundle } from "$lib/api";
+  import { mapsForLibrary } from "$lib/maps-list";
   import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import LibraryRow from "./LibraryRow.svelte";
 
-  const maps = $derived($currentProject?.maps ?? []);
+  // A locally opened OZI map belongs to no LizaAlert project, so listing
+  // `currentProject.maps` alone showed "No maps in this project" while that
+  // map was rendering on the canvas. See `mapsForLibrary`.
+  const maps = $derived(mapsForLibrary($currentProject?.maps ?? [], $activeMap));
 
   /**
    * Open the bundle loader — the same mechanism the command palette's
