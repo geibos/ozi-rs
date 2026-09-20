@@ -1,3 +1,0 @@
-git diff -- .opencode/oh-my-opencode.json
-
-git diff -- src-tauri/gen/schemas
