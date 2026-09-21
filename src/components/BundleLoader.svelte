@@ -415,13 +415,6 @@
           >
             <div class="map-row">
               <span class="map-name">{m.name}</span>
-              {#if !isDownloading && m.size_bytes != null}
-                <!-- The number that decides whether this is worth doing on a
-                     phone tether: fifteen megabytes or two hundred. -->
-                <span class="map-size" data-testid="map-size">
-                  {formatOptionalBytes(m.size_bytes, $locale)}
-                </span>
-              {/if}
               {#if isDownloading}
                 <span class="badge blue">
                   {pct != null ? `${pct}%` : "…"}
@@ -432,6 +425,16 @@
                 <span class="badge orange">↓</span>
               {/if}
             </div>
+
+            {#if !isDownloading && m.size_bytes != null}
+              <!-- Its own line: the column is ~240px and a map name fills it,
+                   so a size beside the name was cut off at the edge. This is
+                   the number that decides whether the download is worth doing
+                   on a phone tether — fifteen megabytes or two hundred. -->
+              <span class="map-size" data-testid="map-size">
+                {formatOptionalBytes(m.size_bytes, $locale)}
+              </span>
+            {/if}
 
             {#if isDownloading && prog}
               <div class="prog-row">
@@ -713,15 +716,17 @@
   }
 
   .map-size {
-    flex-shrink: 0;
-    margin-left: auto;
     font-size: 11px;
     color: hsl(var(--muted-foreground));
     font-variant-numeric: tabular-nums;
   }
 
+  /* `min-width: 0` is what makes the ellipsis work: a flex item defaults to
+     min-width auto and refuses to shrink below its content, so a long map
+     name pushed the size and the downloaded badge out of the column. */
   .map-name {
     flex: 1;
+    min-width: 0;
     font-size: 12px;
     color: hsl(var(--foreground));
     overflow: hidden;

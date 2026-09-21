@@ -10,6 +10,32 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — how big is this download?
+
+Opening a map commits to a download, and nothing said how big it was. In a
+штаб running off a phone tether, the difference between a 16 MiB topo layer and
+a 185 MiB satellite layer decides whether the map gets fetched at all.
+
+The number was already in the listing the app parses — the cell beside each
+file — and was being discarded. Every map row now carries it, in the loader and
+in the Maps tab; a cached map reports the file on disk.
+
+Three copies of a byte formatter lived in the loader, the download popup and
+the cold-start status bar, printing English units into a Russian window and
+disagreeing about MB versus MiB. One shared function now, in the app's
+language, and the status bar's last English strings ("Downloading", "Cancel")
+are translated.
+
+| | |
+|---|---|
+| After | [sizes on every map](2026-09-21-download-size/after-map-sizes.png) |
+| Automated gates | `just ci` green (282 Rust, 315 frontend) |
+
+The size went on its own line after the first attempt put it beside the name
+and the column — about 240px — cut it off.
+
+---
+
 ## 2026-09-21 — which of these can I still open?
 
 Thirteen thousand four hundred and forty projects, twenty-three of them on this

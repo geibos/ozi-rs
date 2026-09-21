@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **which bundles are on disk** (2026-09-21) — the project
-list marks downloaded bundles and can show only them, the filter matches the
-slug, and a single-map download has a progress panel and a cancel — after the
+Last merged slice: **how big is this download** (2026-09-21) — every map row
+states its size, read from the listing the app already parses, with one shared
+locale-aware byte formatter — after slice 0.3 closing (timeouts, Esc discarding
+a draw, `qa_observe`, exports returning errors), the project list marking
+downloaded bundles, single-map downloads getting a panel and a cancel, and the
 bundle flow slice (refusals carry a reason, loader failures are visible, the
 progress panel belongs to the running download, a downloaded bundle is
 recognised wherever its files sit, Cmd-K copes with the full catalogue),
@@ -15,7 +17,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 279 Rust tests and 311 frontend tests;
+rustfmt, clippy, type-checks, 282 Rust tests and 315 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -39,9 +41,10 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **How big is this download?** Map packages carry no byte size, and the
-   prominent button fetches the whole project directory rather than the chosen
-   map. On a tethered phone that is gigabytes with no estimate.
+1. **The prominent button still fetches everything.** "Открыть бандл
+   (скачать)" downloads the whole project directory recursively, not the map
+   the operator picked, and has no total to show. Per-map sizes are on screen
+   now; the bundle button needs either a total or a narrower job.
 2. **The loader Sheet hides the download it started** (overlay `z-50` over a
    `z-40` panel), and the toaster lands in the same corner.
 3. **Slice 1.1 — fixtures from the Rust core** (`revive-ui-cycle` section 2),
