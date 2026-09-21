@@ -315,9 +315,25 @@
     try {
       const dir = await open({ directory: true, multiple: false });
       if (!dir) return;
-      const summary = await importTracksDirectory(dir as string);
+      const report = await importTracksDirectory(dir as string);
       requestAllDataFocus();
-      toast.success(summary);
+      // The backend sends what happened; the wording is here. It used to send
+      // an English sentence that went straight into this toast.
+      const summary = $i18n("tracksTab.importFolderDone")
+        .replace("{tracks}", String(report.tracks))
+        .replace("{waypoints}", String(report.waypoints))
+        .replace("{files}", String(report.files));
+      if (report.skipped.length === 0) {
+        toast.success(summary);
+      } else {
+        // A folder where one navigator's file is unreadable still imported the
+        // rest — that is a success with a caveat, not a failure.
+        toast.warning(summary, {
+          description: $i18n("tracksTab.importFolderSkipped")
+            .replace("{count}", String(report.skipped.length))
+            .replace("{files}", report.skipped.join(", ")),
+        });
+      }
     } catch (err) {
       toast.error($i18n("tracksTab.importFolderFailed"), {
         description: String(err),

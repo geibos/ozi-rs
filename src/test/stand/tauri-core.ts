@@ -108,6 +108,12 @@ function requestedFailure(): string | null {
   return FAILURE;
 }
 
+/** The last path component, which is what an import summary names. */
+function standFileLabel(path: unknown, fallback: string): string {
+  if (typeof path !== "string" || path === "") return fallback;
+  return path.split("/").filter(Boolean).pop() ?? fallback;
+}
+
 function requestedState(): "cold" | "workspace" {
   if (typeof location === "undefined") return "workspace";
   return new URLSearchParams(location.search).get("state") === "cold"
@@ -124,6 +130,37 @@ function requestedState(): "cold" | "workspace" {
  * spinning. The slug is what the loader matches on, so the stand has to move
  * it.
  */
+/**
+ * What an import has added during this stand session.
+ *
+ * The stand serves fixtures, so an import used to be unanswerable and threw.
+ * Now that a file dialog can answer with a path, the import flow is walkable —
+ * but only if importing visibly changes the screen, which is the whole thing
+ * an operator is checking. These rows are appended to the fixture's, and a
+ * reload clears them, as a fresh launch would.
+ */
+const importedTracks: Array<Record<string, unknown>> = [];
+let importedLayerId = 10;
+
+function importOneLayer(label: string, trackCount: number): string {
+  importedLayerId += 1;
+  for (let i = 0; i < trackCount; i += 1) {
+    importedTracks.push({
+      layer_id: importedLayerId,
+      track_id: importedTracks.length + 100,
+      name: `${label} ${i + 1}`,
+      color: "rgba(37,99,235,1.000)",
+      line_width: 3.0,
+      visible: true,
+      point_count: 42,
+      distance_km: 3.7,
+      duration_seconds: 5400,
+    });
+  }
+  standEmit("state-changed", undefined);
+  return `Imported ${trackCount} tracks from ${label}`;
+}
+
 let previewedSlug: string | null = null;
 
 function previewedAppState(): unknown {
@@ -143,7 +180,7 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
   // The rows the Tracks tab reads — its own fixture, not the map's features.
   // Deriving them from the geometry would have made the stand inherit the very
   // omission this listing exists to undo.
-  list_tracks: () => tracksListFixture,
+  list_tracks: () => [...tracksListFixture, ...importedTracks],
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
       ? trackDetailFixture
@@ -186,6 +223,28 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
     tracks: tracksListFixture.length,
     waypoints: waypointsFixture.length,
   }),
+  // Imports: the command answers with the summary the Tracks tab shows, and
+  // the rows appear. Without an answer here the stand threw, which is correct
+  // for a command nobody has thought about and wrong for the first thing a
+  // crew does with a day's recordings.
+  import_gpx: (args) =>
+    importOneLayer(standFileLabel(args?.path, "20260708_Veter2.gpx"), 1),
+  import_plt: (args) =>
+    importOneLayer(standFileLabel(args?.path, "20260708_Veter2.plt"), 1),
+  import_tracks_directory: (args) => {
+    const label = standFileLabel(args?.path, "20260921");
+    importOneLayer(label, 3);
+    // Counts, not a sentence: the interface does the wording now. One file is
+    // reported unreadable, because the caveat branch is a screen too.
+    return { files: 4, tracks: 3, waypoints: 2, skipped: ["ЛИСА17.plt"] };
+  },
+  // Opening a saved project: the stand has one project, so this reports
+  // success and leaves the fixture in place. What the flow is checked for is
+  // the framing, the recents and the toast, all of which are frontend.
+  load_project_file: () => {
+    standEmit("state-changed", undefined);
+    return null;
+  },
   open_local_bundle: () => "",
   // The catalogue arrives as a stream, so the stand sends one: the cached
   // chunk first, then the walk's boundaries around the walk's own chunk. The

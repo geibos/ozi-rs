@@ -66,10 +66,20 @@ describe("Tracks tab — unified import (tasks B & C)", () => {
   });
 
   it("api.ts wrapper delegates to the generated bindings command", () => {
-    expect(apiSource).toContain(
-      "export async function importTracksDirectory(path: string): Promise<string>",
-    );
+    // The return type changed from a sentence to counts on 2026-09-22: the
+    // backend had been building an English summary that went straight into a
+    // toast. What this pins is the delegation, not the shape — the shape is
+    // the generated binding's business.
+    expect(apiSource).toContain("export async function importTracksDirectory(");
     expect(apiSource).toContain("commands.importTracksDirectory(path)");
+  });
+
+  it("the folder import is worded by the interface, not by the backend", () => {
+    expect(tracksTabSource).toContain('$i18n("tracksTab.importFolderDone")');
+    expect(tracksTabSource).toContain('$i18n("tracksTab.importFolderSkipped")');
+    // A folder where one file was unreadable imported the rest: a caveat, not
+    // a failure.
+    expect(tracksTabSource).toContain("toast.warning(summary,");
   });
 });
 

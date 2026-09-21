@@ -215,9 +215,12 @@ and the palette slice; these were not.
 - ~~Backend progress text is English.~~ Done on 2026-09-21 in
   `progress-in-the-crews-language`: the bundle path sends a key and its
   arguments, both status surfaces translate the message and the phase, and the
-  backend's English wording is the fallback. Still English: the `AppState`
-  status line's own 44 messages, which no surface currently renders — convert
-  them the same way if one starts to.
+  backend's English wording is the fallback. The folder import's summary was
+  the one that *was* being rendered, and it was converted on 2026-09-22 in
+  `the-import-speaks-russian`. Still English: the `AppState` status line's own
+  44 messages, which no surface currently renders — convert them the same way
+  if one starts to. Worth a guard over the shape rather than a third sweep:
+  a backend string that reaches a toast.
 - ~~The catalogue is walked in full at every launch, holding the busy flag.~~
   Both halves are done. It is stoppable since 2026-09-21
   (`stop-waiting-for-the-catalogue`), and since 2026-09-22 it holds a flag of

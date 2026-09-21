@@ -161,7 +161,7 @@ async importPlt(path: string) : Promise<Result<string, string>> {
  * CJ-3: recursively import every GPX/PLT under a folder (per-date
  * subfolders included). Per-file failures are reported, not fatal.
  */
-async importTracksDirectory(path: string) : Promise<Result<string, string>> {
+async importTracksDirectory(path: string) : Promise<Result<ImportReportDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("import_tracks_directory", { path }) };
 } catch (e) {
@@ -605,6 +605,20 @@ export type DiagnosticDto = { level: string; message: string }
  * Lat/lon bounding box for extent crops — the current map viewport.
  */
 export type ExtentDto = { min_lat: number; min_lon: number; max_lat: number; max_lon: number }
+/**
+ * What a folder import did, for the interface to put into words.
+ * 
+ * This used to be an English sentence built here and toasted verbatim, so a
+ * Russian crew read "Imported 12 tracks and 3 waypoints from 4 files" after
+ * the most common import there is. Same rule as the bundle progress: the
+ * backend sends what happened, the interface says it.
+ */
+export type ImportReportDto = { files: number; tracks: number; waypoints: number; 
+/**
+ * Names of the files that could not be read. Names, not paths: a toast
+ * has no room for a directory tree and the name is what is recognised.
+ */
+skipped: string[] }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LayerSummaryDto = { id: number; name: string }
 export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: boolean; 

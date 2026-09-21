@@ -1,5 +1,5 @@
 mod commands;
-mod import;
+pub mod import;
 
 pub use crate::infrastructure::import::PltImportError;
 pub use commands::{CommandError, CommandStack, ProjectCommand};

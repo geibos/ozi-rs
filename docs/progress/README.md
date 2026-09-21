@@ -10,6 +10,46 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the import speaks Russian
+
+Importing a folder is how a day's recordings arrive — the field archive is a
+directory of per-date subfolders — and the command answered with an English
+sentence that the Tracks tab put straight into a toast. A Russian crew finished
+the most common import there is and read «Imported 12 tracks and 3 waypoints
+from 4 files».
+
+The project decided this question once already. `progress-in-the-crews-language`
+moved the bundle progress to a key and its arguments, and its own note said the
+remaining English sat in status messages "which no surface currently renders —
+convert them the same way if one starts to". This one was being rendered the
+whole time.
+
+It stayed invisible because nothing could walk it. The stand's dialog stub
+answered "cancelled" to everything — the right default, and it meant no flow
+behind a file dialog could be looked at at all. Yesterday's slice gave it an
+answer; this one gave the stand the import commands, with the imported rows
+actually appearing in the list, because an import that changes nothing on
+screen proves nothing about the import.
+
+Now: «Импортировано: треков 3, точек 2, из файлов 4», and when one navigator's
+file cannot be read, its name arrives as the toast's description rather than
+instead of the result. That distinction is the point — the rest of the folder
+did import, and calling the whole thing a failure would send a crew looking for
+work that is already on screen. The names are file names, not paths: a toast
+has no room for a directory tree.
+
+Measured on the stand in the caveat branch, which is the one worth seeing. The
+clean branch builds the same summary string and differs only in which toast it
+calls.
+
+| | |
+|---|---|
+| Change | `openspec/changes/the-import-speaks-russian/` |
+| Automated gates | `just ci` green (334 Rust, 494 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the day's marks go with it
 
 «Выгрузить всё…» wrote every track in the project to one GPX and stopped there.

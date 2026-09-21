@@ -139,6 +139,9 @@ const dictionaries = {
     "tracksTab.importDone": "Imported {count} of {total} files",
     "tracksTab.importFailedFiles": "Failed: {files}",
     "tracksTab.importFolderFailed": "Failed to import folder",
+    "tracksTab.importFolderDone":
+      "Imported: {tracks} tracks, {waypoints} waypoints, from {files} files",
+    "tracksTab.importFolderSkipped": "Could not read {count}: {files}",
     "tracksTab.nameHint": "Format: YYYYMMDD_Callsign",
     "waypointsTab.empty": "No waypoints yet",
     "waypointsTab.layer": "Waypoint layer",
@@ -472,6 +475,9 @@ const dictionaries = {
     "tracksTab.importDone": "Импортировано файлов: {count} из {total}",
     "tracksTab.importFailedFiles": "Не удалось: {files}",
     "tracksTab.importFolderFailed": "Не удалось импортировать папку",
+    "tracksTab.importFolderDone":
+      "Импортировано: треков {tracks}, точек {waypoints}, из файлов {files}",
+    "tracksTab.importFolderSkipped": "Не прочитано {count}: {files}",
     "tracksTab.nameHint": "Формат: ГГГГММДД_Позывной",
     "waypointsTab.empty": "Точек пока нет",
     "waypointsTab.layer": "Слой точек",

@@ -2,6 +2,7 @@ import {
   commands,
   type DayExportDto,
   type ExtentDto,
+  type ImportReportDto,
   type Result,
   type TrackSummaryDto,
 } from "./bindings";
@@ -188,7 +189,9 @@ export async function importPlt(path: string): Promise<string> {
  * included). Returns a human-readable summary string — per-file failures
  * are folded into the summary, not thrown.
  */
-export async function importTracksDirectory(path: string): Promise<string> {
+export async function importTracksDirectory(
+  path: string,
+): Promise<ImportReportDto> {
   return unwrap(
     "import_tracks_directory",
     commands.importTracksDirectory(path),

@@ -926,29 +926,45 @@ pub fn import_tracks_directory(
     path: String,
     state: State<SharedState>,
     app: AppHandle,
-) -> Result<String, String> {
+) -> Result<ImportReportDto, String> {
     let report = lock_app_state(state.inner())?.import_tracks_directory(PathBuf::from(path))?;
     let _ = app.emit("state-changed", ());
-    let mut message = format!(
-        "Imported {} tracks and {} waypoints from {} files",
-        report.imported_tracks, report.imported_waypoints, report.imported_files,
-    );
-    if !report.skipped.is_empty() {
-        message.push_str(&format!(
-            "; skipped {}: {}",
-            report.skipped.len(),
-            report
+    Ok(ImportReportDto::from(report))
+}
+
+/// What a folder import did, for the interface to put into words.
+///
+/// This used to be an English sentence built here and toasted verbatim, so a
+/// Russian crew read "Imported 12 tracks and 3 waypoints from 4 files" after
+/// the most common import there is. Same rule as the bundle progress: the
+/// backend sends what happened, the interface says it.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct ImportReportDto {
+    pub files: u32,
+    pub tracks: u32,
+    pub waypoints: u32,
+    /// Names of the files that could not be read. Names, not paths: a toast
+    /// has no room for a directory tree and the name is what is recognised.
+    pub skipped: Vec<String>,
+}
+
+impl From<crate::application::import::DirectoryImportReport> for ImportReportDto {
+    fn from(report: crate::application::import::DirectoryImportReport) -> Self {
+        Self {
+            files: report.imported_files as u32,
+            tracks: report.imported_tracks as u32,
+            waypoints: report.imported_waypoints as u32,
+            skipped: report
                 .skipped
                 .iter()
-                .map(|(p, _)| p
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default())
-                .collect::<Vec<_>>()
-                .join(", "),
-        ));
+                .map(|(path, _)| {
+                    path.file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_default()
+                })
+                .collect(),
+        }
     }
-    Ok(message)
 }
 
 #[tauri::command]
@@ -1945,6 +1961,48 @@ mod tests {
         list_track_summaries,
     };
     use crate::domain::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+    /// Importing a folder is how a day's recordings arrive — the archive is a
+    /// directory of per-date subfolders — and the command answered with an
+    /// English sentence that the Tracks tab put straight into a toast. A
+    /// Russian crew read "Imported 12 tracks and 3 waypoints from 4 files".
+    ///
+    /// The same rule the bundle progress got in `progress-in-the-crews-
+    /// language`: the backend sends what happened, the interface says it.
+    #[test]
+    fn a_folder_import_reports_counts_rather_than_an_english_sentence() {
+        let report = crate::application::import::DirectoryImportReport {
+            imported_files: 4,
+            imported_tracks: 12,
+            imported_waypoints: 3,
+            skipped: vec![(
+                std::path::PathBuf::from("/searches/2026-09-21/broken.plt"),
+                "no valid points".to_owned(),
+            )],
+        };
+
+        let dto = super::ImportReportDto::from(report);
+
+        assert_eq!(dto.files, 4);
+        assert_eq!(dto.tracks, 12);
+        assert_eq!(dto.waypoints, 3);
+        // The names, not the paths: a toast has no room for a directory tree,
+        // and the file name is what the operator recognises.
+        assert_eq!(dto.skipped, vec!["broken.plt".to_owned()]);
+    }
+
+    /// A folder where everything imported says so with an empty list, not with
+    /// an absent field the interface has to guess about.
+    #[test]
+    fn a_clean_folder_import_reports_nothing_skipped() {
+        let dto = super::ImportReportDto::from(crate::application::import::DirectoryImportReport {
+            imported_files: 2,
+            imported_tracks: 2,
+            imported_waypoints: 0,
+            skipped: Vec::new(),
+        });
+        assert!(dto.skipped.is_empty());
+    }
 
     #[test]
     fn test_get_track_detail() {
