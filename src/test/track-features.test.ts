@@ -18,9 +18,15 @@ const feature = (
   geometry: GeoJSON.Geometry,
   over: Record<string, unknown> = {},
 ): GeoJSON.Feature =>
-  ({ type: "Feature", geometry, properties: properties(over) }) as GeoJSON.Feature;
+  ({
+    type: "Feature",
+    geometry,
+    properties: properties(over),
+  }) as GeoJSON.Feature;
 
-const collection = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({
+const collection = (
+  features: GeoJSON.Feature[],
+): GeoJSON.FeatureCollection => ({
   type: "FeatureCollection",
   features,
 });
@@ -61,12 +67,16 @@ describe("track rows built from the tracks GeoJSON", () => {
   });
 
   it("still keeps plain LineString tracks", () => {
-    expect(trackFeaturesFromGeojson(collection([feature(single)]))).toHaveLength(1);
+    expect(
+      trackFeaturesFromGeojson(collection([feature(single)])),
+    ).toHaveLength(1);
   });
 
   it("drops geometry that is not a line", () => {
     const point: GeoJSON.Geometry = { type: "Point", coordinates: [37, 55] };
-    expect(trackFeaturesFromGeojson(collection([feature(point)]))).toHaveLength(0);
+    expect(trackFeaturesFromGeojson(collection([feature(point)]))).toHaveLength(
+      0,
+    );
   });
 
   it("treats a missing duration as absent rather than zero", () => {
