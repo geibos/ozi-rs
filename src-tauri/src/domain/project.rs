@@ -725,6 +725,42 @@ impl Project {
         layer.toggle_waypoint_visible(waypoint_id)
     }
 
+    /// Set the visibility of every waypoint in every waypoint layer.
+    ///
+    /// The Waypoints tab needs the same one-step triage the Tracks tab has:
+    /// with a screenful of marks, hiding them one at a time is the slowest
+    /// part of reading a search area.
+    pub fn set_all_waypoints_visible(&mut self, visible: bool) {
+        for layer in self.waypoint_layers.iter_mut() {
+            let ids: Vec<WaypointId> = layer.waypoints().iter().map(|w| w.id()).collect();
+            for id in ids {
+                layer.set_waypoint_visible(id, visible);
+            }
+        }
+    }
+
+    /// Make one waypoint visible and hide every other one in the project.
+    ///
+    /// Returns false when the waypoint does not exist, leaving visibility as
+    /// it was rather than blanking the map.
+    pub fn show_only_waypoint(&mut self, layer_id: LayerId, waypoint_id: WaypointId) -> bool {
+        let exists = self.waypoint_layers.iter().any(|layer| {
+            layer.id() == layer_id && layer.waypoints().iter().any(|w| w.id() == waypoint_id)
+        });
+        if !exists {
+            return false;
+        }
+        self.set_all_waypoints_visible(false);
+        if let Some(layer) = self
+            .waypoint_layers
+            .iter_mut()
+            .find(|layer| layer.id() == layer_id)
+        {
+            layer.set_waypoint_visible(waypoint_id, true);
+        }
+        true
+    }
+
     pub fn move_waypoint_in_layer<L: LayerIdLike, W: WaypointIdLike>(
         &mut self,
         layer_id: L,
@@ -956,6 +992,60 @@ mod tests {
             .map(|t| t.name())
             .collect();
         assert_eq!(visible, vec!["a2"]);
+    }
+
+    fn project_with_two_waypoint_layers() -> Project {
+        let mut first = WaypointLayer::new(LayerId::new(10), "A");
+        first.add_waypoint(Waypoint::new(WaypointId::new(1), "штаб", 55.0, 37.0));
+        first.add_waypoint(Waypoint::new(WaypointId::new(2), "задача 1", 55.1, 37.1));
+        let mut second = WaypointLayer::new(LayerId::new(20), "B");
+        second.add_waypoint(Waypoint::new(WaypointId::new(1), "находка", 55.2, 37.2));
+        let mut project = Project::untitled();
+        project.add_waypoint_layer(first);
+        project.add_waypoint_layer(second);
+        project
+    }
+
+    fn visible_waypoint_names(project: &Project) -> Vec<&str> {
+        project
+            .waypoint_layers()
+            .iter()
+            .flat_map(|l| l.waypoints().iter())
+            .filter(|w| w.visible())
+            .map(|w| w.name())
+            .collect()
+    }
+
+    #[test]
+    fn set_all_waypoints_visible_covers_every_layer() {
+        let mut project = project_with_two_waypoint_layers();
+        project.set_all_waypoints_visible(false);
+        assert!(visible_waypoint_names(&project).is_empty());
+        project.set_all_waypoints_visible(true);
+        assert_eq!(visible_waypoint_names(&project).len(), 3);
+    }
+
+    #[test]
+    fn show_only_waypoint_leaves_exactly_one_visible() {
+        let mut project = project_with_two_waypoint_layers();
+        assert!(project.show_only_waypoint(LayerId::new(20), WaypointId::new(1)));
+        assert_eq!(visible_waypoint_names(&project), vec!["находка"]);
+    }
+
+    #[test]
+    fn show_only_waypoint_shows_one_that_was_hidden() {
+        let mut project = project_with_two_waypoint_layers();
+        project.set_all_waypoints_visible(false);
+        assert!(project.show_only_waypoint(LayerId::new(10), WaypointId::new(2)));
+        assert_eq!(visible_waypoint_names(&project), vec!["задача 1"]);
+    }
+
+    /// A stale row must not blank the map.
+    #[test]
+    fn show_only_waypoint_is_a_no_op_for_a_missing_waypoint() {
+        let mut project = project_with_two_waypoint_layers();
+        assert!(!project.show_only_waypoint(LayerId::new(10), WaypointId::new(99)));
+        assert_eq!(visible_waypoint_names(&project).len(), 3);
     }
 
     /// A stale row must not blank the map.

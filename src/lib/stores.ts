@@ -366,7 +366,8 @@ export const tracksGeometryVersion = writable(0);
  */
 export type MapFocusRequest =
   | { kind: "track"; layerId: bigint; trackId: bigint; nonce: number }
-  | { kind: "all-tracks"; nonce: number };
+  | { kind: "all-tracks"; nonce: number }
+  | { kind: "waypoint"; lat: number; lon: number; nonce: number };
 
 export const mapFocusRequest = writable<MapFocusRequest | null>(null);
 
@@ -389,6 +390,16 @@ export function requestTrackFocus(layerId: bigint, trackId: bigint): void {
  * off-screen (the camera stays wherever the active raster put it) and the
  * user thinks the import failed.
  */
+/**
+ * Request that MapView centres on a waypoint. The coordinates travel with the
+ * request because the row already holds them — no round trip is needed to put
+ * a mark on screen.
+ */
+export function requestWaypointFocus(lat: number, lon: number): void {
+  mapFocusNonce += 1;
+  mapFocusRequest.set({ kind: "waypoint", lat, lon, nonce: mapFocusNonce });
+}
+
 export function requestAllTracksFocus(): void {
   mapFocusNonce += 1;
   mapFocusRequest.set({ kind: "all-tracks", nonce: mapFocusNonce });

@@ -10,6 +10,38 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the Waypoints tab catches up
+
+The Tracks tab had been brought up to field speed; the Waypoints tab listed the
+same kind of object with none of it. It now has the same search field, clear
+button and "shown of total" counter, the same show-all / hide-all pair, the same
+"only this one" row action, and every row carries its coordinates and a locate
+button that moves the map to that mark.
+
+The matching rule is now one function both tabs call (`src/lib/name-filter.ts`),
+so a query that finds a track finds a waypoint of the same name. Bulk visibility
+is two new backend commands, not a loop of per-row toggles, and stays outside the
+undo stack like every other visibility change.
+
+The tests for this slice render the real component and assert on what is in the
+DOM — five of them fail if the filter is removed. The tab's older tests read its
+source text, which is the class of test that let the Tracks tab go empty
+unnoticed.
+
+| | |
+|---|---|
+| Automated gates | `just ci` green (269 Rust, 295 frontend) |
+| On screen | not confirmed — see below |
+
+The native-QA harness could not be driven this time: `appium_click` reported
+success on the rail's "Точки" tab twice without the tab changing, and the MCP
+server's `appium_screenshot` returns HTTP 404 against Appium 3.4.2 (the endpoint
+moved; the bundled binary is from May). Per `CLAUDE.md` the run stopped after two
+attempts. The window capture itself works — `screencapture -x -o -l <windowid>`
+with the id from `CGWindowListCopyWindowInfo`; only the clicking is broken.
+
+---
+
 ## 2026-09-21 — one track at a time
 
 Triage means looking at one track alone on the basemap. With twenty-six tracks

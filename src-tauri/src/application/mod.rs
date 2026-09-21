@@ -745,6 +745,26 @@ impl AppState {
         }
     }
 
+    /// Show or hide every waypoint in the project in one step. Non-undoable,
+    /// like every other visibility change (ADR-0017).
+    pub fn set_all_waypoints_visible(&mut self, visible: bool) {
+        self.project.set_all_waypoints_visible(visible);
+        self.mark_style_mutation();
+    }
+
+    /// Leave one waypoint visible and hide the rest. No-op for a missing one.
+    pub fn show_only_waypoint(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: crate::domain::WaypointId,
+    ) -> bool {
+        let changed = self.project.show_only_waypoint(layer_id, waypoint_id);
+        if changed {
+            self.mark_style_mutation();
+        }
+        changed
+    }
+
     pub fn rename_track(&mut self, layer_id: LayerId, track_id: TrackId, new_name: String) {
         let old_name = self
             .project
@@ -2015,6 +2035,67 @@ mod tests {
             None
         );
         // Visibility stays as last toggled.
+        assert!(state.project.waypoint_layers()[0].waypoints()[0].visible());
+    }
+
+    /// Bulk visibility has to behave like the per-waypoint toggle: it marks
+    /// the project dirty and leaves undo alone.
+    #[test]
+    fn bulk_waypoint_visibility_is_a_style_mutation() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        for (id, name) in [(1u64, "Camp"), (2, "Task"), (3, "Find")] {
+            state
+                .project
+                .add_waypoint_to_layer(
+                    layer_id,
+                    Waypoint::new(WaypointId::new(id), name, 53.9, 27.5667),
+                )
+                .unwrap();
+        }
+        let undo_depth_before = state.history.undo_depth();
+
+        state.set_all_waypoints_visible(false);
+        assert!(
+            state.project.waypoint_layers()[0]
+                .waypoints()
+                .iter()
+                .all(|w| !w.visible())
+        );
+
+        assert!(state.show_only_waypoint(layer_id, WaypointId::new(2)));
+        let visible: Vec<&str> = state.project.waypoint_layers()[0]
+            .waypoints()
+            .iter()
+            .filter(|w| w.visible())
+            .map(|w| w.name())
+            .collect();
+        assert_eq!(visible, vec!["Task"]);
+
+        assert_eq!(
+            state.history.undo_depth(),
+            undo_depth_before,
+            "bulk waypoint visibility SHALL NOT push undo entries"
+        );
+        assert!(
+            state.project_dirty(),
+            "a style mutation marks the project dirty"
+        );
+    }
+
+    #[test]
+    fn show_only_waypoint_leaves_visibility_alone_when_the_waypoint_is_gone() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        state
+            .project
+            .add_waypoint_to_layer(
+                layer_id,
+                Waypoint::new(WaypointId::new(1), "Camp", 53.9, 27.5),
+            )
+            .unwrap();
+
+        assert!(!state.show_only_waypoint(layer_id, WaypointId::new(99)));
         assert!(state.project.waypoint_layers()[0].waypoints()[0].visible());
     }
 

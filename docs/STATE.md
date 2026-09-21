@@ -5,11 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **track triage** (2026-09-21) — bulk visibility, isolate one
-track, shorter import layer names — after Russian by default, track search,
-catalogue repair, row density, dev signing and 0.2 visible fixes. `main` is pushed and
+Last merged slice: **Waypoints tab parity** (2026-09-21) — search, bulk
+visibility, isolate, coordinates and a locate button on every row — after track
+triage, Russian by default, track search, catalogue repair, row density, dev
+signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 263 Rust tests and 286 frontend tests;
+rustfmt, clippy, type-checks, 269 Rust tests and 295 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -19,8 +20,9 @@ rebuilds the UI development cycle rather than the UI: agents that change
 screens cannot currently see them, most frontend tests assert on source text,
 and there is one end-to-end scenario. `openspec/changes/codify-architecture-decisions`
 is written and validating but not yet archived.
-`openspec/changes/faster-track-triage` has all its tasks done and is ready to
-archive once the owner has used the triage controls in the field.
+`openspec/changes/faster-track-triage` and `openspec/changes/waypoints-tab-parity`
+have all their implementation tasks done and are ready to archive once the owner
+has used the triage controls in the field.
 
 ## Next slice
 
@@ -30,11 +32,14 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Waypoints tab parity.** It is localized now but still has no search and a
-   different row rhythm from the tracks tab.
-2. **Bundle flow.** Opening a project still means going through the cold-start
+1. **Bundle flow.** Opening a project still means going through the cold-start
    route; the maps list and the download popup have not been looked at since
    the catalogue was repaired.
+2. **Repair the native-QA click path.** `appium_click` reports success without
+   the click landing, and `appium_screenshot` 404s against Appium 3.4.2, so the
+   last two slices went in on automated tests alone. Window capture works
+   (`screencapture -l <windowid>`); the missing piece is a click that lands and
+   a screenshot endpoint that matches the server.
 
 Then the correctness slice 0.3 (`revive-ui-cycle` tasks 1b.1 … 1b.8): bundles
 root persistence, Esc discarding a draw, `qa_observe`, HTTP timeouts, export
@@ -44,10 +49,15 @@ errors surfaced.
 
 - **Slice 0.2 still owes its customer-journey smoke.** Screenshots are done
   and in the gallery; the smoke run has not been driven yet.
-- **Appium stopped accepting sessions** late on 2026-09-21 (`Resource
-  temporarily unavailable`, os error 35) and did not recover from a server
-  restart. Screenshots still work through `screencapture -l`, so verification
-  continued without it, but driven interaction is currently unavailable.
+- **Appium clicks do not land.** Sessions start again, but `appium_click`
+  returns success for the rail's "Точки" tab without the tab changing, and
+  `appium_screenshot` answers 404 against Appium 3.4.2 — the prebuilt MCP
+  binary predates the endpoint move. Window capture is fine:
+  `screencapture -x -o -l <windowid>`, with the id from
+  `CGWindowListCopyWindowInfo` (a five-line Swift script; `python3` here has no
+  `Quartz`). A Mac2 session also quits the app when it ends, and its
+  WebDriverAgent is one-shot — kill `WebDriverAgentRunner-Runner` before the
+  next session.
 - **`.mcp.json` still runs a prebuilt `ozi-rs-mcp`** from May, so the July
   fixes to it are absent from agent sessions (`revive-ui-cycle` task 0.3).
 - **MapLibre carries a critical advisory** (`GHSA-jrc7-96c5-q579`) whose fix is

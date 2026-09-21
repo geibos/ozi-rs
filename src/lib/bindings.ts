@@ -205,6 +205,28 @@ async showOnlyTrack(layerId: number, trackId: number) : Promise<Result<null, str
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Show or hide every waypoint at once — the Waypoints tab's bulk control.
+ */
+async setAllWaypointsVisible(visible: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_all_waypoints_visible", { visible }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Leave one waypoint visible and hide every other one.
+ */
+async showOnlyWaypoint(layerId: number, waypointId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_only_waypoint", { layerId, waypointId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async toggleWaypointVisible(layerId: number, waypointId: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("toggle_waypoint_visible", { layerId, waypointId }) };

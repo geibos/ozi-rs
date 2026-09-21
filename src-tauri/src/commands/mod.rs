@@ -1013,6 +1013,35 @@ pub fn toggle_track_visible(
     Ok(())
 }
 
+/// Show or hide every waypoint at once — the Waypoints tab's bulk control.
+#[tauri::command]
+#[specta::specta]
+pub fn set_all_waypoints_visible(
+    visible: bool,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    lock_app_state(state.inner())?.set_all_waypoints_visible(visible);
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+/// Leave one waypoint visible and hide every other one.
+#[tauri::command]
+#[specta::specta]
+pub fn show_only_waypoint(
+    layer_id: u64,
+    waypoint_id: u64,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    lock_app_state(state.inner())?
+        .show_only_waypoint(LayerId::new(layer_id), WaypointId::new(waypoint_id));
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn toggle_waypoint_visible(

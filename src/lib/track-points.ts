@@ -39,11 +39,12 @@ export async function loadTrackDetail(
 }
 
 /**
- * Format a point coordinate pair as `<lat>, <lon>` with five decimal
- * places — roughly 1 m precision at the equator. Matches the legacy
- * panel's display verbatim.
+ * Format a coordinate pair as `<lat>, <lon>` with five decimal places —
+ * roughly 1 m precision at the equator. Matches the legacy panel's display
+ * verbatim. Takes anything carrying `lat`/`lon` so the waypoint rows read
+ * the same as the track point list.
  */
-export function formatCoordinates(point: PointDetail): string {
+export function formatCoordinates(point: { lat: number; lon: number }): string {
   return `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`;
 }
 

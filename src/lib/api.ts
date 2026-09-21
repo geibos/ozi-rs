@@ -271,6 +271,25 @@ export async function toggleWaypointVisible(
   );
 }
 
+/** Show or hide every waypoint in the project in one command. */
+export async function setAllWaypointsVisible(visible: boolean): Promise<void> {
+  await unwrap(
+    "set_all_waypoints_visible",
+    commands.setAllWaypointsVisible(visible),
+  );
+}
+
+/** Leave one waypoint visible and hide the rest. */
+export async function showOnlyWaypoint(
+  layerId: bigint,
+  waypointId: bigint,
+): Promise<void> {
+  await unwrap(
+    "show_only_waypoint",
+    commands.showOnlyWaypoint(toIdNumber(layerId), toIdNumber(waypointId)),
+  );
+}
+
 export async function revealBundle(): Promise<void> {
   await unwrap("reveal_bundle", commands.revealBundle());
 }

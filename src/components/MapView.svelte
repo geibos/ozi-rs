@@ -1161,6 +1161,11 @@
       void focusTrack(request.layerId, request.trackId);
     } else if (request.kind === "all-tracks") {
       void focusAllTracks();
+    } else if (request.kind === "waypoint") {
+      map.easeTo({
+        center: [request.lon, request.lat],
+        zoom: Math.max(map.getZoom(), 14),
+      });
     }
   });
 </script>

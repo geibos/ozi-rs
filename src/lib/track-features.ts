@@ -6,6 +6,8 @@
  * a track — filtering on a single geometry type once emptied the whole rail
  * while the map kept drawing every track.
  */
+import { filterByName } from "./name-filter";
+
 export interface TrackFeature {
   layerId: bigint;
   trackId: bigint;
@@ -54,18 +56,10 @@ export function trackFeaturesFromGeojson(
   return rows;
 }
 
-/**
- * Narrow the rows to those whose name contains `query`.
- *
- * Field names are typed as date plus call sign ("20260709-ЛИСА15"), so the
- * match is a case-insensitive substring rather than a prefix: an operator
- * searches by call sign as often as by date, in either alphabet.
- */
+/** Narrow the rows to those whose name contains `query` (see `filterByName`). */
 export function filterTrackFeatures<T extends { name: string }>(
   rows: T[],
   query: string,
 ): T[] {
-  const needle = query.trim().toLocaleLowerCase();
-  if (needle === "") return rows;
-  return rows.filter((row) => row.name.toLocaleLowerCase().includes(needle));
+  return filterByName(rows, query, (row) => row.name);
 }

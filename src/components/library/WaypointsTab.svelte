@@ -4,7 +4,8 @@
    * waypoint layers; header carries the active-waypoint-layer `Select`.
    *
    * Per-row affordances: visibility toggle, symbol button (opens
-   * `SymbolPicker`), name (double-click rename), `⋯` menu with Export WPT
+   * `SymbolPicker`), name (double-click rename), a coordinates subline, a
+   * "show on map" button, and a `⋯` menu with "only this one", Export WPT
    * and Delete. Clicking a row from a non-active waypoint layer flips the
    * active waypoint layer first (`layers` capability extension).
    *
@@ -23,16 +24,27 @@
     addWaypointMode,
     appState,
     drawingModeActive,
+    requestWaypointFocus,
     selectedWaypointId,
   } from "$lib/stores";
   import MapPinIcon from "@lucide/svelte/icons/map-pin";
+  import SearchIcon from "@lucide/svelte/icons/search";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+  import LocateIcon from "@lucide/svelte/icons/locate";
+  import XIcon from "@lucide/svelte/icons/x";
+  import { Input } from "$lib/components/ui/input";
+  import { filterByName } from "$lib/name-filter";
+  import { formatCoordinates as formatWaypointCoordinates } from "$lib/track-points";
   import {
     deleteWaypoint,
     exportWptWaypoints,
     getWaypoints,
     getWptExportDefaultPath,
     renameWaypoint,
+    setAllWaypointsVisible,
     setWaypointSymbol,
+    showOnlyWaypoint,
     toggleWaypointVisible,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -48,6 +60,13 @@
   }
 
   let rows: WaypointRow[] = $state([]);
+  // A search area collects the task point, the found object, dangerous spots
+  // and every group's marks; past a screenful the list needs a filter for the
+  // same reason the track list did.
+  let waypointQuery = $state("");
+  const visibleRows = $derived(
+    filterByName(rows, waypointQuery, (r) => r.wp.name),
+  );
 
   const waypointLayers = $derived($appState?.waypoint_layers ?? []);
   const waypointLayerSelectValue = $derived(
@@ -110,6 +129,26 @@
         ? { ...row, wp: { ...row.wp, visible: !row.wp.visible } }
         : row,
     );
+  }
+
+  async function handleSetAllVisible(visible: boolean) {
+    try {
+      await setAllWaypointsVisible(visible);
+    } catch (err) {
+      toast.error(get(t)("waypointsTab.visibilityFailed"), {
+        description: String(err),
+      });
+    }
+  }
+
+  async function handleShowOnly(r: WaypointRow) {
+    try {
+      await showOnlyWaypoint(r.layerId, BigInt(r.wp.id));
+    } catch (err) {
+      toast.error(get(t)("waypointsTab.visibilityFailed"), {
+        description: String(err),
+      });
+    }
   }
 
   function handleSelectRow(r: WaypointRow) {
@@ -208,6 +247,67 @@
         </Tooltip.Root>
       </div>
     {/if}
+
+    {#if rows.length > 0}
+      <div class="mt-1.5 flex items-center gap-1">
+        <div class="relative min-w-0 flex-1">
+          <SearchIcon
+            class="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
+            strokeWidth={1.5}
+          />
+          <Input
+            bind:value={waypointQuery}
+            class="h-7 pr-7 pl-7 text-xs"
+            placeholder={$t("waypointsTab.searchPlaceholder")}
+            aria-label={$t("waypointsTab.searchPlaceholder")}
+            data-testid="waypoint-search"
+          />
+          {#if waypointQuery !== ""}
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground absolute top-1/2 right-1 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm border-0 bg-transparent p-0"
+              aria-label={$t("waypointsTab.searchClear")}
+              onclick={() => (waypointQuery = "")}
+              data-testid="waypoint-search-clear"
+            >
+              <XIcon class="size-3.5" strokeWidth={2} />
+            </button>
+          {/if}
+        </div>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0"
+            aria-label={$t("waypointsTab.showAll")}
+            onclick={() => handleSetAllVisible(true)}
+            data-testid="waypoints-show-all"
+          >
+            <EyeIcon class="size-3.5" strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>{$t("waypointsTab.showAll")}</Tooltip.Content>
+        </Tooltip.Root>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0"
+            aria-label={$t("waypointsTab.hideAll")}
+            onclick={() => handleSetAllVisible(false)}
+            data-testid="waypoints-hide-all"
+          >
+            <EyeOffIcon class="size-3.5" strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>{$t("waypointsTab.hideAll")}</Tooltip.Content>
+        </Tooltip.Root>
+        {#if waypointQuery !== ""}
+          <span
+            class="text-muted-foreground shrink-0 font-mono text-[10px] tabular-nums"
+            data-testid="waypoint-search-count"
+          >
+            {$t("waypointsTab.searchCount")
+              .replace("{shown}", String(visibleRows.length))
+              .replace("{total}", String(rows.length))}
+          </span>
+        {/if}
+      </div>
+    {/if}
   </header>
 
   <div class="flex-1 overflow-y-auto py-1" data-testid="waypoints-tab-list">
@@ -215,8 +315,15 @@
       <div class="text-muted-foreground p-3 text-center text-xs">
         {$t("waypointsTab.empty")}
       </div>
+    {:else if visibleRows.length === 0}
+      <div
+        class="text-muted-foreground p-3 text-center text-xs"
+        data-testid="waypoint-search-empty"
+      >
+        {$t("waypointsTab.searchEmpty")}
+      </div>
     {:else}
-      {#each rows as r (rowKey(r))}
+      {#each visibleRows as r (rowKey(r))}
         <LibraryRow
           name={r.wp.name}
           visible={r.wp.visible}
@@ -235,7 +342,29 @@
               onSelect={(sym) => handleSetSymbol(r, sym)}
             />
           {/snippet}
+          {#snippet subline()}
+            <span class="text-muted-foreground font-mono text-[10px]">
+              {formatWaypointCoordinates(r.wp)}
+            </span>
+          {/snippet}
+          {#snippet trailingControl()}
+            <Tooltip.Root>
+              <Tooltip.Trigger
+                class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm border-0 bg-transparent p-0"
+                aria-label={$t("track.showOnMap")}
+                onclick={() => requestWaypointFocus(r.wp.lat, r.wp.lon)}
+                data-testid="waypoint-show-on-map"
+              >
+                <LocateIcon class="size-3.5" strokeWidth={1.5} />
+              </Tooltip.Trigger>
+              <Tooltip.Content>{$t("track.showOnMap")}</Tooltip.Content>
+            </Tooltip.Root>
+          {/snippet}
           {#snippet actions()}
+            <DropdownMenu.Item onSelect={() => handleShowOnly(r)}>
+              {$t("waypointsTab.onlyThis")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
             <DropdownMenu.Item
               onSelect={() => handleExportWptForLayer(r.layerId)}
             >
