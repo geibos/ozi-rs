@@ -30,6 +30,7 @@
     getWaypointsExportDefaultPath,
     renameWaypoint,
     setWaypointSymbol,
+    setWaypointColor,
     toggleWaypointVisible,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -38,7 +39,11 @@
   import type { WaypointData } from "$lib/types";
   import SymbolPicker from "../SymbolPicker.svelte";
 
-  let waypoint: WaypointData | null = $state(null);
+  // `$state<T>(...)` rather than an annotated `let`: with the annotation,
+  // TypeScript's flow analysis narrows the variable to `null` at any point
+  // before the first assignment, which is every inline `$derived` in this
+  // file — and then the non-null branch is `never`.
+  let waypoint = $state<WaypointData | null>(null);
   let nameDraft = $state("");
   let nameDirty = $state(false);
 
@@ -96,7 +101,7 @@
     try {
       await setWaypointSymbol(layerId, BigInt(wp.id), symbol);
     } catch (error) {
-      toast.error("Failed to change symbol", { description: String(error) });
+      reportEditFailure("inspector.waypointSymbolFailed", error);
     }
   }
 
@@ -158,11 +163,62 @@
         "Drag-to-move on the map is wired by the existing waypoint layer.",
     });
   }
+  /** The swatch needs a hex value; an uncoloured waypoint shows the default. */
+  const DEFAULT_WAYPOINT_HEX = "#e5c890";
+
+  function toHex(color: [number, number, number, number] | null): string {
+    if (!color) return DEFAULT_WAYPOINT_HEX;
+    const [r, g, b] = color;
+    return (
+      "#" +
+      [r, g, b].map((c: number) => c.toString(16).padStart(2, "0")).join("")
+    );
+  }
+
+  const waypointColorHex = $derived(toHex(waypoint?.color ?? null));
+
+  async function applyColor(color: [number, number, number, number] | null) {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    try {
+      await setWaypointColor(layerId, BigInt(wp.id), color);
+    } catch (error) {
+      reportEditFailure("inspector.waypointColorFailed", error);
+    }
+  }
+
+  function handleColorChange(event: Event) {
+    const hex = (event.currentTarget as HTMLInputElement).value;
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    void applyColor([r, g, b, 255]);
+  }
 </script>
 
 <div class="flex h-full flex-col gap-4 overflow-y-auto p-4">
   <header class="flex items-start gap-3">
     <SymbolPicker symbol={waypoint?.symbol} onSelect={handleSetSymbol} />
+    <!-- The symbol says what a mark is; the colour says whose it is. Clearing
+         returns it to the default rather than to a colour that looks like it. -->
+    <div class="flex shrink-0 flex-col items-center gap-1">
+      <input
+        class="border-border h-8 w-10 rounded-sm border bg-transparent p-0"
+        type="color"
+        value={waypointColorHex}
+        aria-label={$t("inspector.waypointColor")}
+        data-testid="waypoint-color"
+        onchange={handleColorChange}
+      />
+      {#if waypoint?.color}
+        <button
+          class="text-muted-foreground hover:text-foreground border-0 bg-transparent p-0 text-[10px]"
+          onclick={() => void applyColor(null)}
+          data-testid="waypoint-color-reset"
+        >
+          {$t("inspector.waypointColorDefault")}
+        </button>
+      {/if}
+    </div>
     <div class="min-w-0 flex-1">
       <Input
         type="text"

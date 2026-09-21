@@ -1190,6 +1190,26 @@ pub fn set_waypoint_symbol(
     Ok(())
 }
 
+/// Set or clear a waypoint's colour. `None` restores the default rather than
+/// setting a colour that happens to look like it.
+#[tauri::command]
+#[specta::specta]
+pub fn set_waypoint_color(
+    layer_id: u64,
+    waypoint_id: u64,
+    color: Option<[u8; 4]>,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state
+        .apply_set_waypoint_color(LayerId::new(layer_id), WaypointId::new(waypoint_id), color)
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 /// Show or hide every track at once — the triage operator's bulk control.
 #[tauri::command]
 #[specta::specta]
@@ -1730,6 +1750,10 @@ pub struct WaypointDto {
     pub lon: f64,
     pub symbol: Option<String>,
     pub visible: bool,
+    /// RGBA, or absent for "whatever the map draws waypoints with". Absent is
+    /// not a colour: changing the default later moves every uncoloured
+    /// waypoint with it.
+    pub color: Option<[u8; 4]>,
 }
 
 #[tauri::command]
@@ -1759,6 +1783,7 @@ pub fn waypoint_dtos(waypoints: &[crate::domain::Waypoint]) -> Vec<WaypointDto> 
             lon: w.longitude(),
             symbol: w.symbol().map(str::to_owned),
             visible: w.visible(),
+            color: w.color(),
         })
         .collect()
 }

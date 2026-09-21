@@ -27,6 +27,14 @@ pub struct Waypoint {
     /// files without the field deserialize as visible.
     #[serde(default = "default_true")]
     visible: bool,
+    /// RGBA, or `None` for "whatever the map draws waypoints with".
+    ///
+    /// `None` is not a colour: a waypoint that has never been coloured follows
+    /// the default, so changing that default later moves every uncoloured
+    /// waypoint with it. `#[serde(default)]` so a `.ozp` written before this
+    /// existed loads with every waypoint uncoloured, which is what it meant.
+    #[serde(default)]
+    color: Option<[u8; 4]>,
 }
 
 fn default_true() -> bool {
@@ -42,6 +50,7 @@ impl Waypoint {
             latitude,
             longitude,
             visible: true,
+            color: None,
         }
     }
 
@@ -76,6 +85,15 @@ impl Waypoint {
 
     pub fn set_symbol(&mut self, symbol: Option<String>) -> Option<String> {
         std::mem::replace(&mut self.symbol, symbol)
+    }
+
+    pub const fn color(&self) -> Option<[u8; 4]> {
+        self.color
+    }
+
+    /// Set or clear the colour, returning the previous one for the undo delta.
+    pub fn set_color(&mut self, color: Option<[u8; 4]>) -> Option<[u8; 4]> {
+        std::mem::replace(&mut self.color, color)
     }
 
     pub const fn visible(&self) -> bool {

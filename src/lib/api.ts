@@ -604,6 +604,28 @@ export async function setWaypointSymbol(
   );
 }
 
+/**
+ * Set or clear a waypoint's colour.
+ *
+ * `null` restores the default rather than setting a colour that happens to
+ * look like it: an uncoloured waypoint follows whatever the map draws
+ * waypoints with, and moves if that changes.
+ */
+export async function setWaypointColor(
+  layerId: bigint,
+  waypointId: bigint,
+  color: [number, number, number, number] | null,
+): Promise<void> {
+  await unwrap(
+    "set_waypoint_color",
+    commands.setWaypointColor(
+      toIdNumber(layerId),
+      toIdNumber(waypointId),
+      color,
+    ),
+  );
+}
+
 export async function simplifyTrack(
   layerId: bigint,
   trackId: bigint,

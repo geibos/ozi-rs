@@ -823,6 +823,37 @@ impl AppState {
         import::import_plt_file_into_project(&mut self.project, &mut self.history, &path)
     }
 
+    pub fn apply_set_waypoint_color(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        new_color: Option<[u8; 4]>,
+    ) -> Result<(), ProjectLayerError> {
+        let old_color = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|layer| layer.id() == layer_id)
+            .ok_or(ProjectLayerError::WaypointLayerUnavailable(layer_id))?
+            .waypoints()
+            .iter()
+            .find(|waypoint| waypoint.id() == waypoint_id)
+            .ok_or(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))?
+            .color();
+
+        let cmd = commands::ProjectCommand::set_waypoint_color(
+            layer_id,
+            waypoint_id,
+            old_color,
+            new_color,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
     pub fn apply_set_waypoint_symbol(
         &mut self,
         layer_id: LayerId,
@@ -2950,6 +2981,63 @@ mod tests {
 
         state.toggle_waypoint_visible(LayerId::new(99), WaypointId::new(1));
         assert_eq!(state.project, before);
+    }
+
+    /// Colour is the other axis a search map is read on. The symbol says what
+    /// a mark is; the colour says whose it is — group A's marks against group
+    /// B's, on one map, at night, on a laptop. Tracks have had per-track
+    /// colour since the beginning; waypoints have not.
+    #[test]
+    fn waypoint_colour_undo_restores_the_previous_colour_and_redo_reapplies() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let waypoint_id = WaypointId::new(1);
+
+        state
+            .project
+            .add_waypoint_to_layer(layer_id, Waypoint::new(waypoint_id, "ШТАБ", 53.9, 27.5667))
+            .unwrap();
+        assert_eq!(
+            state.project.waypoint_layers()[0].waypoints()[0].color(),
+            None,
+            "a waypoint starts with no colour of its own"
+        );
+
+        state
+            .apply_set_waypoint_color(layer_id, waypoint_id, Some([37, 99, 235, 255]))
+            .unwrap();
+        state
+            .apply_set_waypoint_color(layer_id, waypoint_id, Some([220, 38, 38, 255]))
+            .unwrap();
+
+        let colour = || state.project.waypoint_layers()[0].waypoints()[0].color();
+        assert_eq!(colour(), Some([220, 38, 38, 255]));
+
+        state.undo();
+        assert_eq!(
+            state.project.waypoint_layers()[0].waypoints()[0].color(),
+            Some([37, 99, 235, 255])
+        );
+
+        state.redo();
+        assert_eq!(
+            state.project.waypoint_layers()[0].waypoints()[0].color(),
+            Some([220, 38, 38, 255])
+        );
+
+        // Back to the default, which is not the same as "some default colour".
+        state
+            .apply_set_waypoint_color(layer_id, waypoint_id, None)
+            .unwrap();
+        assert_eq!(
+            state.project.waypoint_layers()[0].waypoints()[0].color(),
+            None
+        );
+        state.undo();
+        assert_eq!(
+            state.project.waypoint_layers()[0].waypoints()[0].color(),
+            Some([220, 38, 38, 255])
+        );
     }
 
     #[test]

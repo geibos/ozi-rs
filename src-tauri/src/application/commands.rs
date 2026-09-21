@@ -125,6 +125,12 @@ pub enum ProjectCommand {
         old_symbol: Option<String>,
         new_symbol: Option<String>,
     },
+    SetWaypointColor {
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_color: Option<[u8; 4]>,
+        new_color: Option<[u8; 4]>,
+    },
     SimplifyTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -389,6 +395,20 @@ impl ProjectCommand {
             waypoint_id,
             old_symbol,
             new_symbol,
+        }
+    }
+
+    pub fn set_waypoint_color(
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_color: Option<[u8; 4]>,
+        new_color: Option<[u8; 4]>,
+    ) -> Self {
+        Self::SetWaypointColor {
+            layer_id,
+            waypoint_id,
+            old_color,
+            new_color,
         }
     }
 
@@ -667,6 +687,15 @@ impl ProjectCommand {
                     *waypoint_id,
                     new_symbol.clone(),
                 )?;
+                Ok(())
+            }
+            Self::SetWaypointColor {
+                layer_id,
+                waypoint_id,
+                new_color,
+                ..
+            } => {
+                project.set_waypoint_color_in_layer(*layer_id, *waypoint_id, *new_color)?;
                 Ok(())
             }
             Self::SimplifyTrack {
@@ -1063,6 +1092,17 @@ impl ProjectCommand {
                 waypoint_id: *waypoint_id,
                 old_symbol: new_symbol.clone(),
                 new_symbol: old_symbol.clone(),
+            },
+            Self::SetWaypointColor {
+                layer_id,
+                waypoint_id,
+                old_color,
+                new_color,
+            } => Self::SetWaypointColor {
+                layer_id: *layer_id,
+                waypoint_id: *waypoint_id,
+                old_color: *new_color,
+                new_color: *old_color,
             },
             Self::SimplifyTrack {
                 layer_id,

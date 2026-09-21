@@ -51,6 +51,12 @@ decision.
   through `get_ozi_tile_projected`, via the `ozi://` protocol. Dead IPC
   surface, not a missing feature: it costs a generated binding and a line in
   the registry.
+- **An annotated `let … = $state(null)` narrows to `null` in an inline
+  `$derived`.** TypeScript's flow analysis, not a broken type: before the first
+  assignment the variable is `null`, so the non-null branch of any inline
+  derived is `never` and every property read on it fails. Function bodies are
+  deferred and never see it, which is why it looks arbitrary. Declare with
+  `$state<T>(null)` instead.
 - **A label looked up from a data table escapes the label guard.** The symbol
   picker carried ten English labels inside its own table; the guard checks what
   is written into an `aria-label`, not what a table hands it. Third miss of

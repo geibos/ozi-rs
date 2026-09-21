@@ -121,15 +121,35 @@ pub fn sample_app_state() -> AppState {
         ));
 
     let waypoint_layer = LayerId::new(WAYPOINT_LAYER_ID);
-    for (id, name, lat, lon, symbol, visible) in [
-        (1u64, "ШТАБ", 59.95243, 31.59681, Some("flag"), true),
-        (2, "ЗАБРОС", 59.951938, 31.596359, None, true),
-        (3, "Проход у полю", 59.94683, 31.69150, Some("camp"), false),
+    // One waypoint carries a colour of its own, one does not: on a search map
+    // the symbol says what a mark is and the colour says whose it is, and the
+    // stand has to show both cases or it shows neither.
+    for (id, name, lat, lon, symbol, visible, color) in [
+        (
+            1u64,
+            "ШТАБ",
+            59.95243,
+            31.59681,
+            Some("flag"),
+            true,
+            Some([37u8, 99, 235, 255]),
+        ),
+        (2, "ЗАБРОС", 59.951938, 31.596359, None, true, None),
+        (
+            3,
+            "Проход у полю",
+            59.94683,
+            31.69150,
+            Some("camp"),
+            false,
+            None,
+        ),
     ] {
         let mut waypoint = Waypoint::new(WaypointId::new(id), name, lat, lon);
         if let Some(symbol) = symbol {
             waypoint.set_symbol(Some(symbol.to_owned()));
         }
+        waypoint.set_color(color);
         waypoint.set_visible(visible);
         state
             .project_mut()

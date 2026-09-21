@@ -370,6 +370,8 @@
     isActive: boolean;
     /** Kept so the reconciler redraws the glyph when the symbol changes. */
     symbol: string | null;
+    /** RGBA, or null for the default the stylesheet gives every marker. */
+    color: [number, number, number, number] | null;
   }
   let appliedWaypoints = new Map<string, AppliedWaypoint>();
 
@@ -444,6 +446,7 @@
             name: wp.name,
             isActive,
             symbol: wp.symbol ?? null,
+            color: wp.color ?? null,
           },
         });
       }
@@ -473,6 +476,13 @@
         // where the danger is. It was stored, listed and exported, and the one
         // place it did not appear was the map.
         el.textContent = waypointGlyph(data.symbol);
+        // The symbol says what a mark is; the colour says whose it is. An
+        // uncoloured waypoint keeps the stylesheet's default, so changing that
+        // default later moves every uncoloured marker with it.
+        if (data.color) {
+          const [r, g, b, a] = data.color;
+          el.style.background = `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+        }
         if (!isActive) {
           el.classList.add("inactive-layer");
         }

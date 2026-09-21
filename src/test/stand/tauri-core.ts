@@ -59,6 +59,7 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "rename_track",
   "rename_waypoint",
   "set_waypoint_symbol",
+  "set_waypoint_color",
   "delete_track",
   "delete_waypoint",
   "cancel_drawing",

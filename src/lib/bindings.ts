@@ -388,6 +388,18 @@ async setWaypointSymbol(layerId: number, waypointId: number, symbol: string | nu
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set or clear a waypoint's colour. `None` restores the default rather than
+ * setting a colour that happens to look like it.
+ */
+async setWaypointColor(layerId: number, waypointId: number, color: [number, number, number, number] | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_waypoint_color", { layerId, waypointId, color }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async simplifyTrack(layerId: number, trackId: number, tolerance: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("simplify_track", { layerId, trackId, tolerance }) };
@@ -603,7 +615,13 @@ export type TrackDetailDto = { id: number; name: string; segments: SegmentDetail
  * the segment data.
  */
 export type TrackSummaryDto = { layer_id: number; track_id: number; name: string; color: string; line_width: number; visible: boolean; distance_km: number; duration_seconds: number | null; point_count: number }
-export type WaypointDto = { id: number; name: string; lat: number; lon: number; symbol: string | null; visible: boolean }
+export type WaypointDto = { id: number; name: string; lat: number; lon: number; symbol: string | null; visible: boolean; 
+/**
+ * RGBA, or absent for "whatever the map draws waypoints with". Absent is
+ * not a colour: changing the default later moves every uncoloured
+ * waypoint with it.
+ */
+color: [number, number, number, number] | null }
 
 /** tauri-specta globals **/
 

@@ -10,6 +10,47 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — whose mark is this
+
+The symbol says what a mark is; the colour says whose it is. Group A's marks
+against group B's, on one map, in a field HQ, at night — a search collects
+marks from every group working it, and symbols alone cannot carry that. Tracks
+have had per-track colour from the beginning. Waypoints had none, and ADR-0020
+declares it in scope.
+
+The care is all in one distinction: **having no colour is not having the
+default one.** A waypoint that has never been coloured follows whatever the map
+draws waypoints with, so changing that default later moves every uncoloured
+waypoint with it; clearing returns a waypoint to that rather than to a colour
+that happens to look like it. `Option<[u8; 4]>` end to end, `#[serde(default)]`
+so a project written before this loads with every waypoint uncoloured — which
+is what it meant.
+
+Two things this cost that were worth the finding.
+
+`svelte-check` refused `waypoint?.color` with "Property 'color' does not exist
+on type 'never'", which reads like a broken type and is not. `let waypoint:
+WaypointData | null = $state(null)` is narrowed by TypeScript's flow analysis
+to `null` at every point before the first assignment — which is every inline
+`$derived` in the file, so the non-null branch is `never`. Ordinary functions
+never see it because their bodies are deferred. `$state<T>(null)` declares the
+type instead of narrowing to it. The declaration says so now.
+
+And beside the symbol handler, `toast.error("Failed to change symbol")` —
+English, in a file I had translated twice. The silent-failure guard let it
+through because it *does* toast; the label guard does not look inside `toast`
+calls. Fourth miss, same shape as the others: a guard on syntax catches the
+careless version.
+
+| | |
+|---|---|
+| Evidence | a Rust test over set, set again, undo, redo, and clearing back to the default |
+| Evidence | walked on the stand: the flagged waypoint draws 🏁 on `rgb(37, 99, 235)`, the uncoloured one 📍 on the default |
+| Automated gates | `just ci` green (314 Rust, 392 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — yesterday's project is one key away
 
 The item I went looking for last slice, built. Reopening yesterday's search

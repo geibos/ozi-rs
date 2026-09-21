@@ -356,6 +356,25 @@ impl WaypointLayer {
         Ok(waypoint.set_symbol(symbol))
     }
 
+    pub fn set_waypoint_color(
+        &mut self,
+        waypoint_id: u64,
+        color: Option<[u8; 4]>,
+    ) -> Result<Option<[u8; 4]>, ProjectLayerError> {
+        let Some(waypoint) = self
+            .waypoints
+            .iter_mut()
+            .find(|waypoint| waypoint.id().value() == waypoint_id)
+        else {
+            return Err(ProjectLayerError::WaypointNotFound(
+                self.id,
+                WaypointId::new(waypoint_id),
+            ));
+        };
+
+        Ok(waypoint.set_color(color))
+    }
+
     pub fn move_waypoint(
         &mut self,
         waypoint_id: WaypointId,
@@ -709,6 +728,18 @@ impl Project {
         let waypoint_id = waypoint_id.into_u64();
         let layer = self.waypoint_layer_mut(layer_id)?;
         layer.set_waypoint_symbol(waypoint_id, symbol)
+    }
+
+    pub fn set_waypoint_color_in_layer<L: LayerIdLike, W: WaypointIdLike>(
+        &mut self,
+        layer_id: L,
+        waypoint_id: W,
+        color: Option<[u8; 4]>,
+    ) -> Result<Option<[u8; 4]>, ProjectLayerError> {
+        let layer_id = layer_id.into_u64();
+        let waypoint_id = waypoint_id.into_u64();
+        let layer = self.waypoint_layer_mut(layer_id)?;
+        layer.set_waypoint_color(waypoint_id, color)
     }
 
     /// Flip the `visible` flag on a waypoint. Non-undoable mutation,
