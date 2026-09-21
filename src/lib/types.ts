@@ -104,7 +104,14 @@ export interface DownloadProgressPayload {
 
 export interface BundleProgressPayload {
   download_id: string;
+  /**
+   * The backend's English wording. Shown only when the interface has no
+   * translation for `message_key` — it is the fallback, not the text.
+   */
   message: string;
+  /** Translation key and its arguments in order, positional as `{0}`, `{1}`. */
+  message_key: string;
+  message_args: string[];
   phase: "scanning" | "downloading" | "extracting" | "indexing";
   completed?: number;
   total?: number;

@@ -24,7 +24,7 @@
     syncProjectsFromAppState,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
-  import { locale, t } from "../lib/i18n";
+  import { locale, progressText, t } from "../lib/i18n";
   import { formatBytes } from "$lib/format-bytes";
   import BundleLoader from "../components/BundleLoader.svelte";
 
@@ -97,9 +97,17 @@
     return $t("catalogue.loaded").replace("{count}", String($projects.length));
   });
 
-  const statusText = $derived(
-    transientStatus ?? $bundleProgress?.message ?? catalogueText,
+  const bundleText = $derived(
+    $bundleProgress === null
+      ? null
+      : $progressText(
+          $bundleProgress.message_key,
+          $bundleProgress.message_args,
+          $bundleProgress.message,
+        ),
   );
+
+  const statusText = $derived(transientStatus ?? bundleText ?? catalogueText);
 
   const currentFileLabel = $derived.by(() => {
     const c = $currentDownload;

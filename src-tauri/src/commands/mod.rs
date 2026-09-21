@@ -235,7 +235,13 @@ struct DownloadProgressPayload {
 #[derive(serde::Serialize, specta::Type, Clone)]
 struct BundleProgressPayload {
     download_id: String,
+    /// The English wording. The interface shows it only when it has no
+    /// translation for `message_key` — it is the fallback, not the text.
     message: String,
+    /// Translation key and its arguments in order, so the status bar can speak
+    /// the interface's language instead of the backend's.
+    message_key: &'static str,
+    message_args: Vec<String>,
     phase: &'static str,
     completed: Option<u64>,
     total: Option<u64>,
@@ -587,13 +593,15 @@ pub fn load_project(
                     match n {
                         DownloadNotification::Phase(p) => {
                             if let Ok(mut s) = lock_app_state(&state_arc) {
-                                s.apply_progress(p.message.clone());
+                                s.apply_progress(p.message());
                             }
                             let _ = app.emit(
                                 "bundle-progress",
                                 BundleProgressPayload {
                                     download_id: download_id.clone(),
-                                    message: p.message,
+                                    message: p.message(),
+                                    message_key: p.text.key(),
+                                    message_args: p.text.args(),
                                     phase: p.phase.as_str(),
                                     completed: p.completed,
                                     total: p.total,
@@ -797,13 +805,15 @@ pub fn open_local_bundle(
     thread::spawn(move || {
         let result = lizaalert::open_bundle_directory(&dir_path, |progress| {
             if let Ok(mut s) = lock_app_state(&state_arc) {
-                s.apply_progress(progress.message.clone());
+                s.apply_progress(progress.message());
             }
             let _ = app.emit(
                 "bundle-progress",
                 BundleProgressPayload {
                     download_id: download_id_for_task.clone(),
-                    message: progress.message,
+                    message: progress.message(),
+                    message_key: progress.text.key(),
+                    message_args: progress.text.args(),
                     phase: progress.phase.as_str(),
                     completed: progress.completed,
                     total: progress.total,

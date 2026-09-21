@@ -10,6 +10,33 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the download speaks Russian
+
+The app has opened in Russian for a while. The one part of it a crew actually
+watches — a bundle coming down — did not, because those sentences are built in
+Rust with `format!` and reach the status bar verbatim. "Downloading 3 files in
+parallel", and the phase word beside it, sat in an otherwise Russian window for
+the whole length of the download.
+
+Twelve messages, which is all of them on the bundle path. Each carries a key
+and its arguments now; the English wording still travels, as what a diagnostic
+records and as the fallback — a build that meets a key it does not know shows
+what the backend said, because a key on screen is worse than English.
+
+Writing the substitution turned up a flaw in the first version of it: replacing
+one argument at a time means the second pass can substitute into what the first
+one inserted, and a bundle name is free text off a web listing. One pass now,
+with a test that a name shaped like a placeholder survives.
+
+| | |
+|---|---|
+| Evidence | a Rust test pinning key, arguments and English for the message shapes; four frontend tests covering both languages, the fallback, the placeholder-shaped name and a missing argument |
+| Stand | the played-out download carries keys, so it shows the translation rather than the fallback |
+| Automated gates | `just ci` green (298 Rust, 349 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — stop waiting for the catalogue
 
 Every launch walks the whole listing: up to a thousand pages, one request each,

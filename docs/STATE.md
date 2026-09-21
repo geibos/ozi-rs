@@ -5,10 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **stop waiting for the catalogue** (2026-09-21) — the
+Last merged slice: **the download speaks Russian** (2026-09-21) — bundle
+progress reaches the status bar as a key and its arguments instead of an
+English sentence; after stopping waiting for the catalogue, where the
 listing walk that holds the download button disabled for minutes after launch
-can be stopped, without passing its first pages off as the whole catalogue;
-after the catalogue keeping your place, where closing
+can be stopped, without passing its first pages off as the whole catalogue,
+and after the catalogue keeping your place, where closing
 the loader to look at the map no longer throws away the search, the selection
 and the place in the list, and after one preview at a time, where clicking through
 several projects no longer lets an abandoned preview swap the map list back
@@ -45,7 +47,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 297 Rust tests and 345 frontend tests;
+rustfmt, clippy, type-checks, 298 Rust tests and 349 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -151,7 +153,8 @@ dependency dropped.
   `codify-architecture-decisions` design under "Findings", fixed by its task 2.6.
 
 Localization is done for the shell, the rails, the three library tabs, all four
-inspectors, the Maps tab and the command palette. What is still English: the
-backend's own status and progress text, which reaches the status bar verbatim
-because there is no key-based channel for it. A test now holds both dictionaries to the same key set, so a
+inspectors, the Maps tab, the command palette and — since 2026-09-21 — bundle
+progress, which now travels as a key and its arguments. What is still English:
+the `AppState` status line's own messages, which no surface currently renders;
+convert them the same way if one starts to. A test now holds both dictionaries to the same key set, so a
 half-finished pass fails instead of falling back to English silently.

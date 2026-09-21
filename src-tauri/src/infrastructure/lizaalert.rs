@@ -60,9 +60,102 @@ impl ProjectOpenPhase {
     }
 }
 
+/// What a progress message says, as something the interface can translate.
+///
+/// These sentences are built in Rust and reach the status bar verbatim, so
+/// while they were plain strings they were English in a Russian window — the
+/// one part of the download a crew watches that never spoke their language.
+///
+/// Each variant carries a key and its arguments in order; `english` is the
+/// wording a diagnostic records, and what the interface falls back to when it
+/// has no translation for the key.
+#[derive(Debug, Clone)]
+pub enum ProgressText {
+    ScanningDirectory { path: String },
+    DownloadingBundle { name: String },
+    OpeningCachedBundle { name: String },
+    DownloadingInParallel { total: usize },
+    DownloadedOfFiles { completed: usize, total: usize },
+    DownloadedFiles { total: usize },
+    ExtractingOziIn { name: String },
+    ExtractingCachedOzi { name: String },
+    ExtractingInParallel { count: usize, names: String },
+    ExtractedOziArchives { count: usize },
+    IndexingMapsIn { name: String },
+    IndexingCachedMaps { name: String },
+}
+
+impl ProgressText {
+    pub fn key(&self) -> &'static str {
+        match self {
+            Self::ScanningDirectory { .. } => "progress.scanningDirectory",
+            Self::DownloadingBundle { .. } => "progress.downloadingBundle",
+            Self::OpeningCachedBundle { .. } => "progress.openingCachedBundle",
+            Self::DownloadingInParallel { .. } => "progress.downloadingInParallel",
+            Self::DownloadedOfFiles { .. } => "progress.downloadedOfFiles",
+            Self::DownloadedFiles { .. } => "progress.downloadedFiles",
+            Self::ExtractingOziIn { .. } => "progress.extractingOziIn",
+            Self::ExtractingCachedOzi { .. } => "progress.extractingCachedOzi",
+            Self::ExtractingInParallel { .. } => "progress.extractingInParallel",
+            Self::ExtractedOziArchives { .. } => "progress.extractedOziArchives",
+            Self::IndexingMapsIn { .. } => "progress.indexingMapsIn",
+            Self::IndexingCachedMaps { .. } => "progress.indexingCachedMaps",
+        }
+    }
+
+    pub fn args(&self) -> Vec<String> {
+        match self {
+            Self::ScanningDirectory { path } => vec![path.clone()],
+            Self::DownloadingBundle { name }
+            | Self::OpeningCachedBundle { name }
+            | Self::ExtractingOziIn { name }
+            | Self::ExtractingCachedOzi { name }
+            | Self::IndexingMapsIn { name }
+            | Self::IndexingCachedMaps { name } => vec![name.clone()],
+            Self::DownloadingInParallel { total } | Self::DownloadedFiles { total } => {
+                vec![total.to_string()]
+            }
+            Self::DownloadedOfFiles { completed, total } => {
+                vec![completed.to_string(), total.to_string()]
+            }
+            Self::ExtractingInParallel { count, names } => {
+                vec![count.to_string(), names.clone()]
+            }
+            Self::ExtractedOziArchives { count } => vec![count.to_string()],
+        }
+    }
+
+    pub fn english(&self) -> String {
+        match self {
+            Self::ScanningDirectory { path } => format!("Scanning {path}"),
+            Self::DownloadingBundle { name } => format!("Downloading project bundle: {name}"),
+            Self::OpeningCachedBundle { name } => {
+                format!("Opening cached project bundle: {name}")
+            }
+            Self::DownloadingInParallel { total } => {
+                format!("Downloading {total} files in parallel")
+            }
+            Self::DownloadedOfFiles { completed, total } => {
+                format!("Downloaded {completed} of {total} files")
+            }
+            Self::DownloadedFiles { total } => format!("Downloaded {total} files"),
+            Self::ExtractingOziIn { name } => format!("Extracting OZI archives in: {name}"),
+            Self::ExtractingCachedOzi { name } => {
+                format!("Extracting cached OZI bundles: {name}")
+            }
+            Self::ExtractingInParallel { count, names } => {
+                format!("Extracting {count} in parallel: {names}")
+            }
+            Self::ExtractedOziArchives { count } => format!("Extracted {count} OZI archives"),
+            Self::IndexingMapsIn { name } => format!("Indexing maps in: {name}"),
+            Self::IndexingCachedMaps { name } => format!("Indexing cached project maps: {name}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProjectOpenProgress {
-    pub message: String,
+    pub text: ProgressText,
     pub phase: ProjectOpenPhase,
     pub completed: Option<u64>,
     pub total: Option<u64>,
@@ -71,15 +164,20 @@ pub struct ProjectOpenProgress {
 }
 
 impl ProjectOpenProgress {
-    fn status(message: impl Into<String>, phase: ProjectOpenPhase) -> Self {
+    fn status(text: ProgressText, phase: ProjectOpenPhase) -> Self {
         Self {
-            message: message.into(),
+            text,
             phase,
             completed: None,
             total: None,
             downloaded_bytes: None,
             total_bytes: None,
         }
+    }
+
+    /// The English wording, for diagnostics and as the interface's fallback.
+    pub fn message(&self) -> String {
+        self.text.english()
     }
 }
 
@@ -402,13 +500,13 @@ where
     };
 
     on_progress(ProjectOpenProgress::status(
-        format!("Extracting OZI archives in: {name}"),
+        ProgressText::ExtractingOziIn { name: name.clone() },
         ProjectOpenPhase::Extracting,
     ));
     materialize_cached_ozi_archives(root, &slug, &mut on_progress)?;
 
     on_progress(ProjectOpenProgress::status(
-        format!("Indexing maps in: {name}"),
+        ProgressText::IndexingMapsIn { name: name.clone() },
         ProjectOpenPhase::Indexing,
     ));
     let project = load_cached_project_from_root(summary, root)?;
@@ -665,7 +763,9 @@ pub async fn download_bundle_concurrent(
 ) -> Result<(), String> {
     fs::create_dir_all(&config.local_dir).map_err(|err| err.to_string())?;
     let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
-        format!("Scanning {}", config.local_dir.display()),
+        ProgressText::ScanningDirectory {
+            path: config.local_dir.display().to_string(),
+        },
         ProjectOpenPhase::Scanning,
     )));
 
@@ -699,7 +799,9 @@ pub async fn download_bundle_concurrent(
         .sum();
 
     let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
-        message: format!("Downloading {total} files in parallel"),
+        text: ProgressText::DownloadingInParallel {
+            total: total as usize,
+        },
         phase: ProjectOpenPhase::Downloading,
         completed: Some(0),
         total: Some(total as u64),
@@ -793,7 +895,10 @@ pub async fn download_bundle_concurrent(
                 completed_files += 1;
                 downloaded_bytes += bytes;
                 let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
-                    message: format!("Downloaded {completed_files} of {total} files"),
+                    text: ProgressText::DownloadedOfFiles {
+                        completed: completed_files as usize,
+                        total: total as usize,
+                    },
                     phase: ProjectOpenPhase::Downloading,
                     completed: Some(completed_files),
                     total: Some(total as u64),
@@ -827,7 +932,9 @@ pub async fn download_bundle_concurrent(
     }
 
     let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
-        message: format!("Downloaded {total} files"),
+        text: ProgressText::DownloadedFiles {
+            total: total as usize,
+        },
         phase: ProjectOpenPhase::Downloading,
         completed: Some(total as u64),
         total: Some(total as u64),
@@ -869,7 +976,9 @@ pub async fn open_project_async(
     match listing_probe {
         Ok(()) => {
             let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
-                format!("Downloading project bundle: {}", summary.name),
+                ProgressText::DownloadingBundle {
+                    name: summary.name.clone(),
+                },
                 ProjectOpenPhase::Downloading,
             )));
             let source_root = project_source_root(&root, &summary.slug);
@@ -888,7 +997,9 @@ pub async fn open_project_async(
                 return Err(err);
             }
             let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress::status(
-                format!("Opening cached project bundle: {}", summary.name),
+                ProgressText::OpeningCachedBundle {
+                    name: summary.name.clone(),
+                },
                 ProjectOpenPhase::Downloading,
             )));
         }
@@ -907,13 +1018,17 @@ pub async fn open_project_async(
                 let _ = tx.send(DownloadNotification::Phase(p));
             };
             on_progress(ProjectOpenProgress::status(
-                format!("Extracting cached OZI bundles: {}", summary.name),
+                ProgressText::ExtractingCachedOzi {
+                    name: summary.name.clone(),
+                },
                 ProjectOpenPhase::Extracting,
             ));
             materialize_cached_ozi_archives(&root, &summary.slug, &mut on_progress)?;
 
             on_progress(ProjectOpenProgress::status(
-                format!("Indexing cached project maps: {}", summary.name),
+                ProgressText::IndexingCachedMaps {
+                    name: summary.name.clone(),
+                },
                 ProjectOpenPhase::Indexing,
             ));
             let project = load_cached_project_from_root(summary.clone(), &root)?;
@@ -1673,11 +1788,10 @@ where
         .filter_map(|(p, _)| p.file_name()?.to_str())
         .collect();
     on_progress(ProjectOpenProgress {
-        message: format!(
-            "Extracting {} in parallel: {}",
-            to_extract.len(),
-            names.join(", ")
-        ),
+        text: ProgressText::ExtractingInParallel {
+            count: to_extract.len(),
+            names: names.join(", "),
+        },
         phase: ProjectOpenPhase::Extracting,
         completed: Some(0),
         total: Some(to_extract.len() as u64),
@@ -1708,7 +1822,9 @@ where
     }
 
     on_progress(ProjectOpenProgress {
-        message: format!("Extracted {} OZI archives", to_extract.len()),
+        text: ProgressText::ExtractedOziArchives {
+            count: to_extract.len(),
+        },
         phase: ProjectOpenPhase::Extracting,
         completed: Some(to_extract.len() as u64),
         total: Some(to_extract.len() as u64),
@@ -2120,6 +2236,55 @@ mod tests {
                 .to_string_lossy()
                 .contains("extracted/5-Ozi(Win&Android)_Topo/Maps/demo.map")
         );
+    }
+
+    /// Bundle progress reaches the status bar verbatim, so as long as it is a
+    /// sentence built in Rust it is English in a Russian window. Every message
+    /// carries a key and its arguments now; the English text stays as what a
+    /// diagnostic reads and as the fallback when a build has no translation.
+    #[test]
+    fn every_progress_message_carries_a_key_and_its_arguments() {
+        use super::ProgressText;
+
+        let cases = [
+            (
+                ProgressText::ScanningDirectory {
+                    path: "/bundles/2026-09-21_demo".to_owned(),
+                },
+                "progress.scanningDirectory",
+                vec!["/bundles/2026-09-21_demo".to_owned()],
+                "Scanning /bundles/2026-09-21_demo",
+            ),
+            (
+                ProgressText::DownloadingInParallel { total: 3 },
+                "progress.downloadingInParallel",
+                vec!["3".to_owned()],
+                "Downloading 3 files in parallel",
+            ),
+            (
+                ProgressText::DownloadedOfFiles {
+                    completed: 2,
+                    total: 3,
+                },
+                "progress.downloadedOfFiles",
+                vec!["2".to_owned(), "3".to_owned()],
+                "Downloaded 2 of 3 files",
+            ),
+            (
+                ProgressText::OpeningCachedBundle {
+                    name: "Ветер".to_owned(),
+                },
+                "progress.openingCachedBundle",
+                vec!["Ветер".to_owned()],
+                "Opening cached project bundle: Ветер",
+            ),
+        ];
+
+        for (text, key, args, english) in cases {
+            assert_eq!(text.key(), key);
+            assert_eq!(text.args(), args, "arguments for {key}");
+            assert_eq!(text.english(), english, "english text for {key}");
+        }
     }
 
     /// The catalogue walk is a thousand pages deep at worst, and it holds the

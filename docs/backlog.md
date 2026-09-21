@@ -91,9 +91,12 @@ and the palette slice; these were not.
   downloaded" toggle, the selection, the cleared contents and the scroll offset
   live in `bundleLoaderView` and come back when the Sheet mounts the loader
   again. Session state only — tomorrow starts on tomorrow's search.
-- **Backend status and progress text is English** and reaches the screen
-  verbatim — there is no key-based channel for it, so the status bar and the
-  bundle phases stay untranslated.
+- ~~Backend progress text is English.~~ Done on 2026-09-21 in
+  `progress-in-the-crews-language`: the bundle path sends a key and its
+  arguments, both status surfaces translate the message and the phase, and the
+  backend's English wording is the fallback. Still English: the `AppState`
+  status line's own 44 messages, which no surface currently renders — convert
+  them the same way if one starts to.
 - **The catalogue is walked in full at every launch**, holding the busy flag.
   The "no way to stop it" half is done on 2026-09-21 in
   `stop-waiting-for-the-catalogue`: the walk is cancellable, the loader offers

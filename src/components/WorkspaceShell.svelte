@@ -32,7 +32,7 @@
     projectDirty,
   } from "$lib/stores";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
-  import { locale, t, toggleLocale } from "$lib/i18n";
+  import { locale, progressText, t, toggleLocale } from "$lib/i18n";
 
   let {
     libraryRail,
@@ -209,8 +209,16 @@
           subscription is registered here.
         -->
         <span class="status-progress" data-testid="status-bundle-progress">
-          <span class="status-phase">{$bundleProgress.phase}</span>
-          <span class="status-message">{$bundleProgress.message}</span>
+          <span class="status-phase"
+            >{$t(`phase.${$bundleProgress.phase}`)}</span
+          >
+          <span class="status-message"
+            >{$progressText(
+              $bundleProgress.message_key,
+              $bundleProgress.message_args,
+              $bundleProgress.message,
+            )}</span
+          >
           {#if $bundleProgress.completed != null && $bundleProgress.total != null}
             <span class="status-counts">
               {$bundleProgress.completed} / {$bundleProgress.total}

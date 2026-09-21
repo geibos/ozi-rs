@@ -39,7 +39,9 @@ export function playBundleDownload(downloadId: string, fail = false): void {
   at(() =>
     standEmit("bundle-progress", {
       download_id: downloadId,
-      message: "Scanning",
+      message: "Scanning /bundles",
+      message_key: "progress.scanningDirectory",
+      message_args: ["/bundles"],
       phase: "scanning",
     }),
   );
@@ -48,6 +50,8 @@ export function playBundleDownload(downloadId: string, fail = false): void {
     standEmit("bundle-progress", {
       download_id: downloadId,
       message: `Downloading ${files.length} files in parallel`,
+      message_key: "progress.downloadingInParallel",
+      message_args: [String(files.length)],
       phase: "downloading",
       completed: 0,
       total: files.length,
@@ -91,6 +95,8 @@ export function playBundleDownload(downloadId: string, fail = false): void {
       standEmit("bundle-progress", {
         download_id: downloadId,
         message: `Downloaded ${done} of ${files.length} files`,
+        message_key: "progress.downloadedOfFiles",
+        message_args: [String(done), String(files.length)],
         phase: "downloading",
         completed: done,
         total: files.length,
@@ -103,7 +109,13 @@ export function playBundleDownload(downloadId: string, fail = false): void {
   at(() =>
     standEmit("bundle-progress", {
       download_id: downloadId,
-      message: fail ? "Downloading" : "Extracting",
+      message: fail
+        ? `Downloaded ${files.length} files`
+        : `Extracted ${files.length} OZI archives`,
+      message_key: fail
+        ? "progress.downloadedFiles"
+        : "progress.extractedOziArchives",
+      message_args: [String(files.length)],
       phase: fail ? "downloading" : "extracting",
     }),
   );

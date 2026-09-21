@@ -210,6 +210,22 @@ const dictionaries = {
     "loader.maps": "Maps",
     "loader.filterPlaceholder": "Filter…",
     "loader.refreshing": "Refreshing list…",
+    "progress.scanningDirectory": "Scanning {0}",
+    "progress.downloadingBundle": "Downloading bundle: {0}",
+    "progress.openingCachedBundle": "Opening downloaded bundle: {0}",
+    "progress.downloadingInParallel": "Downloading {0} files in parallel",
+    "progress.downloadedOfFiles": "Downloaded {0} of {1} files",
+    "progress.downloadedFiles": "Downloaded {0} files",
+    "progress.extractingOziIn": "Extracting OZI archives in: {0}",
+    "progress.extractingCachedOzi": "Extracting downloaded OZI archives: {0}",
+    "progress.extractingInParallel": "Extracting {0} in parallel: {1}",
+    "progress.extractedOziArchives": "Extracted {0} OZI archives",
+    "progress.indexingMapsIn": "Indexing maps in: {0}",
+    "progress.indexingCachedMaps": "Indexing downloaded maps: {0}",
+    "phase.scanning": "scanning",
+    "phase.downloading": "downloading",
+    "phase.extracting": "extracting",
+    "phase.indexing": "indexing",
     "loader.stopRefresh": "Stop",
     "loader.stopRefreshFailed": "Could not stop the refresh",
     "loader.offline": "Offline — this is the saved list",
@@ -438,6 +454,22 @@ const dictionaries = {
     "loader.maps": "Карты",
     "loader.filterPlaceholder": "Фильтр…",
     "loader.refreshing": "Обновление списка…",
+    "progress.scanningDirectory": "Просмотр {0}",
+    "progress.downloadingBundle": "Скачивание комплекта: {0}",
+    "progress.openingCachedBundle": "Открытие скачанного комплекта: {0}",
+    "progress.downloadingInParallel": "Скачивание {0} файлов параллельно",
+    "progress.downloadedOfFiles": "Скачано {0} из {1} файлов",
+    "progress.downloadedFiles": "Скачано файлов: {0}",
+    "progress.extractingOziIn": "Распаковка архивов OZI: {0}",
+    "progress.extractingCachedOzi": "Распаковка скачанных архивов OZI: {0}",
+    "progress.extractingInParallel": "Распаковка {0} параллельно: {1}",
+    "progress.extractedOziArchives": "Распаковано архивов OZI: {0}",
+    "progress.indexingMapsIn": "Индексация карт: {0}",
+    "progress.indexingCachedMaps": "Индексация скачанных карт: {0}",
+    "phase.scanning": "просмотр",
+    "phase.downloading": "скачивание",
+    "phase.extracting": "распаковка",
+    "phase.indexing": "индексация",
     "loader.stopRefresh": "Стоп",
     "loader.stopRefreshFailed": "Не удалось остановить обновление",
     "loader.offline": "Нет связи — список сохранённый",
@@ -528,6 +560,38 @@ export const t: Readable<(key: MessageKey) => string> = derived(
   locale,
   (active) => (key: MessageKey) =>
     dictionaries[active][key] ?? dictionaries.en[key],
+);
+
+/**
+ * A backend progress message, in the interface's language.
+ *
+ * The backend sends a key and its arguments alongside the English wording it
+ * used to send alone. The English is the fallback: a build whose dictionary
+ * does not know the key shows what the backend said rather than the key
+ * itself, which is the one thing worse than English.
+ *
+ * Arguments are positional — `{0}`, `{1}` — because they are counts and names
+ * whose order is fixed by the message, not a named set the dictionaries would
+ * have to agree on.
+ */
+export const progressText: Readable<
+  (key: string, args: string[], fallback: string) => string
+> = derived(
+  locale,
+  (active: Locale) =>
+    (key: string, args: string[], fallback: string): string => {
+      const template =
+        dictionaries[active][key as MessageKey] ??
+        dictionaries.en[key as MessageKey];
+      if (template === undefined) return fallback;
+      // One pass, not one per argument: a project name is free text and may
+      // itself contain something that looks like a placeholder, which a second
+      // pass would then substitute into.
+      return template.replace(/\{(\d+)\}/g, (whole, index) => {
+        const arg = args[Number(index)];
+        return arg === undefined ? whole : arg;
+      });
+    },
 );
 
 /**
