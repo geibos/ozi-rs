@@ -562,8 +562,14 @@ impl AppState {
         &self.bundles_root
     }
 
+    /// Point the app at another bundles directory, and remember it.
+    ///
+    /// Without the write-through the choice lasted until the next launch,
+    /// which silently sent downloads back to the default folder and made
+    /// every already-fetched bundle look missing.
     pub fn set_bundles_root(&mut self, path: PathBuf) {
         self.bundles_root = path;
+        self.persist_session_snapshot();
     }
 
     pub fn track_layers(&self) -> &[crate::domain::TrackLayer] {
@@ -1205,58 +1211,81 @@ impl AppState {
         }
     }
 
-    pub fn export_layer_to_gpx(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
+    /// Export a track layer to GPX.
+    ///
+    /// Returns the failure as well as recording it: a status line at the
+    /// bottom of the window is not an answer to "did my export happen?" —
+    /// the caller needs to be able to show the error toast.
+    pub fn export_layer_to_gpx(
+        &mut self,
+        layer_id: LayerId,
+        path: std::path::PathBuf,
+    ) -> Result<(), String> {
         let Some(layer) = self
             .project
             .track_layers()
             .iter()
             .find(|l| l.id() == layer_id)
         else {
-            self.update_status(DiagnosticLevel::Error, "Layer not found for export");
-            return;
+            let message = "Layer not found for export".to_owned();
+            self.update_status(DiagnosticLevel::Error, message.clone());
+            return Err(message);
         };
         match crate::infrastructure::export::export_layer_to_gpx_file(layer, &path) {
-            Ok(()) => self.update_status(
-                DiagnosticLevel::Info,
-                format!("Exported to {}", path.display()),
-            ),
+            Ok(()) => {
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Exported to {}", path.display()),
+                );
+                Ok(())
+            }
             Err(e) => {
-                self.update_status(DiagnosticLevel::Error, format!("Export failed: {e}"));
+                let message = format!("Export failed: {e}");
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                Err(message)
             }
         }
     }
 
     /// Export all waypoints of the given layer to an OziExplorer `.wpt` file.
-    pub fn export_wpt_waypoints(&mut self, layer_id: LayerId, path: std::path::PathBuf) {
+    pub fn export_wpt_waypoints(
+        &mut self,
+        layer_id: LayerId,
+        path: std::path::PathBuf,
+    ) -> Result<(), String> {
         let Some(layer) = self
             .project
             .waypoint_layers()
             .iter()
             .find(|l| l.id() == layer_id)
         else {
-            self.update_status(
-                DiagnosticLevel::Error,
-                "Waypoint layer not found for export",
-            );
-            return;
+            let message = "Waypoint layer not found for export".to_owned();
+            self.update_status(DiagnosticLevel::Error, message.clone());
+            return Err(message);
         };
         let waypoints: Vec<Waypoint> = layer.waypoints().to_vec();
 
         let mut file = match std::fs::File::create(&path) {
             Ok(file) => file,
             Err(e) => {
-                self.update_status(DiagnosticLevel::Error, format!("Export failed: {e}"));
-                return;
+                let message = format!("Export failed: {e}");
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                return Err(message);
             }
         };
 
         match crate::infrastructure::export::wpt::write_wpt(waypoints, &mut file) {
-            Ok(()) => self.update_status(
-                DiagnosticLevel::Info,
-                format!("Exported waypoints to {}", path.display()),
-            ),
+            Ok(()) => {
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Exported waypoints to {}", path.display()),
+                );
+                Ok(())
+            }
             Err(e) => {
-                self.update_status(DiagnosticLevel::Error, format!("Export failed: {e}"));
+                let message = format!("Export failed: {e}");
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                Err(message)
             }
         }
     }
@@ -1355,6 +1384,12 @@ impl AppState {
                 return;
             }
         };
+
+        // Restore the bundles root first: everything below resolves cached
+        // bundles and the active map against it.
+        if let Some(bundles_root) = session.bundles_root {
+            self.bundles_root = bundles_root;
+        }
 
         if let Some(project_path) = session.last_project_path {
             if !project_path.exists() {
@@ -1456,6 +1491,7 @@ impl AppState {
                 .active_map
                 .as_ref()
                 .map(persisted_active_map_from_selection),
+            bundles_root: Some(self.bundles_root.clone()),
         };
         if let Err(error) = persistence::save_app_session(&session, session_path) {
             self.push_diagnostic(
@@ -1793,6 +1829,99 @@ mod tests {
         );
     }
 
+    /// An export that failed used to answer `Ok(())`, so the caller showed the
+    /// success path and the only trace was a line in the status bar.
+    #[test]
+    fn a_failed_export_is_reported_to_the_caller() {
+        let dir = temp_session_dir("export-failure");
+        let mut state = AppState::new();
+
+        let missing_layer = state.export_layer_to_gpx(LayerId::new(9999), dir.join("out.gpx"));
+        assert!(missing_layer.is_err(), "a missing layer SHALL be an error");
+
+        // A directory that does not exist cannot receive a file.
+        let unwritable = dir.join("no-such-dir").join("out.gpx");
+        let write_failure = state.export_layer_to_gpx(LayerId::new(1), unwritable);
+        assert!(
+            write_failure.is_err(),
+            "a write failure SHALL reach the caller"
+        );
+
+        let missing_waypoint_layer =
+            state.export_wpt_waypoints(LayerId::new(9999), dir.join("out.wpt"));
+        assert!(missing_waypoint_layer.is_err());
+
+        let wpt_write_failure =
+            state.export_wpt_waypoints(LayerId::new(1), dir.join("no-such-dir").join("out.wpt"));
+        assert!(wpt_write_failure.is_err());
+    }
+
+    #[test]
+    fn a_successful_export_writes_the_file_and_answers_ok() {
+        let dir = temp_session_dir("export-success");
+        let mut state = AppState::new();
+        let path = dir.join("tracks.gpx");
+
+        assert!(
+            state
+                .export_layer_to_gpx(LayerId::new(1), path.clone())
+                .is_ok()
+        );
+        assert!(path.exists(), "the GPX file SHALL be on disk");
+
+        let wpt = dir.join("waypoints.wpt");
+        assert!(
+            state
+                .export_wpt_waypoints(LayerId::new(1), wpt.clone())
+                .is_ok()
+        );
+        assert!(wpt.exists(), "the WPT file SHALL be on disk");
+    }
+
+    /// The owner keeps bundles on an external disk. Choosing that folder had
+    /// to be redone on every launch, and until it was, the app looked at the
+    /// default folder and reported every downloaded bundle as missing.
+    #[test]
+    fn bundles_root_survives_a_restart() {
+        let dir = temp_session_dir("session-bundles-root");
+        let session_path = dir.join("session.json");
+        let chosen = dir.join("External Disk").join("LizaAlert Maps");
+
+        let mut first = AppState::new_with_paths(Some(session_path.clone()), dir.join("default"));
+        first.set_bundles_root(chosen.clone());
+
+        let second = AppState::new_with_paths(Some(session_path.clone()), dir.join("default"));
+        assert_eq!(
+            second.bundles_root(),
+            chosen.as_path(),
+            "the chosen bundles root SHALL outlive the process"
+        );
+    }
+
+    /// Session files written before the field existed have no `bundles_root`.
+    /// They must still restore — a parse failure would lose the project too.
+    #[test]
+    fn session_without_a_bundles_root_still_restores_and_keeps_the_injected_one() {
+        let dir = temp_session_dir("session-bundles-root-legacy");
+        let session_path = dir.join("session.json");
+        let project_path = dir.join("search.ozp");
+        persistence::save_project(&Project::untitled(), &project_path).expect("save project");
+        std::fs::write(
+            &session_path,
+            format!(
+                r#"{{"last_project_path":{:?},"active_map":null}}"#,
+                project_path.display().to_string()
+            ),
+        )
+        .expect("write legacy session");
+
+        let injected = dir.join("injected-bundles");
+        let state = AppState::new_with_paths(Some(session_path), injected.clone());
+
+        assert_eq!(state.project_file_path(), Some(project_path.as_path()));
+        assert_eq!(state.bundles_root(), injected.as_path());
+    }
+
     #[test]
     fn session_restore_valid_restores_project_path_and_active_map() {
         let dir = temp_session_dir("session-restore-valid");
@@ -1804,6 +1933,7 @@ mod tests {
         persistence::save_app_session(
             &PersistedAppSession {
                 last_project_path: Some(project_path.clone()),
+                bundles_root: None,
                 active_map: Some(PersistedActiveMap {
                     kind: "sqlite".to_owned(),
                     project_name: "Demo Project".to_owned(),
@@ -1847,6 +1977,7 @@ mod tests {
         persistence::save_app_session(
             &PersistedAppSession {
                 last_project_path: Some(dir.join("missing.ozp")),
+                bundles_root: None,
                 active_map: Some(PersistedActiveMap {
                     kind: "sqlite".to_owned(),
                     project_name: "Missing Project".to_owned(),
@@ -1896,6 +2027,7 @@ mod tests {
         persistence::save_app_session(
             &PersistedAppSession {
                 last_project_path: Some(project_path.clone()),
+                bundles_root: None,
                 active_map: None,
             },
             &session_path,

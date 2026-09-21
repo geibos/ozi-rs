@@ -816,7 +816,8 @@ pub fn export_gpx(
     app: AppHandle,
 ) -> Result<(), String> {
     use crate::domain::LayerId;
-    lock_app_state(state.inner())?.export_layer_to_gpx(LayerId::new(layer_id), PathBuf::from(path));
+    lock_app_state(state.inner())?
+        .export_layer_to_gpx(LayerId::new(layer_id), PathBuf::from(path))?;
     let _ = app.emit("state-changed", ());
     Ok(())
 }
@@ -843,7 +844,7 @@ pub fn export_wpt_waypoints(
 ) -> Result<(), String> {
     use crate::domain::LayerId;
     lock_app_state(state.inner())?
-        .export_wpt_waypoints(LayerId::new(layer_id), PathBuf::from(path));
+        .export_wpt_waypoints(LayerId::new(layer_id), PathBuf::from(path))?;
     let _ = app.emit("state-changed", ());
     Ok(())
 }

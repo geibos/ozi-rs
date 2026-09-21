@@ -62,7 +62,6 @@ pub enum ArchiveEntryKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SupportedArchiveEntryKind {
     Gpx,
-    Kml,
     OziMap,
     OziTrack,
     OziWaypoint,
@@ -72,6 +71,10 @@ pub enum SupportedArchiveEntryKind {
 pub enum UnsupportedArchiveEntryKind {
     RasterPayload,
     SqliteTiles,
+    /// `.kml` — a real track format the importer has no parser for yet.
+    /// Classifying it as supported promised an import that never happened:
+    /// the entry was counted in and then silently dropped.
+    Kml,
     Unknown,
 }
 
@@ -207,7 +210,7 @@ fn archive_file_name(path: &str) -> String {
 pub fn classify_archive_path(path: &str) -> ArchiveEntryKind {
     match extension(path).as_deref() {
         Some("gpx") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::Gpx),
-        Some("kml") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::Kml),
+        Some("kml") => ArchiveEntryKind::Unsupported(UnsupportedArchiveEntryKind::Kml),
         Some("map") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::OziMap),
         Some("plt") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::OziTrack),
         Some("wpt") => ArchiveEntryKind::Supported(SupportedArchiveEntryKind::OziWaypoint),

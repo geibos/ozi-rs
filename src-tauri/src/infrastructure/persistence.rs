@@ -12,6 +12,11 @@ pub enum PersistenceError {
 pub struct PersistedAppSession {
     pub last_project_path: Option<PathBuf>,
     pub active_map: Option<PersistedActiveMap>,
+    /// Where downloaded bundles live. Absent in files written before the
+    /// field existed, which is why it defaults instead of failing the read —
+    /// a session that will not parse loses the restored project too.
+    #[serde(default)]
+    pub bundles_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
