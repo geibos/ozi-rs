@@ -158,6 +158,92 @@ mod tests {
     use chrono::TimeZone as _;
     use encoding_rs::WINDOWS_1251;
 
+    /// PLT is the format a crew hands to whoever is still on OziExplorer, and
+    /// the one this application is replacing. Every piece of it is tested
+    /// somewhere; nothing tested the whole trip, which is what the receiver
+    /// actually gets.
+    ///
+    /// The colour and the width are the caller's, not the track's: the command
+    /// pulls them off the style and packs the colour into an RGB `u32`, so the
+    /// round trip is only honest if it goes through the same packing.
+    #[test]
+    fn a_track_survives_the_plt_trip_out_and_back() {
+        let mut track = Track::new(TrackId::new(1), "20260708_Ветер2");
+
+        let mut first = TrackSegment::new(TrackSegmentId::new(1));
+        first.add_point(
+            TrackPoint::new(TrackPointId::new(1), 59.952430, 31.596810)
+                .with_elevation(150.0)
+                .with_timestamp(
+                    chrono::Utc
+                        .with_ymd_and_hms(2026, 7, 8, 12, 0, 0)
+                        .single()
+                        .expect("timestamp"),
+                ),
+        );
+        first.add_point(TrackPoint::new(TrackPointId::new(2), 59.953350, 31.601640));
+        track.add_segment(first);
+
+        // A second sitting: if the boundary is lost the track claims a
+        // straight line between them that nobody walked.
+        let mut second = TrackSegment::new(TrackSegmentId::new(2));
+        second.add_point(TrackPoint::new(TrackPointId::new(3), 59.944550, 31.659270));
+        second.add_point(TrackPoint::new(TrackPointId::new(4), 59.946590, 31.671080));
+        track.add_segment(second);
+
+        track.style_mut().color = [0, 0, 255, 255];
+        track.style_mut().line_width = 3.0;
+
+        let style = track.style();
+        let [r, g, b, _] = style.color;
+        let packed = (r as u32) << 16 | (g as u32) << 8 | (b as u32);
+
+        let mut written = Vec::new();
+        export_plt(&track, packed, style.line_width as f64, &mut written).expect("export");
+        let (text, _, _) = WINDOWS_1251.decode(&written);
+        let back = import_plt_text("round-trip.plt".to_owned(), &text).expect("import");
+
+        assert_eq!(back.track.name(), "20260708_Ветер2", "the name");
+        assert_eq!(back.track.segments().len(), 2, "both sittings");
+        assert_eq!(back.track.segments()[0].points().len(), 2);
+        assert_eq!(back.track.segments()[1].points().len(), 2);
+
+        let first_point = &back.track.segments()[0].points()[0];
+        assert!(
+            (first_point.latitude() - 59.952430).abs() < 1e-6,
+            "latitude"
+        );
+        assert!(
+            (first_point.longitude() - 31.596810).abs() < 1e-6,
+            "longitude"
+        );
+        // Metres out, feet on the wire, metres back: the rounding to whole
+        // feet is the format's, and a third of a metre is not a hill.
+        assert!(
+            (first_point.elevation().expect("elevation") - 150.0).abs() < 0.2,
+            "elevation, got {:?}",
+            first_point.elevation()
+        );
+        assert_eq!(
+            first_point.timestamp(),
+            Some(
+                chrono::Utc
+                    .with_ymd_and_hms(2026, 7, 8, 12, 0, 0)
+                    .single()
+                    .expect("timestamp")
+            ),
+            "the timestamp"
+        );
+        assert_eq!(
+            back.track.segments()[0].points()[1].timestamp(),
+            None,
+            "and the absence of one"
+        );
+
+        assert_eq!(back.track.style().color, [0, 0, 255, 255], "the colour");
+        assert_eq!(back.track.style().line_width, 3.0, "the line width");
+    }
+
     #[test]
     fn export_plt_writes_exact_header_and_first_data_lines() {
         let mut track = Track::new(TrackId::new(1), "Direct");
