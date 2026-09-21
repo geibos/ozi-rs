@@ -59,8 +59,10 @@ errors surfaced.
   `Quartz`). A Mac2 session also quits the app when it ends, and its
   WebDriverAgent is one-shot — kill `WebDriverAgentRunner-Runner` before the
   next session.
-- **`.mcp.json` still runs a prebuilt `ozi-rs-mcp`** from May, so the July
-  fixes to it are absent from agent sessions (`revive-ui-cycle` task 0.3).
+- **The native-QA MCP server now builds from source** (`.mcp.json` runs
+  `cargo run -p ozi-rs-mcp --`, as `opencode.json` already did). Until
+  2026-09-21 it ran a binary compiled in May, so July's fixes never reached
+  agent sessions. The change takes effect in the next session.
 - **MapLibre carries a critical advisory** (`GHSA-jrc7-96c5-q579`) whose fix is
   two major versions ahead. Waived with a reason in
   `scripts/npm-audit-gate.mjs`; the upgrade needs its own slice.

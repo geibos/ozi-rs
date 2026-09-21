@@ -2,7 +2,7 @@
 
 - [x] 0.1 Run `just ci` on the current tree; commit the uncommitted July slice (unified import + ZIP, import folder, show-on-map, bundle preview, virtualised catalog, DownloadPopup, glyph fix) as one commit with a message describing the owner's first hands-on findings
 - [x] 0.2 Push `main` to `origin` (68 commits behind); confirm `git log origin/main..main` is empty and GitHub Actions runs green on the pushed head
-- [ ] 0.3 Switch `.mcp.json` to `cargo run --quiet -p ozi-rs-mcp --` (mirror `opencode.json`); document in `docs/native-qa-mcp.md` that the prebuilt binary is no longer used
+- [x] 0.3 Switch `.mcp.json` to `cargo run --quiet -p ozi-rs-mcp --` (mirror `opencode.json`); document in `docs/native-qa-mcp.md` that the prebuilt binary is no longer used
 - [ ] 0.4 Document the one-time Screen Recording grant for the terminal and MCP server in `docs/native-qa-mcp.md`; owner performs it
 - [ ] 0.5 Create `docs/STATE.md` (where we are / next slice / known broken) and link it from `AGENTS.md` and `CLAUDE.md` as the first thing to read and last thing to update
 - [ ] 0.6 Add `.github/pull_request_template.md` with the five Definition-of-Done checkboxes

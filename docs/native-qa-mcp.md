@@ -111,7 +111,7 @@ Prints a JSON document describing server identity (`ozi-rs-mcp`), `stdio_safe: t
 
 ## Registering with an MCP client
 
-The repo includes `opencode.json` and `.opencode/oh-my-opencode.json` that wire `ozi-rs-mcp` into opencode. For other clients, run the binary over stdio:
+The repo includes `.mcp.json` (Claude Code) and `opencode.json` that wire `ozi-rs-mcp` into their clients. Both build from source with `cargo run -p ozi-rs-mcp --`: a checked-in prebuilt binary silently serves whatever it was compiled from, which is how a May build stayed in use through July's fixes. For other clients, run the binary over stdio:
 
 ```jsonc
 {
@@ -125,7 +125,7 @@ The repo includes `opencode.json` and `.opencode/oh-my-opencode.json` that wire 
 }
 ```
 
-Use a release build (`cargo build --release --manifest-path tools/ozi-rs-mcp/Cargo.toml`) and point at the produced binary if startup latency matters.
+Use a release build (`cargo build --release --manifest-path tools/ozi-rs-mcp/Cargo.toml`) and point at the produced binary if startup latency matters — but then rebuild it whenever the server changes, or the client keeps running the old one.
 
 ## Tests and contracts
 
