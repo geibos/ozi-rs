@@ -84,6 +84,8 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::rename_track,
         commands::set_track_color,
         commands::toggle_track_visible,
+        commands::set_all_tracks_visible,
+        commands::show_only_track,
         commands::toggle_waypoint_visible,
         commands::move_track_point,
         commands::delete_track_point,

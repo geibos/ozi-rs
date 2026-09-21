@@ -118,7 +118,7 @@ pub fn import_plt_file_into_project(
     let mut report = ArchiveImportReport::new();
 
     let layer_id = next_layer_id(project);
-    let layer_name = format!("Imported tracks: {}", import.source_path);
+    let layer_name = source_file_label(&import.source_path);
     history
         .apply(
             project,
@@ -162,7 +162,7 @@ fn apply_gpx_import(
 ) -> Result<(), ArchiveImportError> {
     if !import.tracks().is_empty() {
         let layer_id = next_layer_id(project);
-        let layer_name = format!("Imported tracks: {}", import.source_path());
+        let layer_name = source_file_label(import.source_path());
         history.apply(
             project,
             &ProjectCommand::add_track_layer(layer_id, layer_name),
@@ -177,7 +177,7 @@ fn apply_gpx_import(
 
     if !import.waypoints().is_empty() {
         let layer_id = next_layer_id(project);
-        let layer_name = format!("Imported waypoints: {}", import.source_path());
+        let layer_name = source_file_label(import.source_path());
         history.apply(
             project,
             &ProjectCommand::add_waypoint_layer(layer_id, layer_name),
@@ -194,6 +194,19 @@ fn apply_gpx_import(
     }
 
     Ok(())
+}
+
+/// Name an import-created layer after the source file.
+///
+/// The full path made every entry in the layer selector look the same: a column
+/// of `Imported tracks: /Users/.../` with the distinguishing part cut off.
+fn source_file_label(source_path: &str) -> String {
+    source_path
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|name| !name.is_empty())
+        .unwrap_or(source_path)
+        .to_owned()
 }
 
 /// Allocate a layer id that no layer of any kind currently uses.

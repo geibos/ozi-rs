@@ -970,6 +970,34 @@ pub fn set_waypoint_symbol(
     Ok(())
 }
 
+/// Show or hide every track at once — the triage operator's bulk control.
+#[tauri::command]
+#[specta::specta]
+pub fn set_all_tracks_visible(
+    visible: bool,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    lock_app_state(state.inner())?.set_all_tracks_visible(visible);
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+/// Leave one track visible and hide every other one.
+#[tauri::command]
+#[specta::specta]
+pub fn show_only_track(
+    layer_id: u64,
+    track_id: u64,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId};
+    lock_app_state(state.inner())?.show_only_track(LayerId::new(layer_id), TrackId::new(track_id));
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn toggle_track_visible(

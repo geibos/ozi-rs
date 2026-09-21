@@ -611,6 +611,36 @@ impl Project {
         }
     }
 
+    /// Set the visibility of every track in every track layer.
+    ///
+    /// Triage on a search is done one track at a time, so hiding the other
+    /// twenty-five has to be one operation rather than twenty-five.
+    pub fn set_all_tracks_visible(&mut self, visible: bool) {
+        for layer in self.track_layers.iter_mut() {
+            let ids: Vec<crate::domain::TrackId> =
+                layer.tracks().iter().map(|track| track.id()).collect();
+            for id in ids {
+                layer.set_track_visible(id, visible);
+            }
+        }
+    }
+
+    /// Make one track visible and hide every other track in the project.
+    ///
+    /// Returns false when the track does not exist, leaving visibility as it
+    /// was rather than hiding everything.
+    pub fn show_only_track(&mut self, layer_id: LayerId, track_id: crate::domain::TrackId) -> bool {
+        let exists = self.track_layers.iter().any(|layer| {
+            layer.id() == layer_id && layer.tracks().iter().any(|t| t.id() == track_id)
+        });
+        if !exists {
+            return false;
+        }
+        self.set_all_tracks_visible(false);
+        self.set_track_visible_in_layer(layer_id, track_id, true);
+        true
+    }
+
     pub fn add_track_to_layer(
         &mut self,
         layer_id: LayerId,
@@ -865,6 +895,77 @@ impl Default for Project {
 
 #[cfg(test)]
 mod tests {
+    /// Ids start past 1: `Project::untitled()` already carries a default
+    /// "Tracks" layer with id 1, and a second layer claiming that id would be
+    /// unreachable — every lookup finds the first match.
+    fn project_with_two_layers() -> Project {
+        let mut first = TrackLayer::new(LayerId::new(10), "A");
+        first.add_track(Track::new(TrackId::new(1), "a1"));
+        first.add_track(Track::new(TrackId::new(2), "a2"));
+        let mut second = TrackLayer::new(LayerId::new(20), "B");
+        second.add_track(Track::new(TrackId::new(1), "b1"));
+        let mut project = Project::untitled();
+        project.add_track_layer(first);
+        project.add_track_layer(second);
+        project
+    }
+
+    fn visibility(project: &Project) -> Vec<bool> {
+        project
+            .track_layers()
+            .iter()
+            .flat_map(|l| l.tracks().iter().map(|t| t.style().visible))
+            .collect()
+    }
+
+    #[test]
+    fn set_all_tracks_visible_covers_every_layer() {
+        let mut project = project_with_two_layers();
+        project.set_all_tracks_visible(false);
+        assert!(visibility(&project).iter().all(|v| !v));
+        project.set_all_tracks_visible(true);
+        assert!(visibility(&project).iter().all(|v| *v));
+    }
+
+    /// Isolating is the triage move: one track on the basemap, the rest gone.
+    #[test]
+    fn show_only_track_leaves_exactly_one_visible() {
+        let mut project = project_with_two_layers();
+        assert!(project.show_only_track(LayerId::new(20), TrackId::new(1)));
+
+        let visible: Vec<&str> = project
+            .track_layers()
+            .iter()
+            .flat_map(|l| l.tracks().iter())
+            .filter(|t| t.style().visible)
+            .map(|t| t.name())
+            .collect();
+        assert_eq!(visible, vec!["b1"]);
+    }
+
+    #[test]
+    fn show_only_track_shows_a_track_that_was_hidden() {
+        let mut project = project_with_two_layers();
+        project.set_all_tracks_visible(false);
+        assert!(project.show_only_track(LayerId::new(10), TrackId::new(2)));
+        let visible: Vec<&str> = project
+            .track_layers()
+            .iter()
+            .flat_map(|l| l.tracks().iter())
+            .filter(|t| t.style().visible)
+            .map(|t| t.name())
+            .collect();
+        assert_eq!(visible, vec!["a2"]);
+    }
+
+    /// A stale row must not blank the map.
+    #[test]
+    fn show_only_track_is_a_no_op_for_a_missing_track() {
+        let mut project = project_with_two_layers();
+        assert!(!project.show_only_track(LayerId::new(10), TrackId::new(99)));
+        assert!(visibility(&project).iter().all(|v| *v));
+    }
+
     /// A project file written by an older build carries two track layers that
     /// both claim id 1. Everything addresses a layer by id, so the second one
     /// is unreachable: renames, imports and deletes all land on the first.

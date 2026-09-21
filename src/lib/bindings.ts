@@ -183,6 +183,28 @@ async toggleTrackVisible(layerId: number, trackId: number) : Promise<Result<null
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Show or hide every track at once — the triage operator's bulk control.
+ */
+async setAllTracksVisible(visible: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_all_tracks_visible", { visible }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Leave one track visible and hide every other one.
+ */
+async showOnlyTrack(layerId: number, trackId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_only_track", { layerId, trackId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async toggleWaypointVisible(layerId: number, waypointId: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("toggle_waypoint_visible", { layerId, waypointId }) };

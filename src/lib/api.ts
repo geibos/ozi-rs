@@ -156,6 +156,27 @@ export async function importTracksDirectory(path: string): Promise<string> {
   );
 }
 
+/**
+ * Show or hide every track in one call.
+ *
+ * Triage looks at one track at a time, so the alternative — a toggle per row —
+ * costs one round trip and one state-changed event per track.
+ */
+export async function setAllTracksVisible(visible: boolean): Promise<void> {
+  await unwrap("set_all_tracks_visible", commands.setAllTracksVisible(visible));
+}
+
+/** Leave one track visible and hide the rest. */
+export async function showOnlyTrack(
+  layerId: bigint,
+  trackId: bigint,
+): Promise<void> {
+  await unwrap(
+    "show_only_track",
+    commands.showOnlyTrack(toIdNumber(layerId), toIdNumber(trackId)),
+  );
+}
+
 export async function exportGpx(layerId: bigint, path: string): Promise<void> {
   await unwrap("export_gpx", commands.exportGpx(toIdNumber(layerId), path));
 }

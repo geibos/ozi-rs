@@ -696,6 +696,25 @@ impl AppState {
         }
     }
 
+    /// Show or hide every track in the project in one step.
+    ///
+    /// Visibility is a style mutation and deliberately bypasses the command
+    /// stack (ADR-0017), so a bulk change marks the project dirty without
+    /// filling undo with twenty-six entries.
+    pub fn set_all_tracks_visible(&mut self, visible: bool) {
+        self.project.set_all_tracks_visible(visible);
+        self.mark_style_mutation();
+    }
+
+    /// Leave one track visible and hide the rest. No-op for a missing track.
+    pub fn show_only_track(&mut self, layer_id: LayerId, track_id: TrackId) -> bool {
+        let changed = self.project.show_only_track(layer_id, track_id);
+        if changed {
+            self.mark_style_mutation();
+        }
+        changed
+    }
+
     pub fn toggle_track_visible(&mut self, layer_id: LayerId, track_id: TrackId) {
         let visible = self
             .project

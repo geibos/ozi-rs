@@ -52,7 +52,9 @@
     importPlt,
     importTracksDirectory,
     renameTrack,
+    setAllTracksVisible,
     setTrackColor,
+    showOnlyTrack,
     setTrackLineWidth,
     simplifyTrack,
     toggleTrackVisible,
@@ -74,8 +76,11 @@
     trackFeaturesFromGeojson,
     type TrackFeature,
   } from "$lib/track-features";
+  import { get } from "svelte/store";
   import { Input } from "$lib/components/ui/input";
   import SearchIcon from "@lucide/svelte/icons/search";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import XIcon from "@lucide/svelte/icons/x";
 
   let tracks: TrackFeature[] = $state([]);
@@ -107,12 +112,34 @@
     }
   });
 
+  async function handleSetAllVisible(visible: boolean) {
+    try {
+      await setAllTracksVisible(visible);
+    } catch (err) {
+      toast.error(get(i18n)("tracksTab.visibilityFailed"), {
+        description: String(err),
+      });
+    }
+  }
+
+  async function handleShowOnly(track: TrackFeature) {
+    try {
+      await showOnlyTrack(track.layerId, track.trackId);
+    } catch (err) {
+      toast.error(get(i18n)("tracksTab.visibilityFailed"), {
+        description: String(err),
+      });
+    }
+  }
+
   async function loadTracks() {
     try {
       tracks = trackFeaturesFromGeojson(await getTracksGeojson());
     } catch (err) {
       console.error("Failed to load tracks", err);
-      toast.error("Failed to load tracks", { description: String(err) });
+      toast.error(get(i18n)("tracksTab.loadFailed"), {
+        description: String(err),
+      });
     }
   }
 
@@ -382,7 +409,9 @@
 <div class="flex h-full min-h-0 flex-col">
   <header class="border-border border-b px-2 py-1.5">
     {#if trackLayers.length > 0}
-      <Label class="text-muted-foreground text-[10px]">Track layer</Label>
+      <Label class="text-muted-foreground text-[10px]">
+        {$i18n("tracksTab.layer")}
+      </Label>
       <div class="flex items-center gap-1">
         <Select.Root
           type="single"
@@ -391,13 +420,13 @@
           disabled={$drawingModeActive}
         >
           <Select.Trigger
-            aria-label="Track layer"
+            aria-label={$i18n("tracksTab.layer")}
             size="sm"
             class="min-w-0 flex-1"
             title={activeTrackLayerName}
           >
             <span class="min-w-0 flex-1 truncate text-left">
-              {activeTrackLayerName ?? "Pick layer"}
+              {activeTrackLayerName ?? $i18n("tracksTab.pickLayer")}
             </span>
           </Select.Trigger>
           <Select.Content class="max-w-72">
@@ -418,8 +447,11 @@
               size: $drawingModeActive ? "sm" : "icon-sm",
             })}
             aria-label={$drawingModeActive
-              ? `Done (${$drawingPointCount} points)`
-              : "Create track"}
+              ? $i18n("tracksTab.finishTrack").replace(
+                  "{count}",
+                  String($drawingPointCount),
+                )
+              : $i18n("tracksTab.createTrack")}
             aria-pressed={$drawingModeActive}
             disabled={$activeTrackLayerId === null}
             onclick={handleCreateTrackToggle}
@@ -434,8 +466,11 @@
           </Tooltip.Trigger>
           <Tooltip.Content>
             {$drawingModeActive
-              ? `Finish track (${$drawingPointCount} points)`
-              : "Create track"}
+              ? $i18n("tracksTab.finishTrack").replace(
+                  "{count}",
+                  String($drawingPointCount),
+                )
+              : $i18n("tracksTab.createTrack")}
           </Tooltip.Content>
         </Tooltip.Root>
       </div>
@@ -492,6 +527,28 @@
             </button>
           {/if}
         </div>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class="text-muted-foreground hover:text-foreground shrink-0 border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
+            aria-label={$i18n("tracksTab.showAll")}
+            onclick={() => handleSetAllVisible(true)}
+            data-testid="tracks-show-all"
+          >
+            <EyeIcon class="size-3.5" strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>{$i18n("tracksTab.showAll")}</Tooltip.Content>
+        </Tooltip.Root>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class="text-muted-foreground hover:text-foreground shrink-0 border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
+            aria-label={$i18n("tracksTab.hideAll")}
+            onclick={() => handleSetAllVisible(false)}
+            data-testid="tracks-hide-all"
+          >
+            <EyeOffIcon class="size-3.5" strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>{$i18n("tracksTab.hideAll")}</Tooltip.Content>
+        </Tooltip.Root>
         {#if trackQuery !== ""}
           <span
             class="text-muted-foreground shrink-0 font-mono text-[10px] tabular-nums"
@@ -592,11 +649,15 @@
             </Tooltip.Root>
           {/snippet}
           {#snippet actions()}
+            <DropdownMenu.Item onSelect={() => handleShowOnly(t)}>
+              {$i18n("tracksTab.onlyThis")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
             <DropdownMenu.Item onSelect={() => handleExportGpx(t)}>
-              Export GPX
+              {$i18n("tracksTab.exportGpx")}
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => handleExportPlt(t)}>
-              Export PLT
+              {$i18n("tracksTab.exportPlt")}
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <Popover.Root>

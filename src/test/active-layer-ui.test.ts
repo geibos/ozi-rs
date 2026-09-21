@@ -57,7 +57,7 @@ describe("active layer UI wiring", () => {
   it("renders minimal active track and waypoint layer selectors in the Library tabs", () => {
     expect(tracksTabSource).toContain("activeTrackLayerId");
     expect(tracksTabSource).toContain("$appState?.track_layers");
-    expect(tracksTabSource).toContain("Track layer");
+    expect(tracksTabSource).toContain('tracksTab.layer');
     expect(waypointsTabSource).toContain("activeWaypointLayerId");
     expect(waypointsTabSource).toContain("$appState?.waypoint_layers");
     // The label is localized now; the key is what the tab must render.

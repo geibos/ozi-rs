@@ -10,6 +10,28 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — one track at a time
+
+Triage means looking at one track alone on the basemap. With twenty-six tracks
+imported from the groups' navigators, the only control was a per-row toggle, so
+isolating one meant hiding twenty-five by hand and restoring them afterwards.
+
+The Tracks tab now has show-all and hide-all beside the search field, and every
+row menu offers "show only this one". Each is a single backend command, so the
+whole project changes in one round trip and one redraw. Visibility is still a
+style mutation, so none of this touches the undo stack.
+
+Import-created layers are named after the source file instead of its full path,
+which makes the layer selector readable.
+
+| | |
+|---|---|
+| Controls | [header](2026-09-21-bulk-visibility/after-controls.png) |
+| Hide all | [one click, empty map](2026-09-21-bulk-visibility/after-hide-all.png) |
+| Automated gates | `just ci` green (263 Rust, 286 frontend) |
+
+---
+
 ## 2026-09-21 — Russian by default
 
 The crew this is built for works in Russian, and the app opened in English
