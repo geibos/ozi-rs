@@ -58,9 +58,12 @@ decision.
   fix is two majors ahead. The affected sink is not called here (popups use
   `setText`, no `innerHTML`), so it is waived in `scripts/npm-audit-gate.mjs`.
   The upgrade needs its own slice with visual verification.
-- **Retries and timeouts on bundle downloads.** Timeouts are in slice 0.3;
-  retries are not planned yet. A stalled TCP connection currently freezes a
-  download indefinitely.
+- ~~Retries and timeouts on bundle downloads.~~ Done: timeouts in slice 0.3,
+  retries on 2026-09-21 in `one-flaky-file-is-not-the-bundle` — three attempts
+  per file, never for a cancellation, and the retry is reported. Still open if
+  it ever matters: a retry starts the file again rather than resuming it with a
+  range request, so a connection that drops near the end of a 185 MiB map costs
+  that map twice.
 - ~~Partial bundle availability.~~ Checked on 2026-09-21: it already worked —
   a map whose file lands gets its local path and opens from disk. What was
   missing was telling the operator. Done, with a test pinning the capability.

@@ -10,6 +10,34 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — one flaky file is not the bundle
+
+Slice 0.3 gave the transfers timeouts, so a stalled connection fails instead of
+hanging for ever. It did not give them a second try, and one file's failure
+failed the whole bundle — after however many files had already come down.
+
+That is the wrong trade for the link a bundle is fetched over. Hundreds of
+megabytes across a handful of files, pulled over a tethered phone at the edge
+of coverage: a dropped connection there is ordinary, not exceptional. Losing
+the whole download to one, and starting again, is how a crew ends up without a
+map.
+
+Three attempts per file, half a second between them — short, because the
+operator is standing there. Cancellation is never retried: it is the operator's
+instruction, not a transport failure, and retrying it would keep the link busy
+after they asked it to stop. And a retry says so through the keyed progress
+channel, because a retry that looks like a stall is a stall to the person
+watching the bar.
+
+| | |
+|---|---|
+| Evidence | a mock server that fails once and then serves: the file lands whole, after exactly one retry |
+| Evidence | a cancelled transfer is not retried |
+| Automated gates | `just ci` green (305 Rust, 375 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — a refused edit says so
 
 The backlog had run thin on things that are not the owner's to decide, so I

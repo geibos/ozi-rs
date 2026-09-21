@@ -71,18 +71,49 @@ impl ProjectOpenPhase {
 /// has no translation for the key.
 #[derive(Debug, Clone)]
 pub enum ProgressText {
-    ScanningDirectory { path: String },
-    DownloadingBundle { name: String },
-    OpeningCachedBundle { name: String },
-    DownloadingInParallel { total: usize },
-    DownloadedOfFiles { completed: usize, total: usize },
-    DownloadedFiles { total: usize },
-    ExtractingOziIn { name: String },
-    ExtractingCachedOzi { name: String },
-    ExtractingInParallel { count: usize, names: String },
-    ExtractedOziArchives { count: usize },
-    IndexingMapsIn { name: String },
-    IndexingCachedMaps { name: String },
+    ScanningDirectory {
+        path: String,
+    },
+    DownloadingBundle {
+        name: String,
+    },
+    OpeningCachedBundle {
+        name: String,
+    },
+    DownloadingInParallel {
+        total: usize,
+    },
+    DownloadedOfFiles {
+        completed: usize,
+        total: usize,
+    },
+    DownloadedFiles {
+        total: usize,
+    },
+    RetryingFile {
+        name: String,
+        attempt: usize,
+        total: usize,
+    },
+    ExtractingOziIn {
+        name: String,
+    },
+    ExtractingCachedOzi {
+        name: String,
+    },
+    ExtractingInParallel {
+        count: usize,
+        names: String,
+    },
+    ExtractedOziArchives {
+        count: usize,
+    },
+    IndexingMapsIn {
+        name: String,
+    },
+    IndexingCachedMaps {
+        name: String,
+    },
 }
 
 impl ProgressText {
@@ -94,6 +125,7 @@ impl ProgressText {
             Self::DownloadingInParallel { .. } => "progress.downloadingInParallel",
             Self::DownloadedOfFiles { .. } => "progress.downloadedOfFiles",
             Self::DownloadedFiles { .. } => "progress.downloadedFiles",
+            Self::RetryingFile { .. } => "progress.retryingFile",
             Self::ExtractingOziIn { .. } => "progress.extractingOziIn",
             Self::ExtractingCachedOzi { .. } => "progress.extractingCachedOzi",
             Self::ExtractingInParallel { .. } => "progress.extractingInParallel",
@@ -118,6 +150,11 @@ impl ProgressText {
             Self::DownloadedOfFiles { completed, total } => {
                 vec![completed.to_string(), total.to_string()]
             }
+            Self::RetryingFile {
+                name,
+                attempt,
+                total,
+            } => vec![name.clone(), attempt.to_string(), total.to_string()],
             Self::ExtractingInParallel { count, names } => {
                 vec![count.to_string(), names.clone()]
             }
@@ -139,6 +176,11 @@ impl ProgressText {
                 format!("Downloaded {completed} of {total} files")
             }
             Self::DownloadedFiles { total } => format!("Downloaded {total} files"),
+            Self::RetryingFile {
+                name,
+                attempt,
+                total,
+            } => format!("Retrying {name} (attempt {attempt} of {total})"),
             Self::ExtractingOziIn { name } => format!("Extracting OZI archives in: {name}"),
             Self::ExtractingCachedOzi { name } => {
                 format!("Extracting cached OZI bundles: {name}")
@@ -853,7 +895,9 @@ pub async fn download_bundle_concurrent(
                     file_count,
                 });
             } else {
-                let res = download_to_path_async(
+                let retry_tx = tx_worker.clone();
+                let retry_pkg = pkg.clone();
+                let res = download_file_with_retries(
                     &client,
                     &url,
                     &path,
@@ -867,6 +911,20 @@ pub async fn download_bundle_concurrent(
                             file_index: index,
                             file_count,
                         });
+                    },
+                    |attempt| {
+                        // Say so: a retry that looks like a stall is the same
+                        // as a stall to the person watching the bar.
+                        let _ = retry_tx.send(DownloadNotification::Phase(
+                            ProjectOpenProgress::status(
+                                ProgressText::RetryingFile {
+                                    name: retry_pkg.clone(),
+                                    attempt: attempt + 1,
+                                    total: FILE_DOWNLOAD_ATTEMPTS,
+                                },
+                                ProjectOpenPhase::Downloading,
+                            ),
+                        ));
                     },
                 )
                 .await;
@@ -1184,6 +1242,60 @@ fn collect_remote_files_rel(
 /// success — a cancel mid-stream therefore never leaves a half-written file
 /// at the canonical path, so `path.exists()` is a reliable "fully done"
 /// signal for resume logic.
+/// How many times a single file is fetched before the bundle gives up on it.
+///
+/// A field link drops transfers. With timeouts in place a stalled one fails
+/// rather than hanging, and before this the whole bundle failed with it —
+/// after however many files had already come down. Three is enough to ride out
+/// a dropped connection without keeping a crew waiting on a link that is
+/// genuinely gone.
+const FILE_DOWNLOAD_ATTEMPTS: usize = 3;
+
+/// Wait between attempts. Short: the operator is standing there.
+const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// Fetch one file, retrying a failed transfer.
+///
+/// `on_retry` is called with the attempt that just failed (1-based), so the
+/// interface can say it is retrying rather than appear stuck.
+///
+/// Cancellation is not a transport failure and is never retried: retrying it
+/// would ignore the operator and keep the link busy after they asked it to
+/// stop.
+async fn download_file_with_retries<F, R>(
+    client: &reqwest::Client,
+    url: &str,
+    path: &Path,
+    cancel: &CancelToken,
+    mut on_progress: F,
+    mut on_retry: R,
+) -> Result<(), String>
+where
+    F: FnMut(u64, Option<u64>),
+    R: FnMut(usize),
+{
+    let mut last_error = String::new();
+    for attempt in 1..=FILE_DOWNLOAD_ATTEMPTS {
+        if cancel.is_cancelled() {
+            return Err(CANCEL_ERROR.to_owned());
+        }
+
+        match download_to_path_async(client, url, path, cancel, &mut on_progress).await {
+            Ok(()) => return Ok(()),
+            Err(error) if error == CANCEL_ERROR => return Err(error),
+            Err(error) => {
+                last_error = error;
+                if attempt == FILE_DOWNLOAD_ATTEMPTS {
+                    break;
+                }
+                on_retry(attempt);
+                tokio::time::sleep(RETRY_BACKOFF).await;
+            }
+        }
+    }
+    Err(last_error)
+}
+
 async fn download_to_path_async<F>(
     client: &reqwest::Client,
     url: &str,
@@ -2879,6 +2991,85 @@ mod bundle_download_tests {
             "99-refs.pdf" => vec![0xDDu8; 16 * 1024],
             _ => b"x".to_vec(),
         }
+    }
+
+    /// A field link drops transfers. With timeouts in place a stalled one now
+    /// fails instead of hanging — and then the whole bundle failed with it,
+    /// after however many files had already come down. One flaky file should
+    /// not cost a crew the bundle.
+    #[tokio::test]
+    async fn a_dropped_transfer_is_retried_before_the_file_is_given_up() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let server = MockServer::start().await;
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let seen = Arc::clone(&attempts);
+
+        Mock::given(method("GET"))
+            .and(path("/flaky.sqlitedb"))
+            .respond_with(move |_: &Request| {
+                // The first attempt dies; the second is served.
+                if seen.fetch_add(1, Ordering::SeqCst) == 0 {
+                    ResponseTemplate::new(503)
+                } else {
+                    ResponseTemplate::new(200).set_body_bytes(vec![7u8; 1024])
+                }
+            })
+            .mount(&server)
+            .await;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("flaky.sqlitedb");
+        let client =
+            super::async_client(super::CONNECT_TIMEOUT, super::READ_TIMEOUT).expect("client");
+
+        let result = super::download_file_with_retries(
+            &client,
+            &format!("{}/flaky.sqlitedb", server.uri()),
+            &path,
+            &CancelToken::new(),
+            |_, _| {},
+            |_attempt| {},
+        )
+        .await;
+
+        assert!(result.is_ok(), "the second attempt succeeded: {result:?}");
+        assert_eq!(attempts.load(Ordering::SeqCst), 2, "one retry, not more");
+        assert_eq!(
+            tokio::fs::metadata(&path).await.expect("file").len(),
+            1024,
+            "and the file that landed is the whole file"
+        );
+    }
+
+    /// Cancelling is not a transport failure: retrying it would ignore the
+    /// operator and keep the link busy after they asked it to stop.
+    #[tokio::test]
+    async fn a_cancelled_transfer_is_not_retried() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/never.sqlitedb"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![0u8; 16]))
+            .mount(&server)
+            .await;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cancel = CancelToken::new();
+        cancel.cancel();
+
+        let mut retries = 0usize;
+        let result = super::download_file_with_retries(
+            &super::async_client(super::CONNECT_TIMEOUT, super::READ_TIMEOUT).expect("client"),
+            &format!("{}/never.sqlitedb", server.uri()),
+            &dir.path().join("never.sqlitedb"),
+            &cancel,
+            |_, _| {},
+            |_attempt| retries += 1,
+        )
+        .await;
+
+        assert!(result.is_err(), "a cancelled transfer fails");
+        assert_eq!(retries, 0, "and is not retried");
     }
 
     async fn setup_bundle_server() -> MockServer {
