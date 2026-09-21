@@ -267,7 +267,14 @@ fn appium_launch_session_with_capabilities(
         "appium:automationName": "Mac2",
         // Mac2 defaults to 60s: any agent think-pause between commands
         // silently kills the session ("invalid session id").
-        "appium:newCommandTimeout": APPIUM_NEW_COMMAND_TIMEOUT_SECS
+        "appium:newCommandTimeout": APPIUM_NEW_COMMAND_TIMEOUT_SECS,
+        // The Mac2 driver suppresses its xcodebuild output by default, so when
+        // the host process dies all anyone gets is "'GET /status' cannot be
+        // proxied to Mac2 Driver server because its process is not running
+        // (probably crashed)" — which names the symptom and nothing else. That
+        // cost two sessions of guessing. The output is verbose; an opaque
+        // crash is worse.
+        "appium:showServerLogs": true
     });
     if let (Some(target), Some(extra)) =
         (always_match.as_object_mut(), app_capabilities.as_object())

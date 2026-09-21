@@ -106,39 +106,45 @@ dependency dropped.
   the visible text at that. WKWebView publishes a control's `aria-label`, not
   the text inside it, so the matchers read the label now and accept either
   language.
-- **The Mac2 driver dies because a stale system authentication blocks UI
-  testing** (2026-09-21, late; root cause found, the fix is the owner's).
-  `just smoke` fails at session creation with "'GET /status' cannot be proxied
-  to Mac2 Driver server because its process is not running (probably crashed)".
-  The crash is downstream. Running the runner directly,
+- **The Mac2 driver host still dies at session creation** (2026-09-21, late;
+  the authentication block is cleared, the remaining cause is not found).
+  `just smoke` fails with "'GET /status' cannot be proxied to Mac2 Driver
+  server because its process is not running (probably crashed)".
 
-      ~/Library/Developer/Xcode/DerivedData/WebDriverAgentMac-*/Build/Products/\
-        Debug/WebDriverAgentRunner-Runner.app/Contents/MacOS/WebDriverAgentRunner-Runner
+  What was ruled out, each by running it:
 
-  reproduces it every time with the real message:
+  - *The stale system authentication.* Earlier the WebDriverAgent runner failed
+    with `com.apple.LocalAuthentication Code=-4 "System authentication is
+    running."` because a `coreautha` agent left over from 16:44 never released
+    the session. That agent is gone and the runner now starts silently.
+  - *A wedged Appium server.* It had been up since 11:21. Restarted; the
+    failure is identical.
+  - *The WebDriverAgent build.* The driver's own command,
 
-      Failed to initialize for UI testing: Error Domain=com.apple.LocalAuthentication
-      Code=-4 "System authentication is running."  BiometryType=1
+        cd ~/.appium/node_modules/appium-mac2-driver
+        xcodebuild build-for-testing test-without-building \
+          -project WebDriverAgentMac/WebDriverAgentMac.xcodeproj \
+          -scheme WebDriverAgentRunner COMPILER_INDEX_STORE_ENABLE=NO
 
-  A `log stream` on `coreauthd` taken across one run names the requester and the
-  refusal: `/usr/libexec/testmanagerd` asks for authentication and gets
-  "Failed to acquire remote authentication ownership" — another authentication
-  already owns the system UI. Nothing is on screen asking for it: the owner is a
-  `coreautha` agent left running since 16:44 that never released the session, so
-  every XCTest UI-testing initialisation is refused for as long as it lives.
+    reports `** TEST BUILD SUCCEEDED **`, and WebDriverAgent opens its port
+    within **four seconds** — checked by polling 127.0.0.1:10100 while it runs.
+  - *A leftover process holding that port.* `lsof -nP -iTCP:10100` is empty and
+    no `WebDriverAgentRunner` or `xcodebuild` process is left over.
 
-  This is machine state, not code and not Appium configuration — nothing in this
-  repository can clear it. The fix is one of, in order of cost:
+  So every piece works when run by hand, and only fails when Appium spawns it.
+  The next thing to look at is the environment the driver's child process
+  inherits — the Appium server used here was started from an agent shell, which
+  is not the same environment as a terminal's. **Worth trying first: start the
+  server from your own terminal** (`! appium --address 127.0.0.1 --port 4723`)
+  and run `just smoke` against that.
 
-      pkill -x coreautha     # the agent relaunches on demand; cancels any
-                             # genuine Touch ID prompt that is up, so look first
-      log out and back in
-      reboot
+  The driver's xcodebuild output was suppressed through all of this, which is
+  why the crash said nothing twice over. `appium:showServerLogs` is on now
+  (`tools/ozi-rs-mcp/src/appium.rs`), so the next failed session carries the
+  reason in the Appium log instead of only the symptom.
 
-  An agent cannot run it: killing a system authentication agent is refused by
-  the permission classifier, and rightly so. After clearing it, `just smoke`
-  is the check — it passed in 18.5s earlier the same day, so a pass restores the
-  gate rather than proving something new.
+  Two attempts is the limit per `docs/agent-verification.md`, and both were
+  spent, so the gate was not run a third time.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run
