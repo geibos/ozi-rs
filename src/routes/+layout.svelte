@@ -15,6 +15,7 @@
     commandPaletteOpen,
     currentDownload,
     currentProject,
+    downloadPopupHeight,
     finishDownload,
     projectDirty,
     projectsLoading,
@@ -26,6 +27,7 @@
   import { isEditableTarget } from "$lib/editable-target";
   import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
+  import { toastOffset } from "$lib/toast-offset";
   import { readyMapName } from "$lib/ready-maps";
   import { installIpcErrorToastObserver } from "../lib/ipc";
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
@@ -55,6 +57,9 @@
   const announcedReadyMap: Record<string, true> = {};
 
   const isWorkspace = $derived(page.url.pathname === "/project");
+  // Toasts share the bottom-right corner with the download panel; this lifts
+  // them clear of it for as long as the panel is on screen.
+  const toastEdge = $derived(toastOffset($downloadPopupHeight));
 
   applyStoredTheme();
 
@@ -256,7 +261,9 @@
   <!-- Per-file bundle-download progress; fixed bottom-right, survives
        route changes so downloads stay visible while the user works. -->
   <DownloadPopup />
-  <Toaster richColors closeButton position="bottom-right" />
+  <!-- Same corner as `DownloadPopup`, and sonner's viewport always draws over
+       it, so the toaster steps above the panel while a download runs. -->
+  <Toaster richColors closeButton position="bottom-right" offset={toastEdge} />
 </Tooltip.Provider>
 
 <style>

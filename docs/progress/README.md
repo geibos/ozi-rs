@@ -10,6 +10,45 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the toast that sat on the download
+
+One tail from the bundle-flow survey went unchecked until now: the toaster and
+the download progress panel live in the same corner. I measured it on the stand
+rather than reasoning about it, and they do collide. At 1024×640 the panel
+occupied 692..1012 × 550..628 and an error toast covered 644..1000 × 542..616 —
+and sonner's viewport carries `z-index: 999999999` against the panel's `60`, so
+the toast wins every time. Hidden: the panel's title, its Cancel button, and the
+files/bytes counters.
+
+The pairing is not a coincidence. A toast during a bundle download is almost
+always *about* the download — a file that failed its retries, a preview that
+could not be read. So the operator learns one file failed and simultaneously
+loses sight of how far the rest got, which is the number that decides whether
+to keep waiting on a tethered phone.
+
+The panel is the one that cannot move: the map keeps its controls in the left
+corners and the panel has to stay above the bundle-loader sheet. So the toaster
+steps aside, and only while there is something to step aside for. `DownloadPopup`
+publishes its measured height; the layout derives sonner's `offset` from it.
+
+Measured after the change, same viewport: panel 522..628, toast lifted to
+437..511, an 11 px gap, no overlap; when the download finishes the height store
+returns to 0 and the toast drops back to its usual 534..608.
+
+One thing the tests would not have caught and the measurement did: a panel
+measured mid-mount can report a height of a few px, which would have put a toast
+*closer* to the edge than normal. The offset is clamped to sonner's own edge
+offset, and the test for that failed before the clamp existed.
+
+| | |
+|---|---|
+| Change | `openspec/changes/progress-stays-readable/` |
+| Measured | on the stand, before and after, geometry above |
+| Automated gates | `just ci` green (320 Rust, 439 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — a waiver that cannot rot
 
 I have declined the MapLibre 4 → 6 upgrade three times, each time for the same

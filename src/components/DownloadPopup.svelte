@@ -28,6 +28,7 @@
     activeDownloadId,
     bundleProgress,
     currentDownload,
+    downloadPopupHeight,
     downloadProgress,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
@@ -63,6 +64,15 @@
     return Math.max(finished, $bundleProgress?.completed ?? 0);
   });
 
+  // The toaster shares this corner and always draws over the panel (sonner's
+  // viewport is z-index 999999999), so it needs the panel's height to step
+  // above it. The binding lives inside the `{#if}` and keeps its last value
+  // when the block goes away, hence the explicit zero for "no download".
+  let panelHeight = $state(0);
+  $effect(() => {
+    downloadPopupHeight.set($activeDownloadId === null ? 0 : panelHeight);
+  });
+
   async function handleCancel() {
     const id = $activeDownloadId;
     if (!id) return;
@@ -78,7 +88,11 @@
      single-map download never sets busy, and a catalogue refresh sets it
      without any download running. `download-finished` clears the id. -->
 {#if $activeDownloadId !== null}
-  <div class="download-popup" data-testid="download-popup">
+  <div
+    class="download-popup"
+    data-testid="download-popup"
+    bind:clientHeight={panelHeight}
+  >
     <div class="popup-header">
       <span class="popup-title">{$t("download.title")}</span>
       <button

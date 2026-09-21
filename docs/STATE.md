@@ -5,9 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a waiver that cannot rot** (2026-09-22) — the MapLibre
-advisory's waiver re-checked against the code and its premise turned into a
-test; after walking the recording, where a track's points
+Last merged slice: **the toast that sat on the download** (2026-09-22) — the
+toaster and the download progress panel shared the bottom-right corner, and the
+toast always won, hiding the panel's title, its Cancel button and its counters
+for as long as it was up; after a waiver that cannot rot, where the MapLibre
+advisory's waiver was re-checked against the code and its premise turned into a
+test, and after walking the recording, where a track's points
 became steppable with the map following, and after trimming the drive to
 the start, where a track
 became trimmable at a point in either direction as one undoable step, and
@@ -129,7 +132,7 @@ re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the twenty-eight OpenSpec changes.** Folding their requirements
+1. **Archive the thirty-seven OpenSpec changes.** Folding their requirements
    into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on
@@ -152,7 +155,7 @@ re-ordered rather than followed blindly.
 
 4. **`just smoke`.** The Mac2 driver host dies at session creation; every
    piece works when run by hand and only fails when Appium spawns it. What has
-   been ruled out, and by which command, is under "Known broken". Seventeen
+   been ruled out, and by which command, is under "Known broken". Twenty-eight
    changes carry an unchecked "smoke green" task waiting on it.
 
 ### An agent can still do these
@@ -232,7 +235,7 @@ existing requirements before writing a delta against it.
   and the earlier `com.apple.LocalAuthentication` block, which was a different
   error and is cleared.
 
-  Twenty-five changes carry an unchecked "smoke green" task waiting on this.
+  Twenty-eight changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run

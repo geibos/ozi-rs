@@ -331,6 +331,14 @@ export function updateDownloadProgress(payload: DownloadProgressPayload) {
   });
 }
 
+/**
+ * Measured height of the download progress panel, or 0 when it is not on
+ * screen. Written by `DownloadPopup`, read by the layout so the toaster can
+ * step above it — see `$lib/toast-offset` for why the panel is the one that
+ * stays put.
+ */
+export const downloadPopupHeight = writable(0);
+
 /** ID of the currently-active bundle download, if any. */
 export const activeDownloadId = writable<string | null>(null);
 
