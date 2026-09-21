@@ -13,6 +13,7 @@ import { redo, saveProject, undo } from "$lib/api";
 import { t } from "$lib/i18n";
 import { projectPath } from "$lib/stores";
 import { PROJECT_SAVE_EXTENSION } from "$lib/project-file";
+import { rememberProject } from "$lib/recent-projects";
 
 /** See `project-file.ts`: the format is `.ozp`, and both dialogs say so. */
 const PROJECT_FILE_FILTER = {
@@ -34,6 +35,7 @@ export async function quickSave(): Promise<void> {
   const translate = get(t);
   try {
     await saveProject(path);
+    rememberProject(path);
     toast.success(translate("toast.saved"));
   } catch (error) {
     toast.error(translate("toast.saveFailed"), { description: String(error) });
@@ -47,6 +49,7 @@ export async function saveAs(): Promise<void> {
     const path = await saveDialog({ filters: [PROJECT_FILE_FILTER] });
     if (!path) return; // user cancelled — not an error
     await saveProject(path);
+    rememberProject(path);
     toast.success(translate("toast.saved"));
   } catch (error) {
     toast.error(translate("toast.saveFailed"), { description: String(error) });

@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the project file is `.ozp`** (2026-09-21) — both dialogs
-filtered on `json`, which made an `.ozp` project invisible in the open dialog;
-after a waypoint looking like what it is, where the
+Last merged slice: **yesterday's project is one key away** (2026-09-21) — the
+palette offers the projects most recently opened or saved; after the project
+file becoming `.ozp`, where both dialogs
+filtered on `json`, which made an `.ozp` project invisible in the open dialog,
+and after a waypoint looking like what it is, where the
 symbol a crew picks is drawn on the map marker, not only in the lists and the
 exports, and after what survives the trip, where a track and a
 waypoint exported to GPX and read back are pinned as the same track and
@@ -83,7 +85,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 313 Rust tests and 382 frontend tests;
+rustfmt, clippy, type-checks, 313 Rust tests and 392 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -148,7 +150,7 @@ re-ordered rather than followed blindly.
    scaffolding, so these need a home that is not the chips — which is a design
    question before it is an implementation one.
 7. **The remaining ADR-0020 items**: open-by-URL, crop by selection,
-   walkthrough, waypoint colour, recent `.ozp`.
+   walkthrough, waypoint colour. Recent `.ozp` was done on 2026-09-21.
 8. **Upkeep**: point the stand at whatever the next slice touches. Every screen
    of the field cycle has been walked on it at least once.
 

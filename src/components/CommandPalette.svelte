@@ -63,6 +63,11 @@
   } from "@tauri-apps/plugin-dialog";
   import { appendRecentFile, getRecentFiles } from "$lib/recentFiles";
   import { PROJECT_OPEN_EXTENSIONS } from "$lib/project-file";
+  import {
+    forgetProject,
+    getRecentProjects,
+    rememberProject,
+  } from "$lib/recent-projects";
   import { toast } from "svelte-sonner";
   import { paletteProjects } from "$lib/palette-projects";
   import type { WaypointData } from "$lib/types";
@@ -133,6 +138,12 @@
   const projectList = $derived(
     paletteProjects($projects, value, PALETTE_PROJECT_LIMIT),
   );
+  // Re-read when the palette opens: another surface may have saved since.
+  const recentProjects = $derived.by(() => {
+    void $commandPaletteOpen;
+    return getRecentProjects();
+  });
+
   const recentFiles = $derived.by(() =>
     $commandPaletteOpen ? getRecentFiles() : [],
   );
@@ -195,9 +206,32 @@
           },
         ],
       } as Parameters<typeof openDialog>[0]);
-      if (path) await loadProjectFile(path as string);
+      if (path) {
+        await loadProjectFile(path as string);
+        rememberProject(path as string);
+      }
     } catch (error) {
       toast.error($i18n("palette.openProjectFailed"), {
+        description: String(error),
+      });
+    }
+  }
+
+  /**
+   * Reopen a project from the recents.
+   *
+   * A path can go stale — the file moved, the disk is not mounted, the crew
+   * is on the other machine. Rather than leaving an entry that fails every
+   * time it is chosen, a failure drops it and says so.
+   */
+  async function handleOpenRecentProject(path: string) {
+    close();
+    try {
+      await loadProjectFile(path);
+      rememberProject(path);
+    } catch (error) {
+      forgetProject(path);
+      toast.error($i18n("palette.projectMissing"), {
         description: String(error),
       });
     }
@@ -476,6 +510,22 @@
             >
           </Command.Item>
         </Command.Group>
+
+        {#if recentProjects.length > 0}
+          <Command.Group heading={$i18n("palette.groupRecentProjects")}>
+            {#each recentProjects as p (p.path)}
+              <Command.Item
+                value={`recent-project:${p.path}`}
+                onSelect={() => void handleOpenRecentProject(p.path)}
+              >
+                <span class="flex-1 truncate">{p.name}</span>
+                <span class="text-muted-foreground truncate text-[10px]"
+                  >{p.path}</span
+                >
+              </Command.Item>
+            {/each}
+          </Command.Group>
+        {/if}
 
         {#if recentFiles.length > 0}
           <Command.Group heading={$i18n("palette.groupRecent")}>

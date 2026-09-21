@@ -34,10 +34,10 @@ decision.
 
 ## Engineering
 
-- **Recent projects are recent maps.** The palette's recents record
-  `{projectSlug, mapPath, mapName}` — a bundle map, not a saved `.ozp`. ADR-0020
-  declares a recent-projects list; reopening yesterday's project still means
-  finding it in the file dialog. `src/lib/recentFiles.ts` is the shape to copy.
+- ~~Recent projects are recent maps.~~ Done on 2026-09-21 in
+  `yesterdays-project-is-one-key-away`: `src/lib/recent-projects.ts` beside the
+  map list, recorded on open and on both saves, offered in the palette, and a
+  stale path is dropped when it fails.
 
 - **A WPT name with a character cp1251 cannot hold becomes `&#NNNN;`.**
   `encoding_rs` does that for every legacy encoding; the code's comment claimed

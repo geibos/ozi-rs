@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — yesterday's project is one key away
+
+The item I went looking for last slice, built. Reopening yesterday's search
+meant finding the file in a dialog again; the palette's recents were recent
+*maps*, which answers a different question.
+
+A crew comes back to the same search for days, and the one they want is almost
+always the one they had open last. Cmd-K now offers the last eight, by file
+name with the path beneath.
+
+Two details that matter more than the list itself. **Both saves record**, not
+just the open dialog: a save is where a never-saved project first gets a path
+at all, and the project just written is the one most likely wanted next — and a
+failed save records nothing, so a read-only volume does not plant an entry that
+never opens. And **a path that fails is dropped**, with a message, rather than
+sitting in the list failing every time it is chosen. Paths go stale: the file
+moved, the disk is not mounted, the crew is on the other machine.
+
+Not merged with `recentFiles.ts`, and the module says why: the records differ,
+the shared part is forty lines of storage plumbing around a working feature
+with its own tests, and two is not yet a pattern.
+
+| | |
+|---|---|
+| Evidence | seven tests on the list, three on the save wiring including the failed save |
+| Evidence | walked on the stand: the palette shows "Недавние проекты" with the file name above its path |
+| Automated gates | `just ci` green (313 Rust, 392 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — the project file is `.ozp`
 
 Went looking for the declared-but-absent "recent `.ozp`" and found something

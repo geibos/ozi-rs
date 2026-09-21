@@ -276,6 +276,9 @@ const dictionaries = {
     "symbol.finish": "Finish",
     "symbol.viewpoint": "Viewpoint",
     "symbol.parking": "Parking",
+    "palette.groupRecentProjects": "Recent projects",
+    "palette.projectMissing":
+      "That project could not be opened; it has been removed from the list",
     "loader.stopRefresh": "Stop",
     "loader.stopRefreshFailed": "Could not stop the refresh",
     "loader.offline": "Offline — this is the saved list",
@@ -570,6 +573,8 @@ const dictionaries = {
     "symbol.finish": "Финиш",
     "symbol.viewpoint": "Обзор",
     "symbol.parking": "Парковка",
+    "palette.groupRecentProjects": "Недавние проекты",
+    "palette.projectMissing": "Проект не открылся и убран из списка",
     "loader.stopRefresh": "Стоп",
     "loader.stopRefreshFailed": "Не удалось остановить обновление",
     "loader.offline": "Нет связи — список сохранённый",
