@@ -31,7 +31,8 @@
     downloadProgress,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
-  import { t } from "../lib/i18n";
+  import { locale, t } from "../lib/i18n";
+  import { formatBytes } from "$lib/format-bytes";
 
   const rows = $derived(
     [...$downloadProgress.values()]
@@ -56,10 +57,6 @@
     ).length;
     return Math.max(finished, $bundleProgress?.completed ?? 0);
   });
-
-  function formatMb(bytes: number): string {
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  }
 
   async function handleCancel() {
     const id = $activeDownloadId;
@@ -107,8 +104,8 @@
               {p.package_name}
             </span>
             <span class="popup-size">
-              {formatMb(p.downloaded_bytes)}{p.total_bytes
-                ? ` / ${formatMb(p.total_bytes)}`
+              {formatBytes(p.downloaded_bytes, $locale)}{p.total_bytes
+                ? ` / ${formatBytes(p.total_bytes, $locale)}`
                 : ""}
             </span>
           </div>

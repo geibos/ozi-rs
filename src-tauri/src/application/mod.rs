@@ -38,6 +38,12 @@ pub struct LizaMapPackage {
     pub url: String,
     pub base_zoom: u8,
     pub local_path: Option<PathBuf>,
+    /// Download size as the listing states it, when it states one.
+    ///
+    /// `None` means "not known", which is not the same as zero: a cached map
+    /// read off disk and a listing without a size column both land here.
+    #[serde(default)]
+    pub size_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -1835,6 +1841,7 @@ mod tests {
                 url: "https://example.invalid/demo-map.sqlitedb".to_owned(),
                 base_zoom: 12,
                 local_path: None,
+                size_bytes: None,
             }],
         }
     }

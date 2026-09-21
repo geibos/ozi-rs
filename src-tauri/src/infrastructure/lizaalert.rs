@@ -499,6 +499,12 @@ fn parse_center(text: &str) -> Result<MapCenter, String> {
 #[allow(dead_code)]
 fn parse_map_packages(html: &str, base_url: &str) -> Result<Vec<LizaMapPackage>, String> {
     let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
+    // Sizes come from the same HTML, keyed by the href they sit beside.
+    let sizes = parse_entry_sizes(html);
+    let sizes_by_url: std::collections::HashMap<String, u64> = sizes
+        .into_iter()
+        .filter_map(|(href, bytes)| Some((resolve_listing_href(base_url, &href)?, bytes)))
+        .collect();
 
     let maps = parse_directory_entries(base_url, html)?
         .into_iter()
@@ -510,12 +516,14 @@ fn parse_map_packages(html: &str, base_url: &str) -> Result<Vec<LizaMapPackage>,
                 .as_str()
                 .parse::<u8>()
                 .ok()?;
+            let size_bytes = sizes_by_url.get(&entry.url).copied();
             Some(LizaMapPackage {
                 name: entry.name.clone(),
                 file_name: entry.name,
                 url: entry.url,
                 base_zoom: zoom,
                 local_path: None,
+                size_bytes,
             })
         })
         .collect::<Vec<_>>();
@@ -1094,6 +1102,75 @@ fn parse_directory_entries(base_url: &str, html: &str) -> Result<Vec<DirectoryEn
     Ok(entries)
 }
 
+/// The download sizes the listing prints beside each file.
+///
+/// Keyed by href, because that is what `parse_directory_entries` resolves
+/// against. The listing renders one table row per entry with the size in the
+/// next cell ("15.9 МиБ"), so the sizes cost no extra request — and without
+/// them the operator commits to a download with no idea whether it is fifteen
+/// megabytes or two hundred, which on a phone tether is the whole decision.
+fn parse_entry_sizes(html: &str) -> std::collections::HashMap<String, u64> {
+    let mut sizes = std::collections::HashMap::new();
+    let Ok(row_regex) = Regex::new(r"(?s)<tr>(.*?)</tr>") else {
+        return sizes;
+    };
+    let Ok(href_regex) = Regex::new(r#"href="([^"]+)""#) else {
+        return sizes;
+    };
+    let Ok(cell_regex) = Regex::new(r"(?s)<td>(.*?)</td>") else {
+        return sizes;
+    };
+
+    for row in row_regex.captures_iter(html) {
+        let Some(row) = row.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
+        let Some(href) = href_regex
+            .captures(row)
+            .and_then(|c| c.get(1))
+            .map(|m| m.as_str().to_owned())
+        else {
+            continue;
+        };
+        for cell in cell_regex.captures_iter(row).skip(1) {
+            let Some(text) = cell.get(1).map(|m| m.as_str()) else {
+                continue;
+            };
+            if let Some(bytes) = parse_human_size(text) {
+                sizes.insert(href, bytes);
+                break;
+            }
+        }
+    }
+
+    sizes
+}
+
+/// Read "15.9 МиБ" / "118.6 КиБ" / "742 Б" as a byte count.
+///
+/// The site prints binary units in Russian; anything else (a folder's "папка",
+/// a dash, a stray cell) is not a size and yields `None`.
+fn parse_human_size(text: &str) -> Option<u64> {
+    let text = text.trim();
+    let mut parts = text.split_whitespace();
+    let number: f64 = parts.next()?.replace(',', ".").parse().ok()?;
+    if number < 0.0 {
+        return None;
+    }
+    let unit = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    let multiplier: f64 = match unit {
+        "Б" | "B" => 1.0,
+        "КиБ" | "KiB" | "КБ" | "KB" => 1024.0,
+        "МиБ" | "MiB" | "МБ" | "MB" => 1024.0 * 1024.0,
+        "ГиБ" | "GiB" | "ГБ" | "GB" => 1024.0 * 1024.0 * 1024.0,
+        _ => return None,
+    };
+    Some((number * multiplier).round() as u64)
+}
+
 fn decode_entry_name(href: &str) -> Option<String> {
     let raw_name = href.trim_end_matches('/').rsplit('/').next()?.trim();
     if raw_name.is_empty() {
@@ -1254,12 +1331,16 @@ fn read_cached_sqlite_map_packages(
             continue;
         };
 
+        // A cached map's size is the file on disk; the listing is not needed
+        // and may not be reachable.
+        let size_bytes = fs::metadata(&path).ok().map(|meta| meta.len());
         maps.push(LizaMapPackage {
             name: file_name.clone(),
             file_name,
             url: String::new(),
             base_zoom,
             local_path: Some(path),
+            size_bytes,
         });
     }
 
@@ -1315,12 +1396,14 @@ fn read_cached_ozi_map_packages(source_root: &Path) -> Result<Vec<LizaMapPackage
                     .to_owned()
             });
 
+        let size_bytes = fs::metadata(&map_path).ok().map(|meta| meta.len());
         packages.push(LizaMapPackage {
             name: format!("OZI: {}", metadata.title()),
             file_name: relative_name,
             url: String::new(),
             base_zoom: 0,
             local_path: Some(map_path),
+            size_bytes,
         });
     }
 
@@ -2176,6 +2259,72 @@ mod tests {
             !path.with_extension("part").exists(),
             "a stalled transfer SHALL clean up its .part file"
         );
+    }
+
+    /// Committing to a download without knowing its size is the difference
+    /// between fifteen megabytes and two hundred on a phone tether.
+    #[test]
+    fn map_packages_carry_the_size_the_listing_prints() {
+        let html = r#"
+            <table><tbody>
+            <tr>
+              <td><a href="/maps/demo/8-Android&amp;iOS/demo_Topo_z16.sqlitedb">demo_Topo_z16.sqlitedb</a></td>
+              <td>15,9 МиБ</td><td><time>08.07.2026</time></td>
+            </tr>
+            <tr>
+              <td><a href="/maps/demo/8-Android&amp;iOS/demo_Satell_z17.sqlitedb">demo_Satell_z17.sqlitedb</a></td>
+              <td>185.1 МиБ</td><td><time>08.07.2026</time></td>
+            </tr>
+            <tr>
+              <td><a href="/maps/demo/8-Android&amp;iOS/notes.txt">notes.txt</a></td>
+              <td>742 Б</td><td><time>08.07.2026</time></td>
+            </tr>
+            </tbody></table>
+        "#;
+
+        let maps = super::parse_map_packages(html, "https://example.com/maps/demo/8-Android&iOS/")
+            .expect("maps");
+
+        assert_eq!(maps.len(), 2);
+        let topo = maps
+            .iter()
+            .find(|m| m.file_name.contains("Topo"))
+            .expect("topo map");
+        assert_eq!(
+            topo.size_bytes,
+            Some((15.9_f64 * 1024.0 * 1024.0).round() as u64),
+            "a comma decimal separator is still a number"
+        );
+        let satell = maps
+            .iter()
+            .find(|m| m.file_name.contains("Satell"))
+            .expect("satellite map");
+        assert_eq!(
+            satell.size_bytes,
+            Some((185.1_f64 * 1024.0 * 1024.0).round() as u64)
+        );
+    }
+
+    #[test]
+    fn a_listing_without_sizes_leaves_them_unknown() {
+        let html = r#"<a href="foo_z16.sqlitedb">foo_z16.sqlitedb</a>"#;
+        let maps = super::parse_map_packages(html, "https://example.com/").expect("maps");
+
+        assert_eq!(maps.len(), 1);
+        assert_eq!(
+            maps[0].size_bytes, None,
+            "an unknown size SHALL stay unknown rather than become zero"
+        );
+    }
+
+    #[test]
+    fn human_sizes_are_read_in_both_alphabets_and_rejected_when_they_are_not_sizes() {
+        assert_eq!(super::parse_human_size("742 Б"), Some(742));
+        assert_eq!(super::parse_human_size("1 КиБ"), Some(1024));
+        assert_eq!(super::parse_human_size("1 GiB"), Some(1024 * 1024 * 1024));
+        assert_eq!(super::parse_human_size("папка"), None);
+        assert_eq!(super::parse_human_size("—"), None);
+        assert_eq!(super::parse_human_size("08.07.2026 14:58 UTC"), None);
     }
 
     fn write_cached_project_fixture() -> std::path::PathBuf {

@@ -6,6 +6,7 @@ const pkg = (name: string, downloaded = true): LizaMapPackageDto => ({
   name,
   base_zoom: 17,
   downloaded,
+  size_bytes: null,
 });
 
 const activeMap = (packageName: string): ActiveMapDto => ({

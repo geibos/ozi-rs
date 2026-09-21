@@ -47,10 +47,11 @@
     previewProject,
     setBundlesRoot,
   } from "../lib/api";
-  import { t } from "../lib/i18n";
+  import { locale, t } from "../lib/i18n";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import { filterProjects } from "$lib/project-list";
+  import { formatBytes, formatOptionalBytes } from "$lib/format-bytes";
   import { appendRecentFile } from "../lib/recentFiles";
 
   let {
@@ -283,12 +284,6 @@
     const dir = await open({ directory: true, multiple: false });
     if (dir) await setBundlesRoot(dir as string);
   }
-
-  function formatBytes(bytes: number): string {
-    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
-    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
-    return `${bytes} B`;
-  }
 </script>
 
 <div class="loader">
@@ -420,6 +415,13 @@
           >
             <div class="map-row">
               <span class="map-name">{m.name}</span>
+              {#if !isDownloading && m.size_bytes != null}
+                <!-- The number that decides whether this is worth doing on a
+                     phone tether: fifteen megabytes or two hundred. -->
+                <span class="map-size" data-testid="map-size">
+                  {formatOptionalBytes(m.size_bytes, $locale)}
+                </span>
+              {/if}
               {#if isDownloading}
                 <span class="badge blue">
                   {pct != null ? `${pct}%` : "…"}
@@ -441,8 +443,10 @@
                   ></div>
                 </div>
                 <span class="prog-label">
-                  {formatBytes(prog.downloaded_bytes)}
-                  {prog.total_bytes ? `/ ${formatBytes(prog.total_bytes)}` : ""}
+                  {formatBytes(prog.downloaded_bytes, $locale)}
+                  {prog.total_bytes
+                    ? `/ ${formatBytes(prog.total_bytes, $locale)}`
+                    : ""}
                 </span>
               </div>
             {/if}
@@ -706,6 +710,14 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+  }
+
+  .map-size {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: 11px;
+    color: hsl(var(--muted-foreground));
+    font-variant-numeric: tabular-nums;
   }
 
   .map-name {

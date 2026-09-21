@@ -27,7 +27,8 @@
   } from "$lib/stores";
   import { openSelectedMap, revealBundle } from "$lib/api";
   import { mapsForLibrary } from "$lib/maps-list";
-  import { t } from "$lib/i18n";
+  import { locale, t } from "$lib/i18n";
+  import { formatOptionalBytes } from "$lib/format-bytes";
   import { toast } from "svelte-sonner";
   import LibraryRow from "./LibraryRow.svelte";
 
@@ -125,6 +126,13 @@
             if (!active && !isDownloading) void handleSwitchTo(m.name);
           }}
         >
+          {#snippet subline()}
+            {#if m.size_bytes != null}
+              <span class="text-muted-foreground font-mono text-[10px]">
+                {formatOptionalBytes(m.size_bytes, $locale)}
+              </span>
+            {/if}
+          {/snippet}
           {#snippet leadingControl()}
             {#if isDownloading}
               <!--

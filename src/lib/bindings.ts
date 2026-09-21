@@ -500,7 +500,12 @@ export type DiagnosticDto = { level: string; message: string }
 export type ExtentDto = { min_lat: number; min_lon: number; max_lat: number; max_lon: number }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LayerSummaryDto = { id: number; name: string }
-export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: boolean }
+export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: boolean; 
+/**
+ * Size in bytes when known — from the listing for a remote map, from the
+ * file for a cached one. `None` is "unknown", not zero.
+ */
+size_bytes: number | null }
 export type LizaProjectDto = { name: string; center_lat: number; center_lon: number; maps: LizaMapPackageDto[] }
 export type LizaProjectSummaryDto = { slug: string; name: string; 
 /**

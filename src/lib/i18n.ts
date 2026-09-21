@@ -215,6 +215,7 @@ const dictionaries = {
     "download.files": "Files",
     "download.cancel": "Cancel",
     "download.failed": "Download failed",
+    "download.currentFile": "Downloading",
     "download.starting": "Starting download…",
   },
   ru: {
@@ -410,6 +411,7 @@ const dictionaries = {
     "download.files": "Файлы",
     "download.cancel": "Отмена",
     "download.failed": "Загрузка не удалась",
+    "download.currentFile": "Скачивается",
     "download.starting": "Начинаем загрузку…",
   },
 } as const satisfies Record<Locale, Record<string, string>>;

@@ -26,6 +26,9 @@ export function mapsForLibrary(
       base_zoom: active.base_zoom,
       // It is open and rendering, so its tiles are on disk by definition.
       downloaded: true,
+      // The active map arrives from the session, not from a listing; its size
+      // is not part of that record.
+      size_bytes: null,
     },
     ...projectMaps,
   ];

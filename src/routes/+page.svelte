@@ -23,6 +23,8 @@
     syncProjectsFromAppState,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
+  import { locale, t } from "../lib/i18n";
+  import { formatBytes } from "$lib/format-bytes";
   import BundleLoader from "../components/BundleLoader.svelte";
 
   let transientStatus = $state<string | null>(null);
@@ -65,12 +67,6 @@
     activeDownloadId.set(null);
   }
 
-  function formatBytes(bytes: number): string {
-    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
-    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
-    return `${bytes} B`;
-  }
-
   const bundlePercent = $derived(
     $bundleProgress?.total
       ? Math.round(
@@ -105,7 +101,8 @@
     <div class="current-file-slot">
       {#if currentFileLabel}
         <span class="current-file" data-testid="current-file-label">
-          Downloading {currentFileLabel}
+          {$t("download.currentFile")}
+          {currentFileLabel}
         </span>
       {/if}
     </div>
@@ -130,9 +127,9 @@
       {/if}
       {#if $bundleProgress?.downloaded_bytes != null}
         <span>
-          {formatBytes($bundleProgress.downloaded_bytes)}
+          {formatBytes($bundleProgress.downloaded_bytes, $locale)}
           {$bundleProgress.total_bytes
-            ? `/ ${formatBytes($bundleProgress.total_bytes)}`
+            ? `/ ${formatBytes($bundleProgress.total_bytes, $locale)}`
             : ""}
         </span>
       {/if}
@@ -143,7 +140,7 @@
         <button
           class="action-btn"
           data-testid="cancel-download"
-          onclick={handleCancelDownload}>Cancel</button
+          onclick={handleCancelDownload}>{$t("download.cancel")}</button
         >
       {/if}
     </div>

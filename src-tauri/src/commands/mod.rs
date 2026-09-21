@@ -134,6 +134,9 @@ pub struct LizaMapPackageDto {
     pub name: String,
     pub base_zoom: u8,
     pub downloaded: bool,
+    /// Size in bytes when known — from the listing for a remote map, from the
+    /// file for a cached one. `None` is "unknown", not zero.
+    pub size_bytes: Option<u64>,
 }
 
 #[derive(serde::Serialize, specta::Type)]
@@ -262,6 +265,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
                 name: m.name.clone(),
                 base_zoom: m.base_zoom,
                 downloaded: m.local_path.is_some(),
+                size_bytes: m.size_bytes,
             })
             .collect(),
     });

@@ -150,10 +150,11 @@ describe("per-file download progress popup", () => {
     expect(popupSource).toContain("$downloadProgress.values()");
     expect(popupSource).toContain("p.download_id === $activeDownloadId");
     // Percent bar when total_bytes is known, indeterminate stripe otherwise,
-    // plus a human-readable MB size.
+    // plus a human-readable size in the app's language (the three local
+    // copies of that formatter are now one shared `formatBytes`).
     expect(popupSource).toContain("p.total_bytes");
     expect(popupSource).toContain("class:indeterminate={pct == null}");
-    expect(popupSource).toContain("formatMb(p.downloaded_bytes)");
+    expect(popupSource).toContain("formatBytes(p.downloaded_bytes, $locale)");
   });
 
   it("shows an x/y files header and a cancel button", () => {
