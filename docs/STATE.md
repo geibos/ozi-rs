@@ -232,7 +232,7 @@ existing requirements before writing a delta against it.
   and the earlier `com.apple.LocalAuthentication` block, which was a different
   error and is cleared.
 
-  Thirty-six changes carry an unchecked "smoke green" task waiting on this.
+  Twenty-five changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run
