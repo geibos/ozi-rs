@@ -5,9 +5,9 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **what survives the trip** (2026-09-21) — a track exported
-to GPX and read back is pinned as the same track, which is the ground the
-planned FTP upload stands on; after one flaky file not being the bundle, where
+Last merged slice: **what survives the trip** (2026-09-21) — a track and a
+waypoint exported to GPX and read back are pinned as the same track and
+waypoint, which is the ground the planned FTP upload stands on; after one flaky file not being the bundle, where
 a
 dropped transfer is retried, and the retry resumes with a `Range` request
 instead of fetching the file again, and after a
@@ -79,7 +79,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 309 Rust tests and 375 frontend tests;
+rustfmt, clippy, type-checks, 310 Rust tests and 375 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

@@ -33,10 +33,26 @@ colour, so it would have passed whether or not the colour survived: it would
 have recorded a fact that was not one. It caught itself only because I ran it
 expecting it to fail and it did not.
 
+Waypoints got the same treatment, since they are the half of a search record
+that names things — the task point, what was found, where the danger is. Name,
+coordinates and symbol all survive, and a waypoint that went out without a
+symbol comes back without one, which matters: acquiring a default would put a
+mark on the map nobody placed.
+
+Then I surveyed the other two formats rather than assuming, because the point
+of this exercise is to know. **PLT** — what OziExplorer itself reads — already
+round-trips, name in Cyrillic, colour and width included; better covered than
+GPX was. **WPT** has no importer, deliberately, and `product-scope` says so;
+its output is pinned line by line instead, exact v1.1 header, CP1251, CRLF, six
+decimal places.
+
+So the interchange story is now known rather than assumed, in all four
+directions.
+
 | | |
 |---|---|
-| Evidence | a round trip over a two-segment track, and the colour gap against a colour that is not the default |
-| Automated gates | `just ci` green (309 Rust, 375 frontend) |
+| Evidence | round trips over a two-segment track and over two waypoints; the colour gap against a colour that is not the default |
+| Automated gates | `just ci` green (310 Rust, 375 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

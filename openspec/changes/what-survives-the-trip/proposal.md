@@ -28,7 +28,17 @@ The first version of that second test asserted against red, which is the
 default colour — so it would have passed whether or not the colour survived,
 and recorded a fact that was not one. It uses blue.
 
+## The other two formats
+
+Surveyed rather than assumed, since the point of this is to know:
+
+- **PLT**, which is what OziExplorer itself reads, already round-trips — name
+  in Cyrillic, colour and width included. Better covered than GPX was.
+- **WPT** has no importer, deliberately: `product-scope` puts WPT export in the
+  MVP and WPT import outside it. Its output is pinned line by line instead —
+  exact v1.1 header, CP1251, CRLF, six decimal places.
+
 ## Impact
 
-- Affected specs: `track-export`
+- Affected specs: `track-export`, `waypoints`
 - Affected code: `src-tauri/src/infrastructure/export/gpx.rs` (tests only)

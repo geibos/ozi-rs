@@ -269,6 +269,47 @@ mod tests {
         );
     }
 
+    /// The same question for waypoints, which is the half of a search record
+    /// that names things: the task point, what was found, where the danger is.
+    ///
+    /// A waypoint carries a name and a symbol, and both are what the other
+    /// groups read when the file reaches them. The symbol is the one a reader
+    /// is most likely to drop, since it is optional.
+    #[test]
+    fn a_waypoint_survives_the_trip_out_and_back() {
+        use crate::infrastructure::import::gpx::import_gpx_file;
+
+        let mut headquarters = Waypoint::new(WaypointId::new(1), "ШТАБ", 59.95243, 31.59681);
+        // `set_symbol` hands back the previous symbol, not a result.
+        let _ = headquarters.set_symbol(Some("flag".to_owned()));
+        // One without a symbol: absent must stay absent rather than become a
+        // default, which would put a mark on the map nobody placed.
+        let plain = Waypoint::new(WaypointId::new(2), "Задача 1", 59.8, 31.7);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("waypoints.gpx");
+        super::export_waypoints_to_gpx_file(&[headquarters, plain], &path).expect("export");
+
+        let back = import_gpx_file(&path).expect("import what we just wrote");
+        let waypoints = back.waypoints();
+        assert_eq!(waypoints.len(), 2, "both came back");
+
+        assert_eq!(waypoints[0].name(), "ШТАБ");
+        assert_eq!(waypoints[0].symbol(), Some("flag"));
+        assert!(
+            (waypoints[0].latitude() - 59.95243).abs() < 1e-9
+                && (waypoints[0].longitude() - 31.59681).abs() < 1e-9,
+            "to the precision a search area needs"
+        );
+
+        assert_eq!(waypoints[1].name(), "Задача 1");
+        assert_eq!(
+            waypoints[1].symbol(),
+            None,
+            "a waypoint with no symbol must not acquire one on the way back"
+        );
+    }
+
     /// A known gap, pinned so it is a fact rather than a surprise.
     ///
     /// The writer emits the track's colour as `gpxx:DisplayColor`; the reader
