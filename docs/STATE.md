@@ -5,10 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a download, played out** (2026-09-21) — the stand replays
-a bundle download, which found that the download button did nothing at all on
-the path from the workspace and then confirmed the panel, its byte totals, the
-ready-map announcement and the close; after a map that is not downloaded being
+Last merged slice: **when it fails** (2026-09-21) — offline the project list
+says it is the saved one, and the failed-download path was verified rather than
+assumed; after the stand replaying a bundle download, which found that the
+download button did nothing at all on the path from the workspace, and after a map that is not downloaded being
 marked as such in the Maps tab with its size in the tooltip, and after the app getting its padding back, where the unlayered global reset had
 been beating every Tailwind spacing utility and fixing it uncovered the
 inspector's segments card collapsing, and after
@@ -64,10 +64,11 @@ than followed blindly.
 1. **Archive the finished OpenSpec changes.** Ten are implemented, gated and
    waiting on the owner's review: archiving folds their requirements into the
    baseline specs, which is a step for a person, not for an agent.
-2. **Keep walking the screens on the stand.** Done: the Track Inspector, the
-   cold-start route, the Waypoints row menu, the shell at 1024×640, and a
-   download in flight. Not yet: an error state — a failed download and an
-   unreachable catalogue.
+2. **The screens of the field cycle have been walked** on the stand: the
+   cold-start route, the Track Inspector, the Waypoints row menu, the shell at
+   1024×640, a download in flight, a download that fails and a catalogue that
+   cannot be reached. What is left there is upkeep — point it at whatever the
+   next slice touches.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 

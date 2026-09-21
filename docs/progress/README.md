@@ -10,6 +10,29 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — when it fails
+
+The stand learned the two failures a field crew actually meets: the listing
+unreachable, and a download that dies.
+
+With no network the project list still shows, from the cache — the right
+answer. Nothing said so. A crew could not tell today's list from one saved days
+ago, and a bundle made this morning missing from it would read as "no such
+search". The loader marks the list as the saved one now, and the status line
+says the refresh did not happen.
+
+The failed download turned out to behave already: the error reaches a toast
+carrying the backend's own message, the panel closes rather than hanging, and
+the map that did land stays openable. Verified rather than assumed.
+
+| | |
+|---|---|
+| Offline | [the saved list, marked](2026-09-21-when-it-fails/offline-catalogue.png) |
+| Failed download | [the toast](2026-09-21-when-it-fails/failed-download.png) |
+| Automated gates | `just ci` green (293 Rust, 340 frontend) |
+
+---
+
 ## 2026-09-21 — a download, played out
 
 The progress panel, the byte totals, the "this map is ready" announcement and
