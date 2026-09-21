@@ -85,13 +85,39 @@ dependency dropped.
   the visible text at that. WKWebView publishes a control's `aria-label`, not
   the text inside it, so the matchers read the label now and accept either
   language.
-- **The Mac2 driver host is crashing again** (2026-09-21, late). `just smoke`
-  fails at session creation with "'GET /status' cannot be proxied to Mac2
-  Driver server because its process is not running (probably crashed)", twice
-  in a row, with the Appium server up and WebDriverAgent killed beforehand.
-  The same failure appeared on 2026-09-20 and a server restart did not help it
-  then. Everything else is green: `just ci`, and the screens were verified on
-  the stand. The E2E gate is the one piece of evidence currently unavailable.
+- **The Mac2 driver dies because a stale system authentication blocks UI
+  testing** (2026-09-21, late; root cause found, the fix is the owner's).
+  `just smoke` fails at session creation with "'GET /status' cannot be proxied
+  to Mac2 Driver server because its process is not running (probably crashed)".
+  The crash is downstream. Running the runner directly,
+
+      ~/Library/Developer/Xcode/DerivedData/WebDriverAgentMac-*/Build/Products/\
+        Debug/WebDriverAgentRunner-Runner.app/Contents/MacOS/WebDriverAgentRunner-Runner
+
+  reproduces it every time with the real message:
+
+      Failed to initialize for UI testing: Error Domain=com.apple.LocalAuthentication
+      Code=-4 "System authentication is running."  BiometryType=1
+
+  A `log stream` on `coreauthd` taken across one run names the requester and the
+  refusal: `/usr/libexec/testmanagerd` asks for authentication and gets
+  "Failed to acquire remote authentication ownership" — another authentication
+  already owns the system UI. Nothing is on screen asking for it: the owner is a
+  `coreautha` agent left running since 16:44 that never released the session, so
+  every XCTest UI-testing initialisation is refused for as long as it lives.
+
+  This is machine state, not code and not Appium configuration — nothing in this
+  repository can clear it. The fix is one of, in order of cost:
+
+      pkill -x coreautha     # the agent relaunches on demand; cancels any
+                             # genuine Touch ID prompt that is up, so look first
+      log out and back in
+      reboot
+
+  An agent cannot run it: killing a system authentication agent is refused by
+  the permission classifier, and rightly so. After clearing it, `just smoke`
+  is the check — it passed in 18.5s earlier the same day, so a pass restores the
+  gate rather than proving something new.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run
