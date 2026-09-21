@@ -97,34 +97,65 @@ is written and validating but not yet archived.
 have all their implementation tasks done and are ready to archive once the owner
 has used them in the field.
 
-## Next slice
+## What is left, and who has to do it
 
 Working goal, set by the owner on 2026-09-21: ozi-rs has to be good enough to
 replace OziExplorer in the field, and working with tracks and bundles has to be
-fast, comfortable and good-looking. The queue below is ordered by how much of
-that it buys, and is meant to be re-read and re-ordered each session rather
-than followed blindly.
+fast, comfortable and good-looking.
 
-1. **Archive the finished OpenSpec changes.** Read the deltas against the
+Rewritten on 2026-09-21 after a long session, because the previous queue had
+been overtaken. It is ordered by what it buys, and is meant to be re-read and
+re-ordered rather than followed blindly.
+
+### Blocked on the owner
+
+1. **Archive the twenty-eight OpenSpec changes.** Folding their requirements
+   into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on
-   2026-09-21. `openspec validate --strict` does not check for that. Eleven are implemented, gated and
-   waiting on the owner's review: archiving folds their requirements into the
-   baseline specs, which is a step for a person, not for an agent.
-   `one-preview-at-a-time` is the twelfth and is implemented too, but its
-   customer-journey smoke could not run, so it is not ready alongside them.
-2. **The screens of the field cycle have been walked** on the stand: the
-   cold-start route, the Track Inspector, the Waypoints row menu, the shell at
-   1024×640, a download in flight, a download that fails and a catalogue that
-   cannot be reached. What is left there is upkeep — point it at whatever the
-   next slice touches.
+   2026-09-21 — `openspec validate --strict` checks a change's shape, not
+   whether it disagrees with the baseline.
+2. **Decisions the code is waiting on**, each with its reasoning in
+   `docs/backlog.md`: the stop threshold for moving time; whether OZI rasters
+   should key their no-data black to transparent, and per map or globally; the
+   catalogue's row and badge sizes; where the theme picker goes, since
+   `ui-shell` requires one and `ThemePicker.svelte` is imported by nothing;
+   and whether a WPT name should carry `&#NNNN;` or `?` for a character
+   cp1251 cannot hold — that one needs someone with OziExplorer in front of
+   them.
+3. **FTP**, when the owner is ready: credentials from a settings form into the
+   macOS keychain, an FTP listing adapter behind the interface the HTTP one
+   implements, and a source preference. Track upload stands on the GPX round
+   trip, which is pinned as of 2026-09-21.
 
-The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
+### Blocked on this machine
 
-Slice 0.3 is done: bundles-root persistence, Esc discarding a draw without a
-redo entry, map layer ids, `qa_observe`, HTTP timeouts, export errors reaching
-the caller, `.kml` classified as unsupported, and the unused `lucide-svelte`
-dependency dropped.
+4. **`just smoke`.** The Mac2 driver host dies at session creation; every
+   piece works when run by hand and only fails when Appium spawns it. What has
+   been ruled out, and by which command, is under "Known broken". Seventeen
+   changes carry an unchecked "smoke green" task waiting on it.
+
+### An agent can still do these
+
+5. **MapLibre 4 → 6**, which clears the waived critical advisory. Deliberately
+   not attempted while the E2E gate is down: the map is the product, and the
+   stand stubs its tiles, so a major upgrade would ship verified only by type
+   checks and a browser.
+6. **Field tools declared in scope and absent**: distance, radius circle,
+   projection. Note that `ui-shell` requires the mode chips to stay inert
+   scaffolding, so these need a home that is not the chips — which is a design
+   question before it is an implementation one.
+7. **The remaining ADR-0020 items**: open-by-URL, crop by selection,
+   walkthrough, waypoint colour, recent `.ozp`.
+8. **Upkeep**: point the stand at whatever the next slice touches. Every screen
+   of the field cycle has been walked on it at least once.
+
+### Where the rest is
+
+`docs/backlog.md` holds the bundle-flow survey, the engineering items and the
+rules this session learned the hard way — the generation stamp for overlapping
+reloads, not deriving a list from map geometry, and reading a capability's
+existing requirements before writing a delta against it.
 
 ## Known broken
 
