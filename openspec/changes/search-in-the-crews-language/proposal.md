@@ -23,6 +23,9 @@ next.
   pattern built for the common case.
 - A space in the query stands for whatever separates words in a slug (`_`, `-`
   or a space), so `Лаврово 2026` finds `Lavrovo-2026`.
+- The command palette's project search answers the same. It is the second way
+  into the catalogue and had the same literal match; two ways in that disagree
+  about what exists would be worse than one that is merely wrong.
 
 ## Capabilities
 
@@ -32,7 +35,8 @@ next.
 
 ## Impact
 
-- **Frontend**: `src/lib/translit.ts` (new), `src/lib/project-list.ts`.
+- **Frontend**: `src/lib/translit.ts` (new), `src/lib/project-list.ts`,
+  `src/lib/palette-projects.ts`.
 - **Backend**: none.
 - **Risk**: low. A query with no Cyrillic takes exactly the path it took
   before; the pattern is built once per call, not once per row.

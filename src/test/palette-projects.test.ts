@@ -32,4 +32,28 @@ describe("paletteProjects", () => {
   it("returns nothing when nothing matches", () => {
     expect(paletteProjects(catalogue, "нет такого", 40)).toEqual([]);
   });
+
+  /**
+   * The palette is the second way into the catalogue and it was matching
+   * literally, so it had the same empty-list problem the loader's filter had:
+   * the names are latin transliterations and the crew types Russian. See
+   * `src/lib/translit.ts`.
+   */
+  it("finds a latin name from its Russian spelling", () => {
+    const rows = [
+      { slug: "2026-07-08_Lavrovo", name: "2026 07 08 Lavrovo" },
+      { slug: "2026-09-20_Schuvalovo", name: "2026 09 20 Schuvalovo" },
+    ];
+    expect(paletteProjects(rows, "Лаврово", 40)).toEqual([rows[0]]);
+    expect(paletteProjects(rows, "Шувалово", 40)).toEqual([rows[1]]);
+    expect(paletteProjects(rows, "Мурманск", 40)).toEqual([]);
+  });
+
+  it("still stops at the limit for a Russian query", () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({
+      slug: `2026-09-01_Lavrovo${i}`,
+      name: `2026 09 01 Lavrovo${i}`,
+    }));
+    expect(paletteProjects(rows, "Лаврово", 5)).toHaveLength(5);
+  });
 });

@@ -2,6 +2,7 @@
 
 - [x] 1.1 `transliteratedPattern` in `src/lib/translit.ts`, with tests written first
 - [x] 1.2 `filterProjects` uses it for a Cyrillic query and keeps substring matching otherwise
+- [x] 1.3 `paletteProjects` uses it too, and still stops at its limit
 
 ## 2. Verification
 

@@ -2,8 +2,8 @@
 
 ### Requirement: The catalogue filter accepts the crew's own language
 
-The catalogue filter SHALL match a query written in Russian against project
-names written in latin transliteration. Because no single transliteration is in
+Every surface that searches the catalogue SHALL match a query written in
+Russian against project names written in latin transliteration. Because no single transliteration is in
 use, a Cyrillic letter SHALL match any of the latin spellings in common use for
 it, and SHALL also match itself, so an entry written in Cyrillic is still
 found. A query containing no Cyrillic SHALL behave exactly as before, matching
@@ -29,3 +29,8 @@ whichever separator the catalogue uses between words.
 
 - **WHEN** the operator types `Sagra`
 - **THEN** the result is the same list the literal substring match produced before this change
+
+#### Scenario: The command palette answers the same as the loader
+
+- **WHEN** the same Russian query is typed into the command palette's project search and into the loader's filter
+- **THEN** both list the same projects, subject to the palette's own screenful limit

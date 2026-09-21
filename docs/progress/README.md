@@ -39,10 +39,15 @@ Checked on the stand against the fixtures the Rust core writes:
 | `Мурманск` | — | 0 из 3 |
 | `Sagra` | 2026 07 14 Sagra | 1 из 3 |
 
+The palette had it too. Its project search is the second way into the catalogue
+and matched just as literally, so the two ways in would have disagreed about
+what the catalogue contains. Same helper, same answer, and it still stops at a
+screenful rather than filtering thirteen thousand rows into `cmdk`.
+
 | | |
 |---|---|
 | Change | `openspec/changes/search-in-the-crews-language/` |
-| Automated gates | `just ci` green (320 Rust, 452 frontend) |
+| Automated gates | `just ci` green (320 Rust, 454 frontend) |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
