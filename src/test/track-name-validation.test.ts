@@ -40,9 +40,10 @@ describe("OK-standard track-name validation", () => {
 describe("Library Tracks tab warning-only validation", () => {
   it("uses the shared track-name helper for warnings", () => {
     expect(tracksTabSource).toContain("isOkStandardTrackName");
-    // Warning surface keeps the same Tailwind utility color so the visual
-    // contract carries over from the floating panel. The hint text itself
-    // is localized via the i18n dictionary (ru: «Формат: ГГГГММДД_Позывной»).
+    // The warning is a yellow glyph beside the name rather than a line of
+    // text under it — spelling the rule out under every row buried the names.
+    // The colour stays as the signal; the text moved into the tooltip and the
+    // accessible label, localized via the i18n dictionary.
     expect(tracksTabSource).toContain("text-yellow-500");
     expect(tracksTabSource).toContain("tracksTab.nameHint");
   });

@@ -159,17 +159,19 @@
         {@render nameSuffix()}
       {/if}
     {:else}
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <span
-        class="cursor-text truncate text-xs"
-        title={name}
-        ondblclick={startRename}
-      >
-        {name}
-      </span>
-      {#if nameSuffix}
-        {@render nameSuffix()}
-      {/if}
+      <div class="flex min-w-0 items-center gap-1">
+        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+        <span
+          class="cursor-text truncate text-xs"
+          title={name}
+          ondblclick={startRename}
+        >
+          {name}
+        </span>
+        {#if nameSuffix}
+          {@render nameSuffix()}
+        {/if}
+      </div>
       {#if subline}
         {@render subline()}
       {/if}

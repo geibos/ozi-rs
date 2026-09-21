@@ -62,6 +62,7 @@
   import UploadIcon from "@lucide/svelte/icons/upload";
   import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
   import LocateIcon from "@lucide/svelte/icons/locate";
+  import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import CheckIcon from "@lucide/svelte/icons/check";
   import { isOkStandardTrackName } from "$lib/track-names";
@@ -493,9 +494,19 @@
           {/snippet}
           {#snippet nameSuffix()}
             {#if !isOkStandardTrackName(t.name)}
-              <span class="text-[10px] leading-tight text-yellow-500">
-                {$i18n("tracksTab.nameHint")}
-              </span>
+              <!-- A non-standard name is worth flagging, but spelling the rule
+                   out under every row buried the names themselves. The glyph
+                   carries the same text as its tooltip and label. -->
+              <Tooltip.Root>
+                <Tooltip.Trigger
+                  class="shrink-0 border-0 bg-transparent p-0 text-yellow-500 hover:text-yellow-400"
+                  aria-label={$i18n("tracksTab.nameHint")}
+                  data-testid="track-name-warning"
+                >
+                  <CircleAlertIcon class="size-3" strokeWidth={2} />
+                </Tooltip.Trigger>
+                <Tooltip.Content>{$i18n("tracksTab.nameHint")}</Tooltip.Content>
+              </Tooltip.Root>
             {/if}
           {/snippet}
           {#snippet subline()}

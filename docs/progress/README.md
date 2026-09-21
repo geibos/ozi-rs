@@ -10,6 +10,28 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — row density and dev signing
+
+The name-format warning was a full line of orange text under most rows, so a
+track row cost three lines and the names themselves were the least prominent
+thing in the list. It is now a small yellow glyph beside the name, carrying the
+same sentence as its tooltip and accessible label. A row is two lines again and
+roughly twice as many tracks fit without scrolling.
+
+Debug builds are signed with a local identity created by
+`scripts/setup-dev-signing.sh`. Before this, every rebuild was a new program to
+macOS, so the Documents-access prompt returned on each build and blocked the
+window from opening — verified fixed: a rebuild now launches straight into the
+workspace with no prompt.
+
+| | |
+|---|---|
+| Before | [rows](2026-09-21-row-density/before-rows.png) |
+| After | [rows](2026-09-21-row-density/after-rows.png) |
+| Automated gates | `just ci` green (248 Rust, 281 frontend) |
+
+---
+
 ## 2026-09-20 — visible fixes (slice 0.2)
 
 Four defects the owner saw the first time the built app was opened.
