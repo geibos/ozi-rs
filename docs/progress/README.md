@@ -10,6 +10,41 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a waypoint looks like what it is
+
+Every waypoint on the map was the same yellow dot. The symbol a crew picks —
+flag, camp, danger, water, meeting point — was stored, listed in the Waypoints
+tab and carried into GPX, and the one place it did not appear was the place
+they look at. A search area collects the task point, what was found, where the
+danger is and every group's marks; ten identical dots distinguish none of it.
+
+The table lived inside the picker, which is why only the picker knew anything.
+It is a module now, read by both, and the marker draws the glyph on the disc
+rather than instead of it — a glyph alone over aerial imagery is unreadable,
+and a marker has to be findable before it can be identified. 22px instead of 14
+to fit one.
+
+Two smaller things fell out. The applied-marker record now carries the symbol,
+so changing a symbol redraws the marker instead of waiting for the waypoint to
+move. And a symbol this build does not know — from a GPX another tool wrote —
+falls back to the default pin rather than leaving the waypoint undrawn: it is
+still there and must still be findable.
+
+The picker's ten labels turned out to be English literals inside its table.
+The label guard did not see them, and could not: they are not written into the
+attribute, they are looked up from data. That is the third case the guard has
+missed, which is roughly what a guard on a syntactic shape is worth — it
+catches the careless version, not every version.
+
+| | |
+|---|---|
+| Evidence | walked on the stand: the flagged waypoint draws 🏁, the one without a symbol 📍, both computed 22×22 |
+| Evidence | tests on the lookup, including the unknown-symbol fallback |
+| Automated gates | `just ci` green (312 Rust, 379 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — re-reading the findings before the owner does
 
 `codify-architecture-decisions` carries two lists of findings the owner reads

@@ -51,6 +51,7 @@
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { createLatestRun } from "$lib/latest-run";
   import { reportEditFailure } from "$lib/edit-failure";
+  import { waypointGlyph } from "$lib/waypoint-symbols";
   import {
     initTracksLayer,
     updateTracksLayer,
@@ -367,6 +368,8 @@
     lon: number;
     name: string;
     isActive: boolean;
+    /** Kept so the reconciler redraws the glyph when the symbol changes. */
+    symbol: string | null;
   }
   let appliedWaypoints = new Map<string, AppliedWaypoint>();
 
@@ -440,6 +443,7 @@
             lon: wp.lon,
             name: wp.name,
             isActive,
+            symbol: wp.symbol ?? null,
           },
         });
       }
@@ -465,6 +469,10 @@
         const isActive = data.isActive;
         const el = document.createElement("div");
         el.className = "waypoint-marker";
+        // The symbol is what tells the task point from what was found from
+        // where the danger is. It was stored, listed and exported, and the one
+        // place it did not appear was the map.
+        el.textContent = waypointGlyph(data.symbol);
         if (!isActive) {
           el.classList.add("inactive-layer");
         }
@@ -1298,12 +1306,20 @@
   }
 
   :global(.waypoint-marker) {
-    width: 14px;
-    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    /* The disc stays: a glyph alone over aerial imagery is unreadable, and a
+       marker has to be findable before it can be identified. */
     background: var(--ctp-yellow, #e5c890);
     border: 2px solid var(--ctp-crust, #232634);
     border-radius: 50%;
+    font-size: 12px;
+    line-height: 1;
     cursor: grab;
+    user-select: none;
   }
 
   :global(.waypoint-marker:active) {

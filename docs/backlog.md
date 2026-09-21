@@ -34,6 +34,12 @@ decision.
 
 ## Engineering
 
+- **A label looked up from a data table escapes the label guard.** The symbol
+  picker carried ten English labels inside its own table; the guard checks what
+  is written into an `aria-label`, not what a table hands it. Third miss of
+  that kind. A guard on a syntactic shape catches the careless version, which
+  is most of them, and is not worth widening until it misses something that
+  reaches a screen — this one did, and is fixed.
 - **The theme picker is unreachable.** `ThemePicker.svelte` is imported by
   nothing, and `ui-shell` requires a selector with five options and persistence
   across sessions. Both stores behind it work; only the placement is missing,

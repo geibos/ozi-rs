@@ -1,6 +1,11 @@
 <script lang="ts">
   import { buttonVariants } from "$lib/components/ui/button";
   import { t } from "$lib/i18n";
+  import {
+    WAYPOINT_SYMBOLS,
+    DEFAULT_WAYPOINT_GLYPH,
+    waypointGlyph,
+  } from "$lib/waypoint-symbols";
   import * as Popover from "$lib/components/ui/popover";
   import * as Tooltip from "$lib/components/ui/tooltip";
 
@@ -13,25 +18,6 @@
   } = $props();
 
   let open = $state(false);
-
-  const SYMBOLS = [
-    { value: "flag", emoji: "🏁", label: "Flag" },
-    { value: "camp", emoji: "🏕️", label: "Camp" },
-    { value: "danger", emoji: "⚠️", label: "Danger" },
-    { value: "water", emoji: "💧", label: "Water" },
-    { value: "shelter", emoji: "🏠", label: "Shelter" },
-    { value: "meeting-point", emoji: "👥", label: "Meeting Point" },
-    { value: "start", emoji: "🟢", label: "Start" },
-    { value: "finish", emoji: "🔴", label: "Finish" },
-    { value: "viewpoint", emoji: "👁️", label: "Viewpoint" },
-    { value: "parking", emoji: "🅿️", label: "Parking" },
-  ];
-
-  function getEmoji(val: string | null | undefined): string {
-    if (!val) return "📍";
-    const found = SYMBOLS.find((s) => s.value === val);
-    return found ? found.emoji : "📍";
-  }
 
   function handleSelect(val: string | null) {
     onSelect(val);
@@ -46,7 +32,7 @@
       ? $t("symbol.named").replace("{symbol}", symbol)
       : $t("symbol.default")}
   >
-    <span class="text-sm leading-none">{getEmoji(symbol)}</span>
+    <span class="text-sm leading-none">{waypointGlyph(symbol)}</span>
   </Popover.Trigger>
   <Popover.Content class="w-auto p-2">
     <div class="grid grid-cols-5 gap-2">
@@ -59,12 +45,12 @@
           onclick={() => handleSelect(null)}
           aria-label={$t("symbol.none")}
         >
-          <span class="text-base leading-none">📍</span>
+          <span class="text-base leading-none">{DEFAULT_WAYPOINT_GLYPH}</span>
         </Tooltip.Trigger>
         <Tooltip.Content>{$t("symbol.noneShort")}</Tooltip.Content>
       </Tooltip.Root>
 
-      {#each SYMBOLS as s (s.value)}
+      {#each WAYPOINT_SYMBOLS as s (s.value)}
         <Tooltip.Root>
           <Tooltip.Trigger
             class={buttonVariants({
@@ -72,11 +58,11 @@
               size: "icon",
             })}
             onclick={() => handleSelect(s.value)}
-            aria-label={s.label}
+            aria-label={$t(s.labelKey as never)}
           >
             <span class="text-base leading-none">{s.emoji}</span>
           </Tooltip.Trigger>
-          <Tooltip.Content>{s.label}</Tooltip.Content>
+          <Tooltip.Content>{$t(s.labelKey as never)}</Tooltip.Content>
         </Tooltip.Root>
       {/each}
     </div>
