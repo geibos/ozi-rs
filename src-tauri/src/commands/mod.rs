@@ -1053,6 +1053,20 @@ pub fn show_only_track(
     Ok(())
 }
 
+/// Abandon a drawing in progress: reverse its commands without leaving them
+/// in the redo stack.
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_drawing(
+    command_count: u32,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    lock_app_state(state.inner())?.cancel_drawing(command_count as usize);
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn toggle_track_visible(

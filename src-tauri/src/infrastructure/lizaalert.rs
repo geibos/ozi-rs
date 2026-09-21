@@ -535,8 +535,43 @@ fn fetch_text(url: &str) -> Result<String, String> {
     Ok(decode_text_bytes(bytes.as_ref()))
 }
 
+/// How long to wait for a TCP connection before giving up.
+///
+/// A штаб link goes through a phone; a host that never answers must fail
+/// rather than hold the app.
+const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// How long a transfer may go without delivering any bytes.
+///
+/// This is a per-read timeout, reset by every successful read, so a slow but
+/// moving download is not interrupted — only a stalled one. A whole-request
+/// timeout would be wrong here: bundles take minutes.
+const READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 fn client() -> Result<Client, String> {
-    Client::builder().build().map_err(|err| err.to_string())
+    // The blocking builder's `timeout` already defaults to 30s for connect,
+    // read and write; the connect timeout is stated explicitly so it does not
+    // depend on that default.
+    Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .build()
+        .map_err(|err| err.to_string())
+}
+
+/// The async client used by the bundle downloader.
+///
+/// It had no timeouts at all: a connection that stopped delivering bytes held
+/// the download open indefinitely, with the progress panel frozen on the file
+/// that stalled and no way to tell it apart from a slow link.
+fn async_client(
+    connect_timeout: std::time::Duration,
+    read_timeout: std::time::Duration,
+) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .connect_timeout(connect_timeout)
+        .read_timeout(read_timeout)
+        .build()
+        .map_err(|err| err.to_string())
 }
 
 /// Configuration for the multi-file download orchestrator.
@@ -606,9 +641,7 @@ pub async fn download_bundle_concurrent(
     let concurrency = config.concurrency.max(1);
     let sem = Arc::new(Semaphore::new(concurrency));
     let mut set: JoinSet<Result<(), String>> = JoinSet::new();
-    let async_client = reqwest::Client::builder()
-        .build()
-        .map_err(|err| err.to_string())?;
+    let async_client = async_client(CONNECT_TIMEOUT, READ_TIMEOUT)?;
 
     for (index, file) in files.into_iter().enumerate() {
         if config.cancel.is_cancelled() {
@@ -989,19 +1022,36 @@ where
             n = stream.next() => n,
         };
         let Some(chunk) = next else { break };
-        let chunk = chunk.map_err(|err| err.to_string())?;
-        file.write_all(&chunk)
-            .await
-            .map_err(|err| err.to_string())?;
+        // A stream or write error leaves a partial `.part` behind unless it is
+        // removed here. Cancellation already cleaned up; a stalled or broken
+        // transfer did not, and the leftovers accumulate in the bundle folder.
+        let chunk = match chunk {
+            Ok(chunk) => chunk,
+            Err(err) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(&tmp_path).await;
+                return Err(err.to_string());
+            }
+        };
+        if let Err(err) = file.write_all(&chunk).await {
+            drop(file);
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            return Err(err.to_string());
+        }
         downloaded_bytes += chunk.len() as u64;
         on_progress(downloaded_bytes, total_bytes);
     }
 
-    file.sync_all().await.map_err(|err| err.to_string())?;
+    if let Err(err) = file.sync_all().await {
+        drop(file);
+        let _ = tokio::fs::remove_file(&tmp_path).await;
+        return Err(err.to_string());
+    }
     drop(file);
-    tokio::fs::rename(&tmp_path, path)
-        .await
-        .map_err(|err| err.to_string())?;
+    if let Err(err) = tokio::fs::rename(&tmp_path, path).await {
+        let _ = tokio::fs::remove_file(&tmp_path).await;
+        return Err(err.to_string());
+    }
     Ok(())
 }
 
@@ -2068,6 +2118,64 @@ mod tests {
         assert_eq!(slugs.len(), 1);
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// A field link goes through a phone, and a stalled TCP connection used to
+    /// hold a bundle download open forever: the panel froze on the file that
+    /// stopped and nothing told it apart from a slow link. The read timeout is
+    /// per-read, so a slow download still finishes; only a dead one fails.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_stalled_transfer_fails_instead_of_hanging() {
+        use std::io::Read;
+        use std::net::TcpListener;
+
+        // Announces a body and then never sends it, holding the socket open.
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let stop_for_server = std::sync::Arc::clone(&stop);
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut request = [0u8; 1024];
+            let _ = stream.read(&mut request);
+            let _ = stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 1000\r\nConnection: close\r\n\r\n");
+            let _ = stream.write_all(&[0xABu8; 10]);
+            // Hold the connection open with nothing more to say.
+            while !stop_for_server.load(std::sync::atomic::Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        });
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("stalled.sqlitedb");
+        let client = super::async_client(
+            std::time::Duration::from_secs(5),
+            std::time::Duration::from_millis(300),
+        )
+        .expect("client");
+
+        let result = super::download_to_path_async(
+            &client,
+            &format!("http://{addr}/stalled.sqlitedb"),
+            &path,
+            &super::CancelToken::new(),
+            |_, _| {},
+        )
+        .await;
+
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _ = server.join();
+
+        assert!(result.is_err(), "a stalled transfer SHALL fail");
+        assert!(
+            !path.exists(),
+            "a stalled transfer SHALL NOT leave a file at the final path"
+        );
+        assert!(
+            !path.with_extension("part").exists(),
+            "a stalled transfer SHALL clean up its .part file"
+        );
     }
 
     fn write_cached_project_fixture() -> std::path::PathBuf {

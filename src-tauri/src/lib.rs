@@ -83,6 +83,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::redo,
         commands::rename_track,
         commands::set_track_color,
+        commands::cancel_drawing,
         commands::toggle_track_visible,
         commands::set_all_tracks_visible,
         commands::show_only_track,

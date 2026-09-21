@@ -42,7 +42,7 @@
     moveWaypoint,
     addWaypoint,
     getWaypoints,
-    undo,
+    cancelDrawing,
   } from "../lib/api";
   import type { PointDetail, SegmentDetail, TrackDetail } from "../lib/types";
   import { t as i18n } from "../lib/i18n";
@@ -149,7 +149,8 @@
 
   async function cancelDrawingMode() {
     if (!$drawingModeActive || $drawingTrackId === null) return;
-    const undoCount = drawingCommandCount + 1; // +1 for CreateEmptyTrack
+    // +1 for the command that created the track itself.
+    const commandCount = drawingCommandCount + 1;
 
     if (pendingDrawingClickTimeout !== null) {
       window.clearTimeout(pendingDrawingClickTimeout);
@@ -157,9 +158,10 @@
     }
 
     try {
-      for (let i = 0; i < undoCount; i += 1) {
-        await undo();
-      }
+      // One discard rather than a loop of undos: undoing left the abandoned
+      // track in the redo stack, where a later redo brought it back, and kept
+      // the project marked as changed although nothing had changed.
+      await cancelDrawing(commandCount);
     } catch (error) {
       console.error("Failed to cancel drawing mode", error);
     } finally {

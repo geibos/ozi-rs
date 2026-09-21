@@ -21,10 +21,10 @@
 ## 1b. Correctness fixes from the ADR translation (slice 0.3, one session)
 
 - [x] 1b.1 Persist the bundles root: add `bundles_root` to `PersistedAppSession`, write it in `set_bundles_root`, restore it at startup before the catalog loads; Rust tests for save/restore and for the default when the field is absent (TDD)
-- [ ] 1b.2 Esc discards a draw: add `CommandStack::discard_last(n)` (reverse-apply without pushing to redo, restore `mutation_count`), a `cancel_drawing` command taking the draw's command count, and switch `MapView` `cancelDrawingMode` to it; Rust tests: redo unavailable after cancel, dirty flag restored, saved project stays saved; frontend test on the api wiring
+- [x] 1b.2 Esc discards a draw: add `CommandStack::discard_last(n)` (reverse-apply without pushing to redo, restore `mutation_count`), a `cancel_drawing` command taking the draw's command count, and switch `MapView` `cancelDrawingMode` to it; Rust tests: redo unavailable after cancel, dirty flag restored, saved project stays saved; frontend test on the api wiring
 - [ ] 1b.3 Map layer identifiers: allocate `LayerId` as max+1 (application/mod.rs:1449 uses `len()+1`); test that adding after a deletion never reuses an id
 - [ ] 1b.4 `qa_observe` captures again: call the log and screenshot captures and return their artifact paths (tools/ozi-rs-mcp/src/native.rs:107-124); test with fake commands; fix the description in `docs/native-qa-mcp.md`
-- [ ] 1b.5 HTTP timeouts: connect timeout on both reqwest clients and a read timeout on the streaming download client (verify the reqwest 0.13 API); test that a stalled fake server fails the download instead of hanging
+- [x] 1b.5 HTTP timeouts: connect timeout on both reqwest clients and a read timeout on the streaming download client (verify the reqwest 0.13 API); test that a stalled fake server fails the download instead of hanging
 - [x] 1b.6 Small cleanups: remove the unused `lucide-svelte` dependency; classify `.kml` archive entries as unsupported until a parser exists (import/archive.rs:65,210) with a test
 - [x] 1b.7 GPX/WPT export commands return `Err` on failure instead of status-only (application/mod.rs:1169-1225); tests; UI shows the existing error toast
 - [ ] 1b.8 `just ci` green, `just smoke` green, PR merged, `main` pushed, `docs/STATE.md` updated

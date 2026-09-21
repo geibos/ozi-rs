@@ -797,6 +797,16 @@ impl AppState {
         changed
     }
 
+    /// Throw away the commands that built a drawing in progress.
+    ///
+    /// Pressing Esc while drawing used to call undo once per command, which
+    /// left the abandoned track in the redo stack — a later redo brought it
+    /// back — and kept the project marked as changed. Discarding reverses the
+    /// same commands without recording them.
+    pub fn cancel_drawing(&mut self, command_count: usize) -> usize {
+        self.history.discard_last(command_count, &mut self.project)
+    }
+
     pub fn rename_track(&mut self, layer_id: LayerId, track_id: TrackId, new_name: String) {
         let old_name = self
             .project
@@ -1880,6 +1890,82 @@ mod tests {
 
         state.lizaalert.busy = false;
         assert!(state.begin_load_project("2026-09-21_demo").is_ok());
+    }
+
+    /// Esc during a drawing is "forget this", not "undo this": the abandoned
+    /// track must not be recoverable with redo, and a project that was saved
+    /// before the drawing started must read as saved again.
+    #[test]
+    fn cancelling_a_drawing_leaves_no_redo_entry_and_no_unsaved_changes() {
+        let dir = temp_session_dir("cancel-drawing");
+        let path = dir.join("search.ozp");
+        let mut state = AppState::new();
+        state.save_project_to(path).expect("save");
+        assert!(!state.project_dirty(), "a freshly saved project is clean");
+
+        // Draw: create the track, then add two points to its first segment.
+        let layer_id = LayerId::new(1);
+        let track_id = state
+            .apply_create_empty_track(layer_id, "drawing".to_owned())
+            .expect("create track");
+        let segment_id = state
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+            .and_then(|t| t.segments().first())
+            .map(|segment| segment.id())
+            .expect("the new track has a segment");
+        state
+            .apply_insert_track_point(layer_id, track_id, segment_id, 0, 55.0, 37.0)
+            .expect("point 1");
+        state
+            .apply_insert_track_point(layer_id, track_id, segment_id, 1, 55.1, 37.1)
+            .expect("point 2");
+        assert!(state.project_dirty(), "drawing marks the project changed");
+        let drawn = state
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("layer")
+            .tracks()
+            .len();
+        assert_eq!(drawn, 1, "the drawing is on the project");
+
+        let discarded = state.cancel_drawing(3);
+        assert_eq!(discarded, 3);
+
+        assert_eq!(
+            state
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .expect("layer")
+                .tracks()
+                .len(),
+            0,
+            "the abandoned track SHALL be gone"
+        );
+        state.redo();
+        assert_eq!(
+            state
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .expect("layer")
+                .tracks()
+                .len(),
+            0,
+            "redo SHALL NOT resurrect an abandoned drawing"
+        );
+        assert!(
+            !state.project_dirty(),
+            "a cancelled drawing SHALL leave the project as saved as it was"
+        );
     }
 
     /// An export that failed used to answer `Ok(())`, so the caller showed the

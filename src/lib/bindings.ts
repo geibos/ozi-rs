@@ -182,6 +182,18 @@ async setTrackColor(layerId: number, trackId: number, color: [number, number, nu
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Abandon a drawing in progress: reverse its commands without leaving them
+ * in the redo stack.
+ */
+async cancelDrawing(commandCount: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_drawing", { commandCount }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async toggleTrackVisible(layerId: number, trackId: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("toggle_track_visible", { layerId, trackId }) };

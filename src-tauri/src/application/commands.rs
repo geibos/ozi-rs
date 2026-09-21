@@ -1381,6 +1381,35 @@ impl CommandStack {
         true
     }
 
+    /// Undo the last `count` commands and forget them.
+    ///
+    /// Abandoning a drawing is not an edit the operator will want back: doing
+    /// it with `undo` left the discarded track sitting in the redo stack, so
+    /// a later redo resurrected a track that was deliberately thrown away,
+    /// and the project stayed marked as changed although nothing had changed.
+    ///
+    /// Returns the number of commands actually discarded, which is less than
+    /// `count` only if the stack was shorter or a reverse failed to apply.
+    pub fn discard_last(&mut self, count: usize, project: &mut Project) -> usize {
+        let mut discarded = 0;
+        for _ in 0..count {
+            let Some(delta) = self.undo_history.pop() else {
+                break;
+            };
+            if delta.reverse.apply(project).is_err() {
+                self.undo_history.push(delta);
+                break;
+            }
+            discarded += 1;
+        }
+
+        // The discarded commands never happened as far as dirty tracking is
+        // concerned, so their mutations come back off the counter instead of
+        // adding more.
+        self.mutation_count = self.mutation_count.saturating_sub(discarded as u64);
+        discarded
+    }
+
     /// See the `mutation_count` field docs; consumed by
     /// `AppState::project_dirty`.
     pub fn mutation_count(&self) -> u64 {
