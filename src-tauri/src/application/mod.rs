@@ -2150,6 +2150,39 @@ mod tests {
         );
     }
 
+    /// The owner's July note: a crew should be able to start on the topo
+    /// layer while the 185 MiB satellite layer is still coming down. The
+    /// plumbing was there — a file that lands mid-download gets its
+    /// `local_path` — but nothing had ever checked that opening it works.
+    #[test]
+    fn a_map_that_lands_mid_download_can_be_opened_without_waiting() {
+        let mut state = AppState::new();
+        let mut project = sample_project_with_remote_map();
+        project.maps[0].local_path = None;
+        let package = project.maps[0].name.clone();
+        let file_name = project.maps[0].file_name.clone();
+        state.lizaalert.selected_project = Some(project);
+
+        // Before its file lands, opening it has to fetch.
+        assert!(matches!(
+            state.begin_open_map(&package),
+            Some(OpenMapRequest::Download(_))
+        ));
+        state.lizaalert.downloading.clear();
+
+        // The bundle download reports that file ready.
+        let landed = std::path::PathBuf::from(format!("/tmp/bundle/{file_name}"));
+        state.note_bundle_file_ready(&format!("8-Android&iOS/{file_name}"), &landed);
+
+        // Now it opens from disk, with the rest of the bundle still running.
+        match state.begin_open_map(&package) {
+            Some(OpenMapRequest::Local(selection)) => {
+                assert_eq!(selection.local_path, landed);
+            }
+            _ => panic!("a map already on disk SHALL open without a download"),
+        }
+    }
+
     /// An export that failed used to answer `Ok(())`, so the caller showed the
     /// success path and the only trace was a line in the status bar.
     #[test]

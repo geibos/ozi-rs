@@ -224,6 +224,9 @@ const dictionaries = {
     "download.cancel": "Cancel",
     "download.failed": "Download failed",
     "download.currentFile": "Downloading",
+    "download.mapReady": "{name} is ready",
+    "download.mapReadyHint":
+      "Open it now — the rest of the bundle keeps downloading.",
     "catalogue.loading": "Loading the project list…",
     "catalogue.loaded": "{count} projects — pick one on the left",
     "catalogue.empty": "No projects yet — refresh, or open a local bundle",
@@ -431,6 +434,8 @@ const dictionaries = {
     "download.cancel": "Отмена",
     "download.failed": "Загрузка не удалась",
     "download.currentFile": "Скачивается",
+    "download.mapReady": "{name} готова",
+    "download.mapReadyHint": "Можно открывать — остальное докачается само.",
     "catalogue.loading": "Загружается список проектов…",
     "catalogue.loaded": "Проектов: {count} — выберите слева",
     "catalogue.empty": "Список пуст — обновите или откройте локальный бандл",

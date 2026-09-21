@@ -11,6 +11,7 @@
     appState,
     commandPaletteOpen,
     currentDownload,
+    currentProject,
     finishDownload,
     projectDirty,
     projectsLoading,
@@ -21,6 +22,7 @@
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
   import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
+  import { readyMapName } from "$lib/ready-maps";
   import { installIpcErrorToastObserver } from "../lib/ipc";
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
@@ -30,6 +32,7 @@
   import { Toaster } from "$lib/components/ui/sonner";
   import * as Tooltip from "$lib/components/ui/tooltip";
   import type {
+    BundleFileReadyPayload,
     BundleProgressPayload,
     DownloadFinishedPayload,
     DownloadProgressPayload,
@@ -38,6 +41,14 @@
   import "../app.css";
 
   let { children } = $props();
+
+  /**
+   * Download ids whose first openable map has already been announced.
+   *
+   * A plain object rather than a `Set`: nothing renders from it, so the
+   * reactive collection the linter asks for would only add machinery.
+   */
+  const announcedReadyMap: Record<string, true> = {};
 
   const isWorkspace = $derived(page.url.pathname === "/project");
 
@@ -76,6 +87,23 @@
         listen<LizaProjectSummaryDto[]>("projects-chunk", (event) =>
           appendProjectsChunk(event.payload),
         ),
+        listen<BundleFileReadyPayload>("bundle-file-ready", (event) => {
+          // A bundle is fetched whole: the 16 MiB topo layer lands long
+          // before the 185 MiB satellite one, and the backend has always
+          // made it openable the moment it does. Nothing said so, so the
+          // crew waited for the whole bundle. Announced once per download.
+          const { download_id, package_name } = event.payload;
+          if (announcedReadyMap[download_id]) return;
+          const name = readyMapName(
+            package_name,
+            get(currentProject)?.maps ?? [],
+          );
+          if (name === null) return;
+          announcedReadyMap[download_id] = true;
+          toast.success(get(t)("download.mapReady").replace("{name}", name), {
+            description: get(t)("download.mapReadyHint"),
+          });
+        }),
         listen<DownloadFinishedPayload>("download-finished", (event) => {
           const wasShowing = finishDownload(event.payload.download_id);
           // A failure that only cleared the panel used to look like a
