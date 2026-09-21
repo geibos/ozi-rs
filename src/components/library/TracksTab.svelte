@@ -68,7 +68,7 @@
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import CheckIcon from "@lucide/svelte/icons/check";
   import { isOkStandardTrackName } from "$lib/track-names";
-  import { t as i18n } from "$lib/i18n";
+  import { locale, t as i18n } from "$lib/i18n";
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
   import {
@@ -633,7 +633,12 @@
                 ? $i18n("track.durationTooltip")
                 : undefined}
             >
-              {formatTrackStats(t.distanceKm, t.durationSeconds, t.pointCount)}
+              {formatTrackStats(
+                t.distanceKm,
+                t.durationSeconds,
+                t.pointCount,
+                $locale,
+              )}
             </span>
           {/snippet}
           {#snippet trailingControl()}

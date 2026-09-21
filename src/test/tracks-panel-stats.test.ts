@@ -12,29 +12,35 @@ const source = readFileSync(
 
 describe("Library Tracks tab statistics formatter", () => {
   it("renders distance, duration, and point count joined by · when timestamps are present", () => {
-    expect(formatTrackStats(12.3, 5040, 156)).toBe(
+    expect(formatTrackStats(12.3, 5040, 156, "en")).toBe(
       "12.3 km · 1h 24m · 156 pts",
+    );
+    // The crews read Russian; the units follow the interface.
+    expect(formatTrackStats(12.3, 5040, 156, "ru")).toBe(
+      "12.3 км · 1ч 24мин · 156 тчк",
     );
   });
 
   it("omits the duration segment (and its separator) when duration is null", () => {
-    const formatted = formatTrackStats(12.3, null, 156);
+    const formatted = formatTrackStats(12.3, null, 156, "en");
     expect(formatted).toBe("12.3 km · 156 pts");
     expect(formatted).not.toMatch(/\d+h\s\d+m/);
     expect(formatted).not.toMatch(/·\s\d+m\s·/);
   });
 
   it("omits the duration segment when duration is undefined", () => {
-    expect(formatTrackStats(0.5, undefined, 4)).toBe("0.5 km · 4 pts");
+    expect(formatTrackStats(0.5, undefined, 4, "en")).toBe("0.5 km · 4 pts");
   });
 
   it("shows minutes-only when the duration is under one hour", () => {
-    expect(formatTrackStats(3.2, 2700, 50)).toBe("3.2 km · 45m · 50 pts");
+    expect(formatTrackStats(3.2, 2700, 50, "en")).toBe("3.2 km · 45m · 50 pts");
   });
 
   it("rounds distance to one decimal place", () => {
-    expect(formatTrackStats(12.345, 60, 10)).toBe("12.3 km · 1m · 10 pts");
-    expect(formatTrackStats(0, 0, 0)).toBe("0.0 km · 0m · 0 pts");
+    expect(formatTrackStats(12.345, 60, 10, "en")).toBe(
+      "12.3 km · 1m · 10 pts",
+    );
+    expect(formatTrackStats(0, 0, 0, "en")).toBe("0.0 km · 0m · 0 pts");
   });
 });
 

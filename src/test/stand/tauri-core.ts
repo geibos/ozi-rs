@@ -22,6 +22,16 @@ import {
 
 type Args = Record<string, unknown> | undefined;
 
+/** A 1×1 transparent PNG, for tiles the stand cannot serve. */
+const TRANSPARENT_PNG = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49,
+  0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06,
+  0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44,
+  0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d,
+  0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42,
+  0x60, 0x82,
+]).buffer;
+
 /** Commands that change state: the stand accepts them and reports no data. */
 const ACCEPTED_WITHOUT_DATA = new Set([
   "set_all_tracks_visible",
@@ -51,19 +61,34 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "export_wpt_waypoints",
 ]);
 
+/**
+ * The layers the fixture actually populated. A handler that ignores its
+ * arguments is a mock that lies: answering every layer with the same
+ * waypoints listed each of them twice in the rail, which looked exactly like
+ * an app defect until the transcript showed two calls with different ids.
+ */
+const FIXTURE_TRACK_LAYER = 1;
+const FIXTURE_WAYPOINT_LAYER = 1;
+const FIXTURE_TRACK = 1;
+
 const HANDLERS: Record<string, (args: Args) => unknown> = {
   get_app_state: () => appStateFixture,
   get_tracks_geojson: () => tracksGeojsonFixture,
-  get_track_detail: () => trackDetailFixture,
-  get_waypoints: () => waypointsFixture,
+  get_track_detail: (args) =>
+    args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
+      ? trackDetailFixture
+      : { id: args?.trackId ?? 0, name: "", segments: [] },
+  get_waypoints: (args) =>
+    args?.layerId === FIXTURE_WAYPOINT_LAYER ? waypointsFixture : [],
   get_track_export_default_path: () => null,
   get_wpt_export_default_path: () => null,
   get_waypoints_export_default_path: () => null,
   get_simplified_preview: () => ({ points: [], removed: 0 }),
-  // No OZF2 file exists on the stand, and the inspector already has a branch
-  // for that — the honest answer is "no calibration metadata", not a
-  // fabricated one.
-  get_ozi_metadata: () => null,
+  // The stand has no tile store. A transparent 1×1 PNG stands in, so the map
+  // shows the basemap instead of a wall of error toasts — cartographic
+  // fidelity is out of scope here and says so in the README.
+  get_sqlite_tile: () => TRANSPARENT_PNG,
+  get_ozi_tile: () => TRANSPARENT_PNG,
   open_selected_map: () => "",
   load_project: () => "",
   open_local_bundle: () => "",

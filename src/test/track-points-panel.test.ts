@@ -70,24 +70,32 @@ describe("track-points module", () => {
     ).toBeNull();
   });
 
-  it("renders timestamps verbatim, never inventing placeholder text", () => {
+  it("renders a timestamp a person can read, and says nothing when there is none", () => {
+    // It used to print the backend's RFC3339 string verbatim under every
+    // row — a machine's answer, repeated down a list an operator scans.
     expect(
-      formatTimestamp({
-        id: 1,
-        lat: 0,
-        lon: 0,
-        elevation: null,
-        timestamp: "2024-06-01T10:00:00Z",
-      }),
-    ).toBe("2024-06-01T10:00:00Z");
+      formatTimestamp(
+        {
+          id: 1,
+          lat: 0,
+          lon: 0,
+          elevation: null,
+          timestamp: "2024-06-01T10:00:00Z",
+        },
+        "ru",
+      ),
+    ).toMatch(/01\.06\.2024/);
     expect(
-      formatTimestamp({
-        id: 1,
-        lat: 0,
-        lon: 0,
-        elevation: null,
-        timestamp: null,
-      }),
+      formatTimestamp(
+        {
+          id: 1,
+          lat: 0,
+          lon: 0,
+          elevation: null,
+          timestamp: null,
+        },
+        "ru",
+      ),
     ).toBeNull();
   });
 

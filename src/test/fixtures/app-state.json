@@ -1,11 +1,11 @@
 {
   "active_map": {
-    "base_zoom": 17,
+    "base_zoom": 16,
     "center_lat": 59.95243,
     "center_lon": 31.59681,
-    "kind": "ozi",
-    "local_path": "/Users/operator/Documents/LizaAlert Maps/2026-07-08_Lavrovo/6-Ozi/2026-07-08_Lavrovo_Satell_z17_ozf.map",
-    "package_name": "2026-07-08_Lavrovo_Satell_z17_ozf.map",
+    "kind": "sqlite",
+    "local_path": "/Users/operator/Documents/LizaAlert Maps/2026-07-08_Lavrovo/8-Android&iOS/2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb",
+    "package_name": "2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb",
     "project_name": "2026 07 08 Lavrovo"
   },
   "busy": false,

@@ -30,7 +30,7 @@
     segmentHeader,
   } from "$lib/track-points";
   import { joinSegments, splitSegment } from "$lib/api";
-  import { t } from "$lib/i18n";
+  import { locale, t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import type { SegmentDetail, TrackDetail } from "$lib/types";
 
@@ -148,7 +148,7 @@
       disabled={!$selectedTrack}
       onclick={toggleEditMode}
     >
-      {$editModeActive ? "Stop Edit" : "Edit Mode"}
+      {$editModeActive ? $t("inspector.stopEdit") : $t("inspector.editMode")}
     </Button>
   </header>
 
@@ -158,11 +158,11 @@
     </div>
   {:else if !trackDetail}
     <div class="text-muted-foreground p-3 text-center text-xs">
-      Loading points…
+      {$t("inspector.loadingPoints")}
     </div>
   {:else if trackDetail.segments.length === 0}
     <div class="text-muted-foreground p-3 text-center text-xs">
-      Track has no segments
+      {$t("inspector.noSegments")}
     </div>
   {:else}
     <ScrollArea class="max-h-72 flex-1">
@@ -176,7 +176,8 @@
           class:border-t={segIdx > 0}
           class:border-b={true}
         >
-          <span class="min-w-0 truncate">{segmentHeader(segment)}</span>
+          <span class="min-w-0 truncate">{segmentHeader(segment, $locale)}</span
+          >
           {#if segIdx > 0}
             <Button
               variant="ghost"
@@ -202,11 +203,11 @@
                 <Table.Cell class="text-border w-4 px-2 py-1">•</Table.Cell>
                 <Table.Cell class="px-2 py-1 font-mono">
                   {formatPointCoords(point)}
-                  {#if formatPointTimestamp(point) !== null}
+                  {#if formatPointTimestamp(point, $locale) !== null}
                     <div
                       class="text-muted-foreground font-mono text-[10px] leading-tight"
                     >
-                      {formatPointTimestamp(point)}
+                      {formatPointTimestamp(point, $locale)}
                     </div>
                   {/if}
                 </Table.Cell>
@@ -232,7 +233,10 @@
               size="sm"
               onclick={() => (expandedSegments[segment.id] = true)}
             >
-              Show {paged.hiddenCount} more
+              {$t("inspector.showMore").replace(
+                "{count}",
+                String(paged.hiddenCount),
+              )}
             </Button>
           </div>
         {/if}

@@ -15,6 +15,11 @@
  */
 
 import type { PointDetail, SegmentDetail, TrackDetail } from "./types";
+import type { Locale } from "./i18n";
+import {
+  formatPointCount,
+  formatTimestamp as formatInstant,
+} from "./track-stats";
 import { getTrackDetail } from "./api";
 
 /**
@@ -60,13 +65,18 @@ export function formatElevation(point: PointDetail): string | null {
 }
 
 /**
- * Returns the backend-provided timestamp as-is, or `null` if the point
- * lacks one. The legacy panel rendered the timestamp only when present
- * (no "No timestamp" placeholder); callers preserve that contract.
+ * A point's time, as a person reads it, or `null` when the point has none.
+ *
+ * The panel used to print the backend's RFC3339 string verbatim
+ * ("2026-07-08T09:00:00+00:00") under every row — a machine's answer,
+ * repeated a hundred times down a list an operator is scanning.
  */
-export function formatTimestamp(point: PointDetail): string | null {
+export function formatTimestamp(
+  point: PointDetail,
+  locale: Locale,
+): string | null {
   if (!point.timestamp) return null;
-  return point.timestamp;
+  return formatInstant(point.timestamp, locale);
 }
 
 /**
@@ -132,8 +142,9 @@ export const formatPointTimestamp = formatTimestamp;
 /**
  * One-line header for a track segment row in the Inspector's segments table.
  */
-export function segmentHeader(segment: SegmentDetail): string {
-  return `Segment ${segment.id} · ${segment.points.length} pts`;
+export function segmentHeader(segment: SegmentDetail, locale: Locale): string {
+  const label = locale === "ru" ? "Сегмент" : "Segment";
+  return `${label} ${segment.id} · ${formatPointCount(segment.points.length, locale)}`;
 }
 
 export interface InspectorPagedSegment {

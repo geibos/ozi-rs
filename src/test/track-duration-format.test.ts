@@ -11,26 +11,52 @@ import { formatDurationSeconds, formatTrackStats } from "../lib/track-stats";
 describe("duration spans of a day or more", () => {
   it("formats a multi-day span in days and hours", () => {
     const span = 26 * 24 * 3600 + 5 * 3600 + 17 * 60;
-    expect(formatDurationSeconds(span)).toBe("26d 5h");
+    expect(formatDurationSeconds(span, "en")).toBe("26d 5h");
   });
 
   it("switches to days exactly at 24 hours", () => {
-    expect(formatDurationSeconds(24 * 3600)).toBe("1d 0h");
-    expect(formatDurationSeconds(24 * 3600 - 60)).toBe("23h 59m");
+    expect(formatDurationSeconds(24 * 3600, "en")).toBe("1d 0h");
+    expect(formatDurationSeconds(24 * 3600 - 60, "en")).toBe("23h 59m");
   });
 
   it("keeps hours and minutes below a day", () => {
-    expect(formatDurationSeconds(5 * 3600 + 16 * 60)).toBe("5h 16m");
-    expect(formatDurationSeconds(32 * 60)).toBe("32m");
-    expect(formatDurationSeconds(0)).toBe("0m");
+    expect(formatDurationSeconds(5 * 3600 + 16 * 60, "en")).toBe("5h 16m");
+    expect(formatDurationSeconds(32 * 60, "en")).toBe("32m");
+    expect(formatDurationSeconds(0, "en")).toBe("0m");
   });
 
   it("treats a negative span as zero rather than printing a minus", () => {
-    expect(formatDurationSeconds(-120)).toBe("0m");
+    expect(formatDurationSeconds(-120, "en")).toBe("0m");
   });
 
   it("carries the day format into the composed row statistics", () => {
-    const stats = formatTrackStats(4.9, 629 * 3600 + 22 * 60, 580);
+    const stats = formatTrackStats(4.9, 629 * 3600 + 22 * 60, 580, "en");
     expect(stats).toBe("4.9 km · 26d 5h · 580 pts");
+    expect(formatTrackStats(4.9, 629 * 3600 + 22 * 60, 580, "ru")).toBe(
+      "4.9 км · 26д 5ч · 580 тчк",
+    );
+  });
+});
+
+describe("a start time a person can read", () => {
+  it("formats an RFC3339 timestamp for the interface language", async () => {
+    const { formatTimestamp } = await import("../lib/track-stats");
+
+    // The inspector printed "2026-07-08T09:00:00+00:00" — a machine's answer
+    // to "when did this start?".
+    expect(formatTimestamp("2026-07-08T09:00:00+00:00", "ru")).toMatch(
+      /08\.07\.2026/,
+    );
+    expect(formatTimestamp("2026-07-08T09:00:00+00:00", "en")).toMatch(
+      /08\/07\/2026/,
+    );
+  });
+
+  it("says nothing when there is no timestamp, and passes through nonsense", async () => {
+    const { formatTimestamp } = await import("../lib/track-stats");
+
+    expect(formatTimestamp(null, "ru")).toBeNull();
+    expect(formatTimestamp(undefined, "ru")).toBeNull();
+    expect(formatTimestamp("not a date", "ru")).toBe("not a date");
   });
 });

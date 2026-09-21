@@ -58,3 +58,23 @@ describe("the stand's events", () => {
     expect(seen).toEqual(["first"]);
   });
 });
+
+describe("the stand respects the arguments it is given", () => {
+  it("answers waypoints for the layer that has them, and no other", async () => {
+    // A handler that ignores its arguments is a mock that lies: answering
+    // every layer with the same waypoints listed each of them twice in the
+    // rail, which read as an app defect.
+    await expect(invoke("get_waypoints", { layerId: 1 })).resolves.toEqual(
+      waypointsFixture,
+    );
+    await expect(invoke("get_waypoints", { layerId: 2 })).resolves.toEqual([]);
+  });
+
+  it("answers the track detail only for the track it belongs to", async () => {
+    const other = (await invoke("get_track_detail", {
+      layerId: 1,
+      trackId: 99,
+    })) as { segments: unknown[] };
+    expect(other.segments).toEqual([]);
+  });
+});

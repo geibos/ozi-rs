@@ -35,4 +35,11 @@ answer throws, with the command name and where to add it — a screen that
 renders because a mock quietly returned `undefined` is the failure this whole
 exercise exists to stop. Dialogs answer "cancelled" (the branch a screen must
 handle anyway) and nothing emits events; `standEmit` in `tauri-event.ts` lets a
-console session deliver one by hand.
+console session deliver one by hand. Tile requests answer with a transparent
+pixel: the stand has no tile store, and a wall of error toasts would hide the
+screen it exists to show.
+
+A handler must respect its arguments. Answering every layer with the same
+waypoints listed each of them twice in the rail, which read as an app defect
+until the call transcript showed two calls with different ids — the same class
+of lie the hand-written mocks told.

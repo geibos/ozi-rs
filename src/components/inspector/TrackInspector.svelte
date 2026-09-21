@@ -46,13 +46,14 @@
     sortTrackPoints,
     toggleTrackVisible,
   } from "$lib/api";
-  import { t } from "$lib/i18n";
+  import { locale, t } from "$lib/i18n";
   import { confirm as confirmDialog, open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import {
     formatDistanceKm,
     formatDurationSeconds,
     formatPointCount,
+    formatTimestamp,
   } from "$lib/track-stats";
   import type { TrackDetail, TrackSummary } from "$lib/types";
   import TrackSegmentsTable from "./TrackSegmentsTable.svelte";
@@ -367,7 +368,7 @@
       >
         <dt class="text-muted-foreground">{$t("inspector.distance")}</dt>
         <dd class="min-w-0 truncate font-mono">
-          {formatDistanceKm(summary!.distance_km)}
+          {formatDistanceKm(summary!.distance_km, $locale)}
         </dd>
         <dt class="text-muted-foreground">{$t("inspector.duration")}</dt>
         <dd
@@ -377,19 +378,19 @@
             : undefined}
         >
           {summary!.duration_seconds !== null
-            ? formatDurationSeconds(summary!.duration_seconds!)
+            ? formatDurationSeconds(summary!.duration_seconds!, $locale)
             : "—"}
         </dd>
         <dt class="text-muted-foreground">{$t("inspector.points")}</dt>
         <dd class="min-w-0 truncate font-mono">
-          {formatPointCount(summary!.point_count)}
+          {formatPointCount(summary!.point_count, $locale)}
         </dd>
         <dt class="text-muted-foreground">{$t("inspector.startTime")}</dt>
         <dd
           class="min-w-0 truncate font-mono"
           title={firstTimestamp(trackDetail) ?? undefined}
         >
-          {firstTimestamp(trackDetail) ?? "—"}
+          {formatTimestamp(firstTimestamp(trackDetail), $locale) ?? "—"}
         </dd>
       </dl>
     {:else}

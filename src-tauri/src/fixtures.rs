@@ -174,19 +174,22 @@ pub fn sample_app_state() -> AppState {
                 },
             ],
         }),
+        // Tiles rather than an OZI raster: an OZF2 map's calibration can only
+        // be read from the file itself, so a fixture that claimed one would
+        // force the stand to invent metadata. The bundle case needs none.
         Some(ActiveMapSelection {
-            kind: ActiveMapKind::OziRaster,
+            kind: ActiveMapKind::SqliteTiles,
             project_name: "2026 07 08 Lavrovo".to_owned(),
-            package_name: "2026-07-08_Lavrovo_Satell_z17_ozf.map".to_owned(),
-            remote_url: String::new(),
+            package_name: "2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb".to_owned(),
+            remote_url: "https://maps.lizaalert.ru/maps/2026-07-08_Lavrovo/8-Android&iOS/2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb".to_owned(),
             local_path: PathBuf::from(
-                "/Users/operator/Documents/LizaAlert Maps/2026-07-08_Lavrovo/6-Ozi/2026-07-08_Lavrovo_Satell_z17_ozf.map",
+                "/Users/operator/Documents/LizaAlert Maps/2026-07-08_Lavrovo/8-Android&iOS/2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb",
             ),
             center: MapCenter {
                 lat: 59.95243,
                 lon: 31.59681,
             },
-            base_zoom: 17,
+            base_zoom: 16,
         }),
         "Loaded project: 2026 07 08 Lavrovo",
     );
