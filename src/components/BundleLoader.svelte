@@ -148,6 +148,101 @@
     if (listEl) listEl.scrollTop = 0;
   });
 
+  /**
+   * Keyboard position in the catalogue, as an index into `filtered`.
+   *
+   * The list is virtualized, so only the rows on screen exist in the DOM:
+   * there is no tab order over thirteen thousand of them and never can be.
+   * Moving DOM focus row by row would also fight the windowing. So the list
+   * itself holds focus and points at the current row with
+   * `aria-activedescendant`, which is what a virtualized listbox is for, and
+   * the index is kept against the filtered array rather than against what
+   * happens to be rendered.
+   *
+   * -1 is "nowhere yet": arrowing down from the search box starts at the top.
+   */
+  let keyboardIndex = $state(-1);
+
+  const activeRowId = $derived(
+    keyboardIndex >= 0 && keyboardIndex < filtered.length
+      ? `project-row-${filtered[keyboardIndex].slug}`
+      : undefined,
+  );
+
+  function scrollIndexIntoView(index: number) {
+    if (!listEl) return;
+    const top = index * ROW_HEIGHT;
+    const bottom = top + ROW_HEIGHT;
+    if (top < listEl.scrollTop) listEl.scrollTop = top;
+    else if (bottom > listEl.scrollTop + listEl.clientHeight) {
+      listEl.scrollTop = bottom - listEl.clientHeight;
+    }
+  }
+
+  function moveKeyboardIndex(to: number) {
+    if (filtered.length === 0) return;
+    const clamped = Math.max(0, Math.min(filtered.length - 1, to));
+    keyboardIndex = clamped;
+    scrollIndexIntoView(clamped);
+  }
+
+  function handleListKeys(event: KeyboardEvent) {
+    const page = Math.max(1, Math.floor(viewportHeight / ROW_HEIGHT) - 1);
+    const from = keyboardIndex < 0 ? -1 : keyboardIndex;
+    switch (event.key) {
+      case "ArrowDown":
+        moveKeyboardIndex(from + 1);
+        break;
+      case "ArrowUp":
+        moveKeyboardIndex(from <= 0 ? 0 : from - 1);
+        break;
+      case "PageDown":
+        moveKeyboardIndex(from + page);
+        break;
+      case "PageUp":
+        moveKeyboardIndex(from - page);
+        break;
+      case "Home":
+        moveKeyboardIndex(0);
+        break;
+      case "End":
+        moveKeyboardIndex(filtered.length - 1);
+        break;
+      case "Enter":
+      case " ":
+        if (keyboardIndex >= 0 && keyboardIndex < filtered.length) {
+          void handleSelectProject(filtered[keyboardIndex].slug);
+        } else {
+          return;
+        }
+        break;
+      default:
+        return;
+    }
+    // Only reached when a key above was handled: the arrows would otherwise
+    // scroll the list underneath the position they just moved.
+    event.preventDefault();
+  }
+
+  /** Down from the search box walks into the list: type, arrow, Enter. */
+  function handleSearchKeys(event: KeyboardEvent) {
+    if (event.key !== "ArrowDown" && event.key !== "Enter") return;
+    if (filtered.length === 0) return;
+    event.preventDefault();
+    listEl?.focus();
+    if (keyboardIndex < 0) moveKeyboardIndex(0);
+    if (event.key === "Enter") {
+      void handleSelectProject(filtered[Math.max(0, keyboardIndex)].slug);
+    }
+  }
+
+  // A narrowed list makes the old position meaningless.
+  $effect(() => {
+    void debouncedProjectFilter;
+    void onlyCached;
+    keyboardIndex = -1;
+  });
+
   const totalHeight = $derived(filtered.length * ROW_HEIGHT);
   const startIndex = $derived(
     Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN),
@@ -376,6 +471,7 @@
         type="search"
         placeholder={$t("loader.filterPlaceholder")}
         bind:value={projectFilter}
+        onkeydown={handleSearchKeys}
       />
     </div>
 
@@ -426,21 +522,32 @@
       </div>
     {/if}
 
+    <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
     <div
       class="list virtual-list"
       data-testid="project-virtual-list"
+      role="listbox"
+      tabindex="0"
+      aria-label={$t("loader.projectListLabel")}
+      aria-activedescendant={activeRowId}
       bind:this={listEl}
       bind:clientHeight={viewportHeight}
       onscroll={handleListScroll}
+      onkeydown={handleListKeys}
     >
       {#if filtered.length === 0}
         <div class="empty">{$t("loader.noMatches")}</div>
       {:else}
         <div class="virtual-spacer" style={`height: ${totalHeight}px`}>
           {#each visibleRows as row (row.project.slug)}
-            <button
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <div
               class="virtual-row list-item"
+              id={`project-row-${row.project.slug}`}
+              role="option"
+              aria-selected={selectedSlug === row.project.slug}
               class:active={selectedSlug === row.project.slug}
+              class:keyed={activeRowId === `project-row-${row.project.slug}`}
               style={`top: ${row.top}px`}
               onclick={() => handleSelectProject(row.project.slug)}
             >
@@ -453,7 +560,7 @@
                   >{$t("loader.cachedBadge")}</span
                 >
               {/if}
-            </button>
+            </div>
           {/each}
         </div>
       {/if}
@@ -689,6 +796,18 @@
 
   .refresh-hint.offline {
     color: hsl(var(--destructive));
+  }
+
+  /* The keyboard position is not DOM focus — the list holds that — so it
+     needs a mark of its own, distinct from the selected row. */
+  .list-item.virtual-row.keyed {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  .virtual-list:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
   }
 
   .stop-refresh-btn {

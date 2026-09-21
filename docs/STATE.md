@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **numbers that mean something** (2026-09-21) — a one-point
-track stopped claiming a distance and a duration, and the catalogue refresh
-says how far it has got; after nothing typed in English, where the map's point
+Last merged slice: **walking the catalogue by keyboard** (2026-09-21) — type,
+Down, Enter reaches a search in a thirteen-thousand-row virtualized list that
+could never have a tab order; after numbers that mean something, where a
+one-point track stopped claiming a distance and a duration, and the catalogue
+refresh says how far it has got, and after nothing typed in English, where the map's point
 context menu and eight other literals were translated, and a test now fails on
 the next one written into a component, and after the rows speaking Russian, where the library
 rows' tooltips and accessible names were English inside a Russian window, which
@@ -63,7 +65,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 300 Rust tests and 362 frontend tests;
+rustfmt, clippy, type-checks, 300 Rust tests and 367 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

@@ -118,7 +118,9 @@ and the palette slice; these were not.
   hint states how many projects are listed so far, which is what the decision
   to stop is actually made on — a page number would have said less. Still open:
   the localStorage cache only ever grows.
-- **Small targets and no keyboard path.** 28px rows, 10px badges, and the
-  virtualized list renders only the visible rows, so there is no tab order over
-  the catalogue and screen readers see a handful of buttons out of thirteen
-  thousand.
+- **Small targets.** 28px rows and 10px badges in the catalogue. The keyboard
+  half of this is done on 2026-09-21 in `walk-the-catalogue-by-keyboard`: the
+  list is a listbox with an `aria-activedescendant` position, walked with the
+  arrows and opened with Enter, so a screen reader is no longer looking at a
+  handful of buttons out of thirteen thousand. The row and badge sizes are
+  still a design decision the owner has not made.

@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — walking the catalogue by keyboard
+
+Thirteen thousand rows, and only the twenty on screen exist in the document.
+There was no tab order over that and there never can be one, so finding a
+search meant the trackpad, and a screen reader saw a handful of buttons out of
+thirteen thousand.
+
+Typing part of the name already narrowed the list. What was missing was the
+rest of the gesture. Now: type, Down, Enter.
+
+The shape matters here. Moving DOM focus row by row would fight the windowing —
+most of the rows a position passes through are not rendered — so the list holds
+focus itself and names the row it is on with `aria-activedescendant`, and the
+position is an index into the filtered array rather than into what happens to
+be drawn. Arrows move it, Page Up and Down by a screenful, Home and End to the
+ends; it stops at both, and the list scrolls to keep it in view. Changing the
+filter clears it, because it no longer points at anything the operator chose.
+
+It also needed a mark of its own: the keyboard position is not DOM focus, and
+it is not the selected row either. Three different things, three different
+looks.
+
+| | |
+|---|---|
+| Evidence | five behavioural tests: pointing, both ends, Enter, Enter before any row, walking in from the search box |
+| Evidence | walked on the stand — End reaches the last search, its outline computes to 3px, and Enter fires `preview_project` for that slug |
+| Automated gates | `just ci` green (300 Rust, 367 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — numbers that mean something
 
 Two numbers on screen that say nothing.
