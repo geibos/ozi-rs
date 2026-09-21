@@ -71,7 +71,6 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "cancel_project_listing",
   "trim_track_at_point",
   "export_gpx",
-  "export_all_tracks_gpx",
   "export_track_plt",
   "export_gpx_waypoints",
   "export_wpt_waypoints",
@@ -181,6 +180,12 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
     playBundleDownload(id, requestedFailure() === "download");
     return id;
   },
+  // Answers with counts, not "accepted": the Tracks tab reads them into the
+  // toast, and a stub that returned nothing crashed on `.tracks`.
+  export_all_tracks_gpx: () => ({
+    tracks: tracksListFixture.length,
+    waypoints: waypointsFixture.length,
+  }),
   open_local_bundle: () => "",
   // The catalogue arrives as a stream, so the stand sends one: the cached
   // chunk first, then the walk's boundaries around the walk's own chunk. The

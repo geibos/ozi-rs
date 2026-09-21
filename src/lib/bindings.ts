@@ -178,9 +178,9 @@ async exportGpx(layerId: number, path: string) : Promise<Result<null, string>> {
 }
 },
 /**
- * Export every track in the project to one GPX file, returning the count.
+ * Export a day's work — every track and every mark — to one GPX file.
  */
-async exportAllTracksGpx(path: string) : Promise<Result<number, string>> {
+async exportAllTracksGpx(path: string) : Promise<Result<DayExportDto, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("export_all_tracks_gpx", { path }) };
 } catch (e) {
@@ -596,6 +596,10 @@ listing_busy: boolean;
  */
 bundle_busy: boolean; downloading_maps: string[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
 export type BundleEntryDto = { name: string; is_dir: boolean; size_bytes: number | null }
+/**
+ * What a day's export wrote, so the interface can say it.
+ */
+export type DayExportDto = { tracks: number; waypoints: number }
 export type DiagnosticDto = { level: string; message: string }
 /**
  * Lat/lon bounding box for extent crops — the current map viewport.

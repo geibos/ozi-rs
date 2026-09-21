@@ -10,6 +10,46 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the day's marks go with it
+
+«Выгрузить всё…» wrote every track in the project to one GPX and stopped there.
+A day's work is not only where people walked: it is the marks they made — the
+штаб, the заброс, the point where something was found. Those live in the
+waypoint layers and were left out of the handover, so a crew exported twice,
+from two tabs, and handed over two files. GPX holds `<wpt>` and `<trk>` in the
+same document; there was never a reason for two.
+
+The export now says what it wrote — «Выгружено: треков 3, точек 3» — and a
+project of marks and no tracks exports rather than being refused. That is a
+real state: the штаб's own project, before anybody has walked anywhere, and it
+has something worth handing over. Only a project with neither is refused.
+
+While checking it, the stand turned out to be unable to show any of this. Its
+dialog stub answers "cancelled" to everything, which is the right default and
+also meant that no flow behind a file dialog — import, export, save-as, open a
+project — could be looked at at all. `standAnswerDialogsWith("/tmp/day.gpx")`
+fixes that; `standCancelDialogs()` puts it back.
+
+Measured on the stand with the dialog answered, sampling the DOM every 120 ms:
+«Выгружено: треков 3, точек 3». The first attempt read no toast at all and was
+simply mistimed — the same lesson as the download panel two slices ago, which
+is why the sampling is there.
+
+Alongside it, a smaller thing with no code in it: **PLT comes back the same.**
+Every piece of the PLT conversion had a test and the whole trip had none, which
+is exactly the shape of gap that hid the lost GPX colour. It passes as written
+— name through cp1251, both sittings, elevation through the round to whole
+feet, a timestamp and the absence of one, colour and width. The behaviour was
+already right; what was missing was saying so.
+
+| | |
+|---|---|
+| Changes | `openspec/changes/the-days-marks-go-with-it/`, `openspec/changes/plt-comes-back-the-same/` |
+| Automated gates | `just ci` green (332 Rust, 493 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the colour comes back
 
 The GPX writer has always said what colour a track is: `gpxx:DisplayColor`, the

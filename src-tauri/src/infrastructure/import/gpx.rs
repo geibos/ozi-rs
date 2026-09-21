@@ -408,8 +408,9 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("coloured.gpx");
-        crate::infrastructure::export::gpx::export_tracks_to_gpx_file(
+        crate::infrastructure::export::gpx::export_day_to_gpx_file(
             std::slice::from_ref(&track),
+            &[],
             &path,
         )
         .expect("export");
@@ -433,8 +434,9 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("almost.gpx");
-        crate::infrastructure::export::gpx::export_tracks_to_gpx_file(
+        crate::infrastructure::export::gpx::export_day_to_gpx_file(
             std::slice::from_ref(&track),
+            &[],
             &path,
         )
         .expect("export");

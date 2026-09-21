@@ -196,6 +196,13 @@ struct LizaAlertState {
     listing_cancel: Option<lizaalert::CancelToken>,
 }
 
+/// What a day's export wrote: the routes and the marks on them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DayExport {
+    pub tracks: usize,
+    pub waypoints: usize,
+}
+
 /// A file that has been fully downloaded and fsync'd inside an in-progress
 /// bundle download.
 #[derive(Debug, Clone)]
@@ -1547,27 +1554,44 @@ impl AppState {
     ///
     /// Returns the number of tracks written; an empty project is an error
     /// rather than a silently empty file.
-    pub fn export_all_tracks_gpx(&mut self, path: std::path::PathBuf) -> Result<usize, String> {
+    pub fn export_all_tracks_gpx(&mut self, path: std::path::PathBuf) -> Result<DayExport, String> {
         let tracks: Vec<crate::domain::Track> = self
             .project
             .track_layers()
             .iter()
             .flat_map(|layer| layer.tracks().iter().cloned())
             .collect();
+        // The marks belong to the handover as much as the routes do: a crew
+        // that found something put a waypoint there, and GPX carries both in
+        // one document.
+        let waypoints: Vec<crate::domain::Waypoint> = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .flat_map(|layer| layer.waypoints().iter().cloned())
+            .collect();
 
-        if tracks.is_empty() {
-            let message = "No tracks to export".to_owned();
+        if tracks.is_empty() && waypoints.is_empty() {
+            let message = "Nothing to export".to_owned();
             self.update_status(DiagnosticLevel::Error, message.clone());
             return Err(message);
         }
 
-        match crate::infrastructure::export::export_tracks_to_gpx_file(&tracks, &path) {
+        match crate::infrastructure::export::export_day_to_gpx_file(&tracks, &waypoints, &path) {
             Ok(()) => {
                 self.update_status(
                     DiagnosticLevel::Info,
-                    format!("Exported {} tracks to {}", tracks.len(), path.display()),
+                    format!(
+                        "Exported {} tracks and {} waypoints to {}",
+                        tracks.len(),
+                        waypoints.len(),
+                        path.display()
+                    ),
                 );
-                Ok(tracks.len())
+                Ok(DayExport {
+                    tracks: tracks.len(),
+                    waypoints: waypoints.len(),
+                })
             }
             Err(e) => {
                 let message = format!("Export failed: {e}");
@@ -2720,7 +2744,7 @@ mod tests {
         let path = dir.join("tracks.gpx");
         let written = state.export_all_tracks_gpx(path.clone()).expect("export");
 
-        assert_eq!(written, 3, "every track, across every layer");
+        assert_eq!(written.tracks, 3, "every track, across every layer");
         let xml = std::fs::read_to_string(&path).expect("read gpx");
         assert_eq!(xml.matches("<trk>").count(), 3);
         assert!(xml.contains("20260709-ЛИСА15"), "Cyrillic names survive");
@@ -2728,6 +2752,52 @@ mod tests {
             xml.contains("20260709-ЛИСА16"),
             "including the second layer"
         );
+    }
+
+    /// Handing the day over means the tracks and the marks made on them. A
+    /// crew that found something put a waypoint there; a file of tracks alone
+    /// leaves the one thing the штаб most wants to see out of the handover,
+    /// and GPX holds both in one document.
+    #[test]
+    fn the_days_export_carries_the_marks_as_well_as_the_tracks() {
+        let dir = temp_session_dir("export-day");
+        let mut state = AppState::new();
+        state
+            .apply_create_empty_track(LayerId::new(1), "20260708_Veter2".to_owned())
+            .expect("track");
+        state
+            .apply_add_waypoint(LayerId::new(1), 59.95243, 31.59681, "ШТАБ".to_owned())
+            .expect("waypoint");
+        state
+            .apply_add_waypoint(LayerId::new(1), 59.95194, 31.59636, "ЗАБРОС".to_owned())
+            .expect("waypoint");
+
+        let path = dir.join("day.gpx");
+        let written = state.export_all_tracks_gpx(path.clone()).expect("export");
+
+        assert_eq!(written.tracks, 1);
+        assert_eq!(written.waypoints, 2);
+        let xml = std::fs::read_to_string(&path).expect("read gpx");
+        assert_eq!(xml.matches("<trk>").count(), 1);
+        assert_eq!(xml.matches("<wpt ").count(), 2);
+        assert!(xml.contains("ШТАБ") && xml.contains("ЗАБРОС"));
+    }
+
+    /// A project of marks and no tracks is a real state — the штаб's own
+    /// project, before anybody has walked anywhere — and it has something
+    /// worth handing over.
+    #[test]
+    fn a_project_of_marks_alone_still_exports() {
+        let dir = temp_session_dir("export-marks-only");
+        let mut state = AppState::new();
+        state
+            .apply_add_waypoint(LayerId::new(1), 59.95243, 31.59681, "ШТАБ".to_owned())
+            .expect("waypoint");
+
+        let path = dir.join("marks.gpx");
+        let written = state.export_all_tracks_gpx(path.clone()).expect("export");
+        assert_eq!(written.tracks, 0);
+        assert_eq!(written.waypoints, 1);
     }
 
     #[test]

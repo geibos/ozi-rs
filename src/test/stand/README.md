@@ -40,7 +40,11 @@ needs the smoke gate.
 answer throws, with the command name and where to add it — a screen that
 renders because a mock quietly returned `undefined` is the failure this whole
 exercise exists to stop. Dialogs answer "cancelled" (the branch a screen must
-handle anyway) and nothing emits events; `standEmit` in `tauri-event.ts` lets a
+handle anyway) unless a session asks otherwise —
+`standAnswerDialogsWith("/tmp/day.gpx")` from `tauri-dialog.ts` makes the
+pickers answer that path, which is the only way to look at import, export,
+save-as or open-a-project on the stand, and `standCancelDialogs()` puts it
+back. Nothing emits events; `standEmit` in `tauri-event.ts` lets a
 console session deliver one by hand. Tile requests answer with a transparent
 pixel: the stand has no tile store, and a wall of error toasts would hide the
 screen it exists to show.

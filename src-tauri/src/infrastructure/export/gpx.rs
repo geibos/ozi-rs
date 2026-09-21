@@ -9,13 +9,38 @@ pub fn export_layer_to_gpx_file(layer: &TrackLayer, path: &Path) -> Result<(), i
     std::fs::write(path, xml)
 }
 
-/// Export every given track to one `.gpx` file on disk.
+/// Export a day's work — the tracks and the marks made on them — to one file.
 ///
-/// Importing a folder of navigators makes one layer per file, so handing the
-/// day's work to the штаб meant one export dialog per layer — the same
-/// twenty-six-clicks shape the visibility toggles had.
-pub fn export_tracks_to_gpx_file(tracks: &[Track], path: &Path) -> Result<(), io::Error> {
-    std::fs::write(path, build_gpx_xml(tracks))
+/// GPX holds `<trk>` and `<wpt>` in the same document, and a crew that found
+/// something put a waypoint there. A handover of tracks alone leaves out the
+/// one thing the штаб most wants to see.
+pub fn export_day_to_gpx_file(
+    tracks: &[Track],
+    waypoints: &[Waypoint],
+    path: &Path,
+) -> Result<(), io::Error> {
+    std::fs::write(path, build_day_gpx_xml(tracks, waypoints))
+}
+
+/// GPX XML for a day: the waypoints first, as every writer of the format puts
+/// them, then the tracks.
+pub fn build_day_gpx_xml(tracks: &[Track], waypoints: &[Waypoint]) -> String {
+    let mut out = String::new();
+
+    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    out.push_str("<gpx version=\"1.1\" creator=\"ozi-rs\"\n");
+    out.push_str("  xmlns=\"http://www.topografix.com/GPX/1/1\"\n");
+    out.push_str("  xmlns:gpxx=\"http://www.garmin.com/xmlschemas/GpxExtensions/v3\">\n");
+
+    for waypoint in waypoints {
+        write_waypoint(&mut out, waypoint);
+    }
+    for track in tracks {
+        write_track(&mut out, track);
+    }
+
+    out.push_str("</gpx>\n");
+    out
 }
 
 /// Build GPX XML for the given tracks, including Garmin color extensions.
@@ -115,8 +140,6 @@ fn write_waypoint(out: &mut String, waypoint: &Waypoint) {
     }
     out.push_str("  </wpt>\n");
 }
-
-const _: fn(&mut String, &Waypoint) = write_waypoint;
 
 fn xml_escape_into(out: &mut String, s: &str) {
     for ch in s.chars() {
@@ -233,7 +256,7 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("out.gpx");
-        super::export_tracks_to_gpx_file(std::slice::from_ref(&track), &path).expect("export");
+        super::export_day_to_gpx_file(std::slice::from_ref(&track), &[], &path).expect("export");
 
         let back = import_gpx_file(&path).expect("import what we just wrote");
         let tracks = back.tracks();

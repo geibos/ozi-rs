@@ -344,9 +344,11 @@
         filters: [{ name: "GPX", extensions: ["gpx"] }],
       } as Parameters<typeof open>[0]);
       if (!path) return;
-      const count = await exportAllTracksGpx(path as string);
+      const written = await exportAllTracksGpx(path as string);
       toast.success(
-        $i18n("tracksTab.exportAllDone").replace("{count}", String(count)),
+        $i18n("tracksTab.exportAllDone")
+          .replace("{tracks}", String(written.tracks))
+          .replace("{waypoints}", String(written.waypoints)),
       );
     } catch (err) {
       toast.error($i18n("tracksTab.exportAllFailed"), {

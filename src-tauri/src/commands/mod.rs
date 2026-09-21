@@ -1002,17 +1002,27 @@ pub fn export_gpx(
     Ok(())
 }
 
-/// Export every track in the project to one GPX file, returning the count.
+/// What a day's export wrote, so the interface can say it.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct DayExportDto {
+    pub tracks: u32,
+    pub waypoints: u32,
+}
+
+/// Export a day's work — every track and every mark — to one GPX file.
 #[tauri::command]
 #[specta::specta]
 pub fn export_all_tracks_gpx(
     path: String,
     state: State<SharedState>,
     app: AppHandle,
-) -> Result<u32, String> {
+) -> Result<DayExportDto, String> {
     let written = lock_app_state(state.inner())?.export_all_tracks_gpx(PathBuf::from(path))?;
     let _ = app.emit("state-changed", ());
-    Ok(written as u32)
+    Ok(DayExportDto {
+        tracks: written.tracks as u32,
+        waypoints: written.waypoints as u32,
+    })
 }
 
 #[tauri::command]
