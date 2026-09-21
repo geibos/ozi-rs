@@ -60,6 +60,26 @@ smoke:
 # Build the full Tauri app (debug)
 build:
     npm run tauri build -- --debug
+    @just sign-dev
+
+# Sign the debug bundle with the local development identity, when one exists.
+# Without a stable identity every rebuild is a new program to macOS, so the
+# Documents-access prompt returns on each build and blocks the window from
+# opening. Create the identity once with ./scripts/setup-dev-signing.sh.
+sign-dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    app="target/debug/bundle/macos/ozi-rs.app"
+    identity="ozi-rs Local Dev"
+    if [ ! -d "$app" ]; then exit 0; fi
+    if ! security find-identity -v -p codesigning | grep -qF "$identity"; then
+      echo "note: no '$identity' signing identity; leaving the ad-hoc signature."
+      echo "      run ./scripts/setup-dev-signing.sh to stop the repeated permission prompts."
+      exit 0
+    fi
+    codesign --force --deep --options runtime --sign "$identity" "$app"
+    codesign --verify --deep --strict "$app"
+    echo "signed $app with '$identity'"
 
 # Build the full Tauri app (release)
 release:

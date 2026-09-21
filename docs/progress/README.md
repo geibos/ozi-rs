@@ -31,21 +31,25 @@ Evidence: [`2026-09-20-visible-fixes/`](2026-09-20-visible-fixes/)
 | | |
 |---|---|
 | Before | [maps tab](2026-09-20-visible-fixes/before-maps-tab.png), [tracks tab](2026-09-20-visible-fixes/before-tracks-tab.png) |
-| After | **not captured — blocked**, see below |
-| Automated gates | `just ci` green (248 Rust, 278 frontend), `cargo audit` clean, npm audit gate clean |
-| Customer-journey smoke | not run — blocked by the same cause |
+| After | [maps tab](2026-09-20-visible-fixes/after-maps-tab.png), [tracks tab](2026-09-20-visible-fixes/after-tracks-tab.png), [row detail](2026-09-20-visible-fixes/after-tracks-rows-detail.png) |
+| Automated gates | `just ci` green (248 Rust, 281 frontend), `cargo audit` clean, npm audit gate clean, GitHub Actions green |
+| Customer-journey smoke | still owed |
 
-**Why the after-shots are missing.** The native QA harness cannot see the
-screen on this machine right now. `xcodebuild` builds WebDriverAgent fine, but
-the Mac2 driver host process dies immediately on launch, and a plain
-`screencapture` of the whole screen comes back 97.6% black with no windows
-listed by the window server — both are the signature of a revoked Screen
-Recording / Accessibility grant, most likely dropped when Xcode updated to
-26.2. Restoring it is a manual step the owner has to take (System Settings →
-Privacy & Security → Screen Recording and Accessibility → allow the terminal
-and Xcode Helper), tracked as task 0.4 of `revive-ui-cycle`.
+Confirmed on screen (2026-09-21): no straight lines across the map; every row
+carries its visibility eye, a round colour swatch, a locate button and the
+actions menu; durations read `26d 5h` and `19d 7h`; the Maps tab lists the
+active local map instead of claiming the project has none.
 
-The after-shots and the CJ smoke for this slice are owed as soon as that grant
-is back; the code changes themselves are covered by unit tests
-(`tracks_geojson_*` in `src-tauri/src/commands/mod.rs`, `maps-list.test.ts`,
-`track-duration-format.test.ts`).
+Two defects surfaced while verifying and are fixed in the same slice: the row
+list went empty because the tab still filtered for `LineString` geometry, and
+the icon utilities never applied because the legacy element defaults sat
+outside a cascade layer and therefore beat them.
+
+Still visibly wrong, not yet addressed: the orange `Format: YYYYMMDD_Callsign`
+line repeats under most rows and dominates the list; the raster's no-data area
+is filled solid black by the source map rather than left transparent.
+
+The CJ smoke is still owed. The grant returned on 2026-09-21, but every
+rebuild re-prompts for Documents access because the debug bundle is ad-hoc
+signed, so the harness needs a stable signing identity before smoke runs can
+be routine.
