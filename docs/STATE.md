@@ -85,6 +85,13 @@ dependency dropped.
   the visible text at that. WKWebView publishes a control's `aria-label`, not
   the text inside it, so the matchers read the label now and accept either
   language.
+- **The Mac2 driver host is crashing again** (2026-09-21, late). `just smoke`
+  fails at session creation with "'GET /status' cannot be proxied to Mac2
+  Driver server because its process is not running (probably crashed)", twice
+  in a row, with the Appium server up and WebDriverAgent killed beforehand.
+  The same failure appeared on 2026-09-20 and a server restart did not help it
+  then. Everything else is green: `just ci`, and the screens were verified on
+  the stand. The E2E gate is the one piece of evidence currently unavailable.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run
