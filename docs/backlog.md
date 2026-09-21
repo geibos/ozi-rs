@@ -34,6 +34,13 @@ decision.
 
 ## Engineering
 
+- **ADR-0020 asks for waypoint export to PLT, which cannot mean what it says.**
+  PLT is OziExplorer's track format — a track header and track rows, no
+  waypoint record. Its waypoint format is WPT, which is implemented. Most
+  likely the ADR meant WPT and the row in `docs/feature-status.md` has been
+  reporting a gap that does not exist. Needs the owner to confirm, and then the
+  ADR or the matrix corrected.
+
 - **The `.ozp` format has no version field and no migration path** (CJ-8). Its
   entire compatibility story is that an older file still reads. An `Option`
   field gives that for free — serde reads a missing one as `None` without being

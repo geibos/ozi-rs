@@ -129,34 +129,46 @@ Map printing is **not planned** (ADR-0023) and is intentionally absent from this
 
 ## What's Next
 
-ADR-0020 must-have items that are **not implemented** (no backend command and/or no UI),
-verified against `src-tauri/src/lib.rs::generate_handler!` and `src/components/`:
+The ADR-0020 must-have list is closed. Every item that stood here on
+2026-09-21 was built over the two days that followed, each verified against
+`src-tauri/src/lib.rs::generate_handler!`, `src/lib/api.ts` and its caller in
+`src/components/` rather than against the previous version of this list:
 
-- **Sort track points by timestamp** — no backend command, no UI (required per ADR-0020;
-  `docs/requirements.md` tracks it as required, not deferred)
-- **Crop track** by current map extent / time range / selected points — no backend, no UI
-- **On-map tools** (ADR-0020 section "On-map tools") — none exist:
-  - Distance measurement
-  - Circle with center at point/cursor and explicit radius
-  - Place waypoint by projection (azimuth + distance) from a selected point
-- **Waypoint export to GPX and PLT** — no commands (`export_gpx` exports track layers only;
-  an unwired `build_waypoint_gpx_xml` helper sits in `infrastructure/export/gpx.rs`);
-  only WPT export is implemented
-- **Open LizaAlert bundle by URL** — no URL input; only catalog browsing and local folders
-- **ZIP archive import via UI** — backend classifies ZIPs, but the import pickers filter
-  to `.gpx`/`.plt` only
-- **Track point walkthrough** — points are click-selectable, but there are no
-  next/previous controls
-- **Recent projects list** — only recent *map opens* exist (frontend localStorage in the
-  Cmd-K palette), not recent `.ozp` projects
+- **Sort track points by timestamp** — `sort_track_points`, reached from the
+  Track Inspector. It had been implemented for some time; this page said
+  otherwise until 2026-09-21.
+- **Crop track** — `crop_track_to_extent` and `crop_track_to_time`. Crop by
+  selected points arrived on 2026-09-22 as `trim_track_at_point`, in two
+  halves: trim before a point, trim after it. Two trims are a selection crop,
+  and each half is the gesture a crew actually has.
+- **On-map tools** — all three, from the command palette: distance, a geodesic
+  radius ring, and placing a waypoint by bearing and distance.
+- **Waypoint export to GPX** — `export_gpx_waypoints`, from the Waypoint
+  Inspector and the row menu, beside the OziExplorer WPT export.
+- **Open LizaAlert bundle by URL** — a catalogue link pasted into the loader's
+  search box opens that search.
+- **ZIP archive import via UI** — the import picker takes `gpx`, `plt` and
+  `zip`.
+- **Track point walkthrough** — previous and next in the points table, with the
+  position shown and the map following.
+- **Recent projects list** — `src/lib/recent-projects.ts`, offered in the
+  command palette, beside the recent-maps list it is not the same thing as.
 
-Regressions from the 2026-05-26 workspace redesign:
+What is left is not a feature list. `docs/STATE.md` holds it: archiving the
+OpenSpec changes, five decisions that are the owner's to make, FTP when they
+are ready, the customer-journey smoke gate (blocked on this machine), and the
+MapLibre 4 → 6 upgrade, which is deliberately not attempted while that gate is
+down.
 
-- **Split/join segment UI** — `split_segment`/`join_segments` backend and `api.ts`
-  wrappers exist, but no component calls them
-- **Theme picker** — `ThemePicker.svelte` is not mounted anywhere; theme cannot be
-  changed from the UI (ADR-0020 lists Catppuccin themes as in-scope)
-- **Undo/redo keyboard shortcuts** — no Ctrl+Z/Ctrl+Y bindings; palette entries only
+Regressions from the 2026-05-26 workspace redesign, re-checked 2026-09-22:
+
+- ~~Split/join segment UI~~ — the Track Inspector's segments table calls both.
+- **Theme picker** — `ThemePicker.svelte` is still imported by nothing, so the
+  theme cannot be changed from the interface, while `ui-shell` requires a
+  selector. Where the control belongs is a design decision, so it is listed
+  rather than placed; see `docs/backlog.md`.
+- ~~Undo/redo keyboard shortcuts~~ — the layout binds Cmd/Ctrl+Z and
+  Shift for redo (`handleGlobalKeydown`, `src/routes/+layout.svelte`).
 
 Other remaining work before 1.0:
 
