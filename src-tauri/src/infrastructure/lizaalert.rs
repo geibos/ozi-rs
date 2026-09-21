@@ -174,49 +174,87 @@ fn leading_prefix(rel: &str) -> (Option<u32>, &str) {
     }
 }
 
+/// Read one page of the root listing: the dated project directories on it and
+/// the URL of the next page, when the catalogue continues.
+fn parse_project_listing(
+    base_url: &str,
+    html: &str,
+) -> Result<(Vec<LizaProjectSummary>, Option<String>), String> {
+    let link_regex = Regex::new(r#"href="([^"]+)""#).map_err(|err| err.to_string())?;
+    let project_regex = Regex::new(r"^\d{4}-\d{2}-\d{2}_.+$").map_err(|err| err.to_string())?;
+
+    let mut projects = Vec::new();
+    let mut next_page = None;
+    let mut seen: Vec<String> = Vec::new();
+
+    for captures in link_regex.captures_iter(html) {
+        let Some(raw_href) = captures.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
+        let href = html_unescape(raw_href);
+
+        // The pagination cursor points at the listing itself with a query, so
+        // it is not a child entry and `resolve_listing_href` rejects it.
+        if next_page.is_none()
+            && let Some(query) = href.split_once("?after=").map(|(_, cursor)| cursor)
+        {
+            next_page = Some(format!("{base_url}?after={query}"));
+        }
+
+        let Some(url) = resolve_listing_href(base_url, raw_href) else {
+            continue;
+        };
+        if !url.ends_with('/') {
+            continue;
+        }
+        let Some(slug) = decode_entry_name(&url) else {
+            continue;
+        };
+        if !project_regex.is_match(&slug) || seen.contains(&slug) {
+            continue;
+        }
+        seen.push(slug.clone());
+        projects.push(LizaProjectSummary {
+            name: slug.replace('_', " "),
+            slug,
+            url,
+        });
+    }
+
+    Ok((projects, next_page))
+}
+
+/// Walk the paginated root listing, reporting each page as it arrives.
+///
+/// The catalogue is served a page at a time with an opaque cursor; stopping at
+/// the first page silently truncates it to the newest few dozen projects.
 pub fn fetch_project_summaries_streaming<F>(
     mut on_chunk: F,
 ) -> Result<Vec<LizaProjectSummary>, String>
 where
     F: FnMut(Vec<LizaProjectSummary>),
 {
-    let html = fetch_text(ROOT_URL)?;
-    let link_regex =
-        Regex::new(r#"href="([^"]+)"[^>]*>([^<]+)</a>"#).map_err(|err| err.to_string())?;
-    let project_regex = Regex::new(r"^\d{4}-\d{2}-\d{2}_.+/$").map_err(|err| err.to_string())?;
+    /// Guard against a server that keeps handing out cursors.
+    const MAX_PAGES: usize = 1000;
 
-    let mut projects = Vec::new();
-    let mut chunk = Vec::with_capacity(200);
+    let mut projects: Vec<LizaProjectSummary> = Vec::new();
+    let mut page_url = ROOT_URL.to_owned();
+    let mut pages = 0usize;
 
-    for captures in link_regex.captures_iter(&html) {
-        let Some(href) = captures.get(1).map(|value| value.as_str()) else {
-            continue;
-        };
-        let Some(label) = captures.get(2).map(|value| value.as_str()) else {
-            continue;
-        };
+    loop {
+        let html = fetch_text(&page_url)?;
+        let (page_projects, next_page) = parse_project_listing(ROOT_URL, &html)?;
 
-        if !project_regex.is_match(href) {
-            continue;
+        if !page_projects.is_empty() {
+            projects.extend(page_projects.iter().cloned());
+            on_chunk(page_projects);
         }
 
-        let project = LizaProjectSummary {
-            slug: label.trim_end_matches('/').to_owned(),
-            name: label.trim_end_matches('/').replace('_', " "),
-            url: format!("{ROOT_URL}{href}"),
-        };
-
-        chunk.push(project.clone());
-        projects.push(project);
-
-        if chunk.len() >= 200 {
-            on_chunk(std::mem::take(&mut chunk));
-            chunk = Vec::with_capacity(200);
+        pages += 1;
+        match next_page {
+            Some(next) if pages < MAX_PAGES && next != page_url => page_url = next,
+            _ => break,
         }
-    }
-
-    if !chunk.is_empty() {
-        on_chunk(chunk);
     }
 
     Ok(projects)
@@ -428,26 +466,22 @@ fn parse_center(text: &str) -> Result<MapCenter, String> {
 
 #[allow(dead_code)]
 fn parse_map_packages(html: &str, base_url: &str) -> Result<Vec<LizaMapPackage>, String> {
-    let link_regex = Regex::new(r#"href="([^"]+\.sqlitedb)"[^>]*>([^<]+)</a>"#)
-        .map_err(|err| err.to_string())?;
     let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
 
-    let maps = link_regex
-        .captures_iter(html)
-        .filter_map(|caps| {
-            let href = caps.get(1)?.as_str();
-            let label = caps.get(2)?.as_str();
+    let maps = parse_directory_entries(base_url, html)?
+        .into_iter()
+        .filter(|entry| !entry.is_dir && entry.name.ends_with(".sqlitedb"))
+        .filter_map(|entry| {
             let zoom = zoom_regex
-                .captures(label)
+                .captures(&entry.name)
                 .and_then(|captures| captures.get(1))?
                 .as_str()
                 .parse::<u8>()
                 .ok()?;
-
             Some(LizaMapPackage {
-                name: label.to_owned(),
-                file_name: label.to_owned(),
-                url: format!("{base_url}{href}"),
+                name: entry.name.clone(),
+                file_name: entry.name,
+                url: entry.url,
                 base_zoom: zoom,
                 local_path: None,
             })
@@ -755,10 +789,46 @@ pub async fn open_project_async(
 /// only download. Offline: falls back to the fully cached view. OZI rasters
 /// appear in the preview only when already extracted locally — remote OZI
 /// archives are listed after a real open.
+/// Collect the downloadable `.sqlitedb` maps a project offers.
+///
+/// A project page lists folders and archives, not maps: the Android/iOS tile
+/// databases live one level down (`8-Android&iOS/` by the bundle convention).
+/// Reading only the project page therefore returned nothing, and selecting a
+/// project showed an empty map list.
+fn fetch_remote_sqlite_maps(
+    project_url: &str,
+    project_listing: &str,
+) -> Result<Vec<LizaMapPackage>, String> {
+    /// A bundle has a handful of folders; the cap only stops a pathological page.
+    const MAX_SUBDIRECTORIES: usize = 8;
+
+    let mut maps = parse_map_packages(project_listing, project_url)?;
+    if !maps.is_empty() {
+        return Ok(maps);
+    }
+
+    let subdirectories: Vec<DirectoryEntry> =
+        parse_directory_entries(project_url, project_listing)?
+            .into_iter()
+            .filter(|entry| entry.is_dir)
+            .take(MAX_SUBDIRECTORIES)
+            .collect();
+
+    for directory in subdirectories {
+        // A folder that cannot be read is not fatal: another may hold the maps.
+        let Ok(listing) = fetch_text(&directory.url) else {
+            continue;
+        };
+        maps.extend(parse_map_packages(&listing, &directory.url)?);
+    }
+
+    Ok(maps)
+}
+
 pub fn preview_project(summary: LizaProjectSummary, root: &Path) -> Result<LizaProject, String> {
     match fetch_text(&summary.url) {
         Ok(listing) => {
-            let mut maps = parse_map_packages(&listing, &summary.url)?;
+            let mut maps = fetch_remote_sqlite_maps(&summary.url, &listing)?;
             let zoom_regex = Regex::new(r"_z(\d+)\.sqlitedb$").map_err(|err| err.to_string())?;
             let cached: Vec<LizaMapPackage> =
                 read_cached_sqlite_map_packages(root, &summary.slug, &zoom_regex)?;
@@ -776,13 +846,14 @@ pub fn preview_project(summary: LizaProjectSummary, root: &Path) -> Result<LizaP
                 .map_err(|err| err.to_string())?
                 .captures(&listing)
                 .and_then(|c| c.get(1).map(|m| m.as_str().to_owned()));
-            let center = match center_href {
-                Some(href) => parse_center(&fetch_text(&format!("{}{href}", summary.url))?)?,
-                None => {
-                    let local = project_coordinates_path(root, &summary.slug);
-                    parse_center(&read_text_file_lossy(&local).map_err(|e| e.to_string())?)?
-                }
-            };
+            let center =
+                match center_href.and_then(|href| resolve_listing_href(&summary.url, &href)) {
+                    Some(url) => parse_center(&fetch_text(&url)?)?,
+                    None => {
+                        let local = project_coordinates_path(root, &summary.slug);
+                        parse_center(&read_text_file_lossy(&local).map_err(|e| e.to_string())?)?
+                    }
+                };
             Ok(LizaProject {
                 summary,
                 center,
@@ -806,8 +877,8 @@ fn collect_remote_files_rel(
 ) -> Result<(), String> {
     let html = fetch_text(url)?;
 
-    for entry in parse_directory_entries(&html)? {
-        let child_url = format!("{url}{}", entry.href);
+    for entry in parse_directory_entries(url, &html)? {
+        let child_url = entry.url.clone();
         let child_path = local_dir.join(&entry.name);
         let child_rel = if rel_prefix.is_empty() {
             entry.name.clone()
@@ -910,35 +981,32 @@ async fn cancel_wait(cancel: &CancelToken) {
     }
 }
 
-fn parse_directory_entries(html: &str) -> Result<Vec<DirectoryEntry>, String> {
-    let link_regex =
-        Regex::new(r#"href="([^"]+)"[^>]*>([^<]+)</a>"#).map_err(|err| err.to_string())?;
-    let mut entries = link_regex
-        .captures_iter(html)
-        .filter_map(|captures| {
-            let href = captures.get(1)?.as_str().trim();
-            let label = captures.get(2)?.as_str().trim();
-            let fallback_name = label.trim_end_matches('/').trim();
-            let name = decode_entry_name(href).unwrap_or_else(|| fallback_name.to_owned());
+fn parse_directory_entries(base_url: &str, html: &str) -> Result<Vec<DirectoryEntry>, String> {
+    // Match the href only. The listing wraps the file name in an icon
+    // `<span>`, so any pattern that expects text straight after `<a ...>`
+    // matches nothing on the markup the site serves.
+    let link_regex = Regex::new(r#"href="([^"]+)""#).map_err(|err| err.to_string())?;
 
-            if href.is_empty()
-                || label.is_empty()
-                || href == "../"
-                || href == "./"
-                || href.starts_with('?')
-                || href.starts_with('#')
-                || name.trim().is_empty()
-            {
-                return None;
-            }
-
-            Some(DirectoryEntry {
-                href: href.to_owned(),
-                name,
-                is_dir: href.ends_with('/'),
-            })
-        })
-        .collect::<Vec<_>>();
+    let mut entries: Vec<DirectoryEntry> = Vec::new();
+    for captures in link_regex.captures_iter(html) {
+        let Some(raw_href) = captures.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
+        let Some(url) = resolve_listing_href(base_url, raw_href) else {
+            continue;
+        };
+        let Some(name) = decode_entry_name(&url) else {
+            continue;
+        };
+        if name.trim().is_empty() || entries.iter().any(|e| e.url == url) {
+            continue;
+        }
+        entries.push(DirectoryEntry {
+            is_dir: url.ends_with('/'),
+            url,
+            name,
+        });
+    }
 
     entries.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(entries)
@@ -949,24 +1017,83 @@ fn decode_entry_name(href: &str) -> Option<String> {
     if raw_name.is_empty() {
         return None;
     }
+    Some(percent_decode(raw_name))
+}
 
-    let mut decoded = String::new();
-    let bytes = raw_name.as_bytes();
+/// Percent-decode into bytes first, then interpret as UTF-8.
+///
+/// Decoding byte by byte into `char` treats each byte as a code point, which
+/// turns every Cyrillic name in the catalogue into mojibake — `%D0%9B` is one
+/// letter, not two.
+fn percent_decode(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut index = 0;
-
     while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
-            let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok()?;
-            let value = u8::from_str_radix(hex, 16).ok()?;
-            decoded.push(value as char);
+        if bytes[index] == b'%'
+            && index + 2 < bytes.len()
+            && let Some(value) = std::str::from_utf8(&bytes[index + 1..index + 3])
+                .ok()
+                .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+        {
+            out.push(value);
             index += 3;
-        } else {
-            decoded.push(bytes[index] as char);
-            index += 1;
+            continue;
         }
+        out.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Undo the HTML escaping the listing applies to hrefs and labels.
+fn html_unescape(value: &str) -> String {
+    value
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+}
+
+/// Turn a listing href into the absolute URL of a child entry, or `None` when
+/// the link is not one.
+///
+/// The catalogue serves absolute hrefs (`/maps/<project>/<file>`); it used to
+/// serve relative ones, and both must work. Anything that is not below
+/// `base_url` — the parent listing, `/login`, stylesheets, the pagination
+/// cursor, another host — is navigation, not content.
+fn resolve_listing_href(base_url: &str, href: &str) -> Option<String> {
+    let href = html_unescape(href.trim());
+    if href.is_empty()
+        || href.starts_with('#')
+        || href.starts_with('?')
+        || href.starts_with("mailto:")
+        || href.starts_with("javascript:")
+        || href == "../"
+        || href == "./"
+    {
+        return None;
     }
 
-    Some(decoded)
+    let absolute = if href.starts_with("http://") || href.starts_with("https://") {
+        href
+    } else if let Some(path) = href.strip_prefix('/') {
+        let origin_end = base_url.find("://").map(|i| i + 3)?;
+        let origin = match base_url[origin_end..].find('/') {
+            Some(slash) => &base_url[..origin_end + slash],
+            None => base_url,
+        };
+        format!("{origin}/{path}")
+    } else {
+        format!("{base_url}{href}")
+    };
+
+    // A child entry lives below the listing; equal-or-shorter means parent.
+    if absolute.len() <= base_url.len() || !absolute.starts_with(base_url) {
+        return None;
+    }
+    Some(absolute)
 }
 
 fn read_text_file_lossy(path: &Path) -> Result<String, std::io::Error> {
@@ -1151,7 +1278,8 @@ fn project_extracted_root(root: &Path, project_slug: &str) -> PathBuf {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DirectoryEntry {
-    href: String,
+    /// Absolute URL of the entry, already resolved against the listing.
+    url: String,
     name: String,
     is_dir: bool,
 }
@@ -1335,6 +1463,7 @@ mod tests {
         decode_text_bytes, load_cached_project_from_root, materialize_cached_ozi_archives,
         parse_center, parse_directory_entries, parse_map_packages, read_text_file_lossy,
     };
+    use super::{parse_project_listing, resolve_listing_href};
     use crate::application::LizaProjectSummary;
     use std::fs;
     use std::io::{Cursor, Write};
@@ -1362,6 +1491,208 @@ mod tests {
         assert_eq!(maps[0].local_path, None);
     }
 
+    /// Markup served by maps.lizaalert.ru as of 2026-09-21: the file name sits
+    /// after an icon `<span>` inside the anchor, and every href is absolute.
+    /// The previous parser matched `>text</a>` directly after the tag, so it
+    /// found nothing at all and the app reported an empty catalogue.
+    const PROJECT_PAGE_HTML: &str = r##"
+        <tbody><tr>
+          <td><a href="/maps/2026-09-20_Schuvalovo/9-Map_4_print/"><span aria-hidden="true">📁</span> 9-Map_4_print</a></td>
+          <td>Папка</td><td><time>20.09.2026 17:09 UTC</time></td>
+        </tr><tr>
+          <td><a href="/maps/2026-09-20_Schuvalovo/8-Android&amp;iOS/"><span aria-hidden="true">📁</span> 8-Android&amp;iOS</a></td>
+          <td>Папка</td><td><time>20.09.2026 17:09 UTC</time></td>
+        </tr><tr>
+          <td><a href="/maps/2026-09-20_Schuvalovo/6-Ozi%28Win&amp;Android%29_Satell.zip"><span aria-hidden="true">↓</span> 6-Ozi(Win&amp;Android)_Satell.zip</a></td>
+          <td>54.0 МиБ</td><td><time>20.09.2026 17:26 UTC</time></td>
+        </tr></tbody>
+        <a href="/maps/">Все файлы</a>
+        <a href="/login">Администрирование</a>
+        <link rel="stylesheet" href="/assets/app.css">
+    "##;
+
+    /// Hits the live catalogue, so it is not part of `just ci`.
+    /// Run with: cargo test --manifest-path src-tauri/Cargo.toml --lib
+    ///   live_catalogue -- --ignored --nocapture
+    #[test]
+    #[ignore = "requires network access to maps.lizaalert.ru"]
+    fn live_catalogue_lists_projects_and_a_project_lists_its_maps() {
+        let mut pages = 0usize;
+        let projects = super::fetch_project_summaries_streaming(|chunk| {
+            pages += 1;
+            if pages == 1 {
+                println!("first chunk: {} projects", chunk.len());
+            }
+        })
+        .expect("catalogue");
+        println!("catalogue: {} projects over {pages} chunks", projects.len());
+        assert!(
+            projects.len() > 1000,
+            "the catalogue is paginated; stopping at page one truncates it to {}",
+            projects.len()
+        );
+
+        let newest = projects.first().expect("at least one project").clone();
+        println!("previewing {} ({})", newest.slug, newest.url);
+        let temp = std::env::temp_dir().join("ozi-rs-live-preview");
+        let project = super::preview_project(newest, &temp).expect("preview");
+        println!(
+            "maps: {:?}",
+            project
+                .maps
+                .iter()
+                .map(|m| &m.file_name)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            !project.maps.is_empty(),
+            "selecting a project must list its maps"
+        );
+    }
+
+    #[test]
+    fn directory_entries_read_the_listing_markup_the_site_serves_now() {
+        let base = "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/";
+        let entries = parse_directory_entries(base, PROJECT_PAGE_HTML).expect("entries");
+
+        let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec![
+                "6-Ozi(Win&Android)_Satell.zip",
+                "8-Android&iOS",
+                "9-Map_4_print"
+            ],
+            "names come from the href, decoded, not from the anchor text"
+        );
+
+        let zip = entries
+            .iter()
+            .find(|e| e.name.ends_with(".zip"))
+            .expect("zip entry");
+        assert!(!zip.is_dir);
+        assert_eq!(
+            zip.url,
+            "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/6-Ozi%28Win&Android%29_Satell.zip",
+            "an absolute href must not be concatenated onto the base url"
+        );
+        assert!(entries.iter().filter(|e| e.is_dir).count() == 2);
+    }
+
+    #[test]
+    fn directory_entries_ignore_navigation_assets_and_the_parent_listing() {
+        let base = "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/";
+        let entries = parse_directory_entries(base, PROJECT_PAGE_HTML).expect("entries");
+        assert!(
+            entries
+                .iter()
+                .all(|e| !e.url.contains("/login") && !e.url.contains("/assets/")),
+            "navigation and stylesheets are not directory entries"
+        );
+        assert!(
+            entries.iter().all(|e| e.url.len() > base.len()),
+            "the parent listing link is not an entry"
+        );
+    }
+
+    #[test]
+    fn resolve_listing_href_handles_absolute_relative_and_foreign_links() {
+        let base = "https://maps.lizaalert.ru/maps/2026-09-20_X/";
+        assert_eq!(
+            resolve_listing_href(base, "/maps/2026-09-20_X/file.zip").as_deref(),
+            Some("https://maps.lizaalert.ru/maps/2026-09-20_X/file.zip")
+        );
+        // Relative hrefs are what the site used to serve; they must keep working.
+        assert_eq!(
+            resolve_listing_href(base, "file.zip").as_deref(),
+            Some("https://maps.lizaalert.ru/maps/2026-09-20_X/file.zip")
+        );
+        assert_eq!(resolve_listing_href(base, "/maps/"), None, "parent");
+        assert_eq!(resolve_listing_href(base, "../"), None, "parent");
+        assert_eq!(resolve_listing_href(base, "/login"), None, "outside base");
+        assert_eq!(resolve_listing_href(base, "?after=x"), None, "pagination");
+        assert_eq!(resolve_listing_href(base, "#top"), None, "fragment");
+        assert_eq!(
+            resolve_listing_href(base, "https://example.test/evil.zip"),
+            None,
+            "another host"
+        );
+    }
+
+    /// The root listing is paginated now: one page carries part of the
+    /// catalogue and a "Следующая страница" link with an opaque cursor.
+    const ROOT_LISTING_HTML: &str = r##"
+        <tbody><tr>
+          <td><a href="/maps/2026-09-20_Schuvalovo/"><span aria-hidden="true">📁</span> 2026-09-20_Schuvalovo</a></td>
+        </tr><tr>
+          <td><a href="/maps/2026-09-20_Orlovo/"><span aria-hidden="true">📁</span> 2026-09-20_Orlovo</a></td>
+        </tr><tr>
+          <td><a href="/maps/%21RAZNOE/"><span aria-hidden="true">📁</span> !RAZNOE</a></td>
+        </tr><tr>
+          <td><a href="/maps/tracks/"><span aria-hidden="true">📁</span> tracks</a></td>
+        </tr></tbody>
+        <a class="button-link secondary-link" href="/maps/?after=eyJ2IjoxfQ">Следующая страница</a>
+    "##;
+
+    #[test]
+    fn project_listing_reads_dated_projects_and_the_next_page_cursor() {
+        let base = "https://maps.lizaalert.ru/maps/";
+        let (projects, next) = parse_project_listing(base, ROOT_LISTING_HTML).expect("listing");
+
+        let slugs: Vec<&str> = projects.iter().map(|p| p.slug.as_str()).collect();
+        assert_eq!(
+            slugs,
+            vec!["2026-09-20_Schuvalovo", "2026-09-20_Orlovo"],
+            "only dated project directories, in page order"
+        );
+        assert_eq!(projects[0].name, "2026-09-20 Schuvalovo");
+        assert_eq!(
+            projects[0].url,
+            "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/"
+        );
+        assert_eq!(
+            next.as_deref(),
+            Some("https://maps.lizaalert.ru/maps/?after=eyJ2IjoxfQ"),
+            "the walk must follow the cursor or it stops at the first page"
+        );
+    }
+
+    #[test]
+    fn project_listing_reports_no_cursor_on_the_last_page() {
+        let base = "https://maps.lizaalert.ru/maps/";
+        let html = r##"<a href="/maps/2026-09-20_Last/"><span>📁</span> 2026-09-20_Last</a>"##;
+        let (projects, next) = parse_project_listing(base, html).expect("listing");
+        assert_eq!(projects.len(), 1);
+        assert!(next.is_none());
+    }
+
+    #[test]
+    fn map_packages_are_read_from_the_current_markup() {
+        let base = "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/8-Android&iOS/";
+        let html = r##"
+          <td><a href="/maps/2026-09-20_Schuvalovo/8-Android&amp;iOS/2026-09-20_Schuvalovo_Topo_GGC_z16.sqlitedb"><span aria-hidden="true">↓</span> 2026-09-20_Schuvalovo_Topo_GGC_z16.sqlitedb</a></td>
+          <td><a href="/maps/2026-09-20_Schuvalovo/8-Android&amp;iOS/2026-09-20_Schuvalovo_Satell_z17.sqlitedb"><span aria-hidden="true">↓</span> 2026-09-20_Schuvalovo_Satell_z17.sqlitedb</a></td>
+        "##;
+
+        let maps = parse_map_packages(html, base).expect("maps");
+        assert_eq!(maps.len(), 2);
+        // Entries come back sorted by name, not in page order.
+        let satell = maps
+            .iter()
+            .find(|m| m.file_name.contains("Satell"))
+            .expect("satellite map");
+        let topo = maps
+            .iter()
+            .find(|m| m.file_name.contains("Topo"))
+            .expect("topo map");
+        assert_eq!(satell.base_zoom, 17);
+        assert_eq!(topo.base_zoom, 16);
+        assert_eq!(
+            topo.url,
+            "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/8-Android&iOS/2026-09-20_Schuvalovo_Topo_GGC_z16.sqlitedb"
+        );
+    }
+
     #[test]
     fn parse_directory_entries_skips_parent_links_and_marks_directories() {
         let html = r#"
@@ -1370,7 +1701,8 @@ mod tests {
             <a href="5-Ozi.zip">5-Ozi.zip</a>
         "#;
 
-        let entries = parse_directory_entries(html).expect("entries");
+        let entries =
+            parse_directory_entries("https://maps.lizaalert.ru/maps/proj/", html).expect("entries");
 
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].name, "5-Ozi.zip");
