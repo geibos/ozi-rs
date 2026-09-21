@@ -5,14 +5,17 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the bundle flow stops lying** (2026-09-21) — refusals
-carry a reason, loader failures are visible, the progress panel belongs to the
-running download, a downloaded bundle is recognised wherever its files sit, and
-Cmd-K copes with a thirteen-thousand-row catalogue — after Waypoints tab parity,
+Last merged slice: **which bundles are on disk** (2026-09-21) — the project
+list marks downloaded bundles and can show only them, the filter matches the
+slug, and a single-map download has a progress panel and a cancel — after the
+bundle flow slice (refusals carry a reason, loader failures are visible, the
+progress panel belongs to the running download, a downloaded bundle is
+recognised wherever its files sit, Cmd-K copes with the full catalogue),
+Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 276 Rust tests and 303 frontend tests;
+rustfmt, clippy, type-checks, 277 Rust tests and 311 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -22,9 +25,10 @@ rebuilds the UI development cycle rather than the UI: agents that change
 screens cannot currently see them, most frontend tests assert on source text,
 and there is one end-to-end scenario. `openspec/changes/codify-architecture-decisions`
 is written and validating but not yet archived.
-`openspec/changes/faster-track-triage`, `openspec/changes/waypoints-tab-parity`
-and `openspec/changes/honest-bundle-flow` have all their implementation tasks
-done and are ready to archive once the owner has used them in the field.
+`openspec/changes/faster-track-triage`, `openspec/changes/waypoints-tab-parity`,
+`openspec/changes/honest-bundle-flow` and `openspec/changes/see-what-is-downloaded`
+have all their implementation tasks done and are ready to archive once the owner
+has used them in the field.
 
 ## Next slice
 
@@ -34,15 +38,17 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Say what is already downloaded.** The project list shows thirteen thousand
-   identical rows; the backend knows which are cached but the summary does not
-   carry the flag. Offline this is the difference between a usable list and a
-   guess. See "Bundle flow" in `docs/backlog.md` for the rest of that survey.
-2. **A single-map download needs a panel and a cancel.** It sets neither the
-   busy flag nor a shared download id, so nothing shows it and nothing stops it.
-3. **The rest of slice 0.3** (`revive-ui-cycle` tasks 1b.2, 1b.4, 1b.5): Esc
+1. **The rest of slice 0.3** (`revive-ui-cycle` tasks 1b.2, 1b.4, 1b.5): Esc
    discarding a draw without leaving a redo entry, `qa_observe` capturing
-   again, and HTTP timeouts on both clients.
+   again, and HTTP timeouts on both clients. The timeouts matter most — a
+   stalled connection currently freezes a download with no way to tell.
+2. **How big is this download?** Map packages carry no byte size, and the
+   prominent button fetches the whole project directory rather than the chosen
+   map. On a tethered phone that is gigabytes with no estimate.
+3. **The loader Sheet hides the download it started** (overlay `z-50` over a
+   `z-40` panel), and the toaster lands in the same corner.
+
+The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 
 Done from slice 0.3 already: bundles-root persistence, export errors reaching
 the caller, `.kml` classified as unsupported, the unused `lucide-svelte`

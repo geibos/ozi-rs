@@ -307,6 +307,9 @@
         placeholder={$t("loader.filterPlaceholder")}
         bind:value={projectFilter}
       />
+    </div>
+
+    <div class="filter-row filter-row-secondary">
       <button
         class="only-cached-btn"
         class:on={onlyCached}
@@ -511,15 +514,18 @@
     color: hsl(var(--foreground));
   }
 
+  /* `flex-shrink: 0` plus `width: 100%` pushed the downloaded filter and the
+     count out of a 280px rail entirely. The input takes what is left after
+     them instead. */
   .filter-input {
-    width: 100%;
+    min-width: 0;
+    flex: 1;
     font-size: 12px;
     padding: 4px 8px;
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
     border-radius: 4px;
     color: hsl(var(--foreground));
-    flex-shrink: 0;
   }
 
   .filter-row {
@@ -527,6 +533,13 @@
     align-items: center;
     gap: 6px;
     margin: 6px 8px;
+  }
+
+  /* Second line: the downloaded filter and the match count. On one line with
+     the input they had no room in a 280px rail. */
+  .filter-row-secondary {
+    margin-top: 0;
+    justify-content: space-between;
   }
 
   .filter-count {

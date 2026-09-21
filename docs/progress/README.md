@@ -10,6 +10,39 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — which of these can I still open?
+
+Thirteen thousand four hundred and forty projects, twenty-three of them on this
+laptop. The backend had always known which — `is_project_cached` has been there
+all along — but the summary sent to the screen carried a slug and a name, so the
+one question a crew asks in a штаб with no signal had no answer.
+
+The summary carries availability now, computed with a single read of the
+bundles root rather than a question per row. The list marks what is on disk and
+can show only that. The filter matches the slug as well as the name, because
+names are transliterations and a date typed with dashes used to find nothing,
+and the count reports matches — it used to show the catalogue total, which made
+filtering look like it had done nothing.
+
+A single-map download had no panel and no way out: it minted a download id
+locally, never returned it and never set the busy flag, so nothing showed it and
+the row simply went disabled until it was over. It now registers a cancel token
+and hands its id to the same progress panel a whole-bundle download uses. Both
+paths announce when they stop, which is also where a failed download finally
+gets reported instead of just making the panel disappear.
+
+| | |
+|---|---|
+| Before | [the catalogue, undifferentiated](2026-09-21-downloaded-bundles/before-catalogue.png) |
+| After | [23 of 13440, each marked](2026-09-21-downloaded-bundles/after-downloaded-only.png) |
+| Automated gates | `just ci` green (277 Rust, 311 frontend) |
+
+Found on screen and fixed in the same slice: the filter input was `width: 100%`
+and `flex-shrink: 0`, so the new toggle and the count were pushed out of the
+280px rail entirely. They have their own line now.
+
+---
+
 ## 2026-09-21 — the way to a map stops lying
 
 A survey of the path from launching the app to having a map on screen found
