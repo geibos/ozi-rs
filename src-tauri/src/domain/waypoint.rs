@@ -31,8 +31,11 @@ pub struct Waypoint {
     ///
     /// `None` is not a colour: a waypoint that has never been coloured follows
     /// the default, so changing that default later moves every uncoloured
-    /// waypoint with it. `#[serde(default)]` so a `.ozp` written before this
-    /// existed loads with every waypoint uncoloured, which is what it meant.
+    /// waypoint with it. A `.ozp` written before this field existed loads with
+    /// every waypoint uncoloured — being an `Option` is what does that, since
+    /// serde reads a missing `Option` field as `None`; the attribute is
+    /// belt-and-braces. A non-`Option` field added here would need the
+    /// attribute for the same effect.
     #[serde(default)]
     color: Option<[u8; 4]>,
 }

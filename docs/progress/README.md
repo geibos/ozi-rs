@@ -33,10 +33,29 @@ tolerant, and nobody had checked. Now it stays that way. I removed one
 `#[serde(default)]` — from `Track.style` — and watched the test name the field
 it could no longer read.
 
+Then the same guard for the session file, which fails worse: `load_app_session`
+returns the parse error rather than `None`, so a session that will not read
+takes the restored project and the active map with it — the crew opens the app
+to an empty workspace and no explanation. A corrupt session is now distinguished
+from an absent one, because absent is a first run.
+
+**And a correction to the paragraph above.** Writing that test I removed the
+`#[serde(default)]` from `bundles_root` expecting it to fail, and it passed.
+Serde reads a missing `Option` field as `None` whether you tell it to or not.
+So the attribute on `bundles_root`, and the one on `Waypoint.color` I made much
+of yesterday, are belt-and-braces; what they are credited with, those fields
+have anyway. The rule is narrower than I wrote it: it is a **non-`Option`**
+field that needs the default, `Track.style` is one, and that is the removal
+that did make the guard fire.
+
+Two code comments and yesterday's write-up said the wrong thing and now say
+this.
+
 | | |
 |---|---|
-| Evidence | the guard, verified red by removing a default |
-| Automated gates | `just ci` green (316 Rust, 395 frontend) |
+| Evidence | the guard, verified red by removing the default from `Track.style` — which is not an `Option` and so depends on it |
+| Evidence | the session guards, and the check that disproved my own claim |
+| Automated gates | `just ci` green (318 Rust, 395 frontend) |
 
 ---
 

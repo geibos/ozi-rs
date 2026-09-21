@@ -35,8 +35,10 @@ decision.
 ## Engineering
 
 - **The `.ozp` format has no version field and no migration path** (CJ-8). Its
-  entire compatibility story is that every persisted field has a
-  `#[serde(default)]`, which a test now enforces
+  entire compatibility story is that an older file still reads. An `Option`
+  field gives that for free — serde reads a missing one as `None` without being
+  told — so the attribute on such a field proves nothing; it is a
+  **non-`Option`** field that needs `#[serde(default)]`. A test now enforces it
   (`a_project_from_an_early_build_still_loads_with_its_contents`). If a field
   ever genuinely cannot have a default, that test is where it will surface, and
   the answer then is a version and a migration rather than a weakened test.

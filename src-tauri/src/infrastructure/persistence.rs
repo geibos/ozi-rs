@@ -12,9 +12,12 @@ pub enum PersistenceError {
 pub struct PersistedAppSession {
     pub last_project_path: Option<PathBuf>,
     pub active_map: Option<PersistedActiveMap>,
-    /// Where downloaded bundles live. Absent in files written before the
-    /// field existed, which is why it defaults instead of failing the read —
-    /// a session that will not parse loses the restored project too.
+    /// Where downloaded bundles live. Absent in files written before the field
+    /// existed, and read as `None` there — serde treats a missing `Option`
+    /// field as `None` without being told to, so the `default` below is
+    /// belt-and-braces rather than the thing doing the work. A non-`Option`
+    /// field added here without one would fail the read, and a session that
+    /// will not parse loses the restored project too.
     #[serde(default)]
     pub bundles_root: Option<PathBuf>,
 }
@@ -144,7 +147,7 @@ pub fn resolve_session_path(
 
 #[cfg(test)]
 mod tests {
-    use super::{load_project, resolve_session_path, save_project};
+    use super::{load_app_session, load_project, resolve_session_path, save_project};
     use crate::domain::{LayerId, Project, TrackLayer, Waypoint, WaypointId, WaypointLayer};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -436,6 +439,55 @@ mod tests {
         let resolved = resolve_session_path(None, Some(legacy.clone()));
 
         assert_eq!(resolved, Some(legacy));
+    }
+
+    /// The session file is the other thing on disk that a field added without a
+    /// default would break, and it breaks worse: `load_app_session` returns the
+    /// parse error rather than `None`, so a session that will not read takes
+    /// the restored project and the active map with it — the crew opens the app
+    /// to an empty workspace and no explanation.
+    ///
+    /// `bundles_root` was added to this struct in slice 0.3. Note what this
+    /// test does and does not prove: removing its `#[serde(default)]` leaves
+    /// it passing, because serde reads a missing `Option` field as `None`
+    /// regardless. What it pins is the behaviour — older sessions read — which
+    /// is what matters, and it will catch a **non-`Option`** field added
+    /// without a default, which is the case that actually breaks.
+    #[test]
+    fn a_session_written_before_the_bundles_root_field_still_reads() {
+        let path = temp_path("json");
+        let older = r#"{
+            "last_project_path": "/searches/2026-09-20_Sagra.ozp",
+            "active_map": null
+        }"#;
+        std::fs::write(&path, older).expect("write the older session");
+
+        let session = load_app_session(&path)
+            .expect("an older session still reads")
+            .expect("and is present");
+
+        assert_eq!(
+            session.last_project_path.as_deref(),
+            Some(std::path::Path::new("/searches/2026-09-20_Sagra.ozp")),
+            "the project it remembered is what matters here"
+        );
+        assert_eq!(
+            session.bundles_root, None,
+            "a field it never carried reads as absent, not as a default path"
+        );
+    }
+
+    /// A session file that is genuinely corrupt is a different case from an
+    /// older one, and the caller has to be able to tell them apart.
+    #[test]
+    fn a_corrupt_session_reports_rather_than_pretending_there_is_none() {
+        let path = temp_path("json");
+        std::fs::write(&path, "{ not json").expect("write");
+
+        assert!(
+            load_app_session(&path).is_err(),
+            "unreadable is not the same as absent: absent is a first run"
+        );
     }
 
     #[test]
