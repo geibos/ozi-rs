@@ -100,7 +100,15 @@
   }
 
   // ── Group data sources ──────────────────────────────────────────────────
-  const isColdStart = $derived($currentProject === null || $activeMap === null);
+  /**
+   * "Cold start" means there is no workspace on screen — no map.
+   *
+   * It used to also require a LizaAlert project, so opening a local OZI map
+   * left the palette offering nothing but Settings: save, undo, redo and the
+   * track search were all hidden while a project with dozens of tracks was
+   * open. The bundle-specific group guards on the project itself.
+   */
+  const isColdStart = $derived($activeMap === null);
 
   const maps = $derived(
     $currentProject?.maps.filter((m) => m.downloaded).map((m) => m.name) ?? [],

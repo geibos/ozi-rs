@@ -5,12 +5,14 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **Waypoints tab parity** (2026-09-21) — search, bulk
-visibility, isolate, coordinates and a locate button on every row — after track
-triage, Russian by default, track search, catalogue repair, row density, dev
-signing and 0.2 visible fixes. `main` is pushed and
+Last merged slice: **the bundle flow stops lying** (2026-09-21) — refusals
+carry a reason, loader failures are visible, the progress panel belongs to the
+running download, a downloaded bundle is recognised wherever its files sit, and
+Cmd-K copes with a thirteen-thousand-row catalogue — after Waypoints tab parity,
+track triage, Russian by default, track search, catalogue repair, row density,
+dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 269 Rust tests and 297 frontend tests;
+rustfmt, clippy, type-checks, 276 Rust tests and 303 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -20,9 +22,9 @@ rebuilds the UI development cycle rather than the UI: agents that change
 screens cannot currently see them, most frontend tests assert on source text,
 and there is one end-to-end scenario. `openspec/changes/codify-architecture-decisions`
 is written and validating but not yet archived.
-`openspec/changes/faster-track-triage` and `openspec/changes/waypoints-tab-parity`
-have all their implementation tasks done and are ready to archive once the owner
-has used the triage controls in the field.
+`openspec/changes/faster-track-triage`, `openspec/changes/waypoints-tab-parity`
+and `openspec/changes/honest-bundle-flow` have all their implementation tasks
+done and are ready to archive once the owner has used them in the field.
 
 ## Next slice
 
@@ -32,18 +34,19 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Bundle flow.** Opening a project still means going through the cold-start
-   route; the maps list and the download popup have not been looked at since
-   the catalogue was repaired.
-2. **Repair the native-QA click path.** `appium_click` reports success without
-   the click landing, and `appium_screenshot` 404s against Appium 3.4.2, so the
-   last two slices went in on automated tests alone. Window capture works
-   (`screencapture -l <windowid>`); the missing piece is a click that lands and
-   a screenshot endpoint that matches the server.
+1. **Say what is already downloaded.** The project list shows thirteen thousand
+   identical rows; the backend knows which are cached but the summary does not
+   carry the flag. Offline this is the difference between a usable list and a
+   guess. See "Bundle flow" in `docs/backlog.md` for the rest of that survey.
+2. **A single-map download needs a panel and a cancel.** It sets neither the
+   busy flag nor a shared download id, so nothing shows it and nothing stops it.
+3. **The rest of slice 0.3** (`revive-ui-cycle` tasks 1b.2, 1b.4, 1b.5): Esc
+   discarding a draw without leaving a redo entry, `qa_observe` capturing
+   again, and HTTP timeouts on both clients.
 
-Then the correctness slice 0.3 (`revive-ui-cycle` tasks 1b.1 … 1b.8): bundles
-root persistence, Esc discarding a draw, `qa_observe`, HTTP timeouts, export
-errors surfaced.
+Done from slice 0.3 already: bundles-root persistence, export errors reaching
+the caller, `.kml` classified as unsupported, the unused `lucide-svelte`
+dependency dropped.
 
 ## Known broken
 
@@ -71,7 +74,8 @@ errors surfaced.
   reference is missing several commands. Listed in the
   `codify-architecture-decisions` design under "Findings", fixed by its task 2.6.
 
-Localization is done for the shell, the rails, the three library tabs and all
-four inspectors. What is still English: the command palette's own entries and
-the bundle loader. A test now holds both dictionaries to the same key set, so a
+Localization is done for the shell, the rails, the three library tabs, all four
+inspectors, the Maps tab and the command palette. What is still English: the
+backend's own status and progress text, which reaches the status bar verbatim
+because there is no key-based channel for it. A test now holds both dictionaries to the same key set, so a
 half-finished pass fails instead of falling back to English silently.

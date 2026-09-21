@@ -50,3 +50,46 @@ decision.
   base` now so they no longer beat component utilities, but four rules still
   lean on them. Removing them needs the screenshot matrix to prove nothing
   regresses.
+
+## Bundle flow — from the 2026-09-21 survey
+
+Found while reviewing the path from "launch the app" to "a map on screen".
+The refusal reporting, the progress-panel lifetime, the cached-bundle
+detection and the palette's project list were fixed in `honest-bundle-flow`
+and the palette slice; these were not.
+
+- **The project list does not say what is already on disk.** `LizaProjectSummaryDto`
+  carries only slug and name, although the backend has `is_project_cached`.
+  Offline, a crew cannot tell which of thirteen thousand projects they can
+  actually open. Needs a `cached` flag on the summary and a badge in the list.
+- **No size before committing to a download.** Map packages carry no byte size,
+  and the prominent button downloads the whole project directory recursively,
+  not the selected map. On a tethered phone that is potentially gigabytes with
+  no estimate and no disk-space check.
+- **A single-map download has no panel and cannot be cancelled.** `open_selected_map`
+  mints its own download id, never returns it and never sets busy, so neither
+  the progress popup nor the cancel button appears; the row is disabled while it
+  runs, so there is no way out.
+- **The loader Sheet hides the download it started.** The Sheet overlay is
+  `z-50`, the download popup `z-40`, and the toaster sits in the same corner.
+  Opening the loader to queue the next map blocks the map and hides the running
+  download.
+- **The filter matches names only and miscounts.** Project names are latin
+  transliterations, so a Cyrillic query finds nothing, and the count beside the
+  box shows the catalogue total rather than the number of matches. No sort, no
+  "recent", no jump to today's search.
+- **The preview timeout is a lie.** After fifteen seconds the spinner clears but
+  the request keeps running and can replace the map list later; two previews
+  race with no ordering, and completion is detected by comparing display names.
+- **Filter and selection do not survive closing the loader**, because the Sheet
+  unmounts the component and both live in component state.
+- **Backend status and progress text is English** and reaches the screen
+  verbatim — there is no key-based channel for it, so the status bar and the
+  bundle phases stay untranslated.
+- **The catalogue is walked in full at every launch**, holding the busy flag,
+  with no page counter and no way to stop it; the localStorage cache only ever
+  grows.
+- **Small targets and no keyboard path.** 28px rows, 10px badges, and the
+  virtualized list renders only the visible rows, so there is no tab order over
+  the catalogue and screen readers see a handful of buttons out of thirteen
+  thousand.

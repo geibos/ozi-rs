@@ -10,6 +10,49 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the way to a map stops lying
+
+A survey of the path from launching the app to having a map on screen found
+that the parts a crew leans on say nothing when they fail and the wrong thing
+when they succeed.
+
+- The only download button is refused while the catalogue walk holds the busy
+  flag — minutes, now that the listing paginates — and the refusal was
+  indistinguishable from success. It carries a reason now, and the button is
+  disabled and says it is waiting.
+- Preview, download and local-bundle failures were swallowed by empty catches
+  while the error reporter is off outside dev builds. They are toasts.
+- The progress panel was never released when a download finished, so it came
+  back with stale rows the next time anything made the app busy.
+- Opening a map left the "show the loader" flag set, so the loader reopened
+  over the map that had just been opened.
+- The catalogue repair taught the remote walk to find `.sqlitedb` files in any
+  subdirectory; the local mirror still read one fixed folder, so a bundle kept
+  elsewhere read as missing and was downloaded a second time. The coordinates
+  file is matched by pattern now too, as it already was online.
+
+Cmd-K was handed every one of the ~13 000 catalogue projects and re-filtered
+all of them on each keystroke; it now gets a filtered screenful, and "switch
+project" actually selects the project in the loader instead of dropping the
+operator at the top of the list with a toast.
+
+Found while verifying: with a locally opened OZI map and no LizaAlert project,
+the palette treated the workspace as a cold start and offered nothing but
+Settings — save, undo, redo and the track search were all hidden with 26 tracks
+on screen. It keys on the active map now.
+
+| | |
+|---|---|
+| After | [command palette](2026-09-21-bundle-flow/after-palette.png), [maps tab in Russian](2026-09-21-bundle-flow/after-maps-tab.png) |
+| Automated gates | `just ci` green (276 Rust, 303 frontend) |
+
+Also translated in this pass: the Maps tab, the command palette, and all four
+inspectors. What stays English is the backend's own status and progress text,
+which reaches the status bar verbatim — there is no key-based channel for it
+yet.
+
+---
+
 ## 2026-09-21 — the Waypoints tab catches up
 
 The Tracks tab had been brought up to field speed; the Waypoints tab listed the
