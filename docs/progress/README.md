@@ -40,11 +40,32 @@ round trip per click is what makes a tool feel slow.
 Metres under a kilometre. "180 м", not "0.2 км": the difference between 40 and
 140 metres is the difference between two sides of a road.
 
+I deferred the drawn line as "decoration" and that was wrong. A crew clicking
+on a map at night has to see where the points went — whether the click
+registered, whether it landed on the road or beside it, what shape the thing
+they are measuring has. A running total with nothing under it is a number they
+cannot check. So: a dot at each click, a dashed line through them, in an orange
+that is neither a track colour nor a waypoint colour, so the tape never reads
+as something in the project. And Backspace takes back the last point, because
+misclicks happen and starting over because of one is worse than the misclick.
+
+That last one wanted `isEditableTarget`, which lived inside the layout. Copied,
+the two handlers would have had their own ideas of what "editable" means, which
+is how they come to disagree about a single keypress. It is a module now, with
+its own tests.
+
+One thing I could not verify, stated rather than glossed: the tape's **pixels**.
+MapLibre does not set `preserveDrawingBuffer`, so reading the canvas back after
+a frame is presented returns an empty buffer — I got zero orange pixels, and
+that zero means nothing either way. What is pinned instead is the GeoJSON the
+tape hands MapLibre, including the `lon, lat` order a map gets wrong once.
+
 | | |
 |---|---|
-| Evidence | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", two clicks on the canvas make it "101 м", Esc takes it away |
-| Evidence | seven tests on the distance and the formatting |
-| Automated gates | `just ci` green (318 Rust, 402 frontend) |
+| Evidence | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", clicks on the canvas make it "101 м" and then "146 м", Esc takes it away |
+| Evidence | tests on the distance, the formatting, the tape's GeoJSON and what counts as an editable target |
+| Not verified | the tape's rendered pixels — see above |
+| Automated gates | `just ci` green (318 Rust, 411 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

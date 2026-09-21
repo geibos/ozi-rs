@@ -43,12 +43,16 @@ describe("CJ-7 global keyboard chords (+layout.svelte)", () => {
   it("skips the chords while focus is in an editable element", () => {
     // Typing a track name must keep native text editing (Cmd+Z = text
     // undo), so the handler bails out on editable targets before the
-    // save/undo/redo branches.
-    expect(layoutSource).toContain("isEditableTarget");
+    // save/undo/redo branches. The predicate moved to `$lib/editable-target`
+    // when the measuring tool's Backspace needed the same answer — two
+    // handlers with their own idea of "editable" is how they come to disagree
+    // about one keypress. Its own test covers what counts as editable.
+    expect(layoutSource).toContain(
+      'import { isEditableTarget } from "$lib/editable-target";',
+    );
     expect(layoutSource).toContain(
       "if (isEditableTarget(event.target)) return;",
     );
-    expect(layoutSource).toContain("contenteditable");
   });
 
   it("delegates to the shared $lib/actions/project helpers", () => {

@@ -23,6 +23,7 @@
   } from "../lib/stores";
   import { loadProjects } from "../lib/api";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import { isEditableTarget } from "$lib/editable-target";
   import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import { readyMapName } from "$lib/ready-maps";
@@ -196,14 +197,6 @@
    * chords (Cmd+S / Cmd+Z / Cmd+Shift+Z) must not hijack native text
    * editing — Cmd+Z while renaming a track stays the input's own undo.
    */
-  function isEditableTarget(target: EventTarget | null): boolean {
-    const el = target instanceof HTMLElement ? target : null;
-    return Boolean(
-      el?.closest(
-        'input, textarea, select, [contenteditable="true"], [contenteditable=""]',
-      ),
-    );
-  }
 
   /**
    * Global keyboard chords (CJ-7):

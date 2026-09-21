@@ -15,10 +15,20 @@ when the tool is switched off. A measurement worth keeping is a track.
 
 A measured distance SHALL be shown in metres below a kilometre.
 
+The points clicked SHALL be drawn on the map, joined in the order they were
+clicked and distinguishable from anything belonging to the project, so that the
+operator can see where each click landed and whether it landed at all. The last
+point SHALL be removable without ending the measurement.
+
 #### Scenario: Measuring a leg
 
 - **WHEN** the operator turns the tool on and clicks two points on the map
 - **THEN** the distance between them is shown, in metres if it is under a kilometre
+
+#### Scenario: A misclick
+
+- **WHEN** the operator removes the last measured point
+- **THEN** it is gone from the map, the total is recomputed, and the measurement continues
 
 #### Scenario: Finishing
 

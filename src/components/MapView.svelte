@@ -56,6 +56,12 @@
   import { reportEditFailure } from "$lib/edit-failure";
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
   import { formatMeasuredDistance, pathLengthKm } from "$lib/geo";
+  import { isEditableTarget } from "$lib/editable-target";
+  import {
+    initMeasureLayer,
+    updateMeasureLayer,
+    raiseMeasureLayer,
+  } from "$lib/maplibre/measure-layer";
   import {
     initTracksLayer,
     updateTracksLayer,
@@ -136,6 +142,17 @@
         e.preventDefault();
         setMeasuring(false);
       }
+    }
+
+    // Misclicks happen, and starting the measurement again because of one is
+    // worse than the misclick.
+    if (
+      (e.key === "Backspace" || e.key === "Delete") &&
+      $measuringActive &&
+      !isEditableTarget(e.target)
+    ) {
+      e.preventDefault();
+      measuredPoints.update((points) => points.slice(0, -1));
     }
 
     if (e.key === "Enter" && $drawingModeActive) {
@@ -399,6 +416,15 @@
    * time. The legacy clear-all-and-recreate path is kept as
    * `clearWaypointMarkers()` for debugging.
    */
+  // The tape follows the points. Raised each time because the track and
+  // waypoint layers are re-added underneath it as the project changes.
+  $effect(() => {
+    const points = $measuredPoints;
+    if (!map || !mapLoaded) return;
+    updateMeasureLayer(map, points);
+    raiseMeasureLayer(map);
+  });
+
   /** See `createLatestRun`: an overtaken refresh must not draw its markers. */
   const waypointMarkerRuns = createLatestRun();
   const trackGeometryRuns = createLatestRun();
@@ -777,6 +803,7 @@
       map.addLayer({ id: "osm-tiles", type: "raster", source: "osm" });
 
       initTracksLayer(map);
+      initMeasureLayer(map);
 
       // Pointer affordance over track lines (CJ-4 click-to-select).
       // Registered after initTracksLayer so the delegated events bind to
