@@ -81,6 +81,20 @@ export async function loadProjects(): Promise<void> {
 }
 
 /**
+ * Stop the catalogue refresh that is running.
+ *
+ * The walk is up to a thousand pages and holds the application busy for all of
+ * it, so on a field link the only download button in the app is disabled for
+ * minutes after launch. Resolves to whether there was a refresh to stop.
+ */
+export async function cancelProjectListing(): Promise<boolean> {
+  return await unwrap(
+    "cancel_project_listing",
+    commands.cancelProjectListing(),
+  );
+}
+
+/**
  * Begin downloading a LizaAlert project bundle.
  *
  * Returns immediately with a `download_id` that callers use to correlate

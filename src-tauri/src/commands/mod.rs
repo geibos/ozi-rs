@@ -461,7 +461,7 @@ pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value
 #[tauri::command]
 #[specta::specta]
 pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
-    let Some(bundles_root) = lock_app_state(state.inner())?.begin_load_projects() else {
+    let Some((bundles_root, cancel)) = lock_app_state(state.inner())?.begin_load_projects() else {
         return Ok(());
     };
     // One read of the bundles root answers "is it downloaded?" for every one
@@ -485,7 +485,7 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
     thread::spawn(move || {
         let chunk_state = Arc::clone(&state_arc);
         let chunk_app = app.clone();
-        let result = lizaalert::fetch_project_summaries_streaming(move |chunk| {
+        let result = lizaalert::fetch_project_summaries_streaming(&cancel, move |chunk, _page| {
             let chunk_payload = to_project_summary_dtos(&chunk, &cached_slugs_for_chunks);
             if let Ok(mut s) = lock_app_state(&chunk_state) {
                 s.apply_projects_chunk(chunk);
@@ -493,8 +493,13 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
             let _ = chunk_app.emit("projects-chunk", chunk_payload);
         });
 
-        if let Ok(projects) = &result {
-            let _ = lizaalert::save_project_summaries_cache(&bundles_root, projects);
+        // A stopped walk read only the first pages. Writing those over the
+        // cache would leave a crew offline tomorrow with the newest few dozen
+        // searches and no sign that the rest ever existed.
+        if let Ok(walk) = &result
+            && !walk.cancelled
+        {
+            let _ = lizaalert::save_project_summaries_cache(&bundles_root, &walk.projects);
         }
 
         if let Ok(mut s) = lock_app_state(&state_arc) {
@@ -675,6 +680,17 @@ pub fn load_project(
     });
 
     Ok(download_id)
+}
+
+/// Stop the catalogue refresh that is running.
+///
+/// The walk is up to a thousand pages and holds the application busy for all
+/// of it, which on a field link disables the only download button in the app
+/// for minutes after launch. Returns whether there was a refresh to stop.
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_project_listing(state: State<SharedState>) -> Result<bool, String> {
+    Ok(lock_app_state(state.inner())?.cancel_project_listing())
 }
 
 #[tauri::command]

@@ -68,6 +68,21 @@ async cancelDownload(downloadId: string) : Promise<Result<boolean, string>> {
 }
 },
 /**
+ * Stop the catalogue refresh that is running.
+ * 
+ * The walk is up to a thousand pages and holds the application busy for all
+ * of it, which on a field link disables the only download button in the app
+ * for minutes after launch. Returns whether there was a refresh to stop.
+ */
+async cancelProjectListing() : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_project_listing") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Open a map, downloading it first when it is not on disk.
  * 
  * Returns the download id when a download started, so the caller can show

@@ -228,40 +228,82 @@ fn parse_project_listing(
     Ok((projects, next_page))
 }
 
+/// What one walk of the catalogue listing read.
+///
+/// `cancelled` is the part that matters to the caller: a stopped walk is not a
+/// failure, but the projects it holds are only the pages it got through, so
+/// they must not be written over the cache as if they were the whole
+/// catalogue.
+#[derive(Debug, Default)]
+pub struct CatalogueWalk {
+    pub projects: Vec<LizaProjectSummary>,
+    pub pages: usize,
+    pub cancelled: bool,
+}
+
 /// Walk the paginated root listing, reporting each page as it arrives.
 ///
 /// The catalogue is served a page at a time with an opaque cursor; stopping at
 /// the first page silently truncates it to the newest few dozen projects.
+///
+/// The walk is cancellable because it is long: a thousand pages at worst, and
+/// it holds the application busy for its whole length. A crew that needs a
+/// bundle now has to be able to stop waiting for it.
 pub fn fetch_project_summaries_streaming<F>(
-    mut on_chunk: F,
-) -> Result<Vec<LizaProjectSummary>, String>
+    cancel: &CancelToken,
+    on_chunk: F,
+) -> Result<CatalogueWalk, String>
 where
-    F: FnMut(Vec<LizaProjectSummary>),
+    F: FnMut(Vec<LizaProjectSummary>, usize),
+{
+    walk_project_listing(ROOT_URL, cancel, on_chunk)
+}
+
+/// The walk itself, against a given listing root so it can be driven by a test
+/// server rather than the live catalogue.
+fn walk_project_listing<F>(
+    root_url: &str,
+    cancel: &CancelToken,
+    mut on_chunk: F,
+) -> Result<CatalogueWalk, String>
+where
+    F: FnMut(Vec<LizaProjectSummary>, usize),
 {
     /// Guard against a server that keeps handing out cursors.
     const MAX_PAGES: usize = 1000;
 
-    let mut projects: Vec<LizaProjectSummary> = Vec::new();
-    let mut page_url = ROOT_URL.to_owned();
-    let mut pages = 0usize;
+    let mut walk = CatalogueWalk::default();
+    let mut page_url = root_url.to_owned();
 
     loop {
-        let html = fetch_text(&page_url)?;
-        let (page_projects, next_page) = parse_project_listing(ROOT_URL, &html)?;
-
-        if !page_projects.is_empty() {
-            projects.extend(page_projects.iter().cloned());
-            on_chunk(page_projects);
+        if cancel.is_cancelled() {
+            walk.cancelled = true;
+            break;
         }
 
-        pages += 1;
+        let html = fetch_text(&page_url)?;
+        let (page_projects, next_page) = parse_project_listing(root_url, &html)?;
+
+        walk.pages += 1;
+        if !page_projects.is_empty() {
+            walk.projects.extend(page_projects.iter().cloned());
+            on_chunk(page_projects, walk.pages);
+        }
+
+        // Checked again here so that stopping during the last page is reported
+        // as a stop rather than as a complete walk.
+        if cancel.is_cancelled() {
+            walk.cancelled = true;
+            break;
+        }
+
         match next_page {
-            Some(next) if pages < MAX_PAGES && next != page_url => page_url = next,
+            Some(next) if walk.pages < MAX_PAGES && next != page_url => page_url = next,
             _ => break,
         }
     }
 
-    Ok(projects)
+    Ok(walk)
 }
 
 pub fn load_project_summaries_cache(root: &Path) -> Result<Vec<LizaProjectSummary>, String> {
@@ -1827,14 +1869,17 @@ mod tests {
     #[test]
     #[ignore = "requires network access to maps.lizaalert.ru"]
     fn live_catalogue_lists_projects_and_a_project_lists_its_maps() {
-        let mut pages = 0usize;
-        let projects = super::fetch_project_summaries_streaming(|chunk| {
-            pages += 1;
-            if pages == 1 {
-                println!("first chunk: {} projects", chunk.len());
-            }
-        })
+        let walk = super::fetch_project_summaries_streaming(
+            &super::CancelToken::new(),
+            |chunk: Vec<LizaProjectSummary>, page: usize| {
+                if page == 1 {
+                    println!("first chunk: {} projects", chunk.len());
+                }
+            },
+        )
         .expect("catalogue");
+        let pages = walk.pages;
+        let projects = walk.projects;
         println!("catalogue: {} projects over {pages} chunks", projects.len());
         assert!(
             projects.len() > 1000,
@@ -2074,6 +2119,71 @@ mod tests {
                 .expect("ozi path")
                 .to_string_lossy()
                 .contains("extracted/5-Ozi(Win&Android)_Topo/Maps/demo.map")
+        );
+    }
+
+    /// The catalogue walk is a thousand pages deep at worst, and it holds the
+    /// application busy for its whole length. A crew that needs a bundle now
+    /// must be able to stop waiting for it — and stopping must not pass a
+    /// half-walked catalogue off as the complete one.
+    #[test]
+    fn a_stopped_catalogue_walk_says_so_and_keeps_what_it_read() {
+        use std::io::Read;
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+
+        // Two pages, each pointing at the next through the cursor the real
+        // listing uses. The walk must stop after the first one.
+        let server = std::thread::spawn(move || {
+            for page in 0..2 {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    return;
+                };
+                let mut request = [0u8; 1024];
+                let _ = stream.read(&mut request);
+                let body = if page == 0 {
+                    r#"<a href="2026-09-21_first/">first</a>
+                       <a href="?after=2026-09-21_first">next</a>"#
+                } else {
+                    r#"<a href="2026-09-20_second/">second</a>"#
+                };
+                let _ = stream.write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                );
+            }
+        });
+
+        let cancel = super::CancelToken::new();
+        let mut seen_pages = 0usize;
+        let walk =
+            super::walk_project_listing(&format!("http://{addr}/"), &cancel, |_chunk, page| {
+                seen_pages = page;
+                // The operator presses stop while the first page is on screen.
+                cancel.cancel();
+            })
+            .expect("a stopped walk is not a failure");
+
+        // Deliberately not joined: the point of the test is that the second
+        // page is never requested, so the server thread is still blocked in
+        // `accept` and joining it would hang here instead of failing.
+        drop(server);
+
+        assert!(walk.cancelled, "the walk must report that it was stopped");
+        assert_eq!(walk.pages, 1, "it must not fetch the page after the stop");
+        assert_eq!(seen_pages, 1);
+        assert_eq!(
+            walk.projects
+                .iter()
+                .map(|p| p.slug.as_str())
+                .collect::<Vec<_>>(),
+            vec!["2026-09-21_first"],
+            "what it did read stays; only the rest is missing"
         );
     }
 

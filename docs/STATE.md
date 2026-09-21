@@ -5,9 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the catalogue keeps your place** (2026-09-21) — closing
+Last merged slice: **stop waiting for the catalogue** (2026-09-21) — the
+listing walk that holds the download button disabled for minutes after launch
+can be stopped, without passing its first pages off as the whole catalogue;
+after the catalogue keeping your place, where closing
 the loader to look at the map no longer throws away the search, the selection
-and the place in the list; after one preview at a time, where clicking through
+and the place in the list, and after one preview at a time, where clicking through
 several projects no longer lets an abandoned preview swap the map list back
 under the operator, and a preview stopped releasing a busy flag it never took,
 and after when it fails, where offline the project list
@@ -42,7 +45,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 296 Rust tests and 343 frontend tests;
+rustfmt, clippy, type-checks, 297 Rust tests and 345 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

@@ -94,8 +94,11 @@ and the palette slice; these were not.
 - **Backend status and progress text is English** and reaches the screen
   verbatim — there is no key-based channel for it, so the status bar and the
   bundle phases stay untranslated.
-- **The catalogue is walked in full at every launch**, holding the busy flag,
-  with no page counter and no way to stop it; the localStorage cache only ever
+- **The catalogue is walked in full at every launch**, holding the busy flag.
+  The "no way to stop it" half is done on 2026-09-21 in
+  `stop-waiting-for-the-catalogue`: the walk is cancellable, the loader offers
+  a stop while it runs, and a stopped walk is not written over the cache. Still
+  open: no page counter ("page 12 of ?"), and the localStorage cache only ever
   grows.
 - **Small targets and no keyboard path.** 28px rows, 10px badges, and the
   virtualized list renders only the visible rows, so there is no tab order over

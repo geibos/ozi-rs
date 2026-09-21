@@ -178,6 +178,13 @@ struct LizaAlertState {
     /// Files that have finished downloading in the active bundle. Lets the UI
     /// surface partial bundle availability before the whole download finishes.
     ready_bundle_files: Vec<ReadyBundleFile>,
+    /// Stops the catalogue walk that is currently running, if one is.
+    ///
+    /// The walk is up to a thousand pages and holds `busy` for all of it, so on
+    /// a field link the only download button in the app can be disabled for
+    /// minutes after launch. This is how the operator says they have waited
+    /// long enough.
+    listing_cancel: Option<lizaalert::CancelToken>,
 }
 
 /// A file that has been fully downloaded and fsync'd inside an in-progress
@@ -247,6 +254,7 @@ impl AppState {
                 busy: false,
                 downloading: HashSet::new(),
                 ready_bundle_files: Vec::new(),
+                listing_cancel: None,
             },
         }
     }
@@ -265,14 +273,33 @@ impl AppState {
 
     // ── Background-task handoff: "begin" sets busy and returns what the thread needs ──
 
-    /// Returns `None` if already busy; otherwise sets busy and returns the bundles root path.
-    pub fn begin_load_projects(&mut self) -> Option<PathBuf> {
+    /// Returns `None` if already busy; otherwise sets busy and returns the
+    /// bundles root path together with the token that stops this walk.
+    pub fn begin_load_projects(&mut self) -> Option<(PathBuf, lizaalert::CancelToken)> {
         if self.lizaalert.busy {
             return None;
         }
         self.lizaalert.busy = true;
+        let cancel = lizaalert::CancelToken::new();
+        self.lizaalert.listing_cancel = Some(cancel.clone());
         self.update_status(DiagnosticLevel::Info, "Loading project list...");
-        Some(self.bundles_root.clone())
+        Some((self.bundles_root.clone(), cancel))
+    }
+
+    /// Stop the catalogue walk that is running, if one is.
+    ///
+    /// Returns whether there was one to stop, so the command can say nothing
+    /// happened rather than reporting a stop that did not occur.
+    pub fn cancel_project_listing(&mut self) -> bool {
+        let Some(cancel) = self.lizaalert.listing_cancel.as_ref() else {
+            return false;
+        };
+        cancel.cancel();
+        self.update_status(
+            DiagnosticLevel::Info,
+            "Stopping the project list refresh...",
+        );
+        true
     }
 
     /// Preview lookup: summary + bundles root WITHOUT the busy gate — a
@@ -373,12 +400,21 @@ impl AppState {
 
     // ── Background-task completion: "apply" receives results and mutates state ──
 
-    pub fn apply_projects_loaded(&mut self, result: Result<Vec<LizaProjectSummary>, String>) {
+    pub fn apply_projects_loaded(&mut self, result: Result<lizaalert::CatalogueWalk, String>) {
         self.lizaalert.busy = false;
+        self.lizaalert.listing_cancel = None;
         match result {
-            Ok(_) => {
+            Ok(walk) => {
                 let count = self.lizaalert.projects.len();
-                self.update_status(DiagnosticLevel::Info, format!("Loaded {count} projects"));
+                // A stopped walk is not a failure and not a complete list
+                // either. Saying which it was is the difference between "there
+                // are 412 searches" and "there are 412 so far".
+                let status = if walk.cancelled {
+                    format!("Stopped the refresh at {count} projects")
+                } else {
+                    format!("Loaded {count} projects")
+                };
+                self.update_status(DiagnosticLevel::Info, status);
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, error);

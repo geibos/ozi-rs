@@ -10,6 +10,34 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — stop waiting for the catalogue
+
+Every launch walks the whole listing: up to a thousand pages, one request each,
+and the walk holds the application busy for all of it. While it runs, the only
+download button in the app is disabled. On a field link that is minutes, and a
+crew that opened the app to fetch one bundle whose name they already know has
+nothing to do but wait for an index of thirteen thousand searches they will not
+read.
+
+The list is already usable long before the walk ends — the cached one is
+applied first and every page adds to it. What was missing was any way to say
+that is enough. There is a stop beside the refreshing hint now.
+
+The part worth being careful about is the cache. A stopped walk holds the first
+few pages; writing those over the cached catalogue would leave a crew offline
+tomorrow with the newest few dozen searches and nothing to say the rest ever
+existed. It does not write. And the status says the refresh was *stopped* at
+412 projects rather than that 412 were loaded — different facts.
+
+| | |
+|---|---|
+| Evidence | a two-page test server, cancelled from inside the first page's callback: the second page is never requested, what was read stays, and the walk reports itself stopped |
+| Evidence | a behavioural test: the stop appears only while refreshing, and reaches the backend |
+| Automated gates | `just ci` green (297 Rust, 345 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — the catalogue keeps your place
 
 The loader is a Sheet on the workspace route precisely so a crew can check the

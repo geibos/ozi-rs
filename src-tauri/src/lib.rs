@@ -73,6 +73,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::load_project,
         commands::preview_project,
         commands::cancel_download,
+        commands::cancel_project_listing,
         commands::open_selected_map,
         commands::open_local_bundle,
         commands::set_bundles_root,

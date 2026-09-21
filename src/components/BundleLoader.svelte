@@ -42,6 +42,7 @@
   } from "../lib/stores";
   import {
     cancelDownload,
+    cancelProjectListing,
     loadProjects,
     loadProject,
     openLocalBundle,
@@ -163,6 +164,24 @@
       top: (startIndex + i) * ROW_HEIGHT,
     })),
   );
+
+  /**
+   * Stop waiting for the catalogue.
+   *
+   * The walk is a thousand pages at worst and holds the application busy for
+   * all of it, so the download button stays disabled for as long as it runs.
+   * What has already arrived stays in the list; it is just not all of it, and
+   * the status line says so.
+   */
+  async function handleStopRefresh() {
+    try {
+      await cancelProjectListing();
+    } catch (error) {
+      toast.error($t("loader.stopRefreshFailed"), {
+        description: String(error),
+      });
+    }
+  }
 
   async function handleRefresh() {
     projectsLoading.set(true);
@@ -382,6 +401,13 @@
       <div class="refresh-hint" data-testid="catalog-refreshing">
         <span class="spinner"></span>
         {$t("loader.refreshing")}
+        <button
+          class="stop-refresh-btn"
+          onclick={handleStopRefresh}
+          data-testid="stop-refresh"
+        >
+          {$t("loader.stopRefresh")}
+        </button>
       </div>
     {:else if $catalogueError !== null}
       <!-- The cached list is the right answer offline, but a crew has to know
@@ -655,6 +681,21 @@
 
   .refresh-hint.offline {
     color: hsl(var(--destructive));
+  }
+
+  .stop-refresh-btn {
+    margin-left: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    padding: 0.05rem 0.4rem;
+    color: inherit;
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  .stop-refresh-btn:hover {
+    background: var(--muted);
   }
 
   .refresh-hint {
