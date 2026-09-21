@@ -77,13 +77,32 @@ export function loadCatalogCache(): LizaProjectSummaryDto[] | null {
 export function saveCatalogCache(items: LizaProjectSummaryDto[]): void {
   try {
     if (typeof localStorage === "undefined") return;
-    const payload: CatalogCachePayload = {
-      items,
-      writtenAt: new Date().toISOString(),
-    };
+    const writtenAt = new Date().toISOString();
+    const payload: CatalogCachePayload = { items, writtenAt };
     localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(payload));
+    catalogueWrittenAt.set(writtenAt);
   } catch (error) {
     console.warn("saveCatalogCache: storage write failed", error);
+  }
+}
+
+/**
+ * When the cached list was last written, as the ISO string the cache holds.
+ *
+ * The timestamp has been in the payload since the cache existed and was
+ * thrown away on read. Offline it is the difference between a list a crew can
+ * act on and a list they cannot: a search published yesterday is missing from
+ * both a stale list and a wrong one.
+ */
+export function loadCatalogWrittenAt(): string | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(CATALOG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CatalogCachePayload>;
+    return typeof parsed?.writtenAt === "string" ? parsed.writtenAt : null;
+  } catch {
+    return null;
   }
 }
 
@@ -134,6 +153,10 @@ export const projectsStore = writable<LizaProjectSummaryDto[]>(
   loadCatalogCache() ?? [],
 );
 export const projects = derived(projectsStore, ($projects) => $projects);
+/** ISO timestamp of the cached list on screen, seeded from the cache. */
+export const catalogueWrittenAt = writable<string | null>(
+  loadCatalogWrittenAt(),
+);
 export const projectsLoading = writable(false);
 
 /**

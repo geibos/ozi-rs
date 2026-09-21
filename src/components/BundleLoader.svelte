@@ -29,6 +29,7 @@
     activeDownloadId,
     activeMap,
     catalogueError,
+    catalogueWrittenAt,
     bundleLoaderOpen,
     bundleLoaderPreselect,
     bundleLoaderView,
@@ -56,6 +57,7 @@
   import { filterProjects } from "$lib/project-list";
   import { openProjectFile } from "$lib/actions/project";
   import { getRecentProjects } from "$lib/recent-projects";
+  import { formatCatalogueAge } from "$lib/catalogue-age";
   import { openMapShowingDownload } from "$lib/actions/open-map";
   import { bundleSlugFromUrl } from "$lib/bundle-url";
   import { formatBytes, formatOptionalBytes } from "$lib/format-bytes";
@@ -495,6 +497,8 @@
    */
   const recentProjects = getRecentProjects().slice(0, 3);
 
+  const listAge = $derived(formatCatalogueAge($catalogueWrittenAt, $locale));
+
   function handleOpenProjectFile() {
     void openProjectFile();
   }
@@ -539,6 +543,15 @@
           .replace("{shown}", String(filtered.length))
           .replace("{total}", String($projects.length))}
       </span>
+      {#if listAge}
+        <!-- Which morning this list is from. Offline it is the difference
+             between a list a crew can act on and one they cannot: a search
+             published yesterday is missing from a stale list exactly as it is
+             from a wrong one. -->
+        <span class="list-age" data-testid="catalogue-age">
+          {$t("loader.listFrom").replace("{when}", listAge)}
+        </span>
+      {/if}
     </div>
 
     {#if $projectsLoading}
@@ -566,7 +579,9 @@
            that is what they are reading: a bundle made today would not be in
            it, and a missing row would otherwise read as "no such search". -->
       <div class="refresh-hint offline" data-testid="catalog-offline">
-        {$t("loader.offline")}
+        {listAge
+          ? $t("loader.offlineFrom").replace("{when}", listAge)
+          : $t("loader.offline")}
       </div>
     {/if}
 
@@ -857,6 +872,9 @@
   }
 
   .filter-count {
+    /* Pushed right so the count and the list's date read as one group on the
+       right-hand side, rather than the count floating in the middle. */
+    margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -1198,6 +1216,12 @@
     font-size: 12px;
     text-align: left;
     padding: 4px 8px;
+  }
+
+  .list-age {
+    font-size: 10px;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
   }
 
   .recent-projects {

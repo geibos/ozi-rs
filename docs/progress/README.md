@@ -10,6 +10,41 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — how old is this list
+
+The catalogue cache has written an ISO timestamp since the day it was
+introduced, and the function that reads the cache threw it away. Nothing ever
+showed it.
+
+It matters in exactly the state the cache exists for. Offline the loader says
+«Нет связи — список сохранённый», which is honest and incomplete: a list saved
+this morning and a list saved three weeks ago look the same, and a search
+published yesterday is missing from both. Without the date a crew cannot tell
+"this search does not exist" from "my list predates it" — and the first
+reading is the one that sends people hunting for another way in.
+
+The loader now shows when the list was written, beside the match count and
+inside the offline notice: «Только скачанные · 3 из 3 · от 21.09, 09:12», and
+«Нет связи — сохранённый список от 21.09, 09:12».
+
+Absolute, not «3 часа назад». Relative Russian needs plural rules to be written
+correctly, and a clock time is what a crew compares against a coordinator
+saying a search went up at two. An unparseable timestamp prints nothing rather
+than "Invalid Date" — the one line whose whole job is to be trusted.
+
+Also the smaller half of a backlog item: this is what a decision to stop
+walking the catalogue at every launch would have to stand on. Nobody can be
+asked to trust a list whose age is invisible.
+
+| | |
+|---|---|
+| After | [the list's date beside the count](2026-09-22-list-age/after-list-age.png) |
+| Change | `openspec/changes/how-old-is-this-list/` |
+| Automated gates | `just ci` green (324 Rust, 493 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — one wait does not block the other
 
 One `busy` flag guarded three unrelated things: the catalogue walk, a bundle

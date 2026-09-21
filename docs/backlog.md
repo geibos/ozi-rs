@@ -226,6 +226,11 @@ and the palette slice; these were not.
   its own (`one-wait-does-not-block-the-other`), so it blocks only another
   refresh — a download may start while it runs. Still open, and smaller now:
   the walk still happens at every launch rather than when the cache is stale.
+  Since 2026-09-22 the list's date is on screen (`how-old-is-this-list`), which
+  is what any "skip the walk" rule would have to stand on — and it needs a
+  staleness threshold, which is an owner decision like the moving-time one.
+  Worth weighing against data usage: a thousand pages of HTML on a phone
+  tether, at every launch.
 
   ~~A project deleted upstream is never removed.~~ Done on 2026-09-21 in
   `a-search-that-is-gone-leaves-the-list`: a complete walk replaces the list,
