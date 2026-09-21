@@ -10,6 +10,25 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — what a click will cost
+
+Walking the screens at the restored padding, at a laptop-sized window: the
+Maps tab marked a downloaded map "В КЭШЕ" and a map that is not downloaded
+with nothing at all. Blank reads as "nothing to say", while clicking that row
+starts a download — 185 MiB for the satellite layer on this bundle.
+
+It carries a marker now, and the tooltip names the size.
+
+| | |
+|---|---|
+| After | [the maps rows](2026-09-21-not-downloaded-marker/after-maps-rows.png) |
+| Automated gates | `just ci` green (293 Rust, 339 frontend) |
+
+The rest of the pass found nothing: the workspace, the tracks and waypoints
+rails and the inspector all hold together at 1024×640.
+
+---
+
 ## 2026-09-21 — the app gets its padding back
 
 Opening a row menu on the stand showed the labels flush against the box's

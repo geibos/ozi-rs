@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the app gets its padding back** (2026-09-21) — the
-unlayered global reset had been beating every Tailwind spacing utility in the
-app, and fixing it uncovered the inspector's segments card collapsing; after
+Last merged slice: **what a click will cost** (2026-09-21) — a map that is not
+downloaded is marked as such in the Maps tab, with its size in the tooltip;
+after the app getting its padding back, where the unlayered global reset had
+been beating every Tailwind spacing utility and fixing it uncovered the
+inspector's segments card collapsing, and after
 the loader letting the operator choose what a download fetches, the owner's
 July type-filter note answered without the app deciding for them, and after
 every track in the project exporting to one GPX, the shape FTP upload will
@@ -61,9 +63,9 @@ than followed blindly.
    waiting on the owner's review: archiving folds their requirements into the
    baseline specs, which is a step for a person, not for an agent.
 2. **Keep walking the screens on the stand.** Done: the Track Inspector, the
-   cold-start route. Not yet: a download in flight, an error state, the
-   Waypoints row menu, and the whole shell at a narrow window. Each needs a
-   fixture state, which is now a few lines in `src-tauri/src/fixtures.rs`.
+   cold-start route, the Waypoints row menu, and the whole shell at 1024×640.
+   Not yet: a download in flight and an error state — each needs a fixture
+   state, which is a few lines in `src-tauri/src/fixtures.rs`.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 

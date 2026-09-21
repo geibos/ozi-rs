@@ -156,7 +156,21 @@
                 {$t("mapsTab.cached")}
               </span>
             {:else}
-              <span class="size-4"></span>
+              <!-- A blank cell read as "nothing to say", while clicking the
+                   row starts a download that can be 185 MiB. The marker says
+                   what the click will cost. -->
+              <span
+                class="bg-primary/10 text-primary inline-flex size-4 items-center justify-center rounded-sm text-[10px] font-semibold"
+                title={m.size_bytes != null
+                  ? $t("mapsTab.notDownloaded").replace(
+                      "{size}",
+                      formatOptionalBytes(m.size_bytes, $locale) ?? "",
+                    )
+                  : $t("mapsTab.notDownloadedUnknown")}
+                data-testid="map-not-downloaded"
+              >
+                ↓
+              </span>
             {/if}
           {/snippet}
           {#snippet actions()}
