@@ -5,8 +5,8 @@ use ozi_rs_mcp::{
     evidence::{EVIDENCE_ROOT, EvidenceStatus},
     native::{
         NativeSessionState, build_app_with_command, build_command, capture_screenshot_with_command,
-        launch_app_from_root, launch_command, qa_environment_for_root, stop_app_at_root,
-        stop_command_for_session,
+        launch_app_from_root, launch_command, qa_environment_for_root, qa_observe_with_commands,
+        stop_app_at_root, stop_command_for_session,
     },
     process::{EvidenceCommand, FakeCommand},
 };
@@ -193,6 +193,62 @@ fn capture_screenshot_keeps_exit_code_error_kind_for_unrelated_failures() {
     assert!(!result.ok);
     assert_eq!(result.error_kind.as_deref(), Some("exit_code"));
     assert!(result.message.is_none());
+}
+
+/// `qa_observe` returned the environment and `evidence: None`: the name
+/// promised an observation and the tool observed nothing, which is worse than
+/// not having it — a session that called it believed it had looked.
+#[test]
+fn qa_observe_returns_both_the_log_tail_and_a_screenshot() {
+    let repo = tempfile::tempdir().expect("repo fixture");
+    create_repo_fixture(repo.path());
+    let logs = FakeCommand::new("log")
+        .stdout("ozi-rs started\n")
+        .exit_code(0);
+    let screenshot = FakeCommand::new("screencapture").exit_code(0);
+
+    let result = qa_observe_with_commands(repo.path(), &logs, &screenshot).expect("observe result");
+
+    assert!(result.ok, "a successful observation reports ok");
+    assert_eq!(
+        result.artifact_paths.len(),
+        2,
+        "an observation carries the log tail and the screenshot: {:?}",
+        result.artifact_paths
+    );
+    let log_path = repo.path().join(&result.artifact_paths[0]);
+    assert!(log_path.is_file(), "the log tail SHALL be on disk");
+    assert!(
+        fs::read_to_string(&log_path)
+            .expect("read log tail")
+            .contains("ozi-rs started"),
+        "the log tail SHALL hold what the command printed"
+    );
+    assert!(
+        result.evidence.is_some(),
+        "an observation SHALL carry evidence metadata"
+    );
+    assert!(result.session.is_some(), "and the app session state");
+}
+
+#[test]
+fn qa_observe_reports_a_denied_screenshot_rather_than_claiming_success() {
+    let repo = tempfile::tempdir().expect("repo fixture");
+    create_repo_fixture(repo.path());
+    let logs = FakeCommand::new("log")
+        .stdout("ozi-rs started\n")
+        .exit_code(0);
+    let screenshot = FakeCommand::new("screencapture")
+        .stderr("could not create image from display\n")
+        .exit_code(1);
+
+    let result = qa_observe_with_commands(repo.path(), &logs, &screenshot).expect("observe result");
+
+    assert!(!result.ok, "a blind observation is not a success");
+    assert_eq!(
+        result.error_kind.as_deref(),
+        Some("screen_recording_denied")
+    );
 }
 
 #[test]

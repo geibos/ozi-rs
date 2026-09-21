@@ -75,16 +75,20 @@ pub fn stop_app() -> NativeToolResult {
     }
 }
 
+pub fn logs_command() -> RealCommand {
+    RealCommand::new("log")
+        .arg("show")
+        .arg("--style")
+        .arg("compact")
+        .arg("--last")
+        .arg("5m")
+        .arg("--predicate")
+        .arg("process == \"ozi-rs\"")
+}
+
 pub fn capture_logs() -> NativeToolResult {
     match config::repo_root().and_then(|root| {
-        let command = RealCommand::new("log")
-            .arg("show")
-            .arg("--style")
-            .arg("compact")
-            .arg("--last")
-            .arg("5m")
-            .arg("--predicate")
-            .arg("process == \"ozi-rs\"");
+        let command = logs_command();
         run_native_command("capture_logs", &root, &command, Vec::new())
     }) {
         Ok(result) => result,
@@ -106,21 +110,60 @@ pub fn capture_screenshot() -> NativeToolResult {
 
 pub fn qa_observe() -> NativeToolResult {
     match config::repo_root().and_then(|root| {
-        let session = read_session(&root)?.unwrap_or_else(stopped_session);
-        Ok(NativeToolResult {
-            ok: true,
-            tool: "qa_observe".to_owned(),
-            error_kind: None,
-            message: None,
-            environment: Some(environment_for_root(&root)),
-            evidence: None,
-            session: Some(session),
-            artifact_paths: Vec::new(),
-        })
+        let paths = EvidencePaths::new(&root);
+        let screenshot_path = paths.path_for("qa_observe", "screenshot.png")?;
+        qa_observe_with_commands(
+            &root,
+            &logs_command(),
+            &screenshot_command(&screenshot_path),
+        )
     }) {
         Ok(result) => result,
         Err(error) => error_result("qa_observe", "command_failed", error.to_string()),
     }
+}
+
+/// One call that answers "what is the app doing right now": the recent log
+/// tail and a screenshot, with the paths of both.
+///
+/// It used to return the environment and `evidence: None` — the name promised
+/// an observation and the tool observed nothing, which is worse than not
+/// having it, because a session that called it believed it had looked.
+pub fn qa_observe_with_commands(
+    repo_root: &Path,
+    logs_command: &impl EvidenceCommand,
+    screenshot_command: &impl EvidenceCommand,
+) -> anyhow::Result<NativeToolResult> {
+    let session = read_session(repo_root)?.unwrap_or_else(stopped_session);
+
+    let logs = run_native_command("qa_observe", repo_root, logs_command, Vec::new())?;
+    let screenshot = capture_screenshot_with_command(repo_root, screenshot_command)?;
+
+    let mut artifact_paths = Vec::new();
+    if let Some(evidence) = logs.evidence.as_ref() {
+        artifact_paths.push(evidence.stdout_path.clone());
+    }
+    artifact_paths.extend(screenshot.artifact_paths.iter().cloned());
+
+    // A screenshot the host was not allowed to take is the failure worth
+    // reporting: the logs alone cannot say what is on screen.
+    let ok = logs.ok && screenshot.ok;
+    let error_kind = if screenshot.ok {
+        logs.error_kind.clone()
+    } else {
+        screenshot.error_kind.clone()
+    };
+
+    Ok(NativeToolResult {
+        ok,
+        tool: "qa_observe".to_owned(),
+        error_kind,
+        message: screenshot.message.clone(),
+        environment: Some(environment_for_root(repo_root)),
+        evidence: screenshot.evidence.clone().or(logs.evidence.clone()),
+        session: Some(session),
+        artifact_paths,
+    })
 }
 
 pub fn build_command(repo_root: &Path) -> RealCommand {

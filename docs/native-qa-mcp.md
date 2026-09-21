@@ -38,7 +38,7 @@ Tier order matters: Tier 1 (native) must always be runnable; Tier 2 (Appium) is 
 | `stop_app` | Terminate a previously launched binary. Records stop state. |
 | `capture_logs` | Pull recent app logs via `log` (macOS unified logging). |
 | `capture_screenshot` | Capture a window screenshot via `screencapture`. |
-| `qa_observe` | Combined observation: log tail + screenshot in one call. |
+| `qa_observe` | Combined observation: the log tail and a screenshot in one call, returning both artifact paths and the app's session state. A denied screenshot makes the whole call fail — the logs alone cannot say what is on screen. |
 
 ### Tier 2 — Appium Mac2 (optional)
 
