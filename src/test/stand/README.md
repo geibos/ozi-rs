@@ -49,3 +49,14 @@ A handler must respect its arguments. Answering every layer with the same
 waypoints listed each of them twice in the rail, which read as an app defect
 until the call transcript showed two calls with different ids — the same class
 of lie the hand-written mocks told.
+
+## Failure states
+
+```
+http://localhost:5273/?fail=catalogue&state=cold   the listing is unreachable
+http://localhost:5273/project?fail=download        the bundle download dies
+```
+
+Both are read once at load, because the app navigates between its own routes
+and would otherwise lose the flag. `?fail=download` plays the same sequence as
+a successful one and ends it with the error the backend really sends.

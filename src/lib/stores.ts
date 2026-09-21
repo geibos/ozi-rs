@@ -121,6 +121,16 @@ export const projectsStore = writable<LizaProjectSummaryDto[]>(
 );
 export const projects = derived(projectsStore, ($projects) => $projects);
 export const projectsLoading = writable(false);
+
+/**
+ * Why the catalogue could not be refreshed, when it could not.
+ *
+ * Offline the list still shows — it comes from the cache, which is the right
+ * answer — but nothing said the refresh had failed, so a crew could not tell
+ * today's list from one saved days ago. That is the difference between
+ * knowing a bundle exists and assuming it does not.
+ */
+export const catalogueError = writable<string | null>(null);
 // Route-independent clear for the "refreshing list…" hint: the catalog
 // refresh flips `lizaalert.busy` back to false on completion, which reaches
 // the frontend via `state-changed` → `appState.refresh()`. Clearing here

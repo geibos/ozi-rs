@@ -94,6 +94,22 @@ const FIXTURE_TRACK = 1;
  * the workspace always wins, because the default fixture has an active map and
  * the cold-start route redirects.
  */
+/**
+ * Which failure the stand should play, from the URL: `?fail=download` ends the
+ * download in an error, `?fail=catalogue` makes the listing unreachable. An
+ * error state is a screen too, and it had never been looked at.
+ */
+const FAILURE: string | null =
+  typeof location === "undefined"
+    ? null
+    : new URLSearchParams(location.search).get("fail");
+
+// Read once, at load: the app navigates between its own routes and would
+// otherwise lose the flag the moment it did.
+function requestedFailure(): string | null {
+  return FAILURE;
+}
+
 function requestedState(): "cold" | "workspace" {
   if (typeof location === "undefined") return "workspace";
   return new URLSearchParams(location.search).get("state") === "cold"
@@ -126,7 +142,7 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
   // panel closing can be looked at without a network.
   load_project: () => {
     const id = `stand-${Date.now()}`;
-    playBundleDownload(id);
+    playBundleDownload(id, requestedFailure() === "download");
     return id;
   },
   open_local_bundle: () => "",
@@ -147,6 +163,15 @@ if (typeof window !== "undefined") {
 
 export async function invoke<T>(command: string, args?: Args): Promise<T> {
   standCalls.push({ command, args });
+
+  if (
+    requestedFailure() === "catalogue" &&
+    (command === "load_projects" || command === "preview_project")
+  ) {
+    throw new Error(
+      "bundle listing unreachable and not cached: error sending request for url (https://maps.lizaalert.ru/maps/)",
+    );
+  }
 
   if (EMITS_STATE_CHANGED.has(command)) {
     queueMicrotask(() => standEmit("state-changed", undefined));

@@ -136,3 +136,18 @@ describe("bundle progress keeps what the next phase does not restate", () => {
     expect(get(bundleProgress)?.total_bytes).toBeUndefined();
   });
 });
+
+describe("a catalogue that would not refresh", () => {
+  it("is remembered, so the list can say it is the saved one", async () => {
+    const { catalogueError } = await import("../lib/stores");
+
+    // Offline the cached list still shows — that is the right answer — but
+    // nothing said the refresh had failed, so a crew could not tell today's
+    // list from one saved days ago.
+    catalogueError.set(null);
+    expect(get(catalogueError)).toBeNull();
+
+    catalogueError.set("listing unreachable");
+    expect(get(catalogueError)).toBe("listing unreachable");
+  });
+});

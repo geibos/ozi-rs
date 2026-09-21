@@ -17,6 +17,7 @@
     appState,
     bundleProgress,
     busy,
+    catalogueError,
     currentDownload,
     projects,
     projectsLoading,
@@ -87,6 +88,11 @@
    */
   const catalogueText = $derived.by(() => {
     if ($projectsLoading) return $t("catalogue.loading");
+    if ($catalogueError !== null) {
+      return $projects.length === 0
+        ? $t("catalogue.staleEmpty")
+        : $t("catalogue.stale").replace("{count}", String($projects.length));
+    }
     if ($projects.length === 0) return $t("catalogue.empty");
     return $t("catalogue.loaded").replace("{count}", String($projects.length));
   });

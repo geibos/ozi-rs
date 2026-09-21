@@ -28,6 +28,7 @@
   import {
     activeDownloadId,
     activeMap,
+    catalogueError,
     bundleLoaderOpen,
     bundleLoaderPreselect,
     busy,
@@ -343,6 +344,13 @@
         <span class="spinner"></span>
         {$t("loader.refreshing")}
       </div>
+    {:else if $catalogueError !== null}
+      <!-- The cached list is the right answer offline, but a crew has to know
+           that is what they are reading: a bundle made today would not be in
+           it, and a missing row would otherwise read as "no such search". -->
+      <div class="refresh-hint offline" data-testid="catalog-offline">
+        {$t("loader.offline")}
+      </div>
     {/if}
 
     <div
@@ -602,6 +610,10 @@
     font-size: 11px;
     color: hsl(var(--muted-foreground));
     flex-shrink: 0;
+  }
+
+  .refresh-hint.offline {
+    color: hsl(var(--destructive));
   }
 
   .refresh-hint {

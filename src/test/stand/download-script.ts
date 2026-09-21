@@ -15,7 +15,7 @@ import { appStateFixture } from "../fixtures";
  */
 const STEP_MS = 700;
 
-export function playBundleDownload(downloadId: string): void {
+export function playBundleDownload(downloadId: string, fail = false): void {
   const maps = appStateFixture.current_project?.maps ?? [];
   const files = [
     { name: "2-Coordinates.txt", bytes: 165 },
@@ -103,15 +103,19 @@ export function playBundleDownload(downloadId: string): void {
   at(() =>
     standEmit("bundle-progress", {
       download_id: downloadId,
-      message: "Extracting",
-      phase: "extracting",
+      message: fail ? "Downloading" : "Extracting",
+      phase: fail ? "downloading" : "extracting",
     }),
   );
   at(() =>
     standEmit("download-finished", {
       download_id: downloadId,
-      ok: true,
-      message: null,
+      ok: !fail,
+      // What the backend actually says when a transfer dies: the message
+      // reaches the operator verbatim, so the stand shows it verbatim too.
+      message: fail
+        ? "error sending request for url (https://maps.lizaalert.ru/…): operation timed out"
+        : null,
     }),
   );
 }

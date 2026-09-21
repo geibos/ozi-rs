@@ -8,6 +8,7 @@
   import {
     appendProjectsChunk,
     applyBundleProgress,
+    catalogueError,
     appState,
     commandPaletteOpen,
     currentDownload,
@@ -130,8 +131,10 @@
       // "refreshing list…" hint while this runs.
       await appState.refresh();
       projectsLoading.set(true);
-      loadProjects().catch(() => {
+      catalogueError.set(null);
+      loadProjects().catch((error) => {
         projectsLoading.set(false);
+        catalogueError.set(String(error));
       });
     })();
 

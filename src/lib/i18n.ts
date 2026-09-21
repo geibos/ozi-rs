@@ -210,6 +210,7 @@ const dictionaries = {
     "loader.maps": "Maps",
     "loader.filterPlaceholder": "Filter…",
     "loader.refreshing": "Refreshing list…",
+    "loader.offline": "Offline — this is the saved list",
     "loader.noMatches": "No matches",
     "loader.selectProject": "Select a project on the left",
     "loader.loadingMaps": "Loading map list…",
@@ -241,6 +242,9 @@ const dictionaries = {
     "catalogue.loading": "Loading the project list…",
     "catalogue.loaded": "{count} projects — pick one on the left",
     "catalogue.empty": "No projects yet — refresh, or open a local bundle",
+    "catalogue.stale":
+      "The list did not refresh — showing the saved one ({count})",
+    "catalogue.staleEmpty": "The list could not be loaded and nothing is saved",
     "download.starting": "Starting download…",
   },
   ru: {
@@ -430,6 +434,7 @@ const dictionaries = {
     "loader.maps": "Карты",
     "loader.filterPlaceholder": "Фильтр…",
     "loader.refreshing": "Обновление списка…",
+    "loader.offline": "Нет связи — список сохранённый",
     "loader.noMatches": "Ничего не найдено",
     "loader.selectProject": "Выберите проект слева",
     "loader.loadingMaps": "Загрузка списка карт…",
@@ -460,6 +465,8 @@ const dictionaries = {
     "catalogue.loading": "Загружается список проектов…",
     "catalogue.loaded": "Проектов: {count} — выберите слева",
     "catalogue.empty": "Список пуст — обновите или откройте локальный бандл",
+    "catalogue.stale": "Список не обновился — показан сохранённый ({count})",
+    "catalogue.staleEmpty": "Список не загрузился, сохранённого нет",
     "download.starting": "Начинаем загрузку…",
   },
 } as const satisfies Record<Locale, Record<string, string>>;
