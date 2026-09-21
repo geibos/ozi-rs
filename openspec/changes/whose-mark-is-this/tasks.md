@@ -4,6 +4,9 @@
 - [x] 1.2 Layer- and project-level setters returning the previous colour
 - [x] 1.3 `SetWaypointColor` command with its inverse, and the application method
 - [x] 1.4 A test over set, set again, undo, redo, and clearing back to the default
+- [x] 1.5 The project round trip carries a waypoint with a symbol, a colour and a visibility flag, rather than a bare one
+- [x] 1.6 A project written before the field existed still loads, with the waypoint uncoloured — built from this build's own output with the key removed, not from hand-written JSON
+- [x] 1.7 Both verified red by making the field `#[serde(skip)]`
 
 ## 2. Surface
 

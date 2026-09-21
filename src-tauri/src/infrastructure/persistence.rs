@@ -166,18 +166,76 @@ mod tests {
         let mut project = Project::untitled();
         let layer_id = LayerId::new(30);
         project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
-        project
-            .add_waypoint_to_layer(
-                layer_id,
-                Waypoint::new(WaypointId::new(1), "Campsite", 55.75, 37.61),
-            )
-            .unwrap();
+        // Everything an operator sets on a waypoint, not a bare one: a round
+        // trip over defaults proves only that defaults survive.
+        let mut waypoint = Waypoint::new(WaypointId::new(1), "ШТАБ", 55.75, 37.61);
+        waypoint.set_symbol(Some("flag".to_owned()));
+        waypoint.set_color(Some([37, 99, 235, 255]));
+        waypoint.set_visible(false);
+        project.add_waypoint_to_layer(layer_id, waypoint).unwrap();
 
         let path = temp_path("ozp");
         save_project(&project, &path).expect("save");
         let loaded = load_project(&path).expect("load");
 
         assert_eq!(loaded, project);
+    }
+
+    /// A project written before waypoints could carry a colour.
+    ///
+    /// This is the case that costs a crew their work if it is wrong, and it
+    /// rests on one `#[serde(default)]` that nothing else exercises — a field
+    /// added without it turns every older `.ozp` into a load error.
+    ///
+    /// The file is this build's own output with the `color` key deleted,
+    /// rather than JSON written by hand: hand-written, it tests my idea of the
+    /// format, and the first attempt failed on a field I had not known was
+    /// there.
+    #[test]
+    fn a_project_saved_before_waypoint_colours_still_loads() {
+        let mut project = Project::untitled();
+        let layer_id = LayerId::new(1);
+        project.add_waypoint_layer(WaypointLayer::new(layer_id, "Waypoints"));
+        let mut waypoint = Waypoint::new(WaypointId::new(1), "ШТАБ", 55.75, 37.61);
+        waypoint.set_symbol(Some("flag".to_owned()));
+        project.add_waypoint_to_layer(layer_id, waypoint).unwrap();
+
+        let path = temp_path("ozp");
+        save_project(&project, &path).expect("save");
+
+        let written = std::fs::read_to_string(&path).expect("read");
+        assert!(
+            written.contains("\"color\""),
+            "this build writes the field, so removing it is a meaningful older file"
+        );
+        let older: serde_json::Value = {
+            let mut value: serde_json::Value = serde_json::from_str(&written).expect("parse");
+            let waypoints = value["waypoint_layers"][0]["waypoints"]
+                .as_array_mut()
+                .expect("the waypoints array");
+            for w in waypoints {
+                w.as_object_mut()
+                    .expect("a waypoint object")
+                    .remove("color");
+            }
+            value
+        };
+        std::fs::write(
+            &path,
+            serde_json::to_string_pretty(&older).expect("serialize"),
+        )
+        .expect("write the older file");
+
+        let loaded = load_project(&path).expect("an older project still loads");
+        let waypoint = &loaded.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.name(), "ШТАБ");
+        assert_eq!(waypoint.symbol(), Some("flag"));
+        assert_eq!(
+            waypoint.color(),
+            None,
+            "no colour, which is what the file meant — not a default colour"
+        );
+        assert!(waypoint.visible(), "and visible, as it was");
     }
 
     #[test]

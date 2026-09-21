@@ -42,6 +42,20 @@ through because it *does* toast; the label guard does not look inside `toast`
 calls. Fourth miss, same shape as the others: a guard on syntax catches the
 careless version.
 
+A colour that does not survive being saved is a lie, and the round trip that
+would have caught it was over a *bare* waypoint — a round trip over defaults
+proves only that defaults survive. It carries a symbol, a colour and a
+visibility flag now.
+
+The case that actually costs a crew their work is the other one: a `.ozp`
+written before the field existed. It rests on a single `#[serde(default)]`,
+and a field added without one turns every older project into a load error.
+There is a test, and it is built from this build's own output with the `color`
+key deleted rather than from JSON I wrote — my hand-written version failed on a
+field I had not known the format carried, which is the whole argument against
+hand-written fixtures. Both tests go red when the field is made
+`#[serde(skip)]`; I checked.
+
 Then the obvious hole in my own feature: the colour was on the map and in the
 inspector, and the **list** — the thing a crew actually reads to find what they
 are looking at on the map — knew nothing about it. The row's symbol button is a
@@ -53,7 +67,8 @@ surfaces, one function, so they cannot disagree.
 | Evidence | a Rust test over set, set again, undo, redo, and clearing back to the default |
 | Evidence | walked on the stand: 🏁 on `rgb(37, 99, 235)` in the row *and* on the marker, the others on the default in both |
 | Evidence | tests on the shared conversion, including alpha and a single-digit channel |
-| Automated gates | `just ci` green (314 Rust, 395 frontend) |
+| Evidence | the project round trip and an older `.ozp` — both red when the field is made `#[serde(skip)]` |
+| Automated gates | `just ci` green (315 Rust, 395 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---
