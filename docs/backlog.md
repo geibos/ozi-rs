@@ -34,6 +34,12 @@ decision.
 
 ## Engineering
 
+- **Nothing else derives a list from map geometry — check before adding one.**
+  Twice now a list built from `build_tracks_geojson` has been wrong: once it
+  emptied the whole rail when the geometry type changed, once it hid every
+  track the map cannot draw. The map's features are shaped for drawing. A list
+  wants its own command, typed, carrying only what a row shows.
+
 - **MapLibre 4 → 6.** Carries a critical advisory (`GHSA-jrc7-96c5-q579`) whose
   fix is two majors ahead. The affected sink is not called here (popups use
   `setText`, no `innerHTML`), so it is waived in `scripts/npm-audit-gate.mjs`.

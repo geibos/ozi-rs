@@ -9,10 +9,11 @@ import { describe, expect, it } from "vitest";
 import {
   appStateFixture,
   tracksGeojsonFixture,
+  tracksListFixture,
   trackDetailFixture,
   waypointsFixture,
 } from "./fixtures";
-import { trackFeaturesFromGeojson } from "../lib/track-features";
+import { trackFeaturesFromSummaries } from "../lib/track-features";
 
 describe("the fixtures are the shape the backend sends", () => {
   it("carries a project with tracks, waypoints and a catalogue", () => {
@@ -57,12 +58,29 @@ describe("the fixtures are the shape the backend sends", () => {
 
 describe("the track geometry fixture", () => {
   it("is what the rail's row model can actually read", () => {
-    const rows = trackFeaturesFromGeojson(tracksGeojsonFixture);
+    const rows = trackFeaturesFromSummaries(tracksListFixture);
 
-    // The regression this guards: a geometry type the row model filtered out.
     expect(rows.length).toBe(appStateFixture.tracks.length);
     expect(rows.some((r) => !r.visible)).toBe(true);
-    expect(rows.every((r) => r.pointCount > 0)).toBe(true);
+  });
+
+  /**
+   * The map drops a track it cannot draw; the list must not. Holding the two
+   * fixtures against each other is what keeps the stand from quietly showing
+   * the same rows the old, geometry-derived list did.
+   */
+  it("lists a track the map has no feature for", () => {
+    const listed = tracksListFixture.map((r) => r.name);
+    const drawn = tracksGeojsonFixture.features.map(
+      (f) => (f.properties ?? {}).name as string,
+    );
+
+    expect(listed.length).toBeGreaterThan(drawn.length);
+    const undrawable = listed.filter((name) => !drawn.includes(name));
+    expect(undrawable).toHaveLength(1);
+    expect(
+      tracksListFixture.find((r) => r.name === undrawable[0])?.point_count,
+    ).toBe(1);
   });
 
   it("keeps a recording's segments apart", () => {

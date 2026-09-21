@@ -37,28 +37,31 @@
   --color-zinc-950: #0a0a0a;
 
   /* --- Teal accent (single hue, ≤ 70% saturation) ---------------------- */
-  --color-teal-50:  oklch(0.972 0.020 190);
-  --color-teal-100: oklch(0.932 0.040 190);
-  --color-teal-200: oklch(0.872 0.060 190);
-  --color-teal-300: oklch(0.792 0.080 190);
-  --color-teal-400: oklch(0.725 0.090 190);
-  --color-teal-500: oklch(0.650 0.100 190); /* primary accent */
+  --color-teal-50: oklch(0.972 0.02 190);
+  --color-teal-100: oklch(0.932 0.04 190);
+  --color-teal-200: oklch(0.872 0.06 190);
+  --color-teal-300: oklch(0.792 0.08 190);
+  --color-teal-400: oklch(0.725 0.09 190);
+  --color-teal-500: oklch(0.65 0.1 190); /* primary accent */
   --color-teal-600: oklch(0.572 0.095 190);
-  --color-teal-700: oklch(0.500 0.085 190);
-  --color-teal-800: oklch(0.420 0.070 190);
-  --color-teal-900: oklch(0.350 0.060 190);
+  --color-teal-700: oklch(0.5 0.085 190);
+  --color-teal-800: oklch(0.42 0.07 190);
+  --color-teal-900: oklch(0.35 0.06 190);
 
   /* --- Radii ----------------------------------------------------------- */
   --radius-card: 1.5rem;
   --radius-pill: 9999px;
 
   /* --- Tinted elevation shadows --------------------------------------- */
-  --shadow-elev-1: 0 1px 2px -1px oklch(0.15 0.02 240 / 0.10),
-                   0 1px 1px oklch(0.15 0.02 240 / 0.06);
-  --shadow-elev-2: 0 6px 16px -6px oklch(0.15 0.02 240 / 0.16),
-                   0 2px 4px -2px oklch(0.15 0.02 240 / 0.08);
-  --shadow-elev-3: 0 20px 40px -16px oklch(0.15 0.02 240 / 0.22),
-                   0 8px 16px -8px oklch(0.15 0.02 240 / 0.12);
+  --shadow-elev-1:
+    0 1px 2px -1px oklch(0.15 0.02 240 / 0.1),
+    0 1px 1px oklch(0.15 0.02 240 / 0.06);
+  --shadow-elev-2:
+    0 6px 16px -6px oklch(0.15 0.02 240 / 0.16),
+    0 2px 4px -2px oklch(0.15 0.02 240 / 0.08);
+  --shadow-elev-3:
+    0 20px 40px -16px oklch(0.15 0.02 240 / 0.22),
+    0 8px 16px -8px oklch(0.15 0.02 240 / 0.12);
 
   /* --- Stable layout dimensions (workspace shell) ---------------------- */
   --status-bar-height: 28px;

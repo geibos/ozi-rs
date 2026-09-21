@@ -28,7 +28,11 @@ vi.mock("$lib/api", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(async () => null) }));
 
 import BundleLoader from "../components/BundleLoader.svelte";
-import { bundleLoaderView, projectsLoading, projectsStore } from "../lib/stores";
+import {
+  bundleLoaderView,
+  projectsLoading,
+  projectsStore,
+} from "../lib/stores";
 
 beforeEach(() => {
   vi.stubGlobal(

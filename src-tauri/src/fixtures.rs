@@ -96,9 +96,20 @@ pub fn sample_app_state() -> AppState {
         .project_mut()
         .add_track_to_layer(layer_id, veter)
         .expect("track layer 1 exists in a fresh project");
+    // A track the map cannot draw: one point, no line. It is in the project,
+    // counts towards it and exports with it, and until 2026-09-21 the Tracks
+    // tab had no row for it, because the rows came from the map's features.
+    let mut stray = Track::new(TrackId::new(3), "точка отсечки");
+    stray.add_segment(segment(4, 30, &[(59.95000, 31.62000)], (10, 2, 0)));
+    stray.style_mut().color = [22, 163, 74, 255];
+
     state
         .project_mut()
         .add_track_to_layer(layer_id, lisa)
+        .expect("track layer 1 exists in a fresh project");
+    state
+        .project_mut()
+        .add_track_to_layer(layer_id, stray)
         .expect("track layer 1 exists in a fresh project");
 
     // A second track layer, the shape an import leaves behind.
@@ -268,6 +279,7 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
 
     let app_state = crate::commands::app_state_dto(&state, &cached_slugs());
     let tracks_geojson = crate::commands::build_tracks_geojson(state.track_layers());
+    let tracks_list = crate::commands::list_track_summaries(state.track_layers());
     let track = state.track_layers()[0]
         .tracks()
         .iter()
@@ -290,6 +302,14 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
         // `.json`, not `.geojson`: the frontend bundler only parses the
         // former as data, and a fixture the tests cannot import is no fixture.
         ("tracks-geojson.json", tracks_geojson),
+        // The rows the Tracks tab reads. Written separately because they are
+        // not the map's features: the map omits a track it cannot draw, and a
+        // list that inherited that omission was how a one-point track ended up
+        // with no row at all.
+        (
+            "tracks-list.json",
+            serde_json::to_value(&tracks_list).expect("serialize track rows"),
+        ),
         (
             "track-detail.json",
             serde_json::to_value(&track_detail).expect("serialize track detail"),

@@ -10,6 +10,41 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a row for every track
+
+The Tracks tab built its rows out of the map's GeoJSON. One call, so it looked
+cheap. It was not.
+
+Every coordinate of every track travelled so that a list of names could be
+drawn. The row model reads nine properties; the geometry beside them — a day's
+folder of recordings is hundreds of thousands of points — was serialized in
+Rust, sent over IPC, parsed and dropped, again on every change that reloads the
+tab.
+
+And a track the map cannot draw had no row at all. `build_tracks_geojson`
+omits a track whose segments are all shorter than two points, which is right —
+there is nothing to draw. The list inherited it, so a one-point track sat in
+the project, counted towards its size and went out with its export, with no way
+to see it, rename it or delete it. That is the second time a list derived from
+map geometry has gone wrong this way; the first emptied the whole rail when the
+geometry type changed.
+
+`list_tracks` returns rows now: one per track, every track, no geometry, and
+typed instead of `JsonValue`. The old mapper had no callers left and is gone.
+
+The stand would have inherited the same omission — it was deriving its answer
+from the geometry fixture — so the core writes `tracks-list.json` beside it and
+the sample project gained a one-point track. Three rows against two features,
+and a test that holds the two fixtures against each other.
+
+| | |
+|---|---|
+| Evidence | Rust tests that the listing includes what the map omits and carries no coordinates; frontend tests on the row mapper and on the gap between the two fixtures |
+| Automated gates | `just ci` green (300 Rust, 349 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — the download speaks Russian
 
 The app has opened in Russian for a while. The one part of it a crew actually

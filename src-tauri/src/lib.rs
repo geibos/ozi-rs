@@ -69,6 +69,7 @@ fn specta_builder() -> tauri_specta::Builder {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
         commands::get_app_state,
         commands::get_tracks_geojson,
+        commands::list_tracks,
         commands::load_projects,
         commands::load_project,
         commands::preview_project,

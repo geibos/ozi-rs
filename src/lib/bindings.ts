@@ -22,6 +22,18 @@ async getTracksGeojson() : Promise<Result<JsonValue, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Every track in the project as a row: what the Tracks tab shows, typed, and
+ * without the geometry it was paying for. See `list_track_summaries`.
+ */
+async listTracks() : Promise<Result<TrackSummaryDto[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_tracks") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async loadProjects() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("load_projects") };

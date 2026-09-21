@@ -113,6 +113,17 @@
       "point_count": 2,
       "track_id": 2,
       "visible": false
+    },
+    {
+      "color": "rgba(22,163,74,1.000)",
+      "distance_km": -0.0,
+      "duration_seconds": 0,
+      "layer_id": 1,
+      "line_width": 2.0,
+      "name": "точка отсечки",
+      "point_count": 1,
+      "track_id": 3,
+      "visible": true
     }
   ],
   "waypoint_layer_count": 2,

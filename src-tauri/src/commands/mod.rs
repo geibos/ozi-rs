@@ -402,6 +402,29 @@ pub fn app_state_dto(
 /// A segment with fewer than two points cannot be drawn as a line and is
 /// skipped; a track left with no parts is omitted rather than emitted with an
 /// empty geometry.
+/// The rows the Tracks tab shows: one per track, with no geometry.
+///
+/// The tab used to build its rows from `build_tracks_geojson`, which cost it
+/// two things. Every coordinate of every track was serialized, sent over IPC
+/// and parsed so that a list of names could be drawn — a day's folder of
+/// recordings is hundreds of thousands of points, re-sent whenever anything
+/// changed. And that GeoJSON deliberately omits a track with nothing drawable,
+/// which is right for the map and wrong for a list: a track of one point was
+/// in the project, counted towards it and exported with it, but had no row, so
+/// it could not be seen, renamed or deleted.
+pub fn list_track_summaries(layers: &[crate::domain::TrackLayer]) -> Vec<TrackSummaryDto> {
+    layers
+        .iter()
+        .flat_map(|layer| {
+            let layer_id = layer.id().value();
+            layer
+                .tracks()
+                .iter()
+                .map(move |track| to_track_summary_dto(layer_id, track))
+        })
+        .collect()
+}
+
 pub fn build_tracks_geojson(layers: &[crate::domain::TrackLayer]) -> serde_json::Value {
     let mut features = Vec::new();
 
@@ -460,6 +483,15 @@ pub fn build_tracks_geojson(layers: &[crate::domain::TrackLayer]) -> serde_json:
 pub fn get_tracks_geojson(state: State<SharedState>) -> Result<serde_json::Value, String> {
     let s = lock_app_state(state.inner())?;
     Ok(build_tracks_geojson(s.track_layers()))
+}
+
+/// Every track in the project as a row: what the Tracks tab shows, typed, and
+/// without the geometry it was paying for. See `list_track_summaries`.
+#[tauri::command]
+#[specta::specta]
+pub fn list_tracks(state: State<SharedState>) -> Result<Vec<TrackSummaryDto>, String> {
+    let s = lock_app_state(state.inner())?;
+    Ok(list_track_summaries(s.track_layers()))
 }
 
 // ── LizaAlert project loading ─────────────────────────────────────────────────
@@ -1831,7 +1863,10 @@ pub fn create_empty_track(
 
 #[cfg(test)]
 mod tests {
-    use super::{PointDetailDto, SegmentDetailDto, TrackDetailDto, build_tracks_geojson};
+    use super::{
+        PointDetailDto, SegmentDetailDto, TrackDetailDto, build_tracks_geojson,
+        list_track_summaries,
+    };
     use crate::domain::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
 
     #[test]
@@ -2017,5 +2052,55 @@ mod tests {
         let features = geojson["features"].as_array().expect("features array");
         assert_eq!(features.len(), 1);
         assert_eq!(features[0]["properties"]["name"], "Drawable");
+    }
+
+    /// The Tracks tab built its rows from the map's GeoJSON, which drops a
+    /// track with nothing drawable — correctly, for the map. The list
+    /// inherited that: a track of one point, or of none, was in the project,
+    /// counted towards its size, exported with it, and could not be seen,
+    /// renamed or deleted, because it had no row.
+    ///
+    /// The listing is its own thing now, and it lists every track.
+    #[test]
+    fn the_track_listing_includes_tracks_the_map_cannot_draw() {
+        let layer = layer_with(vec![
+            track_with(4, "Empty", vec![]),
+            track_with(5, "Single point", vec![segment(1, &[(55.0, 37.0)])]),
+            track_with(
+                6,
+                "Drawable",
+                vec![segment(2, &[(55.0, 37.0), (55.1, 37.1)])],
+            ),
+        ]);
+
+        let rows = list_track_summaries(std::slice::from_ref(&layer));
+
+        assert_eq!(
+            rows.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            vec!["Empty", "Single point", "Drawable"],
+            "every track in the project has a row, drawable or not"
+        );
+        assert_eq!(rows[0].point_count, 0);
+        assert_eq!(rows[1].point_count, 1);
+    }
+
+    /// The rows carry what a row shows and nothing else. They used to arrive
+    /// as the map's GeoJSON: every coordinate of every track, serialized,
+    /// sent over IPC and parsed, so that a list of names could be drawn. A
+    /// day's folder of recordings is hundreds of thousands of points.
+    #[test]
+    fn the_track_listing_carries_no_geometry() {
+        let layer = layer_with(vec![track_with(
+            7,
+            "Long one",
+            vec![segment(1, &[(55.0, 37.0), (55.1, 37.1), (55.2, 37.2)])],
+        )]);
+
+        let rows = list_track_summaries(std::slice::from_ref(&layer));
+        let json = serde_json::to_string(&rows).expect("serialize rows");
+
+        assert!(!json.contains("coordinates"), "rows must carry no geometry");
+        assert!(!json.contains("55.1"), "nor any point of one: {json}");
+        assert_eq!(rows[0].point_count, 3, "only the count of them");
     }
 }

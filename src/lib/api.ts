@@ -1,4 +1,9 @@
-import { commands, type ExtentDto, type Result } from "./bindings";
+import {
+  commands,
+  type ExtentDto,
+  type Result,
+  type TrackSummaryDto,
+} from "./bindings";
 import { invokeIpc, reportIpcError } from "./ipc";
 import type {
   AppStateDto,
@@ -74,6 +79,18 @@ export async function getTracksGeojson(): Promise<GeoJSON.FeatureCollection> {
     commands.getTracksGeojson(),
   );
   return geojson as unknown as GeoJSON.FeatureCollection;
+}
+
+/**
+ * Every track in the project as a row.
+ *
+ * The Tracks tab used to derive its rows from `getTracksGeojson`, paying for
+ * every coordinate of every track to draw a list of names — and inheriting the
+ * map's omission of tracks with nothing drawable, so a one-point track had no
+ * row at all.
+ */
+export async function listTracks(): Promise<TrackSummaryDto[]> {
+  return unwrap("list_tracks", commands.listTracks());
 }
 
 export async function loadProjects(): Promise<void> {

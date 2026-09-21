@@ -11,10 +11,16 @@
 import appStateJson from "./app-state.json";
 import coldStartJson from "./app-state-cold.json";
 import tracksGeojsonJson from "./tracks-geojson.json";
+import tracksListJson from "./tracks-list.json";
 import trackDetailJson from "./track-detail.json";
 import waypointsJson from "./waypoints.json";
 
-import type { AppStateDto, TrackDetailDto, WaypointDto } from "$lib/bindings";
+import type {
+  AppStateDto,
+  TrackDetailDto,
+  TrackSummaryDto,
+  WaypointDto,
+} from "$lib/bindings";
 
 /** A project shaped like one search: two tracks, one of them hidden. */
 export const appStateFixture = appStateJson as AppStateDto;
@@ -25,6 +31,14 @@ export const coldStartFixture = coldStartJson as unknown as AppStateDto;
 /** The same project's tracks, as the map layer receives them. */
 export const tracksGeojsonFixture =
   tracksGeojsonJson as unknown as GeoJSON.FeatureCollection;
+
+/**
+ * The same project's tracks, as the Tracks tab receives them.
+ *
+ * Three rows against the geometry's two: the map cannot draw a track of one
+ * point, and for a while the list inherited that omission.
+ */
+export const tracksListFixture = tracksListJson as unknown as TrackSummaryDto[];
 
 /** The two-segment track, as the inspector receives it. */
 export const trackDetailFixture = trackDetailJson as unknown as TrackDetailDto;

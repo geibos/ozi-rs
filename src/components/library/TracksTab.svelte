@@ -48,7 +48,7 @@
     getSimplifiedPreview,
     getTrackDetail,
     getTrackExportDefaultPath,
-    getTracksGeojson,
+    listTracks,
     importGpx,
     importPlt,
     importTracksDirectory,
@@ -76,7 +76,7 @@
   import LibraryRow from "./LibraryRow.svelte";
   import {
     filterTrackFeatures,
-    trackFeaturesFromGeojson,
+    trackFeaturesFromSummaries,
     type TrackFeature,
   } from "$lib/track-features";
   import { get } from "svelte/store";
@@ -139,7 +139,7 @@
 
   async function loadTracks() {
     try {
-      tracks = trackFeaturesFromGeojson(await getTracksGeojson());
+      tracks = trackFeaturesFromSummaries(await listTracks());
     } catch (err) {
       console.error("Failed to load tracks", err);
       toast.error(get(i18n)("tracksTab.loadFailed"), {

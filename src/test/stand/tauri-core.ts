@@ -20,6 +20,7 @@ import {
   coldStartFixture,
   trackDetailFixture,
   tracksGeojsonFixture,
+  tracksListFixture,
   waypointsFixture,
 } from "../fixtures";
 
@@ -142,6 +143,10 @@ function previewedAppState(): unknown {
 const HANDLERS: Record<string, (args: Args) => unknown> = {
   get_app_state: () => previewedAppState(),
   get_tracks_geojson: () => tracksGeojsonFixture,
+  // The rows the Tracks tab reads — its own fixture, not the map's features.
+  // Deriving them from the geometry would have made the stand inherit the very
+  // omission this listing exists to undo.
+  list_tracks: () => tracksListFixture,
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
       ? trackDetailFixture
