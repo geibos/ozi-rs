@@ -798,7 +798,7 @@
                   else simplifyState.update((s) => ({ ...s, preview: null }));
                 }}
               />
-              <Label class="text-xs">Live preview</Label>
+              <Label class="text-xs">{$i18n("tracksTab.livePreview")}</Label>
             </div>
             {#if $simplifyState.preview}
               <div

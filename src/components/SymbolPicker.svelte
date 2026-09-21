@@ -59,7 +59,7 @@
         >
           <span class="text-base leading-none">📍</span>
         </Tooltip.Trigger>
-        <Tooltip.Content>None</Tooltip.Content>
+        <Tooltip.Content>{$t("symbol.noneShort")}</Tooltip.Content>
       </Tooltip.Root>
 
       {#each SYMBOLS as s (s.value)}

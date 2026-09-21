@@ -1240,11 +1240,11 @@
     >
       <button
         class="hover:bg-muted rounded-sm px-2 py-1.5 text-left text-xs"
-        onclick={handleDeletePoint}>Delete Point</button
+        onclick={handleDeletePoint}>{$i18n("map.deletePoint")}</button
       >
       <button
         class="hover:bg-muted rounded-sm px-2 py-1.5 text-left text-xs"
-        onclick={handleInsertPointAfter}>Insert Point After</button
+        onclick={handleInsertPointAfter}>{$i18n("map.insertPointAfter")}</button
       >
     </div>
   {/if}

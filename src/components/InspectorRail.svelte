@@ -71,7 +71,7 @@
       class="edge-handle"
       onclick={togglePin}
       aria-label={$t("shell.pinInspector")}
-      title="Pin inspector open"
+      title={$t("shell.pinInspector")}
     >
       <span class="edge-handle-pin">
         <PinIcon class="size-3.5" />
@@ -81,7 +81,7 @@
 {:else}
   <div class="inspector-rail-inner" data-testid="inspector-rail">
     <header class="rail-header">
-      <span class="rail-label">Inspector</span>
+      <span class="rail-label">{$t("inspector.railLabel")}</span>
       <button
         type="button"
         class="pin-button"
@@ -107,7 +107,7 @@
         <MapInspector />
       {:else}
         <div class="empty-state">
-          <p class="empty-title">Nothing selected</p>
+          <p class="empty-title">{$t("inspector.nothingSelected")}</p>
           <p class="empty-hint">
             Pick a Track, Waypoint, or Map from the Library to inspect its
             properties.

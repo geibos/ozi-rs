@@ -57,9 +57,9 @@
     </Select.Content>
   </Select.Root>
 
-  <label class="pack-toggle" title="Enable the Catppuccin theme pack">
+  <label class="pack-toggle" title={$t("theme.catppuccinPackHint")}>
     <input type="checkbox" bind:checked={$catppuccinPackEnabled} />
-    <span>Catppuccin pack</span>
+    <span>{$t("theme.catppuccinPack")}</span>
   </label>
 </div>
 

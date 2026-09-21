@@ -32,7 +32,7 @@
     <div
       class="bg-card text-muted-foreground border-border flex items-center justify-between border-b px-2.5 py-1 text-xs"
     >
-      <span>Console</span>
+      <span>{$t("console.title")}</span>
       <Button
         variant="ghost"
         size="icon-xs"

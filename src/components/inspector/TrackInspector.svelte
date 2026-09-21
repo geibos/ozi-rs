@@ -451,7 +451,10 @@
     truncating label span so long localized labels never push past the
     rail width.
   -->
-  <section class="flex min-w-0 flex-col gap-2" aria-label="Track actions">
+  <section
+    class="flex min-w-0 flex-col gap-2"
+    aria-label={$t("inspector.trackActions")}
+  >
     <Button
       variant="outline"
       size="sm"

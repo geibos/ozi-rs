@@ -97,7 +97,7 @@
     {#if libraryRail}
       {@render libraryRail()}
     {:else}
-      <div class="placeholder" aria-hidden="true">Library</div>
+      <div class="placeholder" aria-hidden="true">{$t("shell.library")}</div>
     {/if}
   </aside>
 
@@ -251,7 +251,7 @@
     {#if inspectorRail}
       {@render inspectorRail()}
     {:else}
-      <div class="placeholder" aria-hidden="true">Inspector</div>
+      <div class="placeholder" aria-hidden="true">{$t("shell.inspector")}</div>
     {/if}
   </aside>
 </div>

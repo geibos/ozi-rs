@@ -10,6 +10,34 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — nothing typed in English
+
+Having found English on the library rows, I swept the rest of the components
+rather than the rest of the screens. There was more, and one of it is on the
+path a crew uses in the field: the map's point context menu, in edit mode, read
+**"Delete Point"** and **"Insert Point After"**. Also the inspector rail's
+heading and its empty state, the console's title, the symbol picker's "none",
+the theme pack, the collapsed rails' placeholders, the live-preview label, and
+two inspector sections' accessible names.
+
+Two sweeps in one day for the same defect, so the third one is a test rather
+than a sweep. It scans every component for a literal `aria-label`, `title` or
+`placeholder` whose value contains a Latin letter. Anything computed,
+translated or interpolated passes — it constrains where a label comes from, not
+how it is built.
+
+It earned itself on the first run: two offenders I had already missed twice,
+both accessible names on inspector sections. The allowlist has one entry, an
+inert mode group, with its reason written next to it.
+
+| | |
+|---|---|
+| Evidence | the guard test, red on its first run, naming both files it found |
+| Automated gates | `just ci` green (300 Rust, 359 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — the rows speak Russian
 
 Walked the workspace on the stand, mostly to see the one-point track from the

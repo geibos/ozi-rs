@@ -133,7 +133,7 @@
     {/if}
   </section>
 
-  <section class="flex flex-col gap-2" aria-label="Map actions">
+  <section class="flex flex-col gap-2" aria-label={$t("inspector.mapActions")}>
     <Button
       variant="outline"
       size="sm"
