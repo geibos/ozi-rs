@@ -68,12 +68,22 @@
   font-display: swap;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* The reset belongs in a layer for the same reason the element defaults do,
+ * and it mattered far more: unlayered, `margin: 0; padding: 0` on `*` beat
+ * every Tailwind spacing utility in the app, because an unlayered rule wins
+ * over any `@layer` whatever its specificity. Every shadcn component's own
+ * padding was dead — a dropdown item computed `padding: 0px` and its label sat
+ * flush against the menu's edge. Inside `@layer base` the reset still replaces
+ * the browser's defaults (user-agent styles lose to author styles regardless
+ * of layer) and the utilities decide from there. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html,

@@ -131,8 +131,12 @@
   }
 </script>
 
+<!-- `shrink-0`: this card was the only shrinkable child of the inspector
+     column, so whenever the rail ran short of room it — and only it —
+     collapsed, hiding the points behind the next card instead of letting the
+     rail scroll. Its own `max-h-72` already caps its height. -->
 <section
-  class="bg-card border-border flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-card)] border"
+  class="bg-card border-border flex shrink-0 flex-col overflow-hidden rounded-[var(--radius-card)] border"
   aria-label={$t("inspector.segmentsPoints")}
 >
   <header
