@@ -31,6 +31,7 @@
     catalogueError,
     bundleLoaderOpen,
     bundleLoaderPreselect,
+    bundleLoaderView,
     busy,
     currentProject,
     downloadProgress,
@@ -61,13 +62,18 @@
     onCloseRequest?: () => void;
   } = $props();
 
-  let projectFilter = $state("");
-  let debouncedProjectFilter = $state("");
-  let selectedSlug = $state("");
+  // Where the operator was when the loader last closed. The Sheet unmounts
+  // this component, so anything held only here is gone by the time they come
+  // back — see `bundleLoaderView`.
+  const restoredView = get(bundleLoaderView);
+
+  let projectFilter = $state(restoredView.filter);
+  let debouncedProjectFilter = $state(restoredView.filter);
+  let selectedSlug = $state(restoredView.selectedSlug);
   // Offline this is the only list that means anything: the catalogue is
   // thirteen thousand rows and a crew without a signal can open the handful
   // that are already on disk.
-  let onlyCached = $state(false);
+  let onlyCached = $state(restoredView.onlyCached);
   /**
    * Top-level bundle entries the operator cleared.
    *
@@ -75,7 +81,19 @@
    * this code's. Print sheets and Android tile packs are usually most of the
    * weight and this app opens neither, which is what the hint says.
    */
-  let skipped = $state<Record<string, true>>({});
+  let skipped = $state<Record<string, true>>({ ...restoredView.skipped });
+
+  // Hand the position back on every change, so whenever the Sheet takes the
+  // component away there is nothing left to lose.
+  $effect(() => {
+    bundleLoaderView.set({
+      filter: projectFilter,
+      onlyCached,
+      selectedSlug,
+      skipped: { ...skipped },
+      scrollTop,
+    });
+  });
 
   $effect(() => {
     const value = projectFilter;
@@ -98,7 +116,7 @@
   const OVERSCAN = 15;
 
   let listEl = $state<HTMLDivElement | null>(null);
-  let scrollTop = $state(0);
+  let scrollTop = $state(restoredView.scrollTop);
   let viewportHeight = $state(0);
   let scrollRaf = 0;
 
@@ -110,11 +128,21 @@
     });
   }
 
+  // The reset below must not fire on the component's first run: the filter it
+  // reacts to is the restored one, and resetting for it would throw away the
+  // position this component exists to bring back.
+  let scrollResetArmed = false;
+
   $effect(() => {
     // Reset the scroll window whenever the filtered set changes — a stale
     // offset past the new (shorter) list would render nothing.
     void debouncedProjectFilter;
     void onlyCached;
+    if (!scrollResetArmed) {
+      scrollResetArmed = true;
+      if (listEl) listEl.scrollTop = scrollTop;
+      return;
+    }
     scrollTop = 0;
     if (listEl) listEl.scrollTop = 0;
   });

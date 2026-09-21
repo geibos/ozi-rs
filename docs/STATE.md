@@ -5,10 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **one preview at a time** (2026-09-21) — clicking through
+Last merged slice: **the catalogue keeps your place** (2026-09-21) — closing
+the loader to look at the map no longer throws away the search, the selection
+and the place in the list; after one preview at a time, where clicking through
 several projects no longer lets an abandoned preview swap the map list back
-under the operator, and a preview stopped releasing a busy flag it never took;
-after when it fails, where offline the project list
+under the operator, and a preview stopped releasing a busy flag it never took,
+and after when it fails, where offline the project list
 says it is the saved one, and the failed-download path was verified rather than
 assumed, and after the stand replaying a bundle download, which found that the
 download button did nothing at all on the path from the workspace, and after a map that is not downloaded being
@@ -40,7 +42,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 296 Rust tests and 341 frontend tests;
+rustfmt, clippy, type-checks, 296 Rust tests and 343 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

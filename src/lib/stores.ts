@@ -489,6 +489,34 @@ export const bundleLoaderOpen = writable(false);
  */
 export const bundleLoaderPreselect = writable<string | null>(null);
 /**
+ * Where the operator was in the bundle loader when it last closed.
+ *
+ * On the workspace route the loader lives inside a Sheet, and a Sheet unmounts
+ * its content. Everything the component held went with it: the search text,
+ * the "only downloaded" toggle, the selected project, the contents they had
+ * unchecked, and the place in a thirteen-thousand-row list. Closing the loader
+ * to look at the map — the ordinary thing to do — meant finding the search
+ * again by name afterwards.
+ *
+ * It is deliberately session state, not persisted: a crew opening the app
+ * tomorrow starts on today's search, not on yesterday's.
+ */
+export interface BundleLoaderView {
+  filter: string;
+  onlyCached: boolean;
+  selectedSlug: string;
+  skipped: Record<string, true>;
+  scrollTop: number;
+}
+
+export const bundleLoaderView = writable<BundleLoaderView>({
+  filter: "",
+  onlyCached: false,
+  selectedSlug: "",
+  skipped: {},
+  scrollTop: 0,
+});
+/**
  * Inspector-rail visibility placeholder for the `redesign-shell-layout`
  * change. When false (default) `WorkspaceShell` omits the right rail from
  * the DOM and the canvas grows into the freed 360px. The `inspector-pane`

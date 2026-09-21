@@ -86,8 +86,11 @@ and the palette slice; these were not.
   longer releases a busy flag it never took, the loader matches by slug rather
   than display name, and the fifteen-second timer says the wait is running long
   instead of ending it.
-- **Filter and selection do not survive closing the loader**, because the Sheet
-  unmounts the component and both live in component state.
+- ~~Filter and selection do not survive closing the loader.~~ Done on
+  2026-09-21 in `keep-the-place-in-the-catalogue`: the filter, the "only
+  downloaded" toggle, the selection, the cleared contents and the scroll offset
+  live in `bundleLoaderView` and come back when the Sheet mounts the loader
+  again. Session state only — tomorrow starts on tomorrow's search.
 - **Backend status and progress text is English** and reaches the screen
   verbatim — there is no key-based channel for it, so the status bar and the
   bundle phases stay untranslated.

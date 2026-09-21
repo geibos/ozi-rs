@@ -10,6 +10,33 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the catalogue keeps your place
+
+The loader is a Sheet on the workspace route precisely so a crew can check the
+map without leaving the catalogue. A Sheet unmounts its content, so doing that
+threw away the search text, the "only downloaded" toggle, the selected project,
+the contents they had unchecked and the place in a thirteen-thousand-row list.
+They came back to an empty box at the top. Project names are latin
+transliterations of Russian place names, so "just type it again" is not the
+small thing it sounds like.
+
+The position lives outside the component now and comes back with it. It is
+session state on purpose: tomorrow starts on tomorrow's search.
+
+The test mounts the real component, types a search, throws the component away
+exactly as the Sheet does and mounts it again — and it fails on the old code,
+which is the only reason to trust it. Mounting the loader at all needed
+`$app/navigation` and `$app/paths` stubs; they are there now for the next
+component that navigates.
+
+| | |
+|---|---|
+| Evidence | a behavioural test across an unmount, red before the change |
+| Automated gates | `just ci` green (296 Rust, 343 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — one preview at a time
 
 No screenshot in this one, and that is the point: the defect was in *when*
