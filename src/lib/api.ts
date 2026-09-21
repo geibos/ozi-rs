@@ -533,6 +533,30 @@ export async function cropTrackToExtent(
 }
 
 /**
+ * Trim a track at one of its points, keeping that point.
+ *
+ * The commonest edit to a recording: the drive to the start is the first
+ * twenty minutes of it. `before` cuts what came earlier, otherwise what came
+ * later. Returns how many points went.
+ */
+export async function trimTrackAtPoint(
+  layerId: bigint,
+  trackId: bigint,
+  pointId: bigint,
+  before: boolean,
+): Promise<number> {
+  return await unwrap(
+    "trim_track_at_point",
+    commands.trimTrackAtPoint(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      toIdNumber(pointId),
+      before,
+    ),
+  );
+}
+
+/**
  * Remove points outside the `[from, to]` time range (ISO-8601 UTC strings,
  * either bound optional). Untimed points are always kept. Returns the
  * removed-point count.

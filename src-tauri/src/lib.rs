@@ -112,6 +112,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::simplify_track,
         commands::sort_track_points,
         commands::crop_track_to_extent,
+        commands::trim_track_at_point,
         commands::crop_track_to_time,
         commands::set_track_line_width,
         commands::get_track_detail,

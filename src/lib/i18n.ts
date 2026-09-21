@@ -301,6 +301,11 @@ const dictionaries = {
     "map.newWaypointName": "Waypoint {n}",
     "loader.pastedLinkUnknown":
       "That search is not in the list yet — refresh, or check the link",
+    "inspector.trimBefore": "Trim everything before this point",
+    "inspector.trimAfter": "Trim everything after this point",
+    "inspector.trimmed": "{n} points removed",
+    "inspector.trimNothing": "Nothing to trim here",
+    "inspector.trimFailed": "Could not trim the track",
     "loader.stopRefresh": "Stop",
     "loader.stopRefreshFailed": "Could not stop the refresh",
     "loader.offline": "Offline — this is the saved list",
@@ -618,6 +623,11 @@ const dictionaries = {
     "map.newWaypointName": "Точка {n}",
     "loader.pastedLinkUnknown":
       "Такого поиска пока нет в списке — обновите список или проверьте ссылку",
+    "inspector.trimBefore": "Обрезать всё до этой точки",
+    "inspector.trimAfter": "Обрезать всё после этой точки",
+    "inspector.trimmed": "Удалено точек: {n}",
+    "inspector.trimNothing": "Здесь нечего обрезать",
+    "inspector.trimFailed": "Не удалось обрезать трек",
     "loader.stopRefresh": "Стоп",
     "loader.stopRefreshFailed": "Не удалось остановить обновление",
     "loader.offline": "Нет связи — список сохранённый",

@@ -69,6 +69,7 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "set_bundles_root",
   "reveal_bundle",
   "cancel_project_listing",
+  "trim_track_at_point",
   "export_gpx",
   "export_all_tracks_gpx",
   "export_track_plt",

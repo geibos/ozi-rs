@@ -5,8 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a link a coordinator sent** (2026-09-22) — a catalogue
-link pasted into the search box opens that search; after the three on-map
+Last merged slice: **trimming the drive to the start** (2026-09-22) — a track
+can be trimmed at a point, in either direction, as one undoable step; after a
+link a coordinator sent, where a catalogue
+link pasted into the search box opens that search, and after the three on-map
 tools, where distance, a
 geodesic radius ring and placing a waypoint by bearing and distance all
 arrived, reachable from the command palette, and after an old project still opening, where
@@ -94,7 +96,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 318 Rust tests and 429 frontend tests;
+rustfmt, clippy, type-checks, 320 Rust tests and 429 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -161,9 +163,10 @@ re-ordered rather than followed blindly.
    `product-scope` names as a place a workspace action may live — the mode
    chips stay inert scaffolding per `ui-shell`, and that is not the obstacle it
    looked like.
-7. **The remaining ADR-0020 items**: crop by selection, and the walkthrough.
-   Recent `.ozp` and waypoint colour landed on 2026-09-21; the three on-map
-   tools and open-by-URL on 2026-09-22.
+7. **The remaining ADR-0020 item**: the walkthrough. Recent `.ozp` and
+   waypoint colour landed on 2026-09-21; the three on-map tools, open-by-URL
+   and trimming a track at a point on 2026-09-22. Trimming is crop-by-selection
+   in two halves, each useful alone.
 8. **Upkeep**: point the stand at whatever the next slice touches. Every screen
    of the field cycle has been walked on it at least once.
 

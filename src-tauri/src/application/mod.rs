@@ -1340,13 +1340,45 @@ impl AppState {
         })
     }
 
+    /// Trim a track at one of its points, keeping that point.
+    ///
+    /// The commonest edit to a recording: the first twenty minutes are the
+    /// drive to the start, so cut everything before where the walking begins.
+    /// Crop by time can do it if the crew knows the time; this is the gesture
+    /// they have — they can see the point on the map and in the table.
+    ///
+    /// `before` trims what came earlier, otherwise what came later. Either way
+    /// the named point survives: it is where the walk starts or ends, and
+    /// removing it would be off by one in the direction nobody checks.
+    ///
+    /// Returns how many points were removed; zero records no undo step,
+    /// because trimming at the first or last point is not an edit.
+    pub fn apply_trim_track_at_point(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        point_id: TrackPointId,
+        before: bool,
+    ) -> Result<usize, ProjectLayerError> {
+        // Positional, so the predicate cannot judge a point on its own: walk
+        // the track in order and flip once the named point is reached.
+        let mut seen = false;
+        self.apply_crop_with(layer_id, track_id, |p| {
+            if p.id() == point_id {
+                seen = true;
+                return false;
+            }
+            if before { !seen } else { seen }
+        })
+    }
+
     /// Shared crop plumbing: collect points matching `remove`, apply one
     /// undoable CropTrackPoints. Returns how many points were removed.
     fn apply_crop_with(
         &mut self,
         layer_id: LayerId,
         track_id: TrackId,
-        remove: impl Fn(&crate::domain::TrackPoint) -> bool,
+        mut remove: impl FnMut(&crate::domain::TrackPoint) -> bool,
     ) -> Result<usize, ProjectLayerError> {
         let doomed: Vec<(TrackSegmentId, Vec<TrackPointId>)> = {
             let track = self
@@ -2283,6 +2315,97 @@ mod tests {
             state.lizaalert.projects.len(),
             2,
             "a stopped walk read only a prefix and may not remove anything"
+        );
+    }
+
+    /// Trimming a track at a point.
+    ///
+    /// The commonest edit a crew makes to a recording: the first twenty
+    /// minutes are the drive to the start, so cut everything before the point
+    /// where the walking begins. Crop by time can do it if they know the time;
+    /// this is the gesture they actually have — they can see the point.
+    ///
+    /// The named point is kept in both directions. It is where the walk
+    /// starts, or where it ends, and a crop that removed it would be off by
+    /// one in the direction nobody checks.
+    #[test]
+    fn trimming_at_a_point_keeps_that_point_and_undoes_whole() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let track_id = TrackId::new(1);
+
+        let mut track = Track::new(track_id, "20260708_Ветер");
+        let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+        for i in 1..=5u64 {
+            segment.add_point(TrackPoint::new(
+                TrackPointId::new(i),
+                59.95 + i as f64 * 0.001,
+                31.59,
+            ));
+        }
+        track.add_segment(segment);
+        state.project.add_track_to_layer(layer_id, track).unwrap();
+
+        let ids = |s: &AppState| {
+            s.project.track_layers()[0].tracks()[0].segments()[0]
+                .points()
+                .iter()
+                .map(|p| p.id().value())
+                .collect::<Vec<_>>()
+        };
+
+        let removed = state
+            .apply_trim_track_at_point(layer_id, track_id, TrackPointId::new(3), true)
+            .expect("trim before");
+        assert_eq!(removed, 2, "the two points before it");
+        assert_eq!(ids(&state), vec![3, 4, 5], "and the named point stays");
+
+        state.undo();
+        assert_eq!(
+            ids(&state),
+            vec![1, 2, 3, 4, 5],
+            "one undo puts them all back"
+        );
+
+        let removed = state
+            .apply_trim_track_at_point(layer_id, track_id, TrackPointId::new(3), false)
+            .expect("trim after");
+        assert_eq!(removed, 2);
+        assert_eq!(ids(&state), vec![1, 2, 3]);
+    }
+
+    /// A crop that would leave nothing is refused elsewhere in this file; a
+    /// trim at the first or last point removes nothing and must not pretend
+    /// otherwise by recording an undo step for it.
+    #[test]
+    fn trimming_at_an_end_point_changes_nothing() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let track_id = TrackId::new(1);
+
+        let mut track = Track::new(track_id, "Короткий");
+        let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+        for i in 1..=3u64 {
+            segment.add_point(TrackPoint::new(TrackPointId::new(i), 59.95, 31.59));
+        }
+        track.add_segment(segment);
+        state.project.add_track_to_layer(layer_id, track).unwrap();
+        let before = state.history.mutation_count();
+
+        assert_eq!(
+            state
+                .apply_trim_track_at_point(layer_id, track_id, TrackPointId::new(1), true)
+                .expect("trim before the first point"),
+            0
+        );
+        assert_eq!(
+            state.history.mutation_count(),
+            before,
+            "nothing removed, nothing to undo"
         );
     }
 

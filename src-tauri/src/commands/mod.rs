@@ -1614,6 +1614,32 @@ pub fn crop_track_to_extent(
     Ok(removed as u32)
 }
 
+/// Trim a track at one of its points, keeping that point. `before` cuts what
+/// came earlier, otherwise what came later. Returns removed-point count.
+#[tauri::command]
+#[specta::specta]
+pub fn trim_track_at_point(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    point_id: u64,
+    before: bool,
+) -> Result<u32, String> {
+    use crate::domain::{LayerId, TrackId, TrackPointId};
+    let mut app_state = lock_app_state(state.inner())?;
+    let removed = app_state
+        .apply_trim_track_at_point(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackPointId::new(point_id),
+            before,
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(removed as u32)
+}
+
 /// CJ-4: crop the track to a time range (ISO-8601 UTC bounds, either side
 /// optional). Untimed points are always kept. Returns removed-point count.
 #[tauri::command]

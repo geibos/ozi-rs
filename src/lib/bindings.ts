@@ -433,6 +433,18 @@ async cropTrackToExtent(layerId: number, trackId: number, extent: ExtentDto) : P
 }
 },
 /**
+ * Trim a track at one of its points, keeping that point. `before` cuts what
+ * came earlier, otherwise what came later. Returns removed-point count.
+ */
+async trimTrackAtPoint(layerId: number, trackId: number, pointId: number, before: boolean) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("trim_track_at_point", { layerId, trackId, pointId, before }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * CJ-4: crop the track to a time range (ISO-8601 UTC bounds, either side
  * optional). Untimed points are always kept. Returns removed-point count.
  */

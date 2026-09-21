@@ -10,6 +10,43 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — trimming the drive to the start
+
+ADR-0020 declares cropping a track by selection; crop by extent and crop by
+time exist, and neither is the gesture a crew actually has.
+
+The commonest edit to a recording is that the first twenty minutes of it are
+the drive to the start. Cropping by time does that — if they work out what time
+the walking began. Cropping by extent does it — if the drive happens to fall
+outside a rectangle they can draw. What they *have* is the point: they can see
+where the track stops being a road and starts being a search, on the map and in
+the points table.
+
+So: two controls on each point's row. Trim everything before this point, trim
+everything after it. The named point survives either way — it is where the walk
+starts or ends, and removing it would be off by one in the direction nobody
+checks.
+
+No new command in the core. `CropTrackPoints` already takes the exact points to
+remove and restores them to their places on undo; what was missing was a caller
+that knows *order*, which a per-point predicate cannot. The plumbing takes an
+`FnMut` now and the rule walks the track flipping once it reaches the point.
+
+Two trims compose into a crop by selection — cut before the start, cut after
+the end — which is the same result with half the interface, and each half is
+useful alone.
+
+A trim at the first or last point removes nothing, says so, and records no undo
+step. An edit that changes nothing should not be something to undo.
+
+| | |
+|---|---|
+| Evidence | Rust tests: both directions, the point survives, one undo restores all five, and a trim at an end leaves the mutation count untouched |
+| Automated gates | `just ci` green (320 Rust, 429 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-22 — a link a coordinator sent
 
 `product-scope` declares opening a bundle directly by URL and it had never been

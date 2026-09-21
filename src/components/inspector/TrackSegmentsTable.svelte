@@ -29,7 +29,8 @@
     pageSegmentPoints,
     segmentHeader,
   } from "$lib/track-points";
-  import { joinSegments, splitSegment } from "$lib/api";
+  import { joinSegments, splitSegment, trimTrackAtPoint } from "$lib/api";
+  import { reportEditFailure } from "$lib/edit-failure";
   import { locale, t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import type { SegmentDetail, TrackDetail } from "$lib/types";
@@ -129,6 +130,34 @@
       toast.error($t("points.joinFailed"), { description: String(error) });
     }
   }
+  /**
+   * Trim the track at this point, keeping it.
+   *
+   * Two trims compose into a crop by selection: cut before the start, cut
+   * after the end. That is the same result with half the interface, and each
+   * half is a gesture on its own — "the drive to the start is the first twenty
+   * minutes" needs only one of them.
+   */
+  async function handleTrim(pointId: number, before: boolean) {
+    const selected = $selectedTrack;
+    if (!selected) return;
+    try {
+      const removed = await trimTrackAtPoint(
+        selected.layerId,
+        selected.trackId,
+        BigInt(pointId),
+        before,
+      );
+      if (removed === 0) {
+        toast.message($t("inspector.trimNothing"));
+        return;
+      }
+      tracksGeometryVersion.update((v) => v + 1);
+      toast.success($t("inspector.trimmed").replace("{n}", String(removed)));
+    } catch (error) {
+      reportEditFailure("inspector.trimFailed", error);
+    }
+  }
 </script>
 
 <!-- `shrink-0`: this card was the only shrinkable child of the inspector
@@ -214,6 +243,32 @@
                       {formatPointTimestamp(point, $locale)}
                     </div>
                   {/if}
+                </Table.Cell>
+                <!-- Trimming lives on the row because that is where the
+                     operator has already found the point: they can see it, on
+                     the map and here, which is the whole reason this is easier
+                     than cropping by a time they would have to work out. -->
+                <Table.Cell class="w-14 px-1 py-1 text-right whitespace-nowrap">
+                  <button
+                    class="text-muted-foreground hover:text-foreground border-0 bg-transparent px-1 leading-none"
+                    title={$t("inspector.trimBefore")}
+                    aria-label={$t("inspector.trimBefore")}
+                    data-testid="trim-before"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      void handleTrim(point.id, true);
+                    }}>⇤</button
+                  >
+                  <button
+                    class="text-muted-foreground hover:text-foreground border-0 bg-transparent px-1 leading-none"
+                    title={$t("inspector.trimAfter")}
+                    aria-label={$t("inspector.trimAfter")}
+                    data-testid="trim-after"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      void handleTrim(point.id, false);
+                    }}>⇥</button
+                  >
                 </Table.Cell>
               </Table.Row>
             {/each}
