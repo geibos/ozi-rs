@@ -2539,6 +2539,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "wiremock",
+ "xml-rs",
  "zip",
 ]
 

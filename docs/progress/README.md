@@ -10,6 +10,51 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the colour comes back
+
+The GPX writer has always said what colour a track is: `gpxx:DisplayColor`, the
+Garmin extension every navigator understands. The reader never heard it,
+because the `gpx` crate does not surface extensions at all. Everything this
+application exported and read back came in as the default red.
+
+Three navigators' tracks on one map, all red, is one smear instead of three
+routes — and telling them apart is most of what a coordinator does with a day's
+recordings. The gap was known: a test asserted the loss, so that it was a
+recorded fact rather than something to rediscover. Fixing it is what made that
+test fail, which is what such a test is for.
+
+Reading now walks the document a second time for that one field, with the same
+parser `gpx` itself uses, and matches colours to tracks by position. The part
+worth a test of its own is the alignment: a colourless track between two
+coloured ones must keep its default rather than take the next one's.
+
+Three decisions that are not obvious from the diff:
+
+- **One colour table, both directions.** Two would drift, and the drift would
+  show as a track that changes colour on a round trip.
+- **An unrecognised name leaves the default alone.** Another program's
+  extension or a typo is not a reason to fail an import and not a reason to
+  guess.
+- **A document the second pass cannot read yields no colours at all.** By the
+  time it runs, `gpx` has parsed the same bytes successfully; a disagreement
+  between the two costs the colour, never the import.
+
+And one property worth being honest about rather than quiet: GPX names its
+colours, so what survives is the *nearest* name. A custom shade comes back as
+the nearest GPX colour, and there is a test saying so.
+
+`xml-rs` moves from a transitive dependency to a direct one — one line in the
+lockfile, nothing downloaded, `cargo audit` unchanged at its twelve
+pre-existing allowed warnings.
+
+| | |
+|---|---|
+| Change | `openspec/changes/the-colour-comes-back/` |
+| Automated gates | `just ci` green (329 Rust, 493 frontend), `cargo audit` unchanged |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — how old is this list
 
 The catalogue cache has written an ISO timestamp since the day it was

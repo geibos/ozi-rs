@@ -131,29 +131,46 @@ fn xml_escape_into(out: &mut String, s: &str) {
     }
 }
 
+/// The colour names GPX allows, with the RGB each one stands for.
+///
+/// One table for both directions: writing picks the nearest name, reading
+/// turns a name back into bytes. Two tables would drift, and the drift would
+/// show up as a track that changes colour on a round trip.
+pub const GARMIN_COLORS: &[(&str, u8, u8, u8)] = &[
+    ("Black", 0, 0, 0),
+    ("DarkRed", 128, 0, 0),
+    ("DarkGreen", 0, 128, 0),
+    ("DarkBlue", 0, 0, 128),
+    ("DarkGray", 64, 64, 64),
+    ("Gray", 128, 128, 128),
+    ("LightGray", 192, 192, 192),
+    ("White", 255, 255, 255),
+    ("Red", 255, 0, 0),
+    ("Green", 0, 255, 0),
+    ("Blue", 0, 0, 255),
+    ("Yellow", 255, 255, 0),
+    ("Cyan", 0, 255, 255),
+    ("Magenta", 255, 0, 255),
+    ("Orange", 255, 165, 0),
+    ("LightBlue", 135, 206, 235),
+    ("Violet", 238, 130, 238),
+    ("Purple", 128, 0, 128),
+];
+
+/// Turn a GPX colour name back into RGBA.
+///
+/// `None` for a name this table does not hold — another program's extension,
+/// or a typo. That is not a reason to fail an import, and not a reason to
+/// guess: the track keeps its default colour.
+pub fn garmin_color_to_rgba(name: &str) -> Option<[u8; 4]> {
+    GARMIN_COLORS
+        .iter()
+        .find(|(candidate, _, _, _)| candidate.eq_ignore_ascii_case(name))
+        .map(|(_, r, g, b)| [*r, *g, *b, 255])
+}
+
 /// Map an RGBA color to the nearest Garmin GPX display color name.
 pub fn rgba_to_garmin_color(rgba: [u8; 4]) -> &'static str {
-    const GARMIN_COLORS: &[(&str, u8, u8, u8)] = &[
-        ("Black", 0, 0, 0),
-        ("DarkRed", 128, 0, 0),
-        ("DarkGreen", 0, 128, 0),
-        ("DarkBlue", 0, 0, 128),
-        ("DarkGray", 64, 64, 64),
-        ("Gray", 128, 128, 128),
-        ("LightGray", 192, 192, 192),
-        ("White", 255, 255, 255),
-        ("Red", 255, 0, 0),
-        ("Green", 0, 255, 0),
-        ("Blue", 0, 0, 255),
-        ("Yellow", 255, 255, 0),
-        ("Cyan", 0, 255, 255),
-        ("Magenta", 255, 0, 255),
-        ("Orange", 255, 165, 0),
-        ("LightBlue", 135, 206, 235),
-        ("Violet", 238, 130, 238),
-        ("Purple", 128, 0, 128),
-    ];
-
     let [r, g, b, _] = rgba;
     let r = r as i32;
     let g = g as i32;
@@ -310,47 +327,11 @@ mod tests {
         );
     }
 
-    /// A known gap, pinned so it is a fact rather than a surprise.
-    ///
-    /// The writer emits the track's colour as `gpxx:DisplayColor`; the reader
-    /// drops it, because the `gpx` crate does not surface extensions at all
-    /// and reading one would need a second pass over the XML. So a track that
-    /// leaves the app and comes back is the default colour.
-    ///
-    /// Nothing about the track itself is lost — the colour lives in the `.ozp`
-    /// project file, and GPX is the interchange format, not the record. When
-    /// this is fixed, this test fails, which is the point of it.
-    #[test]
-    fn a_round_trip_loses_the_track_colour() {
-        use crate::infrastructure::import::gpx::import_gpx_file;
-
-        let mut track = Track::new(TrackId::new(1), "coloured");
-        let mut segment = TrackSegment::new(TrackSegmentId::new(1));
-        segment.add_point(TrackPoint::new(TrackPointId::new(1), 59.9, 31.5));
-        segment.add_point(TrackPoint::new(TrackPointId::new(2), 59.91, 31.51));
-        track.add_segment(segment);
-        // Not the default red: that would come back by coincidence and the
-        // test would record a fact that is not one.
-        track.style_mut().color = [0, 0, 255, 255];
-
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("coloured.gpx");
-        super::export_tracks_to_gpx_file(std::slice::from_ref(&track), &path).expect("export");
-
-        let written = std::fs::read_to_string(&path).expect("read back");
-        assert!(
-            written.contains("<gpxx:DisplayColor>Blue</gpxx:DisplayColor>"),
-            "the writer does say what colour the track is"
-        );
-
-        let back = import_gpx_file(&path).expect("import");
-        assert_eq!(
-            back.tracks()[0].style().color,
-            [255, 0, 0, 255],
-            "and the reader does not hear it: the track comes back the default \
-             red, not the blue it went out as — see docs/backlog.md"
-        );
-    }
+    /// The colour the writer emits is read back — pinned on the reading side,
+    /// in `infrastructure::import::gpx`, where the second pass that recovers
+    /// it lives. This used to be a test asserting the colour was *lost*: the
+    /// gap was real, so it was recorded rather than left to be rediscovered,
+    /// and fixing it is what made that test fail.
 
     #[test]
     fn rgba_to_garmin_color_maps_pure_red() {

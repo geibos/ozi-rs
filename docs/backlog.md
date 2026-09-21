@@ -116,13 +116,11 @@ decision.
   and that is a design call — the toolbar, the palette, or a settings sheet
   that does not exist yet.
 
-- **A GPX round trip loses the track's colour.** The writer emits
-  `gpxx:DisplayColor`; the reader drops it, because the `gpx` crate (0.10) does
-  not surface extensions at all — reading one needs a second pass over the XML,
-  matching tracks to colours by order. Pinned by a test in
-  `src-tauri/src/infrastructure/export/gpx.rs`, which fails when this is fixed.
-  Low cost to the record: the colour lives in the `.ozp`, and GPX is the
-  interchange format.
+- ~~A GPX round trip loses the track's colour.~~ Done on 2026-09-22 in
+  `the-colour-comes-back`: the second pass over the document exists, matching
+  colours to tracks by position, with `xml-rs` — the parser `gpx` itself uses.
+  What remains is a property of the format rather than a gap: GPX names its
+  colours, so a custom shade returns as the nearest name, and a test says so.
 
 - **A new requirement may already exist, saying the opposite.** Four deltas
   this session were written as ADDED against a baseline requirement that
