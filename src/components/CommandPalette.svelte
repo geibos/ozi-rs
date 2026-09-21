@@ -37,6 +37,8 @@
     bundleLoaderOpen,
     bundleLoaderPreselect,
     commandPaletteOpen,
+    measuringActive,
+    setMeasuring,
     currentProject,
     projects,
     selectedMapInfo,
@@ -501,6 +503,21 @@
             <span class="flex-1">{$i18n("palette.units")}</span>
             <span class="text-muted-foreground text-[10px]"
               >{$i18n("palette.comingSoon")}</span
+            >
+          </Command.Item>
+          <Command.Item
+            value="tool:measure"
+            onSelect={() => {
+              // Toggling, not starting: the same key that opened the palette
+              // is how a crew reaches for it again to put the tape away.
+              setMeasuring(!$measuringActive);
+              close();
+            }}
+          >
+            <span class="flex-1"
+              >{$measuringActive
+                ? $i18n("palette.measureStop")
+                : $i18n("palette.measure")}</span
             >
           </Command.Item>
           <Command.Item value="setting:gps" onSelect={handleGpsSetting}>

@@ -425,6 +425,27 @@ export const drawingPointCount = writable(0);
 export const drawingFinishRequested = writable(false);
 export const drawingSegmentId = writable<bigint | null>(null);
 export const editModeActive = writable(false);
+
+/**
+ * The on-map measuring tool: click points, read the running distance.
+ *
+ * ADR-0020 puts distance measurement in the MVP. Its entry point is the
+ * command palette — `ui-shell` requires the mode chips above the canvas to
+ * stay inert scaffolding, and `product-scope` names the palette as a place a
+ * workspace action may live.
+ *
+ * The points are scratch: they are not a track, they are never saved, and they
+ * go when the tool is switched off. A measurement a crew wants to keep is a
+ * track, which they can already draw.
+ */
+export const measuringActive = writable(false);
+export const measuredPoints = writable<{ lat: number; lon: number }[]>([]);
+
+/** Turn the tool on or off, discarding whatever was measured. */
+export function setMeasuring(active: boolean): void {
+  measuredPoints.set([]);
+  measuringActive.set(active);
+}
 export const selectedTrack = writable<{
   layerId: bigint;
   trackId: bigint;

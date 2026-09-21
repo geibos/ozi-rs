@@ -19,6 +19,9 @@
     addWaypointMode,
     activeWaypointLayerId,
     drawingModeActive,
+    measuringActive,
+    measuredPoints,
+    setMeasuring,
     drawingTrackLayerId,
     drawingTrackId,
     drawingPointCount,
@@ -45,13 +48,14 @@
     cancelDrawing,
   } from "../lib/api";
   import type { PointDetail, SegmentDetail, TrackDetail } from "../lib/types";
-  import { t as i18n } from "../lib/i18n";
+  import { locale, t as i18n } from "../lib/i18n";
   import { toast } from "svelte-sonner";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { createLatestRun } from "$lib/latest-run";
   import { reportEditFailure } from "$lib/edit-failure";
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
+  import { formatMeasuredDistance, pathLengthKm } from "$lib/geo";
   import {
     initTracksLayer,
     updateTracksLayer,
@@ -127,6 +131,10 @@
       }
       if ($addWaypointMode) {
         addWaypointMode.set(false);
+      }
+      if ($measuringActive) {
+        e.preventDefault();
+        setMeasuring(false);
       }
     }
 
@@ -801,6 +809,15 @@
 
     map.on("click", (e) => {
       contextMenu = null;
+      if ($measuringActive) {
+        // Measuring takes the click whole: a click meant for the tape should
+        // not also select a track or drop a waypoint.
+        measuredPoints.update((points) => [
+          ...points,
+          { lat: e.lngLat.lat, lon: e.lngLat.lng },
+        ]);
+        return;
+      }
       handleMapClickForWaypoint(e);
       handleMapClickForDrawing(e);
       handleMapClickForTrackSelect(e);
@@ -1269,6 +1286,20 @@
       >
     </div>
   {/if}
+  {#if $measuringActive}
+    <!-- Over the canvas rather than in the status bar: a crew reads the number
+         where they are clicking, not at the other end of the window. -->
+    <div
+      class="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-sm bg-black/70 px-2 py-1 text-center text-xs text-white tabular-nums"
+      data-testid="measure-readout"
+    >
+      <span class="font-mono text-sm"
+        >{formatMeasuredDistance(pathLengthKm($measuredPoints), $locale)}</span
+      >
+      <span class="ml-2 opacity-70">{$i18n("map.measureHint")}</span>
+    </div>
+  {/if}
+
   {#if fpsVisible}
     <div
       class="pointer-events-none absolute top-2 right-2 z-10 rounded-sm bg-black/55 px-1.5 py-0.5 font-mono text-xs text-emerald-400 tabular-nums"

@@ -10,6 +10,45 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — how far is that
+
+ADR-0020 puts distance measurement in the MVP and it had never been built. It
+is the measurement a search crew takes constantly — how far is that from the
+task point, how wide is this clearing, how long is the leg we are about to walk
+— and without it they measure by eye or open another program.
+
+I had it filed as blocked on *where it goes*, because `ui-shell` requires the
+four mode chips above the canvas to stay inert scaffolding. That was a
+misreading of my own note: `product-scope` names the command palette as a place
+a workspace action may live, and it is where the other verbs already are. The
+block was mine, not the spec's.
+
+Cmd-K, "Измерить расстояние". Click points, read the number over the canvas —
+not in the status bar, because a crew reads it where they are clicking. Esc
+finishes, as it cancels a draw. The same palette entry puts the tape away,
+labelled for the state it is in.
+
+Three decisions worth stating. A click while measuring is taken **whole**, so
+it does not also select a track or drop a waypoint. The points are **scratch** —
+never saved, gone when the tool goes off; a measurement worth keeping is a
+track, which they can already draw. And the arithmetic is the frontend's, using
+the same haversine and the same earth radius as `domain/track.rs`, so a
+measured leg and a track's length are the same number for the same two points —
+a tool that argued with the list beside it would be worse than none, and a
+round trip per click is what makes a tool feel slow.
+
+Metres under a kilometre. "180 м", not "0.2 км": the difference between 40 and
+140 metres is the difference between two sides of a road.
+
+| | |
+|---|---|
+| Evidence | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", two clicks on the canvas make it "101 м", Esc takes it away |
+| Evidence | seven tests on the distance and the formatting |
+| Automated gates | `just ci` green (318 Rust, 402 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-22 — an old project still opens
 
 Yesterday's waypoint colour turned up a class rather than an instance. The
