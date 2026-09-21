@@ -57,13 +57,35 @@ describe("row click = preview, button = download", () => {
     expect(selectBody).not.toContain("resetBundleDownloadState");
   });
 
-  it("shows a pending maps hint cleared by currentProject match or timeout", () => {
+  /**
+   * The pending hint is keyed on the slug, and the timer only says the wait is
+   * running long.
+   *
+   * Both used to be otherwise. Completion was detected by comparing display
+   * names, which are not identity — two of thirteen thousand catalogue entries
+   * can carry the same one — and the fifteen-second timer cleared the spinner
+   * outright while the request was still in flight, which told the operator
+   * the list had arrived when nothing had.
+   */
+  it("keys the pending maps hint on the slug and never clears it on a timer", () => {
     expect(loaderSource).toContain('data-testid="maps-pending"');
-    expect(loaderSource).toContain("PREVIEW_TIMEOUT_MS = 15_000");
     expect(loaderSource).toContain(
-      "$currentProject?.name === previewPendingName",
+      "$currentProject?.slug === previewPendingSlug",
     );
     expect(loaderSource).toContain('$t("loader.loadingMaps")');
+    expect(loaderSource).toContain('$t("loader.mapsStillLoading")');
+
+    // The name is gone as an identity: matching on it is the bug.
+    expect(loaderSource).not.toContain("previewPendingName");
+
+    // The timer marks the wait slow; it must not end it.
+    const timerBody = sliceBetween(
+      loaderSource,
+      "previewTimer = setTimeout(",
+      "PREVIEW_SLOW_MS)",
+    );
+    expect(timerBody).toContain("previewIsSlow = true");
+    expect(timerBody).not.toContain("previewPendingSlug = null");
   });
 
   it("open-bundle button starts the real download with cancel-and-reset semantics", () => {

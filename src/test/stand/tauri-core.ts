@@ -70,7 +70,6 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "set_bundles_root",
   "reveal_bundle",
   "load_projects",
-  "preview_project",
   "export_gpx",
   "export_all_tracks_gpx",
   "export_track_plt",
@@ -117,9 +116,30 @@ function requestedState(): "cold" | "workspace" {
     : "workspace";
 }
 
+/**
+ * The project the stand is currently previewing.
+ *
+ * `preview_project` used to be answered with a bare "accepted", so the loader
+ * asked for a project, got a state-changed event, and found the same project
+ * still there — the pending hint could never clear and the screen sat
+ * spinning. The slug is what the loader matches on, so the stand has to move
+ * it.
+ */
+let previewedSlug: string | null = null;
+
+function previewedAppState(): unknown {
+  const base = requestedState() === "cold" ? coldStartFixture : appStateFixture;
+  if (previewedSlug === null) return base;
+  const state = base as { current_project?: { slug: string } | null };
+  if (!state.current_project) return base;
+  return {
+    ...base,
+    current_project: { ...state.current_project, slug: previewedSlug },
+  };
+}
+
 const HANDLERS: Record<string, (args: Args) => unknown> = {
-  get_app_state: () =>
-    requestedState() === "cold" ? coldStartFixture : appStateFixture,
+  get_app_state: () => previewedAppState(),
   get_tracks_geojson: () => tracksGeojsonFixture,
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
@@ -146,6 +166,10 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
     return id;
   },
   open_local_bundle: () => "",
+  preview_project: (args) => {
+    previewedSlug = typeof args?.slug === "string" ? args.slug : null;
+    return null;
+  },
   cancel_download: () => true,
 };
 

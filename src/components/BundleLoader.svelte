@@ -142,15 +142,26 @@
   }
 
   // ── Preview on row click ────────────────────────────────────────────
-  // `previewProject` fetches the map list only; the pending hint clears
-  // when the previewed project lands in `currentProject` (state-changed
-  // round-trip) or after a 15 s timeout, whichever comes first.
-  const PREVIEW_TIMEOUT_MS = 15_000;
-  let previewPendingName = $state<string | null>(null);
+  // `previewProject` fetches the map list only; the pending hint clears when
+  // the previewed project lands in `currentProject` (state-changed round-trip).
+  //
+  // The marker is the slug, not the display name: a name is not identity, and
+  // in a catalogue of thirteen thousand entries two searches can carry the
+  // same one.
+  //
+  // The timer no longer ends the wait. It used to clear the spinner after
+  // fifteen seconds while the request was still running, which said "done"
+  // about something that had not happened; now it only admits the wait is
+  // running long. What bounds the request is the HTTP read timeout in the
+  // backend, which reports a real failure through `previewProject`.
+  const PREVIEW_SLOW_MS = 15_000;
+  let previewPendingSlug = $state<string | null>(null);
+  let previewIsSlow = $state(false);
   let previewTimer: ReturnType<typeof setTimeout> | null = null;
 
   function clearPreviewPending() {
-    previewPendingName = null;
+    previewPendingSlug = null;
+    previewIsSlow = false;
     if (previewTimer !== null) {
       clearTimeout(previewTimer);
       previewTimer = null;
@@ -162,13 +173,13 @@
     // A different bundle has different contents; carrying the previous
     // choice over would silently skip a folder of the new one.
     skipped = {};
-    const name = $projects.find((p) => p.slug === slug)?.name ?? slug;
-    previewPendingName = name;
+    previewPendingSlug = slug;
+    previewIsSlow = false;
     if (previewTimer !== null) clearTimeout(previewTimer);
     previewTimer = setTimeout(() => {
       previewTimer = null;
-      previewPendingName = null;
-    }, PREVIEW_TIMEOUT_MS);
+      previewIsSlow = true;
+    }, PREVIEW_SLOW_MS);
     try {
       await previewProject(slug);
     } catch (error) {
@@ -196,8 +207,8 @@
 
   $effect(() => {
     if (
-      previewPendingName !== null &&
-      $currentProject?.name === previewPendingName
+      previewPendingSlug !== null &&
+      $currentProject?.slug === previewPendingSlug
     ) {
       clearPreviewPending();
     }
@@ -404,7 +415,7 @@
       {/if}
     </div>
 
-    {#if $currentProject && !previewPendingName && $currentProject.contents.length > 0}
+    {#if $currentProject && !previewPendingSlug && $currentProject.contents.length > 0}
       <div class="contents-box" data-testid="bundle-contents">
         <div class="contents-title">{$t("loader.contents")}</div>
         {#each $currentProject.contents as entry (entry.name)}
@@ -434,7 +445,7 @@
       </div>
     {/if}
 
-    {#if $currentProject && !previewPendingName}
+    {#if $currentProject && !previewPendingSlug}
       <div class="maps-actions">
         <button
           class="open-bundle-btn"
@@ -449,10 +460,12 @@
     {/if}
 
     <div class="list">
-      {#if previewPendingName}
+      {#if previewPendingSlug}
         <div class="empty pending" data-testid="maps-pending">
           <span class="spinner"></span>
-          {$t("loader.loadingMaps")}
+          {previewIsSlow
+            ? $t("loader.mapsStillLoading")
+            : $t("loader.loadingMaps")}
         </div>
       {:else if $currentProject}
         {#each $currentProject.maps as m (m.name)}

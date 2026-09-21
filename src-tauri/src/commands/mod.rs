@@ -530,7 +530,10 @@ pub fn preview_project(
     std::thread::spawn(move || {
         let result = crate::infrastructure::lizaalert::preview_project(summary, &bundles_root);
         if let Ok(mut s) = state_arc.lock() {
-            s.apply_project_loaded(result);
+            // By slug, because nothing orders two previews: the one clicked
+            // first can answer last, and it must not land on a row the
+            // operator has already left.
+            s.apply_preview_loaded(&slug, result);
         }
         let _ = app_handle.emit("state-changed", ());
     });

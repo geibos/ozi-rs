@@ -400,6 +400,34 @@ impl AppState {
         }
     }
 
+    /// Land a preview's map list, unless the operator has moved on.
+    ///
+    /// A preview runs in its own thread with nothing ordering two of them, so
+    /// the project clicked first can answer last. Applied blindly it swapped
+    /// the map list under a row the operator had already left, and its failure
+    /// put an error in the status bar about a project nobody was looking at.
+    /// The requested slug decides: only the newest preview may land.
+    ///
+    /// It also does not touch `busy`. A preview never takes that flag — that
+    /// is deliberate, so a click during the catalogue walk is not swallowed —
+    /// and releasing a flag it never took let a second download start while
+    /// the first was still going.
+    pub fn apply_preview_loaded(&mut self, slug: &str, result: Result<LizaProject, String>) {
+        if self.lizaalert.selected_project_slug.as_deref() != Some(slug) {
+            return;
+        }
+        match result {
+            Ok(project) => {
+                let name = project.summary.name.clone();
+                self.lizaalert.selected_project = Some(project);
+                self.update_status(DiagnosticLevel::Info, format!("Loaded project: {name}"));
+            }
+            Err(error) => {
+                self.update_status(DiagnosticLevel::Error, error);
+            }
+        }
+    }
+
     pub fn apply_project_loaded(&mut self, result: Result<LizaProject, String>) {
         self.lizaalert.busy = false;
         match result {
@@ -2010,6 +2038,112 @@ mod tests {
         assert!(
             state.project_file_path().is_none(),
             "a failed save must not update the current project path"
+        );
+    }
+
+    fn summary_for(slug: &str, name: &str) -> LizaProjectSummary {
+        LizaProjectSummary {
+            slug: slug.to_owned(),
+            name: name.to_owned(),
+            url: format!("https://example.invalid/{slug}/"),
+        }
+    }
+
+    fn previewed_project(slug: &str, name: &str) -> LizaProject {
+        LizaProject {
+            summary: summary_for(slug, name),
+            center: MapCenter {
+                lat: 55.0,
+                lon: 37.0,
+            },
+            maps: Vec::new(),
+            contents: Vec::new(),
+        }
+    }
+
+    /// Two previews in a row: the operator clicks one project, changes their
+    /// mind and clicks the next. Each request runs in its own thread, so the
+    /// first can land last — and it used to win, swapping the map list under a
+    /// row the operator had already moved on from. Nothing ordered the two.
+    #[test]
+    fn a_preview_the_operator_has_moved_on_from_is_dropped() {
+        let mut state = AppState::new();
+        state.lizaalert.projects.push(summary_for("first", "First"));
+        state
+            .lizaalert
+            .projects
+            .push(summary_for("second", "Second"));
+
+        state.preview_data("first").expect("first preview starts");
+        state.preview_data("second").expect("second preview starts");
+
+        state.apply_preview_loaded("first", Ok(previewed_project("first", "First")));
+        assert!(
+            state.lizaalert.selected_project.is_none(),
+            "the abandoned preview must not become the shown project"
+        );
+        assert_eq!(
+            state.lizaalert.selected_project_slug.as_deref(),
+            Some("second"),
+            "and it must not steal the selection back either"
+        );
+
+        state.apply_preview_loaded("second", Ok(previewed_project("second", "Second")));
+        assert_eq!(
+            state
+                .lizaalert
+                .selected_project
+                .as_ref()
+                .map(|p| p.summary.slug.as_str()),
+            Some("second"),
+            "the preview the operator is waiting for still lands"
+        );
+    }
+
+    /// A failure from an abandoned preview is just as stale as a success: it
+    /// would put an error in the status bar about a project nobody asked about
+    /// any more.
+    #[test]
+    fn a_stale_preview_failure_is_not_reported() {
+        let mut state = AppState::new();
+        state.lizaalert.projects.push(summary_for("first", "First"));
+        state
+            .lizaalert
+            .projects
+            .push(summary_for("second", "Second"));
+
+        state.preview_data("first").expect("first preview starts");
+        state.preview_data("second").expect("second preview starts");
+        let status_while_waiting = state.lizaalert.status.clone();
+
+        state.apply_preview_loaded("first", Err("host unreachable".to_owned()));
+
+        assert_eq!(
+            state.lizaalert.status, status_while_waiting,
+            "an abandoned preview must not report its failure"
+        );
+    }
+
+    /// A preview deliberately runs without taking the busy flag, so that a
+    /// click during the catalogue walk is not silently ignored. It must not
+    /// clear the flag on the way out either: doing so let a second download
+    /// start while the first was still running.
+    #[test]
+    fn a_finished_preview_leaves_the_busy_flag_alone() {
+        let mut state = AppState::new();
+        state.lizaalert.projects.push(summary_for("demo", "Demo"));
+
+        state.preview_data("demo").expect("preview starts");
+        state
+            .begin_load_project("demo")
+            .expect("a download starts while the preview is in flight");
+        assert!(state.lizaalert.busy, "the download owns the busy flag");
+
+        state.apply_preview_loaded("demo", Ok(previewed_project("demo", "Demo")));
+
+        assert!(
+            state.lizaalert.busy,
+            "the preview did not take the busy flag and must not release it"
         );
     }
 

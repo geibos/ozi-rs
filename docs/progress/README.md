@@ -10,6 +10,38 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — one preview at a time
+
+No screenshot in this one, and that is the point: the defect was in *when*
+things happened, not in how they looked. Scrolling a thirteen-thousand-entry
+catalogue, a crew clicks several projects in a row — that is how you find the
+right search. Each click previews a bundle in a thread of its own, and nothing
+ordered them. Whichever answered last won, so the map list could swap, seconds
+later, to a project the operator had already scrolled past, under the row they
+were actually reading. A failure from an abandoned preview announced itself the
+same way, naming a search nobody had asked about any more.
+
+Two more faults sat on the same path. A preview deliberately does not take the
+busy flag — a click during the catalogue walk must not be swallowed — but it
+*cleared* the flag on the way out, releasing something it never held; a preview
+landing mid-download let a second download start. And the loader decided the
+list had arrived by comparing display names, which are not identity, while a
+fifteen-second timer cleared the spinner outright with the request still in
+flight: it said "done" about something that had not happened.
+
+The newest preview is now the only one that may land, by slug. The timer says
+the wait is running long rather than ending it; what bounds the request is the
+HTTP read timeout added in slice 0.3, which reports a real failure.
+
+| | |
+|---|---|
+| Evidence | three tests that fail on the old code: the abandoned preview lands and wins, its failure is reported, and it clears the busy flag |
+| Stand | `preview_project` moves the previewed slug now, so the round trip closes instead of spinning forever |
+| Automated gates | `just ci` green (296 Rust, 341 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — when it fails
 
 The stand learned the two failures a field crew actually meets: the listing

@@ -21,9 +21,10 @@ decision.
   file, so it hides the OSM basemap underneath. OziExplorer offers colour-keyed
   transparency for this; ozi-rs passes the pixels through unchanged. Would need
   a per-map setting, since black is legitimate image data elsewhere.
-- **Shorter names for import-created track layers.** Importing a folder creates
-  one layer per file named `Imported tracks: /Users/.../20260708_Veter2.gpx`.
-  In the layer selector that is a column of paths. The file name alone would do.
+- ~~Shorter names for import-created track layers.~~ Already done, confirmed on
+  2026-09-21: every layer-creating import path — single `.plt`, archived GPX
+  tracks and archived GPX waypoints — names the layer through
+  `source_file_label`, which keeps the file name and drops the path.
 - **Moving time as a track statistic.** `duration_seconds` is the span between
   the first and last point, which reads oddly for multi-day recordings even now
   that it is formatted in days. Moving time needs a stop threshold the owner has
@@ -80,9 +81,11 @@ and the palette slice; these were not.
   transliterations, so a Cyrillic query finds nothing, and the count beside the
   box shows the catalogue total rather than the number of matches. No sort, no
   "recent", no jump to today's search.
-- **The preview timeout is a lie.** After fifteen seconds the spinner clears but
-  the request keeps running and can replace the map list later; two previews
-  race with no ordering, and completion is detected by comparing display names.
+- ~~The preview timeout is a lie.~~ Done on 2026-09-21 in
+  `one-preview-at-a-time`: only the newest preview may land, a preview no
+  longer releases a busy flag it never took, the loader matches by slug rather
+  than display name, and the fifteen-second timer says the wait is running long
+  instead of ending it.
 - **Filter and selection do not survive closing the loader**, because the Sheet
   unmounts the component and both live in component state.
 - **Backend status and progress text is English** and reaches the screen

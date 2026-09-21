@@ -214,6 +214,8 @@ const dictionaries = {
     "loader.noMatches": "No matches",
     "loader.selectProject": "Select a project on the left",
     "loader.loadingMaps": "Loading map list…",
+    "loader.mapsStillLoading":
+      "Still loading the map list — the server is slow to answer",
     "loader.openBundle": "Open bundle (download)",
     "loader.contents": "What to download",
     "loader.contentsHint":
@@ -438,6 +440,8 @@ const dictionaries = {
     "loader.noMatches": "Ничего не найдено",
     "loader.selectProject": "Выберите проект слева",
     "loader.loadingMaps": "Загрузка списка карт…",
+    "loader.mapsStillLoading":
+      "Список карт всё ещё загружается — сервер отвечает медленно",
     "loader.openBundle": "Открыть бандл (скачать)",
     "loader.contents": "Что скачивать",
     "loader.contentsHint":

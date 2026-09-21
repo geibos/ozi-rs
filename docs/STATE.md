@@ -5,9 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **when it fails** (2026-09-21) — offline the project list
+Last merged slice: **one preview at a time** (2026-09-21) — clicking through
+several projects no longer lets an abandoned preview swap the map list back
+under the operator, and a preview stopped releasing a busy flag it never took;
+after when it fails, where offline the project list
 says it is the saved one, and the failed-download path was verified rather than
-assumed; after the stand replaying a bundle download, which found that the
+assumed, and after the stand replaying a bundle download, which found that the
 download button did nothing at all on the path from the workspace, and after a map that is not downloaded being
 marked as such in the Maps tab with its size in the tooltip, and after the app getting its padding back, where the unlayered global reset had
 been beating every Tailwind spacing utility and fixing it uncovered the
@@ -37,8 +40,8 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 293 Rust tests and 340 frontend tests;
-`just smoke` passes;
+rustfmt, clippy, type-checks, 296 Rust tests and 341 frontend tests;
+`just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -61,9 +64,11 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Archive the finished OpenSpec changes.** Ten are implemented, gated and
+1. **Archive the finished OpenSpec changes.** Eleven are implemented, gated and
    waiting on the owner's review: archiving folds their requirements into the
    baseline specs, which is a step for a person, not for an agent.
+   `one-preview-at-a-time` is the twelfth and is implemented too, but its
+   customer-journey smoke could not run, so it is not ready alongside them.
 2. **The screens of the field cycle have been walked** on the stand: the
    cold-start route, the Track Inspector, the Waypoints row menu, the shell at
    1024×640, a download in flight, a download that fails and a catalogue that
