@@ -17,12 +17,20 @@
 - [x] 3.3 `isEditableTarget` shared rather than copied, so the layout's chords and the tool's Backspace cannot disagree about one keypress — with its own tests
 - [x] 3.4 Tests on the GeoJSON the tape hands MapLibre, including `lon, lat` order and that one point draws no line
 
-## 4. Not in this slice
+## 4. The radius ring
 
-- [ ] 4.1 Radius circle and projection, the other two on-map tools ADR-0020 declares
-- [ ] 4.2 The tape's rendered pixels are unverified. MapLibre does not set `preserveDrawingBuffer`, so reading the canvas back gives an empty buffer — the zero I got means nothing either way, and is recorded rather than reported as a pass
+- [x] 4.1 `destinationPoint` and `ringAround` in `geo.ts`, with tests that every ring point holds the radius at 60° north, at 500 m and at 25 km
+- [x] 4.2 Longitudes wrapped into −180..180, so a ring near the antimeridian is not a band around the world
+- [x] 4.3 Click a centre, click a radius, click again to move it; Esc finishes
+- [x] 4.4 One tool at a time, each discarding what it held — with tests
+- [x] 4.5 Walked on the stand: "Клик — центр", then "Клик — радиус", then "52 м"
 
-## 5. Gates
+## 5. Not in this slice
 
-- [x] 5.1 `just ci` green
-- [ ] 5.2 `just smoke` green (blocked: the Mac2 driver host crashes at session creation — see `docs/STATE.md`)
+- [ ] 5.1 Projection, the last of the three on-map tools ADR-0020 declares
+- [ ] 5.2 The tape's and the ring's rendered pixels are unverified. MapLibre does not set `preserveDrawingBuffer`, so reading the canvas back gives an empty buffer — the zero I got means nothing either way, and is recorded rather than reported as a pass
+
+## 6. Gates
+
+- [x] 6.1 `just ci` green
+- [ ] 6.2 `just smoke` green (blocked: the Mac2 driver host crashes at session creation — see `docs/STATE.md`)

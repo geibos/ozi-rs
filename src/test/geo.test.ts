@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { distanceKm, formatMeasuredDistance, pathLengthKm } from "../lib/geo";
+import {
+  destinationPoint,
+  distanceKm,
+  formatMeasuredDistance,
+  pathLengthKm,
+  ringAround,
+} from "../lib/geo";
 
 /**
  * The same haversine the Rust side uses for track statistics, with the same
@@ -55,5 +61,53 @@ describe("a measured distance a person reads", () => {
     expect(formatMeasuredDistance(1.234, "ru")).toBe("1.23 км");
     expect(formatMeasuredDistance(12.34, "ru")).toBe("12.3 км");
     expect(formatMeasuredDistance(12.34, "en")).toBe("12.3 km");
+  });
+});
+
+/**
+ * A ring drawn as a flat circle in screen pixels is wrong everywhere except
+ * the equator, and worse the further north the search is. At 60° — which is
+ * where these searches happen — a "500 m" circle drawn flat is half a
+ * kilometre north-south and a kilometre east-west, and the crew standing in it
+ * is looking in the wrong place.
+ */
+describe("a ring of a given radius", () => {
+  const centre = { lat: 59.95, lon: 31.59 };
+
+  it("puts every point the radius away from the centre, at 60° north", () => {
+    for (const point of ringAround(centre, 0.5)) {
+      expect(distanceKm(centre, point)).toBeCloseTo(0.5, 6);
+    }
+  });
+
+  it("holds at a radius where a flat circle would be badly wrong", () => {
+    for (const point of ringAround(centre, 25)) {
+      expect(distanceKm(centre, point)).toBeCloseTo(25, 4);
+    }
+  });
+
+  it("closes on itself", () => {
+    const ring = ringAround(centre, 1, 8);
+    expect(ring).toHaveLength(9);
+    expect(ring[8]).toEqual(ring[0]);
+  });
+
+  it("is nothing at all for a radius of zero", () => {
+    expect(ringAround(centre, 0)).toEqual([]);
+    expect(ringAround(centre, -1)).toEqual([]);
+  });
+
+  it("goes due north when asked to", () => {
+    const north = destinationPoint(centre, 0, 1);
+    expect(north.lat).toBeGreaterThan(centre.lat);
+    expect(north.lon).toBeCloseTo(centre.lon, 9);
+  });
+
+  /** A ring near the antimeridian must not come out as a band around the world. */
+  it("keeps longitudes inside −180..180", () => {
+    for (const point of ringAround({ lat: 65, lon: 179.98 }, 5)) {
+      expect(point.lon).toBeGreaterThanOrEqual(-180);
+      expect(point.lon).toBeLessThanOrEqual(180);
+    }
   });
 });

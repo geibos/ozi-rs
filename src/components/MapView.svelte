@@ -22,6 +22,10 @@
     measuringActive,
     measuredPoints,
     setMeasuring,
+    ringActive,
+    ringCentre,
+    ringRadiusKm,
+    setRing,
     drawingTrackLayerId,
     drawingTrackId,
     drawingPointCount,
@@ -55,7 +59,12 @@
   import { createLatestRun } from "$lib/latest-run";
   import { reportEditFailure } from "$lib/edit-failure";
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
-  import { formatMeasuredDistance, pathLengthKm } from "$lib/geo";
+  import {
+    distanceKm,
+    formatMeasuredDistance,
+    pathLengthKm,
+    ringAround,
+  } from "$lib/geo";
   import { isEditableTarget } from "$lib/editable-target";
   import {
     initMeasureLayer,
@@ -141,6 +150,10 @@
       if ($measuringActive) {
         e.preventDefault();
         setMeasuring(false);
+      }
+      if ($ringActive) {
+        e.preventDefault();
+        setRing(false);
       }
     }
 
@@ -420,8 +433,11 @@
   // waypoint layers are re-added underneath it as the project changes.
   $effect(() => {
     const points = $measuredPoints;
+    const centre = $ringCentre;
+    const radius = $ringRadiusKm;
     if (!map || !mapLoaded) return;
-    updateMeasureLayer(map, points);
+    const ring = centre === null ? [] : ringAround(centre, radius);
+    updateMeasureLayer(map, points, ring);
     raiseMeasureLayer(map);
   });
 
@@ -843,6 +859,20 @@
           ...points,
           { lat: e.lngLat.lat, lon: e.lngLat.lng },
         ]);
+        return;
+      }
+      if ($ringActive) {
+        const here = { lat: e.lngLat.lat, lon: e.lngLat.lng };
+        const centre = $ringCentre;
+        if (centre === null) {
+          ringCentre.set(here);
+          ringRadiusKm.set(0);
+        } else {
+          // A second click sets the radius; a third starts a new ring, because
+          // a crew drawing rings draws several and should not have to reach
+          // for the palette between them.
+          ringRadiusKm.set(distanceKm(centre, here));
+        }
         return;
       }
       handleMapClickForWaypoint(e);
@@ -1324,6 +1354,22 @@
         >{formatMeasuredDistance(pathLengthKm($measuredPoints), $locale)}</span
       >
       <span class="ml-2 opacity-70">{$i18n("map.measureHint")}</span>
+    </div>
+  {/if}
+
+  {#if $ringActive}
+    <div
+      class="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-sm bg-black/70 px-2 py-1 text-center text-xs text-white tabular-nums"
+      data-testid="ring-readout"
+    >
+      <span class="font-mono text-sm"
+        >{formatMeasuredDistance($ringRadiusKm, $locale)}</span
+      >
+      <span class="ml-2 opacity-70"
+        >{$ringCentre === null
+          ? $i18n("map.ringCentreHint")
+          : $i18n("map.ringRadiusHint")}</span
+      >
     </div>
   {/if}
 

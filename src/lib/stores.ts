@@ -441,10 +441,44 @@ export const editModeActive = writable(false);
 export const measuringActive = writable(false);
 export const measuredPoints = writable<{ lat: number; lon: number }[]>([]);
 
-/** Turn the tool on or off, discarding whatever was measured. */
+/**
+ * The radius ring: click a centre, click again to set the radius.
+ *
+ * A search draws these constantly — everything within five hundred metres of
+ * the last known position — and it is the other on-map tool ADR-0020 declares.
+ * Scratch like the tape: not a project object, gone when the tool goes off.
+ */
+export const ringActive = writable(false);
+export const ringCentre = writable<{ lat: number; lon: number } | null>(null);
+export const ringRadiusKm = writable(0);
+
+/**
+ * Turn one tool on and the other off.
+ *
+ * The two take the same click, so they cannot both be listening: a click meant
+ * for the ring's centre must not also extend the tape. One function so that
+ * invariant lives in one place rather than in each caller.
+ */
 export function setMeasuring(active: boolean): void {
   measuredPoints.set([]);
   measuringActive.set(active);
+  if (active) setRingOff();
+}
+
+export function setRing(active: boolean): void {
+  ringCentre.set(null);
+  ringRadiusKm.set(0);
+  ringActive.set(active);
+  if (active) {
+    measuredPoints.set([]);
+    measuringActive.set(false);
+  }
+}
+
+function setRingOff(): void {
+  ringCentre.set(null);
+  ringRadiusKm.set(0);
+  ringActive.set(false);
 }
 export const selectedTrack = writable<{
   layerId: bigint;

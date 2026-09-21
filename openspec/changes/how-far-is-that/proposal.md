@@ -31,6 +31,27 @@ earth radius as `domain/track.rs`, so a measured leg and a track's length are
 the same number for the same two points. A round trip per click is what makes a
 tool feel slow.
 
+## The radius ring, in the same slice
+
+ADR-0020's other on-map tool, and the one a search draws constantly:
+everything within five hundred metres of the last known position. It shares
+everything the tape built — the palette entry, the scratch geometry, the layer
+— so it is here rather than in a slice of its own.
+
+Click a centre, click again to set the radius; a further click moves the
+radius, because a crew drawing rings draws several and should not reach for the
+palette between them.
+
+The ring is **geodesic**, not a circle in screen pixels. A flat circle is wrong
+everywhere except the equator and worse the further north the search is: at
+60°, where these searches happen, a "500 m" circle drawn flat is half a
+kilometre north-south and a kilometre east-west, and the crew standing in it is
+looking in the wrong place.
+
+The two tools take the same click, so they cannot both be listening. Turning
+one on turns the other off and discards what it held — a stale point left
+behind would be measured into the next measurement.
+
 ## Impact
 
 - Affected specs: `product-scope`

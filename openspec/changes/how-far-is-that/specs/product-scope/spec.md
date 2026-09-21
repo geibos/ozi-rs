@@ -39,3 +39,29 @@ point SHALL be removable without ending the measurement.
 
 - **WHEN** the operator clicks the map while measuring
 - **THEN** a point is added and no track is selected and no waypoint is placed
+
+### Requirement: A radius ring can be drawn on the map
+
+The operator SHALL be able to draw a ring of a chosen radius around a chosen
+point, by placing a centre and then setting the radius, and SHALL see the
+radius while they do. A search works in rings around a last known position.
+
+The ring SHALL be geodesic: every point on it SHALL be the stated distance from
+the centre on the ground, not in screen pixels. A ring drawn flat is wrong
+everywhere but the equator and worse the further north the search is.
+
+The ring SHALL be scratch, like a measurement, and SHALL NOT be part of the
+project.
+
+Only one on-map tool SHALL be listening for clicks at a time, and switching
+tools SHALL discard what the previous one held.
+
+#### Scenario: A ring around the last known position
+
+- **WHEN** the operator places a centre and then sets a radius
+- **THEN** a ring of that radius is drawn, and every point on it is that distance from the centre
+
+#### Scenario: Switching tools
+
+- **WHEN** the operator turns on one on-map tool while another is active
+- **THEN** the other is off and what it held is discarded

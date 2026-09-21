@@ -61,3 +61,61 @@ export function formatMeasuredDistance(
   const rounded = km.toFixed(km < 10 ? 2 : 1);
   return locale === "ru" ? `${rounded} км` : `${rounded} km`;
 }
+
+/**
+ * The point `distanceKm` away from `from` on the given bearing.
+ *
+ * Used to build a radius ring. A ring drawn as a flat circle in screen pixels
+ * is wrong everywhere except the equator and gets worse the further north the
+ * search is — at 60°, which is where these searches happen, a "500 m" circle
+ * drawn flat is half a kilometre north-south and a kilometre east-west. The
+ * crew standing in it would be looking in the wrong place.
+ */
+export function destinationPoint(
+  from: LatLon,
+  bearingDegrees: number,
+  km: number,
+): LatLon {
+  const angular = km / EARTH_RADIUS_KM;
+  const bearing = toRadians(bearingDegrees);
+  const lat1 = toRadians(from.lat);
+  const lon1 = toRadians(from.lon);
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angular) +
+      Math.cos(lat1) * Math.sin(angular) * Math.cos(bearing),
+  );
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(bearing) * Math.sin(angular) * Math.cos(lat1),
+      Math.cos(angular) - Math.sin(lat1) * Math.sin(lat2),
+    );
+
+  return {
+    lat: toDegrees(lat2),
+    // Back into −180..180, so a ring drawn across the antimeridian does not
+    // come out as a band around the world.
+    lon: ((toDegrees(lon2) + 540) % 360) - 180,
+  };
+}
+
+/**
+ * A ring of `km` around `centre`, as a closed path.
+ *
+ * `steps` points, evenly spaced by bearing; 64 is smooth at any zoom a crew
+ * uses and cheap enough to rebuild on every drag.
+ */
+export function ringAround(centre: LatLon, km: number, steps = 64): LatLon[] {
+  if (km <= 0) return [];
+  const ring: LatLon[] = [];
+  for (let i = 0; i < steps; i += 1) {
+    ring.push(destinationPoint(centre, (360 * i) / steps, km));
+  }
+  ring.push(ring[0]);
+  return ring;
+}
+
+function toDegrees(radians: number): number {
+  return (radians * 180) / Math.PI;
+}

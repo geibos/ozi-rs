@@ -39,6 +39,8 @@
     commandPaletteOpen,
     measuringActive,
     setMeasuring,
+    ringActive,
+    setRing,
     currentProject,
     projects,
     selectedMapInfo,
@@ -518,6 +520,19 @@
               >{$measuringActive
                 ? $i18n("palette.measureStop")
                 : $i18n("palette.measure")}</span
+            >
+          </Command.Item>
+          <Command.Item
+            value="tool:ring"
+            onSelect={() => {
+              setRing(!$ringActive);
+              close();
+            }}
+          >
+            <span class="flex-1"
+              >{$ringActive
+                ? $i18n("palette.ringStop")
+                : $i18n("palette.ring")}</span
             >
           </Command.Item>
           <Command.Item value="setting:gps" onSelect={handleGpsSetting}>

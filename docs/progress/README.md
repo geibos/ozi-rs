@@ -10,7 +10,7 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
-## 2026-09-22 — how far is that
+## 2026-09-22 — how far is that, and what is within five hundred metres
 
 ADR-0020 puts distance measurement in the MVP and it had never been built. It
 is the measurement a search crew takes constantly — how far is that from the
@@ -60,12 +60,32 @@ a frame is presented returns an empty buffer — I got zero orange pixels, and
 that zero means nothing either way. What is pinned instead is the GeoJSON the
 tape hands MapLibre, including the `lon, lat` order a map gets wrong once.
 
+And the other on-map tool ADR-0020 declares, in the same slice because it
+shares everything the tape built: the **radius ring**. Everything within five
+hundred metres of the last known position is a thing a search draws constantly.
+Click a centre, click a radius, click again to move it — a crew drawing rings
+draws several and should not reach for the palette between them.
+
+The ring is geodesic, and that is the whole point of it. A circle drawn flat in
+screen pixels is right only at the equator: at 60°, where these searches are, a
+"500 m" circle drawn flat is half a kilometre north-south and a kilometre
+east-west, and the crew standing in it is looking in the wrong place. The tests
+hold every point of a 500 m ring and a 25 km ring to its radius at that
+latitude, and check that a ring near the antimeridian does not come out as a
+band around the world.
+
+The two tools take the same click, so they cannot both be listening. Turning
+one on turns the other off and discards what it held — a stale point left
+behind would be measured into the next measurement, which is the kind of wrong
+number nobody questions.
+
 | | |
 |---|---|
 | Evidence | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", clicks on the canvas make it "101 м" and then "146 м", Esc takes it away |
+| Evidence | the ring on the stand: "Клик — центр", then "Клик — радиус", then "52 м" |
 | Evidence | tests on the distance, the formatting, the tape's GeoJSON and what counts as an editable target |
 | Not verified | the tape's rendered pixels — see above |
-| Automated gates | `just ci` green (318 Rust, 411 frontend) |
+| Automated gates | `just ci` green (318 Rust, 421 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

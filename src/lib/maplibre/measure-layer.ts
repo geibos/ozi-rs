@@ -5,8 +5,8 @@ const MEASURE_LINE = "measure-line";
 const MEASURE_POINTS = "measure-points";
 
 /**
- * The tape the measuring tool draws: the points clicked, and the line through
- * them.
+ * What the on-map tools draw: the tape's clicked points and the line through
+ * them, and the radius ring.
  *
  * Not decoration. A crew clicking on a map at night has to see where the
  * points went — whether the click registered at all, whether it landed on the
@@ -56,6 +56,7 @@ export function initMeasureLayer(map: MapLibreMap): void {
 export function updateMeasureLayer(
   map: MapLibreMap,
   points: { lat: number; lon: number }[],
+  ring: { lat: number; lon: number }[] = [],
 ): void {
   const source = map.getSource(MEASURE_SOURCE);
   if (!source || !("setData" in source)) return;
@@ -75,6 +76,17 @@ export function updateMeasureLayer(
       geometry: {
         type: "LineString",
         coordinates: points.map((p) => [p.lon, p.lat]),
+      },
+    });
+  }
+
+  if (ring.length >= 2) {
+    features.push({
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "LineString",
+        coordinates: ring.map((p) => [p.lon, p.lat]),
       },
     });
   }
