@@ -10,6 +10,35 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a stand, so a screen can be looked at
+
+Every visual check in this repository has cost a full `just build`, an Appium
+session that owns the screen and dims the display, and a window that has to be
+caught in the right state before it moves on. Most of a working day went into
+that, and twice the run was abandoned after two attempts per the project rule.
+
+`just stand` serves the real frontend with the Tauri modules aliased to
+fixture-backed stubs. The same screens open in a browser tab in a second, at any
+size, with devtools. The data is the bytes the backend sends, because the
+fixtures come from the same mappers the commands use.
+
+An unanswered command throws with its name instead of returning `undefined` —
+a screen that renders because a mock quietly answered nothing is the failure
+this whole exercise exists to stop. The first run made the case for itself by
+catching an unanswered `get_ozi_metadata` behind a red toast.
+
+| | |
+|---|---|
+| Maps tab | [on fixtures](2026-09-21-stand/stand-maps.png) — sizes, cached badges, the active local map |
+| Tracks tab | [on fixtures](2026-09-21-stand/stand-tracks.png) — a hidden track dimmed, the name-format warning, stats sublines |
+| Automated gates | `just ci` green (289 Rust, 330 frontend) |
+
+What it does not prove is in `src/test/stand/README.md`: nothing about the Rust
+side, the IPC boundary, tiles or the packaged app. ADR-0024 stands — the smoke
+gate is still what says the app works.
+
+---
+
 ## 2026-09-21 — fixtures the frontend can trust
 
 The frontend's tests mocked the backend by hand, and the mocks drifted. That is
