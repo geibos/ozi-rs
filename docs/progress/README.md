@@ -10,6 +10,38 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a download, played out
+
+The progress panel, the byte totals, the "this map is ready" announcement and
+the panel closing had all been built without ever being seen: catching them
+needs a bundle in flight, and on this link a bundle lands in seconds. The stand
+now plays the event sequence a real download emits — same names, same payload
+shapes — slowly enough to watch.
+
+The first press proved the idea in the worst way: **`load_project` was never
+called at all.** `handleOpenBundle` reads the slug of the row the operator
+clicked, and on the path from the workspace — Maps tab, "Открыть проект…" — a
+project is already previewed and no row has been clicked. The handler returned
+before calling anything, so the only download button in the app sat there doing
+nothing, silently. The project now carries its slug and the handler falls back
+to it.
+
+With that fixed, one run confirmed everything at once: the panel appears, its
+total reads `165 Б / 201.0 МиБ` and climbs to `201.0 МиБ / 201.0 МиБ`, the file
+count walks 0/3 → 3/3, the per-file bars arrive one by one, the ready-map
+announcement fires when the topo layer lands, and the panel closes when the
+download finishes.
+
+| | |
+|---|---|
+| The panel, mid-flight | [captured](2026-09-21-download-in-flight/panel-in-flight.png) |
+| Automated gates | `just ci` green (293 Rust, 340 frontend) |
+
+`window.__stand.calls` now exposes the IPC transcript, which is how "the button
+does nothing" became "the command never fired" without guessing.
+
+---
+
 ## 2026-09-21 — what a click will cost
 
 Walking the screens at the restored padding, at a laptop-sized window: the

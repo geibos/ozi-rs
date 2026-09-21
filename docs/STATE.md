@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **what a click will cost** (2026-09-21) — a map that is not
-downloaded is marked as such in the Maps tab, with its size in the tooltip;
-after the app getting its padding back, where the unlayered global reset had
+Last merged slice: **a download, played out** (2026-09-21) — the stand replays
+a bundle download, which found that the download button did nothing at all on
+the path from the workspace and then confirmed the panel, its byte totals, the
+ready-map announcement and the close; after a map that is not downloaded being
+marked as such in the Maps tab with its size in the tooltip, and after the app getting its padding back, where the unlayered global reset had
 been beating every Tailwind spacing utility and fixing it uncovered the
 inspector's segments card collapsing, and after
 the loader letting the operator choose what a download fetches, the owner's
@@ -35,7 +37,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 293 Rust tests and 339 frontend tests;
+rustfmt, clippy, type-checks, 293 Rust tests and 340 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -63,9 +65,9 @@ than followed blindly.
    waiting on the owner's review: archiving folds their requirements into the
    baseline specs, which is a step for a person, not for an agent.
 2. **Keep walking the screens on the stand.** Done: the Track Inspector, the
-   cold-start route, the Waypoints row menu, and the whole shell at 1024×640.
-   Not yet: a download in flight and an error state — each needs a fixture
-   state, which is a few lines in `src-tauri/src/fixtures.rs`.
+   cold-start route, the Waypoints row menu, the shell at 1024×640, and a
+   download in flight. Not yet: an error state — a failed download and an
+   unreachable catalogue.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 
