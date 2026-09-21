@@ -299,6 +299,8 @@ const dictionaries = {
     "map.projectionPlace": "Place",
     "map.projectionFailed": "Could not place the waypoint",
     "map.newWaypointName": "Waypoint {n}",
+    "loader.pastedLinkUnknown":
+      "That search is not in the list yet — refresh, or check the link",
     "loader.stopRefresh": "Stop",
     "loader.stopRefreshFailed": "Could not stop the refresh",
     "loader.offline": "Offline — this is the saved list",
@@ -614,6 +616,8 @@ const dictionaries = {
     "map.projectionPlace": "Поставить",
     "map.projectionFailed": "Не удалось поставить точку",
     "map.newWaypointName": "Точка {n}",
+    "loader.pastedLinkUnknown":
+      "Такого поиска пока нет в списке — обновите список или проверьте ссылку",
     "loader.stopRefresh": "Стоп",
     "loader.stopRefreshFailed": "Не удалось остановить обновление",
     "loader.offline": "Нет связи — список сохранённый",

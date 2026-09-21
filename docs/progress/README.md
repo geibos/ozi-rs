@@ -10,6 +10,41 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — a link a coordinator sent
+
+`product-scope` declares opening a bundle directly by URL and it had never been
+built. A link is how a search arrives: someone sends
+`https://maps.lizaalert.ru/maps/2026-09-21_Vesta/` over a messenger. Typing the
+name back in instead is error-prone in the way that costs time in the field —
+the names are latin transliterations of Russian place names, and the one in the
+link is the one that is exactly right.
+
+**No new control.** Paste it into the loader's search box, which is where a
+paste naturally lands; text that is not a link is still just a filter, and the
+box keeps the readable name afterwards rather than the URL, so the operator can
+see what they landed on.
+
+The parsing is lenient about what a messenger does to a link — a lost scheme, a
+missing trailing slash, a `?utm_source`, a percent-encoded Cyrillic name — and
+strict about the host, so `evil.example/maps.lizaalert.ru/maps/x/` is not one.
+Anything that is not a catalogue link yields nothing rather than a guess: a box
+that jumped to a project because someone typed a word with a slash in it would
+be worse than one that did nothing.
+
+The case that will actually happen: a link sent minutes after the search was
+created, for a project the catalogue has not walked yet. That says so and names
+the slug, because it is not an error and "nothing happened" would be the wrong
+thing to show.
+
+| | |
+|---|---|
+| Evidence | six tests on the parsing, including the lookalike host and the catalogue root |
+| Evidence | walked on the stand — a pasted link previews that slug and leaves "2026 09 20 Schuvalovo" in the box; an unlisted one shows the message and previews nothing |
+| Automated gates | `just ci` green (318 Rust, 429 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-22 — the three on-map tools
 
 ADR-0020 puts distance measurement in the MVP and it had never been built. It

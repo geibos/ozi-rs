@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the three on-map tools** (2026-09-22) — distance, a
-geodesic radius ring and placing a waypoint by bearing and distance, all from
-the command palette; after an old project still opening, where
+Last merged slice: **a link a coordinator sent** (2026-09-22) — a catalogue
+link pasted into the search box opens that search; after the three on-map
+tools, where distance, a
+geodesic radius ring and placing a waypoint by bearing and distance all
+arrived, reachable from the command palette, and after an old project still opening, where
 the `.ozp`
 format's tolerance of older files became a test rather than an assumption,
 and after whose mark is this, where a waypoint gained
@@ -92,7 +94,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 318 Rust tests and 423 frontend tests;
+rustfmt, clippy, type-checks, 318 Rust tests and 429 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -159,8 +161,9 @@ re-ordered rather than followed blindly.
    `product-scope` names as a place a workspace action may live — the mode
    chips stay inert scaffolding per `ui-shell`, and that is not the obstacle it
    looked like.
-7. **The remaining ADR-0020 items**: open-by-URL, crop by selection,
-   walkthrough. Recent `.ozp` and waypoint colour were done on 2026-09-21.
+7. **The remaining ADR-0020 items**: crop by selection, and the walkthrough.
+   Recent `.ozp` and waypoint colour landed on 2026-09-21; the three on-map
+   tools and open-by-URL on 2026-09-22.
 8. **Upkeep**: point the stand at whatever the next slice touches. Every screen
    of the field cycle has been walked on it at least once.
 

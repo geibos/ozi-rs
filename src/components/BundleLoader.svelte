@@ -54,6 +54,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import { filterProjects } from "$lib/project-list";
+  import { bundleSlugFromUrl } from "$lib/bundle-url";
   import { formatBytes, formatOptionalBytes } from "$lib/format-bytes";
   import { appendRecentFile } from "../lib/recentFiles";
 
@@ -102,6 +103,36 @@
       debouncedProjectFilter = value;
     }, 150);
     return () => clearTimeout(handle);
+  });
+
+  /**
+   * A catalogue link pasted into the search box opens that search.
+   *
+   * This is how a link arrives — a coordinator sends it over a messenger, and
+   * the crew pastes it. Typing the name back in instead is error-prone: the
+   * names are latin transliterations of Russian place names and the one in the
+   * link is exactly right.
+   *
+   * No new control for it. The box is where a paste naturally lands, and text
+   * that is not a link is still just a filter.
+   */
+  let handledPastedLink = "";
+  $effect(() => {
+    const slug = bundleSlugFromUrl(projectFilter);
+    if (slug === null || slug === handledPastedLink) return;
+    handledPastedLink = slug;
+
+    const known = $projects.find((p) => p.slug === slug);
+    if (!known) {
+      // The catalogue may simply not have been walked since the search was
+      // created, which is the likeliest case and not an error.
+      toast.message($t("loader.pastedLinkUnknown"), { description: slug });
+      return;
+    }
+    // Leave the name in the box rather than the URL: the list is filtered to
+    // it, and the operator can see what they landed on.
+    projectFilter = known.name;
+    void handleSelectProject(slug);
   });
 
   const filtered = $derived(
