@@ -45,6 +45,7 @@
     setProjection,
     currentProject,
     projects,
+    requestAllDataFocus,
     selectedMapInfo,
     selectedTrack,
     selectedWaypointId,
@@ -218,6 +219,9 @@
       if (path) {
         await loadProjectFile(path as string);
         rememberProject(path as string);
+        // Otherwise the project's tracks land wherever the camera happens to
+        // be pointing, which looks exactly like a project that did not load.
+        requestAllDataFocus();
       }
     } catch (error) {
       toast.error($i18n("palette.openProjectFailed"), {
@@ -238,6 +242,7 @@
     try {
       await loadProjectFile(path);
       rememberProject(path);
+      requestAllDataFocus();
     } catch (error) {
       forgetProject(path);
       toast.error($i18n("palette.projectMissing"), {

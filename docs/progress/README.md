@@ -10,6 +10,44 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — open a project and see it
+
+The camera was fitted to the data in exactly one place: after an import. That
+fix exists because of the owner's own finding — "imported tracks don't show on
+the map" — and its comment says why: the tracks "render wherever they are, off
+the active raster, and look like they failed to import".
+
+Opening a saved project has the same hole, and it is the path that gets used
+every morning. Both ways in — the Open dialog and the recents — load the file
+and stop. The map stays where it was, so a crew reopening yesterday's search
+gets an empty screen that is indistinguishable from a project that did not
+load.
+
+Two things came out of fixing it. The import fit only ever covered track
+geometry, so a project whose content is a headquarters and a drop-off point
+had nothing to fit — waypoints count now, and their positions come from the
+markers already on the map, so it costs no round trip. And the bbox maths moved
+out of `MapView`, which needs a MapLibre instance to mount and therefore had
+none of this under test; on the way out it learned to skip a coordinate that is
+not a finite number, rather than turning the whole frame into `NaN` because one
+track could not be built.
+
+A single point is centred at a readable zoom instead of fitted. `fitBounds` on
+a box a metre across answers with its maximum zoom, which puts the crew inside
+a building.
+
+Measured on the stand: the scale bar went 50 m → 500 m and both track segments
+and the waypoint markers came on screen.
+
+| | |
+|---|---|
+| After | [framed on the data](2026-09-22-framing/after-framed-on-the-data.png) |
+| Change | `openspec/changes/open-a-project-and-see-it/` |
+| Automated gates | `just ci` green (320 Rust, 483 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — what the ground does
 
 The track inspector carried a card headed «Высота» whose whole content was

@@ -86,6 +86,12 @@ decision.
   that kind. A guard on a syntactic shape catches the careless version, which
   is most of them, and is not worth widening until it misses something that
   reaches a screen — this one did, and is fixed.
+- **Logic inside `MapView` has no tests, and that is where defects hide.** It
+  needs a MapLibre instance to mount, so nothing in its 1200 lines runs under
+  vitest. Two extractions so far — the generation stamps (still untested) and
+  the bbox maths, which gained a `NaN` guard the moment it was testable. When
+  touching that file, take the arithmetic out with the change.
+
 - **A grid child can grow its own column.** `.canvas-column` had
   `grid-template-rows` and no `grid-template-columns`, so the implicit column
   was `auto` = max-content and the context bar widened it by 358px, under the

@@ -561,7 +561,7 @@ export const tracksGeometryVersion = writable(0);
  */
 export type MapFocusRequest =
   | { kind: "track"; layerId: bigint; trackId: bigint; nonce: number }
-  | { kind: "all-tracks"; nonce: number }
+  | { kind: "all-data"; nonce: number }
   | { kind: "waypoint"; lat: number; lon: number; nonce: number };
 
 export const mapFocusRequest = writable<MapFocusRequest | null>(null);
@@ -604,9 +604,16 @@ export function requestWaypointFocus(lat: number, lon: number): void {
  */
 export const focusTrackPoint = requestWaypointFocus;
 
-export function requestAllTracksFocus(): void {
+/**
+ * Frame everything the project holds — tracks and waypoints alike.
+ *
+ * Asked for after an import and after a project is opened. A project whose
+ * only content is waypoints (a headquarters and a drop-off point) has to be
+ * framed too, which is why this is not "all tracks" any more.
+ */
+export function requestAllDataFocus(): void {
   mapFocusNonce += 1;
-  mapFocusRequest.set({ kind: "all-tracks", nonce: mapFocusNonce });
+  mapFocusRequest.set({ kind: "all-data", nonce: mapFocusNonce });
 }
 export const bundleLoaderOpen = writable(false);
 /**

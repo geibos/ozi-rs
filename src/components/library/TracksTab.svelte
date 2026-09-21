@@ -36,7 +36,7 @@
     drawingTrackLayerId,
     editModeActive,
     requestTrackFocus,
-    requestAllTracksFocus,
+    requestAllDataFocus,
     selectedTrack,
     simplifyState,
   } from "$lib/stores";
@@ -288,7 +288,7 @@
       const summary = $i18n("tracksTab.importDone")
         .replace("{count}", String(imported))
         .replace("{total}", String(paths.length));
-      if (imported > 0) requestAllTracksFocus();
+      if (imported > 0) requestAllDataFocus();
       if (failed.length === 0) {
         toast.success(summary);
       } else {
@@ -316,7 +316,7 @@
       const dir = await open({ directory: true, multiple: false });
       if (!dir) return;
       const summary = await importTracksDirectory(dir as string);
-      requestAllTracksFocus();
+      requestAllDataFocus();
       toast.success(summary);
     } catch (err) {
       toast.error($i18n("tracksTab.importFolderFailed"), {

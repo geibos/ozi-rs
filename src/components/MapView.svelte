@@ -63,6 +63,13 @@
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { createLatestRun } from "$lib/latest-run";
   import { reportEditFailure } from "$lib/edit-failure";
+  import {
+    boundsOf,
+    centreOf,
+    geojsonPositions,
+    isDegenerate,
+    toLngLatBounds,
+  } from "$lib/map-bounds";
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
   import {
     destinationPoint,
@@ -1329,45 +1336,41 @@
     }
   }
 
-  // Fit the camera to ALL track geometry — used after an import so the newly
-  // added tracks are actually on screen (otherwise they render wherever they
-  // are, off the active raster, and look like they failed to import).
-  async function focusAllTracks() {
+  /**
+   * Fit the camera to everything the project holds.
+   *
+   * Asked for after an import — otherwise the new tracks render wherever they
+   * are, off the active raster, and look like the import failed — and after a
+   * project is opened, where the same emptiness looks like a project that
+   * failed to load.
+   *
+   * Waypoints count. A project whose content is a headquarters and a drop-off
+   * point has nothing in its track geometry, and fitting to tracks alone left
+   * it unframed. Their positions come from the markers already on the map, so
+   * this costs one round trip, not one per waypoint layer.
+   */
+  async function focusAllData() {
     try {
       const geojson = await getTracksGeojson();
-      let minLat = Infinity;
-      let minLon = Infinity;
-      let maxLat = -Infinity;
-      let maxLon = -Infinity;
-      let hasPoints = false;
-      const visit = (coords: unknown): void => {
-        if (
-          Array.isArray(coords) &&
-          coords.length === 2 &&
-          typeof coords[0] === "number" &&
-          typeof coords[1] === "number"
-        ) {
-          const [lon, lat] = coords as [number, number];
-          hasPoints = true;
-          if (lat < minLat) minLat = lat;
-          if (lat > maxLat) maxLat = lat;
-          if (lon < minLon) minLon = lon;
-          if (lon > maxLon) maxLon = lon;
-          return;
-        }
-        if (Array.isArray(coords)) for (const c of coords) visit(c);
-      };
-      for (const feature of geojson.features) {
-        visit((feature.geometry as { coordinates?: unknown }).coordinates);
-      }
-      if (!hasPoints) return;
-      map.fitBounds(
-        [
-          [minLon, minLat],
-          [maxLon, maxLat],
-        ],
-        { padding: 60, maxZoom: 16 },
+      const points = geojsonPositions(
+        geojson.features as { geometry?: { coordinates?: unknown } | null }[],
       );
+      for (const marker of waypointMarkers.values()) {
+        const { lng, lat } = marker.getLngLat();
+        points.push({ lon: lng, lat });
+      }
+      const bounds = boundsOf(points);
+      if (!bounds) return;
+      if (isDegenerate(bounds)) {
+        // One point, or a few metres across: `fitBounds` answers that with its
+        // maximum zoom, which puts the crew inside a building.
+        map.easeTo({
+          center: centreOf(bounds),
+          zoom: Math.max(map.getZoom(), 14),
+        });
+        return;
+      }
+      map.fitBounds(toLngLatBounds(bounds), { padding: 60, maxZoom: 16 });
     } catch (error) {
       reportEditFailure("map.fitAllTracksFailed", error);
     }
@@ -1381,8 +1384,8 @@
     mapFocusRequest.set(null);
     if (request.kind === "track") {
       void focusTrack(request.layerId, request.trackId);
-    } else if (request.kind === "all-tracks") {
-      void focusAllTracks();
+    } else if (request.kind === "all-data") {
+      void focusAllData();
     } else if (request.kind === "waypoint") {
       map.easeTo({
         center: [request.lon, request.lat],
