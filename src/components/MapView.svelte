@@ -49,6 +49,7 @@
   import { toast } from "svelte-sonner";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
+  import { createLatestRun } from "$lib/latest-run";
   import {
     initTracksLayer,
     updateTracksLayer,
@@ -381,8 +382,13 @@
    * time. The legacy clear-all-and-recreate path is kept as
    * `clearWaypointMarkers()` for debugging.
    */
+  /** See `createLatestRun`: an overtaken refresh must not draw its markers. */
+  const waypointMarkerRuns = createLatestRun();
+  const trackGeometryRuns = createLatestRun();
+
   async function refreshWaypointMarkers() {
     if (!map) return;
+    const run = waypointMarkerRuns.begin();
     // Read appState non-reactively. This function is invoked both from a
     // slice $effect (where reactivity is already scoped) and from explicit
     // mutation handlers (where we want a snapshot, not a subscription).
@@ -401,16 +407,25 @@
     type Incoming = AppliedWaypoint & { wpId: number };
     const incoming = new Map<string, { layerId: bigint; data: Incoming }>();
 
-    for (const layer of layers) {
-      const layerId = BigInt(layer.id);
-      const isActive = activeId !== null && layerId === activeId;
-      let waypoints;
-      try {
-        waypoints = await getWaypoints(layerId);
-      } catch {
-        continue;
-      }
+    // Every layer at once: one await per layer made the marker set cost a
+    // round trip per layer, on a path that runs on every state change.
+    const perLayer = await Promise.all(
+      layers.map(async (layer) => {
+        const layerId = BigInt(layer.id);
+        try {
+          return { layerId, waypoints: await getWaypoints(layerId) };
+        } catch {
+          return { layerId, waypoints: [] };
+        }
+      }),
+    );
 
+    // An older refresh finishing here would draw a marker set the operator has
+    // already moved past — a waypoint just added, gone again.
+    if (!waypointMarkerRuns.isCurrent(run)) return;
+
+    for (const { layerId, waypoints } of perLayer) {
+      const isActive = activeId !== null && layerId === activeId;
       for (const wp of waypoints.filter((w) => w.visible !== false)) {
         const key = waypointMarkerKey(layerId, wp.id);
         incoming.set(key, {
@@ -931,7 +946,12 @@
     }
 
     appliedTracksFingerprint = fp;
+    const run = trackGeometryRuns.begin();
     getTracksGeojson().then((geojson) => {
+      // Two changes in quick succession leave two fetches in flight, and the
+      // older one can answer last. Drawing it would put the map behind the
+      // rail it is supposed to match.
+      if (!trackGeometryRuns.isCurrent(run)) return;
       updateTracksLayer(map, geojson);
       raiseTrackLayers();
     });

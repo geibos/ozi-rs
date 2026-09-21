@@ -10,6 +10,38 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — one rule, written once
+
+Having found the overlapping-reload bug three times, I went looking for the
+fourth. It was on the map, where it is worse than in a list.
+
+`refreshWaypointMarkers` runs from a slice effect and from every waypoint
+action handler, so two runs overlap as a matter of course, and the marker set
+written last won even when it had started first: a waypoint just added could
+disappear again. The track geometry fetch beside it has the same shape — two
+quick edits leave two fetches in flight, and the older one drawing last puts
+the map behind the rail it is supposed to match. The map was also reading its
+waypoint layers one after another, on a path that runs on every state change.
+
+Five places, one rule: take a token before the first await, check it before
+writing anything, and check it on the failure path too. Written out by hand
+five times is how it comes to be missing the sixth, so it is written once now,
+in `latest-run.ts`, with the tests on it rather than on each caller. The two
+tabs from the last slice moved onto it as well.
+
+Honest about the gap: the map's two guards have no test. `MapView` needs a
+MapLibre instance, and this slice did not build one. That is recorded in the
+change's tasks rather than left to be assumed.
+
+| | |
+|---|---|
+| Evidence | four tests on the rule itself; the two tabs' behavioural tests still green through the refactor |
+| Not covered | the map's two guards — stated, not implied |
+| Automated gates | `just ci` green (300 Rust, 356 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — only the newest list wins
 
 The same bug as the bundle preview, in a second and a third place.

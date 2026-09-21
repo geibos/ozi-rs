@@ -20,6 +20,7 @@
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Popover from "$lib/components/ui/popover";
+  import { createLatestRun } from "$lib/latest-run";
   import * as Select from "$lib/components/ui/select";
   import { Slider } from "$lib/components/ui/slider";
   import { Switch } from "$lib/components/ui/switch";
@@ -137,22 +138,17 @@
     }
   }
 
-  /**
-   * Which reload owns the rows. The tab reloads on every app-state change, and
-   * during a bundle download `state-changed` fires once per file, so reloads
-   * overlap; the one that started first could answer last and put its rows on
-   * screen. Only the newest may land.
-   */
-  let loadGeneration = 0;
+  /** See `createLatestRun`: an overtaken reload must not put its rows back. */
+  const listRuns = createLatestRun();
 
   async function loadTracks() {
-    const generation = (loadGeneration += 1);
+    const run = listRuns.begin();
     try {
       const rows = trackFeaturesFromSummaries(await listTracks());
-      if (generation !== loadGeneration) return;
+      if (!listRuns.isCurrent(run)) return;
       tracks = rows;
     } catch (err) {
-      if (generation !== loadGeneration) return;
+      if (!listRuns.isCurrent(run)) return;
       console.error("Failed to load tracks", err);
       toast.error(get(i18n)("tracksTab.loadFailed"), {
         description: String(err),

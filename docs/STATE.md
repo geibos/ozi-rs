@@ -5,9 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **only the newest list wins** (2026-09-21) — overlapping
+Last merged slice: **one rule, written once** (2026-09-21) — the same
+overlapping-reload bug found on the map, where a waypoint just added could
+disappear again, and the rule extracted to `latest-run.ts` for all five
+callers; after only the newest list winning, where overlapping
 reloads in both library tabs could put an older list back on screen, and the
-Waypoints tab read its layers one round trip at a time; after a row for every
+Waypoints tab read its layers one round trip at a time, and after a row for every
 track, where the Tracks tab
 stopped building its rows out of the map's geometry, which cost every
 coordinate of every track to draw a list of names and left a track the map
@@ -53,7 +56,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 300 Rust tests and 352 frontend tests;
+rustfmt, clippy, type-checks, 300 Rust tests and 356 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

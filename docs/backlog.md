@@ -34,12 +34,14 @@ decision.
 
 ## Engineering
 
-- **An async reload that writes to shared state needs a generation stamp.**
-  Found three times now: the bundle preview, the Tracks tab and the Waypoints
-  tab all let an older request overwrite a newer one's result. Anything that
-  reloads on `state-changed` overlaps with itself during a download, which
-  emits once per file. Stamp the request, compare before writing, and drop the
-  failure path too.
+- **An async reload that writes to shared state needs `createLatestRun`.**
+  Found five times: the bundle preview, both library tabs, and the map's
+  marker refresh and track-geometry fetch. Anything that reloads on
+  `state-changed` overlaps with itself during a download, which emits once per
+  file. `src/lib/latest-run.ts` holds the rule; take a token before the first
+  await, check it before writing, and check it on the failure path too.
+  Still open: the map's two guards have no test, because `MapView` needs a
+  MapLibre instance to mount.
 - **Nothing else derives a list from map geometry — check before adding one.**
   Twice now a list built from `build_tracks_geojson` has been wrong: once it
   emptied the whole rail when the geometry type changed, once it hid every

@@ -49,7 +49,9 @@ describe("selectVisibleWaypointLayers", () => {
 describe("MapView non-destructive waypoint rendering", () => {
   it("iterates all visible waypoint layers, not only the active one", () => {
     expect(mapViewSource).toContain("visibleWaypointLayers");
-    expect(mapViewSource).toContain("for (const layer of layers)");
+    // Every visible layer is asked, in whatever shape the loop takes — it was
+    // a sequential `for` until the layers started being fetched together.
+    expect(mapViewSource).toMatch(/layers\.map\(|for \(const layer of layers\)/);
     // The old active-only early-return must be gone.
     expect(mapViewSource).not.toMatch(
       /const layerId = \$activeWaypointLayerId;\s*if \(!\$appState[^}]*layerId === null\) return;/,
@@ -89,7 +91,7 @@ describe("MapView non-destructive waypoint rendering", () => {
     // The dragend handler captures `layerId` from the iteration over all
     // visible waypoint layers, not from the active-layer store.
     expect(mapViewSource).toMatch(
-      /for \(const layer of layers\)[\s\S]+?const layerId = BigInt\(layer\.id\);/,
+      /layers\.map\([\s\S]{0,200}?const layerId = BigInt\(layer\.id\);/,
     );
     expect(mapViewSource).toMatch(
       /marker\.on\("dragend"[\s\S]+?await moveWaypoint\(layerId,/,

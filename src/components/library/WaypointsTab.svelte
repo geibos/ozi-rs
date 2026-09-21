@@ -36,6 +36,7 @@
   import XIcon from "@lucide/svelte/icons/x";
   import { Input } from "$lib/components/ui/input";
   import { filterByName } from "$lib/name-filter";
+  import { createLatestRun } from "$lib/latest-run";
   import { formatCoordinates as formatWaypointCoordinates } from "$lib/track-points";
   import {
     deleteWaypoint,
@@ -87,21 +88,13 @@
     void loadAll(layers);
   });
 
-  /**
-   * Which reload owns the rows.
-   *
-   * The tab reloads on every app-state change, and during a bundle download
-   * `state-changed` fires once per file, so reloads overlap. Nothing ordered
-   * them: the one that started first could answer last and put its rows on
-   * screen, so the list went backwards under the operator. Only the newest may
-   * land — the same rule a bundle preview needed.
-   */
-  let loadGeneration = 0;
+  /** See `createLatestRun`: an overtaken reload must not put its rows back. */
+  const listRuns = createLatestRun();
 
   async function loadAll(
     layers: { id: number; name: string }[],
   ): Promise<void> {
-    const generation = (loadGeneration += 1);
+    const run = listRuns.begin();
     try {
       // Every layer at once. One await per layer meant a project of a dozen
       // import-created layers paid a dozen round trips in a row for a list
@@ -112,7 +105,7 @@
           wps: await getWaypoints(BigInt(layer.id)),
         })),
       );
-      if (generation !== loadGeneration) return;
+      if (!listRuns.isCurrent(run)) return;
 
       const collected: WaypointRow[] = perLayer.flatMap(({ layer, wps }) =>
         wps.map((wp) => ({
@@ -127,7 +120,7 @@
       });
       rows = collected;
     } catch (err) {
-      if (generation !== loadGeneration) return;
+      if (!listRuns.isCurrent(run)) return;
       console.error("Failed to load waypoints", err);
       toast.error(get(t)("waypointsTab.loadFailed"), {
         description: String(err),
