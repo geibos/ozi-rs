@@ -116,8 +116,16 @@ and the palette slice; these were not.
   `stop-waiting-for-the-catalogue`: the walk is cancellable, the loader offers
   a stop while it runs, and a stopped walk is not written over the cache. The
   hint states how many projects are listed so far, which is what the decision
-  to stop is actually made on — a page number would have said less. Still open:
-  the localStorage cache only ever grows.
+  to stop is actually made on — a page number would have said less.
+
+  Still open, and this is what "the cache only ever grows" really means: a
+  project deleted upstream is never removed. `apply_projects_chunk` appends
+  what it has not seen and removes nothing, on both sides, so a search that
+  vanished from the server stays in the list and in the cache for good.
+  Pruning needs the frontend to know a walk completed rather than was stopped:
+  emit the refresh's start and its clean finish, collect the slugs seen
+  between them, drop the rest. The backend half is easier — a complete
+  `CatalogueWalk` already holds exactly the right list.
 - **Small targets.** 28px rows and 10px badges in the catalogue. The keyboard
   half of this is done on 2026-09-21 in `walk-the-catalogue-by-keyboard`: the
   list is a listbox with an `aria-activedescendant` position, walked with the

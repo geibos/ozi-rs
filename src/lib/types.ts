@@ -21,8 +21,26 @@ export type {
   DiagnosticDto,
   LizaMapPackageDto,
   LizaProjectDto,
-  LizaProjectSummaryDto,
 } from "./bindings";
+
+/**
+ * One row of the LizaAlert catalogue.
+ *
+ * Hand-written rather than generated: the catalogue travels only as the
+ * `projects-chunk` event payload, and specta generates types for command
+ * signatures, not for events. It left the generated bindings when it left
+ * `AppStateDto` — which it did because the state snapshot is fetched on every
+ * `state-changed`, and thirteen thousand rows is not a state snapshot.
+ *
+ * Mirrors `LizaProjectSummaryDto` in `src-tauri/src/commands/mod.rs`; keep the
+ * two in step by hand, as `CLAUDE.md` requires for this file.
+ */
+export interface LizaProjectSummaryDto {
+  slug: string;
+  name: string;
+  /** Whether this bundle is already on disk and openable offline. */
+  cached: boolean;
+}
 
 // Generated DTOs re-exported under their historical frontend names.
 // `TrackSummary.duration_seconds` is null when none of the track points
@@ -37,10 +55,7 @@ export type {
   WaypointDto as WaypointData,
 } from "./bindings";
 
-import type {
-  LayerSummaryDto as GeneratedLayerSummaryDto,
-  LizaProjectSummaryDto,
-} from "./bindings";
+import type { LayerSummaryDto as GeneratedLayerSummaryDto } from "./bindings";
 
 /**
  * Generated wire shape plus an optional per-layer visibility flag. The

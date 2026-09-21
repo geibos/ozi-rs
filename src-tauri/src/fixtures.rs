@@ -277,7 +277,7 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     std::fs::create_dir_all(dir)?;
     let state = sample_app_state();
 
-    let app_state = crate::commands::app_state_dto(&state, &cached_slugs());
+    let app_state = crate::commands::app_state_dto(&state);
     let tracks_geojson = crate::commands::build_tracks_geojson(state.track_layers());
     let tracks_list = crate::commands::list_track_summaries(state.track_layers());
     let track = state.track_layers()[0]
@@ -288,7 +288,7 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let track_detail = crate::commands::track_detail_dto(track);
     let waypoints = crate::commands::waypoint_dtos(state.project_waypoint_layers()[0].waypoints());
 
-    let cold = crate::commands::app_state_dto(&cold_start_app_state(), &cached_slugs());
+    let cold = crate::commands::app_state_dto(&cold_start_app_state());
 
     let files: Vec<(&str, serde_json::Value)> = vec![
         (
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn the_sample_project_covers_the_states_a_screen_has_to_handle() {
         let state = sample_app_state();
-        let dto = crate::commands::app_state_dto(&state, &cached_slugs());
+        let dto = crate::commands::app_state_dto(&state);
 
         assert!(
             dto.tracks.iter().any(|t| !t.visible),
@@ -411,9 +411,12 @@ mod tests {
             project.maps.iter().all(|m| m.size_bytes.is_some()),
             "sizes, so the row that states them is exercised"
         );
+        // The catalogue no longer rides in the application state, so there is
+        // nothing to assert about it here. Cached bundles are exercised
+        // through `cached_slugs` on the chunk path instead.
         assert!(
-            dto.projects.iter().any(|p| p.cached),
-            "a catalogue entry already on disk"
+            !cached_slugs().is_empty(),
+            "a bundle already on disk, for the chunk path to mark"
         );
     }
 }

@@ -561,7 +561,7 @@ project_dirty: boolean;
  * Current .ozp path when the project has been saved/loaded; lets the
  * frontend quick-save (Cmd+S) without a dialog.
  */
-project_path: string | null; status: string; busy: boolean; downloading_maps: string[]; projects: LizaProjectSummaryDto[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
+project_path: string | null; status: string; busy: boolean; downloading_maps: string[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
 export type BundleEntryDto = { name: string; is_dir: boolean; size_bytes: number | null }
 export type DiagnosticDto = { level: string; message: string }
 /**
@@ -590,14 +590,6 @@ slug: string; name: string; center_lat: number; center_lon: number; maps: LizaMa
  * what not to download.
  */
 contents: BundleEntryDto[] }
-export type LizaProjectSummaryDto = { slug: string; name: string; 
-/**
- * Whether this bundle is already on disk and openable offline.
- * 
- * Without it the catalogue is thirteen thousand identical rows and a
- * crew with no signal cannot tell which of them they can still open.
- */
-cached: boolean }
 export type PointDetailDto = { id: number; lat: number; lon: number; elevation: number | null; timestamp: string | null }
 export type SegmentDetailDto = { id: number; points: PointDetailDto[] }
 export type SimplifiedPreviewDto = { original_count: number; simplified_count: number; segments: SimplifiedSegmentDto[] }

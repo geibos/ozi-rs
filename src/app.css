@@ -36,9 +36,11 @@
 
   /* Geist (variable) + Geist Mono via `font-sans` / `font-mono`. Inter is
    * banned from this codebase (see `ui-shell` spec, Typography requirement). */
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system,
-               "Segoe UI Variable", "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans:
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable",
+    "Segoe UI", sans-serif;
+  --font-mono:
+    "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 @layer base {

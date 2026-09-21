@@ -279,17 +279,6 @@ export function appendProjectsChunk(chunk: LizaProjectSummaryDto[]) {
   });
 }
 
-export function syncProjectsFromAppState(state: AppStateDto | null) {
-  // Stale-while-revalidate guard: a null state (store not hydrated yet) or
-  // an empty backend list (catalog refresh still in flight on cold start)
-  // must NOT clobber the localStorage-seeded catalog — wiping it here made
-  // the loader render an empty list until the full network refresh landed,
-  // even though a perfectly clickable cached list was already available.
-  const incoming = state?.projects ?? [];
-  if (incoming.length === 0) return;
-  projectsStore.set(incoming);
-}
-
 // Per-package download progress: package_name → { downloaded, total? }
 export const downloadProgress = writable<Map<string, DownloadProgressPayload>>(
   new Map(),

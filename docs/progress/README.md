@@ -10,6 +10,40 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the catalogue is not application state
+
+I went looking for the backlog's note that the catalogue cache "only ever
+grows", and found something larger on the way: `get_app_state` was carrying the
+whole catalogue. Thirteen thousand rows of slug, name and a cached flag — by
+the DTO's own shape, **about 1 MiB of JSON per call** — and that call is made
+on every `state-changed`: once per file during a bundle download, on every
+preview, on every edit. Building it also walked the bundles directory each
+time, to compute a flag for rows nobody read.
+
+One consumer wanted it, and only to seed a store that is already seeded twice:
+synchronously from the `localStorage` cache when the module loads, and again
+from the first `projects-chunk`, which `load_projects` emits from the disk
+cache before it touches the network.
+
+A catalogue is not application state. It is a stream, and it already had one.
+
+The test pins the cost rather than the code: build a snapshot with five hundred
+projects in the state, and assert the catalogue is not in it and the snapshot
+is under 4 KiB. The real fixture is 2 908 bytes.
+
+One consequence worth writing down: `LizaProjectSummaryDto` is no longer
+generated, because specta generates from command signatures and the catalogue
+now travels only as an event payload. It is hand-written in `types.ts`, which
+`CLAUDE.md` already requires to be kept in step by hand.
+
+| | |
+|---|---|
+| Evidence | a Rust test that a 500-project catalogue does not reach the snapshot, and that it stays under 4 KiB |
+| Automated gates | `just ci` green (301 Rust, 367 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — walking the catalogue by keyboard
 
 Thirteen thousand rows, and only the twenty on screen exist in the document.

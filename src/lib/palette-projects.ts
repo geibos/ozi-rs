@@ -1,4 +1,4 @@
-import type { LizaProjectSummaryDto } from "./bindings";
+import type { LizaProjectSummaryDto } from "./types";
 
 /**
  * Which catalogue projects the command palette should render.

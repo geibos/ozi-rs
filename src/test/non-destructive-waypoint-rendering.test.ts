@@ -51,7 +51,9 @@ describe("MapView non-destructive waypoint rendering", () => {
     expect(mapViewSource).toContain("visibleWaypointLayers");
     // Every visible layer is asked, in whatever shape the loop takes — it was
     // a sequential `for` until the layers started being fetched together.
-    expect(mapViewSource).toMatch(/layers\.map\(|for \(const layer of layers\)/);
+    expect(mapViewSource).toMatch(
+      /layers\.map\(|for \(const layer of layers\)/,
+    );
     // The old active-only early-return must be gone.
     expect(mapViewSource).not.toMatch(
       /const layerId = \$activeWaypointLayerId;\s*if \(!\$appState[^}]*layerId === null\) return;/,

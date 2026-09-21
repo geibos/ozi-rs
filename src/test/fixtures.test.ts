@@ -16,12 +16,14 @@ import {
 import { trackFeaturesFromSummaries } from "../lib/track-features";
 
 describe("the fixtures are the shape the backend sends", () => {
-  it("carries a project with tracks, waypoints and a catalogue", () => {
+  it("carries a project with tracks and waypoints, and no catalogue", () => {
     expect(appStateFixture.project_name).toBeTypeOf("string");
     expect(appStateFixture.tracks.length).toBeGreaterThan(1);
     expect(appStateFixture.track_layers.length).toBeGreaterThan(1);
     expect(appStateFixture.waypoint_layers.length).toBeGreaterThan(1);
-    expect(appStateFixture.projects.length).toBeGreaterThan(1);
+    // The catalogue left the state snapshot: it is thirteen thousand rows and
+    // this is fetched on every `state-changed`. It arrives as its own stream.
+    expect(appStateFixture).not.toHaveProperty("projects");
   });
 
   it("has exactly one default layer of each kind, not two sharing an id", () => {

@@ -21,7 +21,6 @@
     currentDownload,
     projects,
     projectsLoading,
-    syncProjectsFromAppState,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
   import { locale, progressText, t } from "../lib/i18n";
@@ -32,7 +31,6 @@
 
   $effect(() => {
     const s = $appState;
-    syncProjectsFromAppState(s);
     if (s && !s.busy) {
       projectsLoading.set(false);
       bundleProgress.set(null);

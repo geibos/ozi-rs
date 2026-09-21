@@ -67,18 +67,6 @@
   "project_name": "Untitled Project",
   "project_path": null,
   "project_saved": false,
-  "projects": [
-    {
-      "cached": true,
-      "name": "2026 07 08 Lavrovo",
-      "slug": "2026-07-08_Lavrovo"
-    },
-    {
-      "cached": false,
-      "name": "2026 07 14 Sagra",
-      "slug": "2026-07-14_Sagra"
-    }
-  ],
   "status": "Loaded project: 2026 07 08 Lavrovo",
   "track_layer_count": 2,
   "track_layers": [

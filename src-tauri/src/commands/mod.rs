@@ -75,7 +75,11 @@ pub struct AppStateDto {
     pub status: String,
     pub busy: bool,
     pub downloading_maps: Vec<String>,
-    pub projects: Vec<LizaProjectSummaryDto>,
+    // The catalogue is deliberately absent. It is thirteen thousand rows, and
+    // this DTO is fetched on every `state-changed` — once per file during a
+    // bundle download. The frontend gets the catalogue from its own cache and
+    // from the `projects-chunk` stream, which is where a list that size
+    // belongs.
     pub current_project: Option<LizaProjectDto>,
     pub active_map: Option<ActiveMapDto>,
     pub diagnostics: Vec<DiagnosticDto>,
@@ -264,8 +268,10 @@ struct BundleFileReadyPayload {
 #[specta::specta]
 pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
     let s = lock_app_state(state.inner())?;
-    let cached_slugs = lizaalert::cached_project_slugs(s.bundles_root());
-    Ok(app_state_dto(&s, &cached_slugs))
+    // No directory walk here any more: the only thing that needed the set of
+    // downloaded bundles was the catalogue, and the catalogue has left. This
+    // command runs on every `state-changed`, once per file during a download.
+    Ok(app_state_dto(&s))
 }
 
 /// Build the state snapshot the frontend renders.
@@ -273,20 +279,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
 /// Split out of the command so it can be driven without a Tauri runtime: the
 /// test fixtures the frontend renders against come from this exact function,
 /// which is the only way a mock cannot drift from what the app really sends.
-pub fn app_state_dto(
-    s: &crate::application::AppState,
-    cached_slugs: &std::collections::HashSet<String>,
-) -> AppStateDto {
-    let projects = s
-        .lizaalert_projects()
-        .iter()
-        .map(|p| LizaProjectSummaryDto {
-            slug: p.slug.clone(),
-            name: p.name.clone(),
-            cached: cached_slugs.contains(&p.slug),
-        })
-        .collect();
-
+pub fn app_state_dto(s: &crate::application::AppState) -> AppStateDto {
     let current_project = s.current_project().map(|p| LizaProjectDto {
         slug: p.summary.slug.clone(),
         name: p.summary.name.clone(),
@@ -376,7 +369,6 @@ pub fn app_state_dto(
         status: s.lizaalert_status().to_owned(),
         busy: s.lizaalert_busy(),
         downloading_maps: s.downloading_maps().iter().cloned().collect(),
-        projects,
         current_project,
         active_map,
         diagnostics,
@@ -1864,7 +1856,7 @@ pub fn create_empty_track(
 #[cfg(test)]
 mod tests {
     use super::{
-        PointDetailDto, SegmentDetailDto, TrackDetailDto, build_tracks_geojson,
+        PointDetailDto, SegmentDetailDto, TrackDetailDto, app_state_dto, build_tracks_geojson,
         list_track_summaries,
     };
     use crate::domain::{Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
@@ -2088,6 +2080,39 @@ mod tests {
     /// as the map's GeoJSON: every coordinate of every track, serialized,
     /// sent over IPC and parsed, so that a list of names could be drawn. A
     /// day's folder of recordings is hundreds of thousands of points.
+    /// `get_app_state` is fetched on every `state-changed`, and during a
+    /// bundle download that fires once per file. It used to carry the whole
+    /// LizaAlert catalogue with it — thirteen thousand rows of slug and name,
+    /// roughly a megabyte of JSON — for one consumer that only needed it to
+    /// seed a store already seeded from `localStorage` and from the first
+    /// `projects-chunk`. The catalogue is not application state.
+    #[test]
+    fn the_application_state_does_not_carry_the_catalogue() {
+        use crate::application::{AppState, LizaProjectSummary};
+
+        let mut state = AppState::new();
+        for i in 0..500 {
+            state.push_project_summary_for_test(LizaProjectSummary {
+                slug: format!("2026-09-{:02}_search-{i}", (i % 28) + 1),
+                name: format!("Search {i}"),
+                url: format!("https://example.invalid/search-{i}/"),
+            });
+        }
+
+        let dto = app_state_dto(&state);
+        let json = serde_json::to_string(&dto).expect("serialize app state");
+
+        assert!(
+            !json.contains("search-499"),
+            "the catalogue must not ride along in the application state"
+        );
+        assert!(
+            json.len() < 4_000,
+            "application state stayed small; it was {} bytes",
+            json.len()
+        );
+    }
+
     #[test]
     fn the_track_listing_carries_no_geometry() {
         let layer = layer_with(vec![track_with(

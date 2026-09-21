@@ -141,13 +141,18 @@ describe("virtualized project list", () => {
 });
 
 describe("instant catalog + non-blocking refresh", () => {
-  it("an empty backend snapshot never clobbers the cache-seeded catalog", () => {
-    const syncBody = sliceBetween(
-      storesSource,
-      "export function syncProjectsFromAppState",
-      "// Per-package download progress",
-    );
-    expect(syncBody).toContain("if (incoming.length === 0) return;");
+  /**
+   * The guard this replaces protected a path that no longer exists: the
+   * application state used to carry the whole catalogue, and an empty snapshot
+   * arriving mid-refresh could wipe the cache-seeded list. The state does not
+   * carry the catalogue at all now, so nothing can clobber it — the list comes
+   * from `localStorage` and from the `projects-chunk` stream, and that is the
+   * contract worth pinning.
+   */
+  it("seeds the catalog from the cache, not from the application state", () => {
+    expect(storesSource).toContain("loadCatalogCache() ?? []");
+    expect(storesSource).toContain("export function appendProjectsChunk");
+    expect(storesSource).not.toContain("syncProjectsFromAppState");
   });
 
   it("startup refresh runs in background with an unobtrusive hint", () => {

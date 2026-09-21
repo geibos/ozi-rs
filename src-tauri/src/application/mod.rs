@@ -422,6 +422,12 @@ impl AppState {
         }
     }
 
+    /// Seed the catalogue directly. Tests only: the real path is a walk.
+    #[cfg(test)]
+    pub fn push_project_summary_for_test(&mut self, summary: LizaProjectSummary) {
+        self.lizaalert.projects.push(summary);
+    }
+
     pub fn apply_projects_chunk(&mut self, chunk: Vec<LizaProjectSummary>) {
         for project in chunk {
             if self
@@ -643,10 +649,6 @@ impl AppState {
 
     pub fn current_project(&self) -> Option<&LizaProject> {
         self.lizaalert.selected_project.as_ref()
-    }
-
-    pub fn lizaalert_projects(&self) -> &[LizaProjectSummary] {
-        &self.lizaalert.projects
     }
 
     pub fn lizaalert_status(&self) -> &str {
