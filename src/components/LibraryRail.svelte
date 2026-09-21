@@ -22,22 +22,22 @@
     bind:value={$libraryActiveTab}
     class="flex h-full min-h-0 flex-col"
   >
-    <Tabs.List class="bg-card mx-2 mt-2">
+    <Tabs.List class="bg-card mx-2 mt-2 w-[calc(100%-1rem)] gap-1">
       <Tabs.Trigger
         value="maps"
-        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+        class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
         Maps
       </Tabs.Trigger>
       <Tabs.Trigger
         value="tracks"
-        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+        class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
         Tracks
       </Tabs.Trigger>
       <Tabs.Trigger
         value="waypoints"
-        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+        class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
         Waypoints
       </Tabs.Trigger>
