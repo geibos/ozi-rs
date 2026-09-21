@@ -907,6 +907,37 @@ pub fn export_wpt_waypoints(
     Ok(())
 }
 
+/// Export a waypoint layer to GPX — the format phones, navigators and the
+/// other groups' software read.
+#[tauri::command]
+#[specta::specta]
+pub fn export_gpx_waypoints(
+    layer_id: u64,
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    lock_app_state(state.inner())?
+        .export_gpx_waypoints(LayerId::new(layer_id), PathBuf::from(path))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+/// Suggested file name for a waypoint export in the given format.
+#[tauri::command]
+#[specta::specta]
+pub fn get_waypoints_export_default_path(
+    layer_id: u64,
+    extension: String,
+    state: State<SharedState>,
+) -> Result<Option<String>, String> {
+    use crate::domain::LayerId;
+    Ok(lock_app_state(state.inner())?
+        .export_waypoints_default_path(LayerId::new(layer_id), &extension)
+        .map(|path| path.display().to_string()))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_wpt_export_default_path(

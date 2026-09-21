@@ -23,9 +23,10 @@
   } from "$lib/stores";
   import {
     deleteWaypoint,
+    exportGpxWaypoints,
     exportWptWaypoints,
     getWaypoints,
-    getWptExportDefaultPath,
+    getWaypointsExportDefaultPath,
     renameWaypoint,
     setWaypointSymbol,
     toggleWaypointVisible,
@@ -123,19 +124,28 @@
     }
   }
 
-  async function handleExportWpt() {
+  /** GPX for phones and other groups' software, WPT for OziExplorer. */
+  async function handleExport(format: "gpx" | "wpt") {
     const layerId = $activeWaypointLayerId;
     if (layerId === null) return;
     try {
-      const defaultPath = await getWptExportDefaultPath(layerId);
+      const defaultPath = await getWaypointsExportDefaultPath(layerId, format);
       const path = await open({
         save: true,
-        defaultPath: defaultPath ?? "waypoints.wpt",
-        filters: [{ name: "OziExplorer WPT", extensions: ["wpt"] }],
+        defaultPath: defaultPath ?? `waypoints.${format}`,
+        filters:
+          format === "gpx"
+            ? [{ name: "GPX", extensions: ["gpx"] }]
+            : [{ name: "OziExplorer WPT", extensions: ["wpt"] }],
       } as Parameters<typeof open>[0]);
-      if (path) await exportWptWaypoints(layerId, path as string);
+      if (!path) return;
+      if (format === "gpx") {
+        await exportGpxWaypoints(layerId, path as string);
+      } else {
+        await exportWptWaypoints(layerId, path as string);
+      }
     } catch (error) {
-      toast.error("Failed to export waypoints", {
+      toast.error($t("inspector.exportFailed"), {
         description: String(error),
       });
     }
@@ -227,7 +237,17 @@
       variant="outline"
       size="sm"
       class="justify-start gap-2"
-      onclick={handleExportWpt}
+      onclick={() => handleExport("gpx")}
+      disabled={!waypoint}
+    >
+      <FileOutputIcon class="size-4" />
+      {$t("inspector.exportGpx")}
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="justify-start gap-2"
+      onclick={() => handleExport("wpt")}
       disabled={!waypoint}
     >
       <FileOutputIcon class="size-4" />

@@ -1332,6 +1332,63 @@ impl AppState {
         }
     }
 
+    /// Export all waypoints of the given layer to a GPX file.
+    ///
+    /// The waypoints capability has always required this and the XML builder
+    /// has always existed; nothing reached it, so the only way out of the app
+    /// was OziExplorer's own WPT — which the phones and the other groups'
+    /// software do not read.
+    pub fn export_gpx_waypoints(
+        &mut self,
+        layer_id: LayerId,
+        path: std::path::PathBuf,
+    ) -> Result<(), String> {
+        let Some(layer) = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+        else {
+            let message = "Waypoint layer not found for export".to_owned();
+            self.update_status(DiagnosticLevel::Error, message.clone());
+            return Err(message);
+        };
+
+        match crate::infrastructure::export::export_waypoints_to_gpx_file(layer.waypoints(), &path)
+        {
+            Ok(()) => {
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Exported waypoints to {}", path.display()),
+                );
+                Ok(())
+            }
+            Err(e) => {
+                let message = format!("Export failed: {e}");
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                Err(message)
+            }
+        }
+    }
+
+    /// Default path suggestion for a waypoint export, in the given format.
+    pub fn export_waypoints_default_path(
+        &self,
+        layer_id: LayerId,
+        extension: &str,
+    ) -> Option<PathBuf> {
+        let layer = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)?;
+        let file_name = format!("{}.{extension}", layer.name());
+        match self.active_bundle_dir() {
+            Some(dir) => Some(dir.join(file_name)),
+            None => Some(PathBuf::from(file_name)),
+        }
+    }
+
     /// Default path suggestion for a WPT waypoint export.
     /// Returns `<bundle>/<layer_name>.wpt` when a bundle is active; otherwise
     /// `<layer_name>.wpt` (filename only, the dialog will pick a directory).
@@ -1972,6 +2029,78 @@ mod tests {
         assert!(
             !state.project_dirty(),
             "a cancelled drawing SHALL leave the project as saved as it was"
+        );
+    }
+
+    /// The waypoints capability has always required a GPX export and the XML
+    /// builder has always existed — nothing called it. WPT alone strands a
+    /// crew whose counterpart runs a phone rather than OziExplorer.
+    #[test]
+    fn waypoints_export_to_gpx_that_a_phone_can_read() {
+        let dir = temp_session_dir("waypoint-gpx-export");
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        state
+            .project
+            .add_waypoint_to_layer(
+                layer_id,
+                Waypoint::new(WaypointId::new(1), "ЗАБРОС", 59.951938, 31.596359),
+            )
+            .unwrap();
+        state
+            .apply_set_waypoint_symbol(layer_id, WaypointId::new(1), Some("Flag".to_owned()))
+            .unwrap();
+
+        let path = dir.join("waypoints.gpx");
+        state
+            .export_gpx_waypoints(layer_id, path.clone())
+            .expect("export");
+
+        let xml = std::fs::read_to_string(&path).expect("read gpx");
+        assert!(xml.contains("<gpx"), "a GPX document");
+        assert!(
+            xml.contains("59.951938") && xml.contains("31.596359"),
+            "the waypoint's position: {xml}"
+        );
+        assert!(xml.contains("ЗАБРОС"), "its name, in Cyrillic: {xml}");
+        assert!(xml.contains("Flag"), "and its symbol: {xml}");
+    }
+
+    #[test]
+    fn a_failed_waypoint_gpx_export_reaches_the_caller() {
+        let dir = temp_session_dir("waypoint-gpx-failure");
+        let mut state = AppState::new();
+
+        assert!(
+            state
+                .export_gpx_waypoints(LayerId::new(9999), dir.join("out.gpx"))
+                .is_err(),
+            "a missing layer SHALL be an error"
+        );
+        assert!(
+            state
+                .export_gpx_waypoints(LayerId::new(1), dir.join("no-such-dir").join("out.gpx"))
+                .is_err(),
+            "an unwritable path SHALL be an error"
+        );
+    }
+
+    #[test]
+    fn the_suggested_waypoint_file_name_follows_the_format() {
+        let state = AppState::new();
+        let gpx = state
+            .export_waypoints_default_path(LayerId::new(1), "gpx")
+            .expect("suggestion");
+        let wpt = state
+            .export_waypoints_default_path(LayerId::new(1), "wpt")
+            .expect("suggestion");
+
+        assert!(gpx.to_string_lossy().ends_with(".gpx"));
+        assert!(wpt.to_string_lossy().ends_with(".wpt"));
+        assert_eq!(
+            state.export_waypoints_default_path(LayerId::new(9999), "gpx"),
+            None,
+            "no suggestion for a layer that is not there"
         );
     }
 

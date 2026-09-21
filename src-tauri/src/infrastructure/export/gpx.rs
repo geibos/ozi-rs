@@ -26,6 +26,15 @@ pub fn build_gpx_xml(tracks: &[Track]) -> String {
     out
 }
 
+/// Export a waypoint layer to a `.gpx` file on disk.
+///
+/// GPX is what a phone, a navigator and the other groups' software all read;
+/// WPT is OziExplorer's own format. A crew that marks a найденный объект has
+/// to be able to hand it over in the format the receiver has.
+pub fn export_waypoints_to_gpx_file(waypoints: &[Waypoint], path: &Path) -> Result<(), io::Error> {
+    std::fs::write(path, build_waypoint_gpx_xml(waypoints))
+}
+
 pub fn build_waypoint_gpx_xml(waypoints: &[Waypoint]) -> String {
     let mut out = String::new();
 
@@ -98,7 +107,6 @@ fn write_waypoint(out: &mut String, waypoint: &Waypoint) {
     out.push_str("  </wpt>\n");
 }
 
-const _: fn(&[Waypoint]) -> String = build_waypoint_gpx_xml;
 const _: fn(&mut String, &Waypoint) = write_waypoint;
 
 fn xml_escape_into(out: &mut String, s: &str) {

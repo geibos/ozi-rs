@@ -275,6 +275,28 @@ export async function toggleWaypointVisible(
   );
 }
 
+/** Export a waypoint layer to GPX — the format phones and navigators read. */
+export async function exportGpxWaypoints(
+  layerId: bigint,
+  path: string,
+): Promise<void> {
+  await unwrap(
+    "export_gpx_waypoints",
+    commands.exportGpxWaypoints(toIdNumber(layerId), path),
+  );
+}
+
+/** Suggested file name for a waypoint export in the given format. */
+export async function getWaypointsExportDefaultPath(
+  layerId: bigint,
+  extension: string,
+): Promise<string | null> {
+  return unwrap(
+    "get_waypoints_export_default_path",
+    commands.getWaypointsExportDefaultPath(toIdNumber(layerId), extension),
+  );
+}
+
 /** Show or hide every waypoint in the project in one command. */
 export async function setAllWaypointsVisible(visible: boolean): Promise<void> {
   await unwrap(

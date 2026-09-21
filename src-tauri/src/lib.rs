@@ -112,6 +112,8 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::reveal_bundle,
         commands::export_track_plt,
         commands::export_wpt_waypoints,
+        commands::export_gpx_waypoints,
+        commands::get_waypoints_export_default_path,
         commands::get_wpt_export_default_path,
         commands::create_empty_track,
         commands::tiles::get_ozi_metadata,

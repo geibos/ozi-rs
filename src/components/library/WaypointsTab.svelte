@@ -38,9 +38,10 @@
   import { formatCoordinates as formatWaypointCoordinates } from "$lib/track-points";
   import {
     deleteWaypoint,
+    exportGpxWaypoints,
     exportWptWaypoints,
     getWaypoints,
-    getWptExportDefaultPath,
+    getWaypointsExportDefaultPath,
     renameWaypoint,
     setAllWaypointsVisible,
     setWaypointSymbol,
@@ -177,15 +178,34 @@
     }
   }
 
-  async function handleExportWptForLayer(layerId: bigint) {
-    const defaultPath = await getWptExportDefaultPath(layerId);
+  /**
+   * Export one waypoint layer.
+   *
+   * Two formats, because the receiver decides: GPX is what a phone, a
+   * navigator and the other groups' software read; WPT is OziExplorer's own.
+   */
+  async function handleExportLayer(layerId: bigint, format: "gpx" | "wpt") {
+    const defaultPath = await getWaypointsExportDefaultPath(layerId, format);
+    const filters =
+      format === "gpx"
+        ? [{ name: "GPX", extensions: ["gpx"] }]
+        : [{ name: "OziExplorer WPT", extensions: ["wpt"] }];
     const path = await open({
       save: true,
-      defaultPath: defaultPath ?? "waypoints.wpt",
-      filters: [{ name: "OziExplorer WPT", extensions: ["wpt"] }],
+      defaultPath: defaultPath ?? `waypoints.${format}`,
+      filters,
     } as Parameters<typeof open>[0]);
-    if (path) {
-      await exportWptWaypoints(layerId, path as string);
+    if (!path) return;
+    try {
+      if (format === "gpx") {
+        await exportGpxWaypoints(layerId, path as string);
+      } else {
+        await exportWptWaypoints(layerId, path as string);
+      }
+    } catch (err) {
+      toast.error(get(t)("waypointsTab.exportFailed"), {
+        description: String(err),
+      });
     }
   }
 </script>
@@ -366,7 +386,12 @@
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item
-              onSelect={() => handleExportWptForLayer(r.layerId)}
+              onSelect={() => handleExportLayer(r.layerId, "gpx")}
+            >
+              {$t("waypointsTab.exportGpx")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={() => handleExportLayer(r.layerId, "wpt")}
             >
               {$t("waypointsTab.exportWpt")}
             </DropdownMenu.Item>

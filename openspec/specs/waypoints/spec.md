@@ -1,7 +1,7 @@
 # waypoints Specification
 
 ## Purpose
-Covers waypoint layers as user data: placing, moving, renaming, deleting and hiding waypoints, the optional symbol attached to each waypoint, and exporting a waypoint layer to OziExplorer WPT. Undo semantics come from `undo-redo`; waypoints arriving from GPX files are created by `track-import`.
+Covers waypoint layers as user data: placing, moving, renaming, deleting and hiding waypoints, the optional symbol attached to each waypoint, and exporting a waypoint layer to GPX or OziExplorer WPT. Undo semantics come from `undo-redo`; waypoints arriving from GPX files are created by `track-import`.
 
 ### Decision history
 
@@ -10,7 +10,7 @@ Covers waypoint layers as user data: placing, moving, renaming, deleting and hid
 - Change `add-wpt-waypoint-export` (2026-05-17): removed the mistaken "waypoints to PLT" requirement (PLT is a track format) and introduced the WPT writer.
 - Changes `add-waypoint-visibility-toggle` and `fix-non-destructive-waypoint-rendering`: per-waypoint visibility outside the undo history and non-destructive marker updates; codified as: Multiple waypoints render simultaneously with per-waypoint visibility.
 
-- Owner decision (2026-09-19): "System exports waypoints to GPX" stays as a target requirement even though no command or UI exists yet; implementation is scheduled with CJ-6 (revive-ui-cycle roadmap, phase 4).
+- "System exports waypoints to GPX" was a target requirement with no command or UI behind it; the owner kept it on 2026-09-19 ("это по-любасу нужно") and it was implemented on 2026-09-21 — both the Waypoints tab row menu and the Waypoint Inspector offer GPX and WPT.
 
 ## Requirements
 ### Requirement: User can add a waypoint by clicking on the map

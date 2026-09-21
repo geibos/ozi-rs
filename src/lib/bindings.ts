@@ -442,6 +442,29 @@ async exportWptWaypoints(layerId: number, path: string) : Promise<Result<null, s
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Export a waypoint layer to GPX — the format phones, navigators and the
+ * other groups' software read.
+ */
+async exportGpxWaypoints(layerId: number, path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_gpx_waypoints", { layerId, path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Suggested file name for a waypoint export in the given format.
+ */
+async getWaypointsExportDefaultPath(layerId: number, extension: string) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_waypoints_export_default_path", { layerId, extension }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getWptExportDefaultPath(layerId: number) : Promise<Result<string | null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_wpt_export_default_path", { layerId }) };
