@@ -10,6 +10,34 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — only the newest list wins
+
+The same bug as the bundle preview, in a second and a third place.
+
+Both library tabs reload their rows whenever the app state changes, and during
+a bundle download `state-changed` fires once per file. So reloads overlap, and
+nothing ordered them: the one that started first could answer last and write
+its rows to the screen. The list went backwards under the operator, and the
+worse the link, the more likely it was.
+
+The Waypoints tab carried a second cost on the same path. It read its layers
+one after another, awaiting each, so a project of a dozen import-created layers
+paid a dozen round trips in a row to draw a list that is rebuilt whole anyway.
+It asks them all at once now.
+
+The test for that one is the kind worth keeping: each layer's answer resolves
+only once every layer has been asked, so the sequential version does not fail
+an assertion — it deadlocks, and the rows never appear.
+
+| | |
+|---|---|
+| Evidence | a held-open reload overtaken by a newer one, in both tabs; both red before the change |
+| Evidence | a parallel-fetch test that cannot pass sequentially |
+| Automated gates | `just ci` green (300 Rust, 352 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — a row for every track
 
 The Tracks tab built its rows out of the map's GeoJSON. One call, so it looked

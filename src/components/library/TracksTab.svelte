@@ -137,10 +137,22 @@
     }
   }
 
+  /**
+   * Which reload owns the rows. The tab reloads on every app-state change, and
+   * during a bundle download `state-changed` fires once per file, so reloads
+   * overlap; the one that started first could answer last and put its rows on
+   * screen. Only the newest may land.
+   */
+  let loadGeneration = 0;
+
   async function loadTracks() {
+    const generation = (loadGeneration += 1);
     try {
-      tracks = trackFeaturesFromSummaries(await listTracks());
+      const rows = trackFeaturesFromSummaries(await listTracks());
+      if (generation !== loadGeneration) return;
+      tracks = rows;
     } catch (err) {
+      if (generation !== loadGeneration) return;
       console.error("Failed to load tracks", err);
       toast.error(get(i18n)("tracksTab.loadFailed"), {
         description: String(err),

@@ -87,27 +87,47 @@
     void loadAll(layers);
   });
 
+  /**
+   * Which reload owns the rows.
+   *
+   * The tab reloads on every app-state change, and during a bundle download
+   * `state-changed` fires once per file, so reloads overlap. Nothing ordered
+   * them: the one that started first could answer last and put its rows on
+   * screen, so the list went backwards under the operator. Only the newest may
+   * land — the same rule a bundle preview needed.
+   */
+  let loadGeneration = 0;
+
   async function loadAll(
     layers: { id: number; name: string }[],
   ): Promise<void> {
+    const generation = (loadGeneration += 1);
     try {
-      const collected: WaypointRow[] = [];
-      for (const layer of layers) {
-        const wps = await getWaypoints(BigInt(layer.id));
-        for (const wp of wps) {
-          collected.push({
-            layerId: BigInt(layer.id),
-            layerName: layer.name,
-            wp,
-          });
-        }
-      }
+      // Every layer at once. One await per layer meant a project of a dozen
+      // import-created layers paid a dozen round trips in a row for a list
+      // that is redrawn whole anyway.
+      const perLayer = await Promise.all(
+        layers.map(async (layer) => ({
+          layer,
+          wps: await getWaypoints(BigInt(layer.id)),
+        })),
+      );
+      if (generation !== loadGeneration) return;
+
+      const collected: WaypointRow[] = perLayer.flatMap(({ layer, wps }) =>
+        wps.map((wp) => ({
+          layerId: BigInt(layer.id),
+          layerName: layer.name,
+          wp,
+        })),
+      );
       collected.sort((a, b) => {
         if (a.layerId === b.layerId) return a.wp.id - b.wp.id;
         return a.layerId < b.layerId ? -1 : 1;
       });
       rows = collected;
     } catch (err) {
+      if (generation !== loadGeneration) return;
       console.error("Failed to load waypoints", err);
       toast.error(get(t)("waypointsTab.loadFailed"), {
         description: String(err),

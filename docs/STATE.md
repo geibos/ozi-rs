@@ -5,10 +5,13 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a row for every track** (2026-09-21) — the Tracks tab
+Last merged slice: **only the newest list wins** (2026-09-21) — overlapping
+reloads in both library tabs could put an older list back on screen, and the
+Waypoints tab read its layers one round trip at a time; after a row for every
+track, where the Tracks tab
 stopped building its rows out of the map's geometry, which cost every
 coordinate of every track to draw a list of names and left a track the map
-cannot draw with no row at all; after the download speaking Russian, where
+cannot draw with no row at all, and after the download speaking Russian, where
 bundle progress reaches the status bar as a key and its arguments instead of an
 English sentence, and after stopping waiting for the catalogue, where the
 listing walk that holds the download button disabled for minutes after launch
@@ -50,7 +53,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 300 Rust tests and 349 frontend tests;
+rustfmt, clippy, type-checks, 300 Rust tests and 352 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
