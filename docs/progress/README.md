@@ -10,6 +10,57 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the button that was not there
+
+Selecting a track opens the inspector. Opening the inspector put Save, Undo,
+Redo and the ⌘K trigger underneath it — not crowded, *unreachable*. At 1024×640
+with a track selected, `document.elementFromPoint` at the centre of each of
+those four returned `HEADER.rail-header`. A click on Save went to the inspector.
+
+So in an application for editing tracks, the way to save disappeared at the
+moment a track was selected. I found it by looking at the screen, not by
+reading code, which is the argument for looking at the screen.
+
+The cause is one missing declaration. `.canvas-column` is a grid with
+`grid-template-rows` and no `grid-template-columns`, so its implicit column is
+`auto` — max-content. The bar wants about 710px for the inert mode chips plus
+the actions; the column was 384px; `auto` made the column 742px wide and the
+overflow ran under the inspector, which paints after it. Not an edge case of a
+tiny window: with both rails open, a 1280px laptop leaves the bar 640px.
+
+Now the column is `minmax(0, 1fr)`, so the bar shrinks instead. What it sheds
+is ordered: the inert mode placeholders go first and entirely, then the words
+on the two labelled controls, and never a control — the actions are
+`flex-shrink: 0`. The breakpoints are container queries on the bar itself,
+because what takes the width away is the library rail and the inspector, not
+the window.
+
+Measured on the stand with a track selected:
+
+| Window | Bar | Overflow past the column | Unreachable actions |
+|---|---|---|---|
+| 880 | 240px | 0px | none |
+| 1024 | 384px | 0px | none |
+| 1280 | 640px | 0px | none |
+| 1300 | 660px | 0px | none |
+| 1440 | 800px | 0px | none |
+
+One thing I nearly left in: the first version also hid the "Сохранено" readout
+on a narrow bar, and that rule silently did nothing — `.dirty-indicator`
+declares its own `display` later in the same stylesheet, at equal specificity.
+A rule that does not apply is worse than no rule, so it is gone; the readout
+ellipsizes on its own, and "is my work saved" earns its 57 pixels.
+
+| | |
+|---|---|
+| Before | [inspector over the toolbar](2026-09-22-toolbar/before-inspector-covers-toolbar.png) |
+| After | [the bar inside its column](2026-09-22-toolbar/after-toolbar-fits.png) |
+| Change | `openspec/changes/the-toolbar-stays-clickable/` |
+| Automated gates | `just ci` green (320 Rust, 462 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the third way to open a map
 
 `open_selected_map` opens a map from disk when it is there and starts a

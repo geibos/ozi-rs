@@ -81,6 +81,13 @@ decision.
   that kind. A guard on a syntactic shape catches the careless version, which
   is most of them, and is not worth widening until it misses something that
   reaches a screen — this one did, and is fixed.
+- **A grid child can grow its own column.** `.canvas-column` had
+  `grid-template-rows` and no `grid-template-columns`, so the implicit column
+  was `auto` = max-content and the context bar widened it by 358px, under the
+  inspector. Anywhere a grid holds a row that can be wider than its track,
+  declare `minmax(0, 1fr)`; `min-width: 0` on the container is not enough,
+  because it constrains the container, not the track.
+
 - **The theme picker is unreachable.** `ThemePicker.svelte` is imported by
   nothing, and `ui-shell` requires a selector with five options and persistence
   across sessions. Both stores behind it work; only the placement is missing,

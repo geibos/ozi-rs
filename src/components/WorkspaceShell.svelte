@@ -307,6 +307,12 @@
 
   .canvas-column {
     display: grid;
+    /* Explicit, because the implicit `auto` column is sized to max-content:
+       the context bar is wider than the canvas whenever the inspector is
+       open, and it grew the column instead of shrinking itself. The bar then
+       reached under the inspector, which drew over it — Save, Undo, Redo and
+       the palette were unclickable exactly when a track was selected. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) var(--status-bar-height);
     min-width: 0;
     min-height: 0;
@@ -322,12 +328,44 @@
     background: hsl(var(--background));
     box-shadow: inset 0 -1px 0 var(--inner-border);
     flex-shrink: 0;
+    min-width: 0;
+    /* The breakpoints below measure the bar, not the window: what decides
+       whether the actions fit is how much the library rail and the inspector
+       have left of it. */
+    container-type: inline-size;
   }
 
   .mode-chips {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    /* Inert scaffolding per `ui-shell`. It yields the width first, and is
+       gone entirely before anything that can be clicked gives up a pixel. */
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /*
+   * A narrow bar drops the placeholders, then the words — never a control.
+   * 640px is where the chips and the actions stop fitting side by side; 380px
+   * is where the actions alone stop fitting with their labels. Both measured
+   * on the stand against the bar's content box, which is what
+   * `container-type: inline-size` reports.
+   *
+   * The save-state readout is not in either rule: it already ellipsizes, and
+   * "is my work saved" is worth the few pixels it keeps.
+   */
+  @container (max-width: 640px) {
+    .mode-chips {
+      display: none;
+    }
+  }
+
+  @container (max-width: 380px) {
+    .bar-btn-save span,
+    .cmdk-label {
+      display: none;
+    }
   }
 
   .chips-divider {
@@ -366,6 +404,9 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
+    /* Whatever else gives way, these do not: they are the only route to
+       Save and to the command palette. */
+    flex-shrink: 0;
   }
 
   .bar-btn {
