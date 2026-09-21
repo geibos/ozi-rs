@@ -101,7 +101,8 @@ const dictionaries = {
     "mapsTab.downloading": "Downloading",
     "mapsTab.cachedTooltip": "Tiles cached locally",
     "mapsTab.notDownloaded": "Not downloaded — opening it fetches {size}",
-    "mapsTab.notDownloadedUnknown": "Not downloaded — opening it fetches it first",
+    "mapsTab.notDownloadedUnknown":
+      "Not downloaded — opening it fetches it first",
     "mapsTab.switchTo": "Switch to this map",
     "mapsTab.reveal": "Reveal in Finder",
     "mapsTab.empty": "No maps in this project",

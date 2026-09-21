@@ -214,7 +214,12 @@
   // backend never sees overlapping downloads), resets the transient
   // progress stores, then records the new download_id.
   async function handleOpenBundle() {
-    const slug = selectedSlug;
+    // Falling back to the open project's slug: the loader is also reached
+    // from the workspace ("Открыть проект…"), where a project is already
+    // previewed and no row has been clicked. Without the fallback the only
+    // download button in the app did nothing at all on that path — silently,
+    // because the handler returned before it called anything.
+    const slug = selectedSlug || ($currentProject?.slug ?? "");
     if (!slug) return;
     const previousId = $activeDownloadId;
     if (previousId !== null) {

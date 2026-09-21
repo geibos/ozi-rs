@@ -40,6 +40,13 @@ describe("the fixtures are the shape the backend sends", () => {
     );
   });
 
+  it("carries the open project's slug, not only its name", () => {
+    // Without it the loader had a project and no way to ask for that
+    // project: opened from the workspace, where no row has been clicked,
+    // the only download button in the app returned before calling anything.
+    expect(appStateFixture.current_project?.slug).toBeTruthy();
+  });
+
   it("exercises a downloaded and a not-downloaded map, both with sizes", () => {
     const maps = appStateFixture.current_project?.maps ?? [];
     expect(maps.some((m) => m.downloaded)).toBe(true);

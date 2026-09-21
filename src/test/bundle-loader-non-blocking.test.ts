@@ -60,7 +60,9 @@ describe("bundle loader main-thread responsiveness", () => {
     );
     expect(loaderSource).toMatch(/await\s+cancelDownload\(/);
     // The call carries the operator's choice of what not to download.
-    expect(loaderSource).toMatch(/loadProject\(slug, Object\.keys\(skipped\)\)/);
+    expect(loaderSource).toMatch(
+      /loadProject\(slug, Object\.keys\(skipped\)\)/,
+    );
   });
 
   it("project list is not blanket-disabled while a download is in flight", () => {

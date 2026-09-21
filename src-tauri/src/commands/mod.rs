@@ -123,6 +123,12 @@ pub struct LizaProjectSummaryDto {
 
 #[derive(serde::Serialize, specta::Type)]
 pub struct LizaProjectDto {
+    /// The bundle's identifier, as `load_project` takes it.
+    ///
+    /// Without it a loader opened on an already-previewed project had a name
+    /// and no way to ask for that project, so its download button did
+    /// nothing at all.
+    pub slug: String,
     pub name: String,
     pub center_lat: f64,
     pub center_lon: f64,
@@ -276,6 +282,7 @@ pub fn app_state_dto(
         .collect();
 
     let current_project = s.current_project().map(|p| LizaProjectDto {
+        slug: p.summary.slug.clone(),
         name: p.summary.name.clone(),
         center_lat: p.center.lat,
         center_lon: p.center.lon,

@@ -45,7 +45,7 @@
 - [x] 3.4 Unit tests for the transport: fixture answer, mutation accepted, unanswered command rejected by name, call transcript, event delivery and unsubscribe
 - [x] 3.5 `/project` rendered on fixtures, Maps and Tracks tabs photographed; the first run immediately caught an unanswered `get_ozi_metadata`
 - [ ] 3.6 `just ci` green, PR merged, `docs/STATE.md` updated
-- [ ] 3.7 Deferred, with reason: latency and error injection, and scripted replay of the download events. The stand earns its keep on layout and state; the download flow is better exercised against the real backend, where the timing is real
+- [x] 3.7 Scripted replay of the download events, after all: pressing the download button on the stand plays the sequence a real bundle emits, slowly enough to look at. It paid for itself immediately — the button turned out to do nothing at all when the loader is opened on an already-previewed project. Latency and error injection stay deferred
 
 ## 4. Screenshot matrix and evidence policy (slice 1.3, one session)
 

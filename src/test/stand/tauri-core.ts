@@ -14,6 +14,7 @@
  * producing.
  */
 import { standEmit } from "./tauri-event";
+import { playBundleDownload } from "./download-script";
 import {
   appStateFixture,
   coldStartFixture,
@@ -120,13 +121,29 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
   get_sqlite_tile: () => TRANSPARENT_PNG,
   get_ozi_tile: () => TRANSPARENT_PNG,
   open_selected_map: () => "",
-  load_project: () => "",
+  // Pressing the download button plays the event sequence a real bundle
+  // download emits, so the panel, the "map is ready" announcement and the
+  // panel closing can be looked at without a network.
+  load_project: () => {
+    const id = `stand-${Date.now()}`;
+    playBundleDownload(id);
+    return id;
+  },
   open_local_bundle: () => "",
   cancel_download: () => true,
 };
 
 /** Commands the stand answered, in order — a screen's IPC transcript. */
 export const standCalls: Array<{ command: string; args: Args }> = [];
+
+// The transcript on `window.__stand`, so a stand session can see what a screen
+// asked for from the console — which is how "the button does nothing" turns
+// into "the command never fired" without guessing.
+if (typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).__stand = {
+    calls: standCalls,
+  };
+}
 
 export async function invoke<T>(command: string, args?: Args): Promise<T> {
   standCalls.push({ command, args });

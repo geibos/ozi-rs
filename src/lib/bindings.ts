@@ -549,7 +549,15 @@ export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: b
  * file for a cached one. `None` is "unknown", not zero.
  */
 size_bytes: number | null }
-export type LizaProjectDto = { name: string; center_lat: number; center_lon: number; maps: LizaMapPackageDto[]; 
+export type LizaProjectDto = { 
+/**
+ * The bundle's identifier, as `load_project` takes it.
+ * 
+ * Without it a loader opened on an already-previewed project had a name
+ * and no way to ask for that project, so its download button did
+ * nothing at all.
+ */
+slug: string; name: string; center_lat: number; center_lon: number; maps: LizaMapPackageDto[]; 
 /**
  * The bundle's top level — what the operator chooses from when deciding
  * what not to download.
