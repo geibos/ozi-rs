@@ -1,0 +1,49 @@
+{
+  "active_map": null,
+  "busy": false,
+  "current_project": null,
+  "diagnostics": [
+    {
+      "level": "info",
+      "message": "Load projects from maps.lizaalert.ru"
+    }
+  ],
+  "downloading_maps": [],
+  "project_dirty": false,
+  "project_name": "Untitled Project",
+  "project_path": null,
+  "project_saved": false,
+  "projects": [
+    {
+      "cached": true,
+      "name": "2026 07 08 Lavrovo",
+      "slug": "2026-07-08_Lavrovo"
+    },
+    {
+      "cached": false,
+      "name": "2026 07 14 Sagra",
+      "slug": "2026-07-14_Sagra"
+    },
+    {
+      "cached": false,
+      "name": "2026 09 20 Schuvalovo",
+      "slug": "2026-09-20_Schuvalovo"
+    }
+  ],
+  "status": "Load projects from maps.lizaalert.ru",
+  "track_layer_count": 1,
+  "track_layers": [
+    {
+      "id": 1,
+      "name": "Tracks"
+    }
+  ],
+  "tracks": [],
+  "waypoint_layer_count": 1,
+  "waypoint_layers": [
+    {
+      "id": 1,
+      "name": "Waypoints"
+    }
+  ]
+}

@@ -9,6 +9,7 @@
  * regenerated here with `just fixtures`.
  */
 import appStateJson from "./app-state.json";
+import coldStartJson from "./app-state-cold.json";
 import tracksGeojsonJson from "./tracks-geojson.json";
 import trackDetailJson from "./track-detail.json";
 import waypointsJson from "./waypoints.json";
@@ -17,6 +18,9 @@ import type { AppStateDto, TrackDetailDto, WaypointDto } from "$lib/bindings";
 
 /** A project shaped like one search: two tracks, one of them hidden. */
 export const appStateFixture = appStateJson as AppStateDto;
+
+/** The app's first screen: the catalogue is loaded, nothing is open. */
+export const coldStartFixture = coldStartJson as unknown as AppStateDto;
 
 /** The same project's tracks, as the map layer receives them. */
 export const tracksGeojsonFixture =

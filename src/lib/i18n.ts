@@ -224,6 +224,9 @@ const dictionaries = {
     "download.cancel": "Cancel",
     "download.failed": "Download failed",
     "download.currentFile": "Downloading",
+    "catalogue.loading": "Loading the project list…",
+    "catalogue.loaded": "{count} projects — pick one on the left",
+    "catalogue.empty": "No projects yet — refresh, or open a local bundle",
     "download.starting": "Starting download…",
   },
   ru: {
@@ -428,6 +431,9 @@ const dictionaries = {
     "download.cancel": "Отмена",
     "download.failed": "Загрузка не удалась",
     "download.currentFile": "Скачивается",
+    "catalogue.loading": "Загружается список проектов…",
+    "catalogue.loaded": "Проектов: {count} — выберите слева",
+    "catalogue.empty": "Список пуст — обновите или откройте локальный бандл",
     "download.starting": "Начинаем загрузку…",
   },
 } as const satisfies Record<Locale, Record<string, string>>;

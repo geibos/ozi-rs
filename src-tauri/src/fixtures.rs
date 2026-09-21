@@ -197,6 +197,38 @@ pub fn sample_app_state() -> AppState {
     state
 }
 
+/// The app's first screen: the catalogue is loaded, nothing is open.
+///
+/// The cold-start route is what a crew sees when they launch the app, and it
+/// had never been looked at — the other fixture carries an active map, so the
+/// workspace always won the redirect.
+pub fn cold_start_app_state() -> AppState {
+    let mut state = AppState::new();
+    state.set_fixture_catalogue(
+        vec![
+            LizaProjectSummary {
+                slug: "2026-07-08_Lavrovo".to_owned(),
+                name: "2026 07 08 Lavrovo".to_owned(),
+                url: "https://maps.lizaalert.ru/maps/2026-07-08_Lavrovo/".to_owned(),
+            },
+            LizaProjectSummary {
+                slug: "2026-07-14_Sagra".to_owned(),
+                name: "2026 07 14 Sagra".to_owned(),
+                url: "https://maps.lizaalert.ru/maps/2026-07-14_Sagra/".to_owned(),
+            },
+            LizaProjectSummary {
+                slug: "2026-09-20_Schuvalovo".to_owned(),
+                name: "2026 09 20 Schuvalovo".to_owned(),
+                url: "https://maps.lizaalert.ru/maps/2026-09-20_Schuvalovo/".to_owned(),
+            },
+        ],
+        None,
+        None,
+        "Load projects from maps.lizaalert.ru",
+    );
+    state
+}
+
 /// The bundles the fixture's catalogue reports as already downloaded.
 fn cached_slugs() -> HashSet<String> {
     HashSet::from(["2026-07-08_Lavrovo".to_owned()])
@@ -217,7 +249,13 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let track_detail = crate::commands::track_detail_dto(track);
     let waypoints = crate::commands::waypoint_dtos(state.project_waypoint_layers()[0].waypoints());
 
+    let cold = crate::commands::app_state_dto(&cold_start_app_state(), &cached_slugs());
+
     let files: Vec<(&str, serde_json::Value)> = vec![
+        (
+            "app-state-cold.json",
+            serde_json::to_value(&cold).expect("serialize cold-start state"),
+        ),
         (
             "app-state.json",
             serde_json::to_value(&app_state).expect("serialize app state"),

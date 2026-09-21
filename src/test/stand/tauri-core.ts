@@ -13,8 +13,10 @@
  * is exactly the kind of evidence this whole exercise exists to stop
  * producing.
  */
+import { standEmit } from "./tauri-event";
 import {
   appStateFixture,
+  coldStartFixture,
   trackDetailFixture,
   tracksGeojsonFixture,
   waypointsFixture,
@@ -33,6 +35,19 @@ const TRANSPARENT_PNG = Uint8Array.from([
 ]).buffer;
 
 /** Commands that change state: the stand accepts them and reports no data. */
+/**
+ * Commands whose real implementation finishes by emitting `state-changed`.
+ *
+ * Without it the stand leaves the app mid-flight: `load_projects` sets the
+ * "refreshing…" hint, and only a state update clears it, so the hint sat there
+ * forever and the first screen always looked like it was still loading.
+ */
+const EMITS_STATE_CHANGED = new Set([
+  "load_projects",
+  "preview_project",
+  "set_bundles_root",
+]);
+
 const ACCEPTED_WITHOUT_DATA = new Set([
   "set_all_tracks_visible",
   "show_only_track",
@@ -71,8 +86,22 @@ const FIXTURE_TRACK_LAYER = 1;
 const FIXTURE_WAYPOINT_LAYER = 1;
 const FIXTURE_TRACK = 1;
 
+/**
+ * Which state the stand serves, from the URL: `?state=cold` opens the app as a
+ * crew first sees it, with the catalogue loaded and nothing open. Without it
+ * the workspace always wins, because the default fixture has an active map and
+ * the cold-start route redirects.
+ */
+function requestedState(): "cold" | "workspace" {
+  if (typeof location === "undefined") return "workspace";
+  return new URLSearchParams(location.search).get("state") === "cold"
+    ? "cold"
+    : "workspace";
+}
+
 const HANDLERS: Record<string, (args: Args) => unknown> = {
-  get_app_state: () => appStateFixture,
+  get_app_state: () =>
+    requestedState() === "cold" ? coldStartFixture : appStateFixture,
   get_tracks_geojson: () => tracksGeojsonFixture,
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
@@ -100,6 +129,10 @@ export const standCalls: Array<{ command: string; args: Args }> = [];
 
 export async function invoke<T>(command: string, args?: Args): Promise<T> {
   standCalls.push({ command, args });
+
+  if (EMITS_STATE_CHANGED.has(command)) {
+    queueMicrotask(() => standEmit("state-changed", undefined));
+  }
 
   const handler = HANDLERS[command];
   if (handler) return handler(args) as T;

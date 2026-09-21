@@ -8,6 +8,12 @@ just fixtures   # only when a DTO changed
 just stand      # http://localhost:5273
 ```
 
+States:
+
+- `http://localhost:5273/project` — a project open, two tracks, three waypoints
+- `http://localhost:5273/?state=cold` — the app as a crew first sees it: the
+  catalogue loaded, nothing open
+
 ## Why
 
 Every visual check before this cost a full `just build`, an Appium session that

@@ -13,7 +13,8 @@
    * `visible` flag, toggled through `toggle_waypoint_visible`.
    */
   import { get } from "svelte/store";
-  import { t } from "$lib/i18n";
+  import { locale, t } from "$lib/i18n";
+  import { layerDisplayName } from "$lib/layer-names";
   import { buttonVariants } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -227,14 +228,22 @@
             size="sm"
             class="min-w-0 flex-1"
           >
-            {waypointLayers.find(
-              (l) => String(l.id) === waypointLayerSelectValue,
-            )?.name ?? $t("waypointsTab.pickLayer")}
+            {(() => {
+              const name = waypointLayers.find(
+                (l) => String(l.id) === waypointLayerSelectValue,
+              )?.name;
+              return name === undefined
+                ? $t("waypointsTab.pickLayer")
+                : layerDisplayName(name, $locale);
+            })()}
           </Select.Trigger>
           <Select.Content>
             {#each waypointLayers as layer (layer.id)}
-              <Select.Item value={String(layer.id)} label={layer.name}>
-                {layer.name}
+              <Select.Item
+                value={String(layer.id)}
+                label={layerDisplayName(layer.name, $locale)}
+              >
+                {layerDisplayName(layer.name, $locale)}
               </Select.Item>
             {/each}
           </Select.Content>

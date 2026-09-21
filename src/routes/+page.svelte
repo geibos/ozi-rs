@@ -18,8 +18,8 @@
     bundleProgress,
     busy,
     currentDownload,
+    projects,
     projectsLoading,
-    status,
     syncProjectsFromAppState,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
@@ -75,8 +75,24 @@
       : null,
   );
 
+  /**
+   * What the bottom line says on the app's first screen.
+   *
+   * The backend's own status is free English text ("Load projects from
+   * maps.lizaalert.ru"), and it was the first thing a Russian crew read on
+   * launch. When the frontend knows the answer — the catalogue is loading, or
+   * it holds N projects — it says so in the interface language. A transient
+   * message, a running download's phase or a backend status that is not the
+   * idle one still win, because those carry information this cannot derive.
+   */
+  const catalogueText = $derived.by(() => {
+    if ($projectsLoading) return $t("catalogue.loading");
+    if ($projects.length === 0) return $t("catalogue.empty");
+    return $t("catalogue.loaded").replace("{count}", String($projects.length));
+  });
+
   const statusText = $derived(
-    transientStatus ?? $bundleProgress?.message ?? $status ?? "",
+    transientStatus ?? $bundleProgress?.message ?? catalogueText,
   );
 
   const currentFileLabel = $derived.by(() => {

@@ -69,6 +69,7 @@
   import CheckIcon from "@lucide/svelte/icons/check";
   import { isOkStandardTrackName } from "$lib/track-names";
   import { locale, t as i18n } from "$lib/i18n";
+  import { layerDisplayName } from "$lib/layer-names";
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
   import {
@@ -101,10 +102,12 @@
   // Import-created layers are named after the source path ("Imported
   // tracks: /very/long/path.gpx") — the trigger text must truncate, not
   // overflow the 280px rail; `title` keeps the full name reachable.
-  const activeTrackLayerName = $derived(
-    trackLayers.find((l) => String(l.id) === trackLayerSelectValue)?.name ??
-      null,
-  );
+  const activeTrackLayerName = $derived.by(() => {
+    const name = trackLayers.find(
+      (l) => String(l.id) === trackLayerSelectValue,
+    )?.name;
+    return name === undefined ? null : layerDisplayName(name, $locale);
+  });
 
   $effect(() => {
     if ($appState) {
@@ -431,9 +434,15 @@
           </Select.Trigger>
           <Select.Content class="max-w-72">
             {#each trackLayers as layer (layer.id)}
-              <Select.Item value={String(layer.id)} label={layer.name}>
-                <span class="min-w-0 truncate" title={layer.name}>
-                  {layer.name}
+              <Select.Item
+                value={String(layer.id)}
+                label={layerDisplayName(layer.name, $locale)}
+              >
+                <span
+                  class="min-w-0 truncate"
+                  title={layerDisplayName(layer.name, $locale)}
+                >
+                  {layerDisplayName(layer.name, $locale)}
                 </span>
               </Select.Item>
             {/each}
