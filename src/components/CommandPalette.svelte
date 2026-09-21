@@ -56,10 +56,10 @@
     getWaypoints,
     getWptExportDefaultPath,
     loadProjectFile,
-    openSelectedMap,
     revealBundle,
   } from "$lib/api";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import { openMapShowingDownload } from "$lib/actions/open-map";
   // Aliased: the tracks loop below binds `t`, and a store read inside it
   // would resolve to the loop variable.
   import { t as i18n, toggleLocale } from "$lib/i18n";
@@ -158,7 +158,10 @@
   async function handleOpenMap(mapName: string) {
     close();
     try {
-      await openSelectedMap(mapName);
+      // A map that is not on disk starts a download instead of opening: the
+      // helper puts its progress on screen with a cancel, and there is nothing
+      // to record or navigate to until it lands.
+      if (!(await openMapShowingDownload(mapName))) return;
       const am = get(activeMap);
       const cp = get(currentProject);
       if (am && cp) {

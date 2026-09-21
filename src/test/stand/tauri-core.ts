@@ -14,7 +14,7 @@
  * producing.
  */
 import { standEmit } from "./tauri-event";
-import { playBundleDownload } from "./download-script";
+import { playBundleDownload, playMapDownload } from "./download-script";
 import {
   appStateFixture,
   coldStartFixture,
@@ -160,7 +160,19 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
   // fidelity is out of scope here and says so in the README.
   get_sqlite_tile: () => TRANSPARENT_PNG,
   get_ozi_tile: () => TRANSPARENT_PNG,
-  open_selected_map: () => "",
+  // A map already on disk opens with no download id; one that is not starts a
+  // download and returns its id, which is what the caller needs in order to
+  // show the panel and offer a cancel.
+  open_selected_map: (args) => {
+    const mapName = String(args?.mapName ?? "");
+    const map = (appStateFixture.current_project?.maps ?? []).find(
+      (m) => m.name === mapName,
+    );
+    if (!map || map.downloaded) return "";
+    const id = `stand-map-${Date.now()}`;
+    playMapDownload(id, mapName);
+    return id;
+  },
   // Pressing the download button plays the event sequence a real bundle
   // download emits, so the panel, the "map is ready" announcement and the
   // panel closing can be looked at without a network.

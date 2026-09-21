@@ -10,6 +10,43 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the third way to open a map
+
+`open_selected_map` opens a map from disk when it is there and starts a
+download when it is not, returning the download id in the second case so the
+caller can show progress and offer a cancel. The bundle loader used it. The
+Library Maps tab used it. The command palette threw it away.
+
+So from the palette, asking for a map whose bytes were not on disk did this:
+the palette closed, a download started, nothing appeared on screen, nothing
+could be cancelled, and the map never opened — the palette's navigation is
+gated on an `activeMap` that a running download has not set yet. The way in is
+the palette's recent files, which name a map that may since have been removed,
+moved, or downloaded onto a different machine.
+
+Third call site, so the rule became a helper rather than a third copy — the
+same move `latest-run.ts` got when the generation-stamp rule turned up five
+times.
+
+Finding it needed the stand to grow: its `open_selected_map` always answered
+"already on disk", so this path had never been playable. It now plays a
+single-map download for a map the fixture reports as not downloaded.
+
+Measured on the stand by sampling the DOM every 150 ms across the click: the
+panel is absent before, present for 18 consecutive samples (~2.7 s, the
+script's length), and gone on `download-finished`. Two earlier checks said the
+panel never appeared — both had sampled after the script had already finished,
+which is worth writing down: a one-shot check of a transient panel proves
+nothing about whether it was there.
+
+| | |
+|---|---|
+| Change | `openspec/changes/one-way-to-start-a-map/` |
+| Automated gates | `just ci` green (320 Rust, 458 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — typing the name you were given
 
 The catalogue names every search in latin transliteration — `2026-07-08_Lavrovo`,

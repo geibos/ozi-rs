@@ -131,3 +131,46 @@ export function playBundleDownload(downloadId: string, fail = false): void {
     }),
   );
 }
+
+/**
+ * One map, fetched because the operator asked to open it and it was not on
+ * disk. Same events as a bundle download, one file long: the backend mints a
+ * download id for this path too, and until 2026-09-22 the command palette
+ * threw that id away, which is exactly the kind of thing a stand exists to
+ * show.
+ */
+export function playMapDownload(downloadId: string, mapName: string): void {
+  const map = (appStateFixture.current_project?.maps ?? []).find(
+    (m) => m.name === mapName,
+  );
+  const bytes = map?.size_bytes ?? 194_093_875;
+
+  let step = 0;
+  const at = (fn: () => void) => {
+    step += 1;
+    setTimeout(fn, step * STEP_MS);
+  };
+
+  const progress = (downloadedBytes: number) =>
+    standEmit("download-progress", {
+      download_id: downloadId,
+      package_name: mapName,
+      downloaded_bytes: downloadedBytes,
+      total_bytes: bytes,
+      file_index: 0,
+      file_count: 1,
+    });
+
+  at(() => progress(0));
+  at(() => progress(Math.round(bytes / 3)));
+  at(() => progress(Math.round((bytes * 2) / 3)));
+  at(() => {
+    progress(bytes);
+    standEmit("download-finished", {
+      download_id: downloadId,
+      ok: true,
+      message: null,
+    });
+    standEmit("state-changed", undefined);
+  });
+}

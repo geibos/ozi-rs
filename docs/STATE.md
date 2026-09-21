@@ -5,7 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **typing the name you were given** (2026-09-22) — the
+Last merged slice: **the third way to open a map** (2026-09-22) — the command
+palette dropped the download id `open_selected_map` returns, so asking it for a
+map that was not on disk started an invisible, uncancellable download and never
+opened the map; after typing the name you were given, where the
 catalogue is spelled in latin transliteration and the filter matched literally,
 so a crew typing `Лаврово` got an empty list of thirteen thousand rows; after
 the toast that sat on the download, where the
@@ -135,7 +138,7 @@ re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the thirty-eight OpenSpec changes.** Folding their requirements
+1. **Archive the thirty-nine OpenSpec changes.** Folding their requirements
    into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on
@@ -158,7 +161,7 @@ re-ordered rather than followed blindly.
 
 4. **`just smoke`.** The Mac2 driver host dies at session creation; every
    piece works when run by hand and only fails when Appium spawns it. What has
-   been ruled out, and by which command, is under "Known broken". Twenty-nine
+   been ruled out, and by which command, is under "Known broken". Thirty
    changes carry an unchecked "smoke green" task waiting on it.
 
 ### An agent can still do these
@@ -238,7 +241,7 @@ existing requirements before writing a delta against it.
   and the earlier `com.apple.LocalAuthentication` block, which was a different
   error and is cleared.
 
-  Twenty-nine changes carry an unchecked "smoke green" task waiting on this.
+  Thirty changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run

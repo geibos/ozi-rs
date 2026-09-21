@@ -160,10 +160,11 @@ and the palette slice; these were not.
   and the prominent button downloads the whole project directory recursively,
   not the selected map. On a tethered phone that is potentially gigabytes with
   no estimate and no disk-space check.
-- **A single-map download has no panel and cannot be cancelled.** `open_selected_map`
-  mints its own download id, never returns it and never sets busy, so neither
-  the progress popup nor the cancel button appears; the row is disabled while it
-  runs, so there is no way out.
+- ~~A single-map download has no panel and cannot be cancelled.~~ The backend
+  returns the id; the last caller that ignored it, the command palette, was
+  fixed on 2026-09-22 in `one-way-to-start-a-map`, and the rule now lives in
+  `src/lib/actions/open-map.ts` so a fourth caller cannot get it wrong. The
+  stand plays a single-map download, which is what made the gap visible.
 - **The loader Sheet hides the download it started.** The Sheet overlay is
   `z-50`, the download popup `z-40`, and the toaster sits in the same corner.
   Opening the loader to queue the next map blocks the map and hides the running

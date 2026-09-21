@@ -46,7 +46,6 @@
     loadProjects,
     loadProject,
     openLocalBundle,
-    openSelectedMap,
     previewProject,
     setBundlesRoot,
   } from "../lib/api";
@@ -54,6 +53,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import { filterProjects } from "$lib/project-list";
+  import { openMapShowingDownload } from "$lib/actions/open-map";
   import { bundleSlugFromUrl } from "$lib/bundle-url";
   import { formatBytes, formatOptionalBytes } from "$lib/format-bytes";
   import { appendRecentFile } from "../lib/recentFiles";
@@ -434,13 +434,9 @@
 
   async function handleOpenMap(mapName: string) {
     try {
-      const downloadId = await openSelectedMap(mapName);
-      if (downloadId) {
-        // The map was not on disk: show its progress and let it be cancelled,
-        // the same as a whole-bundle download.
-        resetBundleDownloadState(downloadId);
-        return;
-      }
+      // `false` means the map was not on disk: the helper put its progress on
+      // screen with a cancel, and there is nothing to open yet.
+      if (!(await openMapShowingDownload(mapName))) return;
     } catch (error) {
       toast.error($t("loader.openMapFailed"), { description: String(error) });
       return;
