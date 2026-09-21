@@ -33,7 +33,9 @@
   // A locally opened OZI map belongs to no LizaAlert project, so listing
   // `currentProject.maps` alone showed "No maps in this project" while that
   // map was rendering on the canvas. See `mapsForLibrary`.
-  const maps = $derived(mapsForLibrary($currentProject?.maps ?? [], $activeMap));
+  const maps = $derived(
+    mapsForLibrary($currentProject?.maps ?? [], $activeMap),
+  );
 
   /**
    * Open the bundle loader — the same mechanism the command palette's
@@ -53,7 +55,7 @@
     try {
       await openSelectedMap(mapName);
     } catch (err) {
-      toast.error("Failed to switch map", { description: String(err) });
+      toast.error($t("mapsTab.switchFailed"), { description: String(err) });
     }
   }
 
@@ -61,7 +63,7 @@
     try {
       await revealBundle();
     } catch (err) {
-      toast.error("Failed to reveal bundle", { description: String(err) });
+      toast.error($t("mapsTab.revealFailed"), { description: String(err) });
     }
   }
 </script>
@@ -131,14 +133,14 @@
               -->
               <span
                 class="bg-primary text-background inline-flex h-4 min-w-[2rem] items-center justify-center rounded-sm px-1 text-[10px] font-medium tabular-nums"
-                title="Downloading"
+                title={$t("mapsTab.downloading")}
               >
                 {pct != null ? `${pct}%` : "…"}
               </span>
             {:else if m.downloaded}
               <span
-                class="bg-muted text-muted-foreground inline-flex h-4 items-center rounded-sm px-1.5 text-[10px] font-medium uppercase tracking-wide"
-                title="Tiles cached locally"
+                class="bg-muted text-muted-foreground inline-flex h-4 items-center rounded-sm px-1.5 text-[10px] font-medium tracking-wide uppercase"
+                title={$t("mapsTab.cachedTooltip")}
               >
                 {$t("mapsTab.cached")}
               </span>
@@ -148,11 +150,11 @@
           {/snippet}
           {#snippet actions()}
             <DropdownMenu.Item onSelect={() => handleSwitchTo(m.name)}>
-              Switch to
+              {$t("mapsTab.switchTo")}
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={handleReveal} disabled={!active}>
               <ExternalLinkIcon class="size-3.5" />
-              Reveal in Finder
+              {$t("mapsTab.reveal")}
             </DropdownMenu.Item>
           {/snippet}
         </LibraryRow>

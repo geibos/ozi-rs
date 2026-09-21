@@ -28,6 +28,7 @@
   import {
     activeDownloadId,
     activeMap,
+    bundleLoaderOpen,
     busy,
     currentProject,
     downloadProgress,
@@ -152,8 +153,9 @@
     }, PREVIEW_TIMEOUT_MS);
     try {
       await previewProject(slug);
-    } catch {
+    } catch (error) {
       clearPreviewPending();
+      toast.error($t("loader.previewFailed"), { description: String(error) });
     }
   }
 
@@ -192,8 +194,17 @@
     try {
       const id = await loadProject(slug);
       activeDownloadId.set(id || null);
-    } catch {
+    } catch (error) {
       activeDownloadId.set(null);
+      // The backend refuses while the catalogue walk holds the busy flag.
+      // Saying "wait" is the difference between a slow app and a dead button.
+      const busyRefusal = String(error).includes("busy:");
+      toast.error(
+        busyRefusal
+          ? $t("loader.openBundleBusy")
+          : $t("loader.openBundleFailed"),
+        busyRefusal ? undefined : { description: String(error) },
+      );
     }
   }
 
@@ -214,6 +225,10 @@
         mapName: am.package_name,
         openedAt: Date.now(),
       });
+      // The "open the loader" flag is set by callers that navigate to `/`
+      // (Maps tab, command palette). `/` does not own the Sheet, so without
+      // clearing it here the loader reopened over the map just opened.
+      bundleLoaderOpen.set(false);
       if (onCloseRequest) {
         onCloseRequest();
       } else {
@@ -224,10 +239,15 @@
 
   async function handleOpenLocalBundle() {
     const dir = await open({ directory: true, multiple: false });
-    if (dir) {
-      resetBundleDownloadState(null);
+    if (!dir) return;
+    resetBundleDownloadState(null);
+    try {
       const id = await openLocalBundle(dir as string);
       if (id) activeDownloadId.set(id);
+    } catch (error) {
+      toast.error($t("loader.openLocalBundleFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -237,8 +257,7 @@
   }
 
   function formatBytes(bytes: number): string {
-    if (bytes >= 1024 * 1024)
-      return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
     if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KiB`;
     return `${bytes} B`;
   }
@@ -283,7 +302,7 @@
         <div class="virtual-spacer" style={`height: ${totalHeight}px`}>
           {#each visibleRows as row (row.project.slug)}
             <button
-              class="list-item virtual-row"
+              class="virtual-row list-item"
               class:active={selectedSlug === row.project.slug}
               style={`top: ${row.top}px`}
               onclick={() => handleSelectProject(row.project.slug)}
@@ -319,8 +338,10 @@
           class="open-bundle-btn"
           data-testid="open-bundle"
           onclick={handleOpenBundle}
+          disabled={$busy}
+          title={$busy ? $t("loader.openBundleBusy") : undefined}
         >
-          {$t("loader.openBundle")}
+          {$busy ? $t("loader.openBundleBusy") : $t("loader.openBundle")}
         </button>
       </div>
     {/if}
@@ -368,9 +389,7 @@
                 </div>
                 <span class="prog-label">
                   {formatBytes(prog.downloaded_bytes)}
-                  {prog.total_bytes
-                    ? `/ ${formatBytes(prog.total_bytes)}`
-                    : ""}
+                  {prog.total_bytes ? `/ ${formatBytes(prog.total_bytes)}` : ""}
                 </span>
               </div>
             {/if}
@@ -550,8 +569,14 @@
     cursor: pointer;
   }
 
-  .open-bundle-btn:hover {
+  .open-bundle-btn:hover:not(:disabled) {
     filter: brightness(1.1);
+  }
+
+  .open-bundle-btn:disabled {
+    background: hsl(var(--secondary));
+    color: hsl(var(--muted-foreground));
+    cursor: default;
   }
 
   .map-item {

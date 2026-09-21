@@ -17,6 +17,7 @@ use tokio::task::JoinSet;
 
 const ROOT_URL: &str = "https://maps.lizaalert.ru/maps/";
 const MOBILE_MAPS_DIR_NAME: &str = "8-Android&iOS";
+const COORDINATES_FILE_NAME: &str = "2-Coordinates.txt";
 const PROJECT_EXTRACTED_DIR: &str = "extracted";
 const PROJECTS_CACHE_FILE_NAME: &str = "projects-cache.json";
 const PROJECTS_CACHE_VERSION: u8 = 1;
@@ -1141,44 +1142,73 @@ fn read_cached_map_packages(
     Ok(ozi_maps)
 }
 
+/// Find the `.sqlitedb` tile databases already on disk for this bundle.
+///
+/// Searched over the whole bundle directory rather than the `8-Android&iOS`
+/// folder alone: the remote walk stopped assuming that name when the site
+/// changed, and the downloader writes every file under its real relative
+/// path. Reading one fixed folder made a downloaded bundle stored anywhere
+/// else look missing, so the map showed a "not downloaded" badge and a click
+/// fetched it a second time.
 fn read_cached_sqlite_map_packages(
     root: &Path,
     project_slug: &str,
     zoom_regex: &Regex,
 ) -> Result<Vec<LizaMapPackage>, String> {
-    let maps_dir = project_mobile_maps_dir(root, project_slug);
-    if !maps_dir.exists() {
-        return Ok(Vec::new());
+    let bundle_dir = project_source_root(root, project_slug);
+    let mut files = Vec::new();
+    collect_cached_sqlite_map_files(&bundle_dir, &mut files)?;
+
+    let mut maps = Vec::new();
+    for path in files {
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let file_name = file_name.to_owned();
+        let Some(base_zoom) = zoom_regex
+            .captures(&file_name)
+            .and_then(|captures| captures.get(1))
+            .and_then(|zoom| zoom.as_str().parse::<u8>().ok())
+        else {
+            continue;
+        };
+
+        maps.push(LizaMapPackage {
+            name: file_name.clone(),
+            file_name,
+            url: String::new(),
+            base_zoom,
+            local_path: Some(path),
+        });
     }
 
-    let maps = fs::read_dir(&maps_dir)
-        .map_err(|err| err.to_string())?
-        .filter_map(|entry| entry.ok())
-        .filter_map(|entry| {
-            let path = entry.path();
-            let file_name = path.file_name()?.to_str()?.to_owned();
-            if !file_name.ends_with(".sqlitedb") {
-                return None;
-            }
-
-            let base_zoom = zoom_regex
-                .captures(&file_name)
-                .and_then(|captures| captures.get(1))?
-                .as_str()
-                .parse::<u8>()
-                .ok()?;
-
-            Some(LizaMapPackage {
-                name: file_name.clone(),
-                file_name,
-                url: String::new(),
-                base_zoom,
-                local_path: Some(path),
-            })
-        })
-        .collect();
-
     Ok(maps)
+}
+
+fn collect_cached_sqlite_map_files(dir: &Path, output: &mut Vec<PathBuf>) -> Result<(), String> {
+    if !dir.exists() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(dir).map_err(|err| err.to_string())? {
+        let entry = entry.map_err(|err| err.to_string())?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            collect_cached_sqlite_map_files(&path, output)?;
+            continue;
+        }
+
+        if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("sqlitedb"))
+        {
+            output.push(path);
+        }
+    }
+
+    Ok(())
 }
 
 fn read_cached_ozi_map_packages(source_root: &Path) -> Result<Vec<LizaMapPackage>, String> {
@@ -1260,8 +1290,33 @@ fn map_kind_from_local_path(path: &Path) -> ActiveMapKind {
     }
 }
 
+/// The bundle's coordinates file on disk.
+///
+/// The online side finds it by matching `*Coordinates.txt` in the listing, so
+/// the local side matches the same way instead of insisting on the
+/// `2-Coordinates.txt` spelling — otherwise a bundle previews online and then
+/// fails to open from cache, and `is_project_cached` calls it absent. The
+/// conventional path is returned when nothing matches, so the error message
+/// still names the file that was expected.
 fn project_coordinates_path(root: &Path, project_slug: &str) -> PathBuf {
-    project_source_root(root, project_slug).join("2-Coordinates.txt")
+    let bundle_dir = project_source_root(root, project_slug);
+    let conventional = bundle_dir.join(COORDINATES_FILE_NAME);
+    if conventional.exists() {
+        return conventional;
+    }
+
+    let found = fs::read_dir(&bundle_dir).ok().and_then(|entries| {
+        entries
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .find(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.to_ascii_lowercase().ends_with("coordinates.txt"))
+            })
+    });
+
+    found.unwrap_or(conventional)
 }
 
 fn project_mobile_maps_dir(root: &Path, project_slug: &str) -> PathBuf {
@@ -1461,7 +1516,8 @@ fn extraction_destination_for_archive(extracted_root: &Path, archive_path: &Path
 mod tests {
     use super::{
         decode_text_bytes, load_cached_project_from_root, materialize_cached_ozi_archives,
-        parse_center, parse_directory_entries, parse_map_packages, read_text_file_lossy,
+        parse_center, parse_directory_entries, parse_map_packages, read_cached_sqlite_map_packages,
+        read_text_file_lossy,
     };
     use super::{parse_project_listing, resolve_listing_href};
     use crate::application::LizaProjectSummary;
@@ -1900,6 +1956,59 @@ mod tests {
 
         assert!(text.contains("54.32821"));
         assert!(text.contains("048.40917"));
+    }
+
+    /// The remote walk stopped assuming a folder name when the site changed —
+    /// it now descends into whatever subdirectory holds the `.sqlitedb`. The
+    /// local mirror kept reading only `8-Android&iOS`, so a bundle stored
+    /// anywhere else read as "not downloaded" and was fetched again.
+    #[test]
+    fn cached_sqlite_maps_are_found_in_any_subdirectory() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("ozi-rs-cached-sqlite-{unique}"));
+        let bundle = root.join("2026-09-21_demo");
+        let odd_dir = bundle.join("9-Mobile").join("maps");
+        fs::create_dir_all(&odd_dir).expect("create nested dir");
+        fs::write(odd_dir.join("demo_z16.sqlitedb"), []).expect("write sqlite placeholder");
+        // A file that is not a map must not become one.
+        fs::write(odd_dir.join("readme.txt"), b"hello").expect("write txt");
+
+        let zoom_regex = regex::Regex::new(r"_z(\d+)\.sqlitedb$").expect("regex");
+        let maps = read_cached_sqlite_map_packages(&root, "2026-09-21_demo", &zoom_regex)
+            .expect("read cached sqlite maps");
+
+        assert_eq!(maps.len(), 1, "the nested .sqlitedb SHALL be found");
+        assert_eq!(maps[0].file_name, "demo_z16.sqlitedb");
+        assert_eq!(maps[0].base_zoom, 16);
+        assert!(maps[0].local_path.is_some());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The online preview finds the coordinates file by pattern; the cache
+    /// used to demand the exact `2-Coordinates.txt` spelling, so a bundle that
+    /// previewed online was reported as not cached at all.
+    #[test]
+    fn a_cached_bundle_is_recognised_by_a_differently_named_coordinates_file() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("ozi-rs-coords-name-{unique}"));
+        let bundle = root.join("2026-09-21_demo");
+        fs::create_dir_all(&bundle).expect("create bundle dir");
+        fs::write(bundle.join("1-Coordinates.txt"), "N 54.32821 E 048.40917")
+            .expect("write coordinates");
+
+        assert!(
+            super::is_project_cached("2026-09-21_demo", &root),
+            "a bundle with a differently numbered coordinates file is still cached"
+        );
+
+        let _ = fs::remove_dir_all(&root);
     }
 
     fn write_cached_project_fixture() -> std::path::PathBuf {

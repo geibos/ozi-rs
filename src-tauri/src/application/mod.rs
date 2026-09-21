@@ -176,6 +176,25 @@ impl Default for AppState {
     }
 }
 
+/// Why `begin_load_project` did not start.
+///
+/// The frontend needs the difference: "wait, the catalogue is still loading"
+/// is a hint, "this project is not in the list" is an error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LoadProjectRefusal {
+    Busy,
+    UnknownProject,
+}
+
+impl LoadProjectRefusal {
+    pub const fn message(self) -> &'static str {
+        match self {
+            Self::Busy => "busy: another bundle operation is still running",
+            Self::UnknownProject => "unknown project",
+        }
+    }
+}
+
 impl AppState {
     pub fn new() -> Self {
         let mut project = Project::default();
@@ -252,20 +271,27 @@ impl AppState {
         Some((summary, self.bundles_root.clone()))
     }
 
-    /// Returns `None` if busy or project slug not found; otherwise returns data needed for thread.
+    /// Start opening a bundle, or say why it cannot start.
+    ///
+    /// Both refusals used to be the same `None`, which the command turned into
+    /// an empty string and the loader into nothing at all: pressing the only
+    /// download button during the catalogue refresh looked like a dead button.
     pub fn begin_load_project(
         &mut self,
         project_slug: &str,
-    ) -> Option<(LizaProjectSummary, PathBuf)> {
+    ) -> Result<(LizaProjectSummary, PathBuf), LoadProjectRefusal> {
         if self.lizaalert.busy {
-            return None;
+            return Err(LoadProjectRefusal::Busy);
         }
-        let summary = self
+        let Some(summary) = self
             .lizaalert
             .projects
             .iter()
             .find(|p| p.slug == project_slug)
-            .cloned()?;
+            .cloned()
+        else {
+            return Err(LoadProjectRefusal::UnknownProject);
+        };
 
         self.lizaalert.busy = true;
         self.lizaalert.ready_bundle_files.clear();
@@ -275,7 +301,7 @@ impl AppState {
             format!("Downloading project {}...", summary.name)
         };
         self.update_status(DiagnosticLevel::Info, status);
-        Some((summary, self.bundles_root.clone()))
+        Ok((summary, self.bundles_root.clone()))
     }
 
     /// Returns `None` if map/project not found or this package is already downloading.
@@ -1827,6 +1853,33 @@ mod tests {
             state.project_file_path().is_none(),
             "a failed save must not update the current project path"
         );
+    }
+
+    /// The catalogue refresh holds the busy flag for as long as it takes to
+    /// walk every page. A download asked for during that window must say so.
+    #[test]
+    fn opening_a_bundle_while_busy_is_refused_with_a_reason() {
+        let mut state = AppState::new();
+        state.lizaalert.projects.push(LizaProjectSummary {
+            slug: "2026-09-21_demo".to_owned(),
+            name: "Demo".to_owned(),
+            url: "https://example.invalid/demo/".to_owned(),
+        });
+
+        state.lizaalert.busy = true;
+        assert_eq!(
+            state.begin_load_project("2026-09-21_demo"),
+            Err(LoadProjectRefusal::Busy)
+        );
+
+        state.lizaalert.busy = false;
+        assert_eq!(
+            state.begin_load_project("nothing-like-this"),
+            Err(LoadProjectRefusal::UnknownProject)
+        );
+
+        state.lizaalert.busy = false;
+        assert!(state.begin_load_project("2026-09-21_demo").is_ok());
     }
 
     /// An export that failed used to answer `Ok(())`, so the caller showed the

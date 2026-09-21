@@ -474,10 +474,9 @@ pub fn load_project(
     downloads: State<SharedDownloads>,
     app: AppHandle,
 ) -> Result<String, String> {
-    let data = lock_app_state(state.inner())?.begin_load_project(&slug);
-    let Some((summary, bundles_root)) = data else {
-        return Ok(String::new());
-    };
+    let (summary, bundles_root) = lock_app_state(state.inner())?
+        .begin_load_project(&slug)
+        .map_err(|refusal| refusal.message().to_owned())?;
     let _ = app.emit("state-changed", ());
 
     let download_id = uuid::Uuid::new_v4().to_string();

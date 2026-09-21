@@ -90,7 +90,12 @@ describe("virtualized project list", () => {
     // Spacer div carrying the total height + absolutely positioned rows.
     expect(loaderSource).toContain('class="virtual-spacer"');
     expect(loaderSource).toMatch(/style=\{`height: \$\{totalHeight\}px`\}/);
-    expect(loaderSource).toContain('class="list-item virtual-row"');
+    // Both classes, in whatever order the formatter settles on — the
+    // contract is that the row is a positioned `.list-item.virtual-row`,
+    // not the spelling of the attribute.
+    expect(loaderSource).toMatch(
+      /class="(?:virtual-row list-item|list-item virtual-row)"/,
+    );
     expect(loaderSource).toMatch(/style=\{`top: \$\{row\.top\}px`\}/);
     expect(loaderSource).toMatch(
       /\.list-item\.virtual-row\s*\{[^}]*position: absolute/,
