@@ -232,7 +232,13 @@
 
   async function handleOpenMap(mapName: string) {
     try {
-      await openSelectedMap(mapName);
+      const downloadId = await openSelectedMap(mapName);
+      if (downloadId) {
+        // The map was not on disk: show its progress and let it be cancelled,
+        // the same as a whole-bundle download.
+        resetBundleDownloadState(downloadId);
+        return;
+      }
     } catch (error) {
       toast.error($t("loader.openMapFailed"), { description: String(error) });
       return;

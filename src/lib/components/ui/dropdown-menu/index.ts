@@ -6,17 +6,17 @@ import Separator from "./dropdown-menu-separator.svelte";
 import Label from "./dropdown-menu-label.svelte";
 
 export {
-	Root,
-	Trigger,
-	Content,
-	Item,
-	Separator,
-	Label,
-	//
-	Root as DropdownMenu,
-	Trigger as DropdownMenuTrigger,
-	Content as DropdownMenuContent,
-	Item as DropdownMenuItem,
-	Separator as DropdownMenuSeparator,
-	Label as DropdownMenuLabel,
+  Root,
+  Trigger,
+  Content,
+  Item,
+  Separator,
+  Label,
+  //
+  Root as DropdownMenu,
+  Trigger as DropdownMenuTrigger,
+  Content as DropdownMenuContent,
+  Item as DropdownMenuItem,
+  Separator as DropdownMenuSeparator,
+  Label as DropdownMenuLabel,
 };

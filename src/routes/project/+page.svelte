@@ -49,7 +49,7 @@
 <Sheet.Root bind:open={$bundleLoaderOpen}>
   <Sheet.Content
     side="right"
-    class="w-[480px] max-w-[480px] sm:max-w-[480px] p-0"
+    class="w-[480px] max-w-[480px] p-0 sm:max-w-[480px]"
   >
     <BundleLoader onCloseRequest={() => bundleLoaderOpen.set(false)} />
   </Sheet.Content>

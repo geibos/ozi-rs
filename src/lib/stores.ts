@@ -301,22 +301,28 @@ export function updateDownloadProgress(payload: DownloadProgressPayload) {
 export const activeDownloadId = writable<string | null>(null);
 
 /**
- * Close out a bundle download when the backend stops being busy.
+ * Close out the download the panel is showing.
  *
- * Nothing used to clear `activeDownloadId` on success, and the progress panel
- * shows while `activeDownloadId !== null && busy`. So the panel vanished when
- * the download ended — and came back, still showing that download's finished
- * rows, the next time anything made the app busy (refreshing the project list,
- * for one). Tying the id to the busy edge makes the panel belong to the
- * operation that is actually running.
+ * Both download paths emit `download-finished` with their id; the layout
+ * routes it here. Before that, nothing cleared `activeDownloadId` at all, so
+ * the panel came back with a finished download's rows the next time anything
+ * made the app busy. Ignoring a stale id matters: a bundle download that ends
+ * while a map download is running must not close the map's panel.
  */
-let wasBusy = false;
-busy.subscribe((isBusy) => {
-  if (wasBusy && !isBusy) {
-    activeDownloadId.set(null);
+export function finishDownload(downloadId: string): boolean {
+  let matched = false;
+  activeDownloadId.update((current) => {
+    if (current !== downloadId) return current;
+    matched = true;
+    return null;
+  });
+  if (matched) {
+    downloadProgress.set(new Map());
+    currentDownload.set(null);
+    bundleProgress.set(null);
   }
-  wasBusy = isBusy;
-});
+  return matched;
+}
 
 export function resetBundleDownloadState(downloadId: string | null) {
   activeDownloadId.set(downloadId);

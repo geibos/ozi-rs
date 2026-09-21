@@ -30,7 +30,10 @@ describe("recentFiles helper (palette consumer)", () => {
     appendRecentFile(makeRecord("/maps/a.ozi", 1));
     appendRecentFile(makeRecord("/maps/b.ozi", 2));
     const recents = getRecentFiles();
-    expect(recents.map((r) => r.mapPath)).toEqual(["/maps/b.ozi", "/maps/a.ozi"]);
+    expect(recents.map((r) => r.mapPath)).toEqual([
+      "/maps/b.ozi",
+      "/maps/a.ozi",
+    ]);
   });
 
   it("dedupes by mapPath — existing entries move to the front", () => {
@@ -38,7 +41,10 @@ describe("recentFiles helper (palette consumer)", () => {
     appendRecentFile(makeRecord("/maps/b.ozi", 2));
     appendRecentFile(makeRecord("/maps/a.ozi", 3));
     const recents = getRecentFiles();
-    expect(recents.map((r) => r.mapPath)).toEqual(["/maps/a.ozi", "/maps/b.ozi"]);
+    expect(recents.map((r) => r.mapPath)).toEqual([
+      "/maps/a.ozi",
+      "/maps/b.ozi",
+    ]);
     expect(recents[0].openedAt).toBe(3);
   });
 

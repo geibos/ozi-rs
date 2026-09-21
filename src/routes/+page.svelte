@@ -73,7 +73,9 @@
 
   const bundlePercent = $derived(
     $bundleProgress?.total
-      ? Math.round((($bundleProgress.completed ?? 0) / $bundleProgress.total) * 100)
+      ? Math.round(
+          (($bundleProgress.completed ?? 0) / $bundleProgress.total) * 100,
+        )
       : null,
   );
 
@@ -129,7 +131,9 @@
       {#if $bundleProgress?.downloaded_bytes != null}
         <span>
           {formatBytes($bundleProgress.downloaded_bytes)}
-          {$bundleProgress.total_bytes ? `/ ${formatBytes($bundleProgress.total_bytes)}` : ""}
+          {$bundleProgress.total_bytes
+            ? `/ ${formatBytes($bundleProgress.total_bytes)}`
+            : ""}
         </span>
       {/if}
     </div>
@@ -139,7 +143,8 @@
         <button
           class="action-btn"
           data-testid="cancel-download"
-          onclick={handleCancelDownload}>Cancel</button>
+          onclick={handleCancelDownload}>Cancel</button
+        >
       {/if}
     </div>
   </div>
@@ -242,8 +247,14 @@
   }
 
   @keyframes indeterminate-bar {
-    0% { margin-left: -40%; width: 40%; }
-    100% { margin-left: 100%; width: 40%; }
+    0% {
+      margin-left: -40%;
+      width: 40%;
+    }
+    100% {
+      margin-left: 100%;
+      width: 40%;
+    }
   }
 
   .bundle-fill.indeterminate-bar {
@@ -284,7 +295,9 @@
   }
 
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .spinner {

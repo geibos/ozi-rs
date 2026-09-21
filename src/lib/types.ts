@@ -112,6 +112,13 @@ export interface BundleProgressPayload {
   total_bytes?: number;
 }
 
+/** Emitted once by whichever path owns a download, when it stops running. */
+export interface DownloadFinishedPayload {
+  download_id: string;
+  ok: boolean;
+  message?: string | null;
+}
+
 /** Emitted once a single file inside a bundle has been fully written to disk. */
 export interface BundleFileReadyPayload {
   download_id: string;

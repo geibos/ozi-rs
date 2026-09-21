@@ -4,7 +4,7 @@ import { join } from "path";
 
 const source = readFileSync(
   join(__dirname, "../components/library/TracksTab.svelte"),
-  "utf-8"
+  "utf-8",
 );
 
 describe("Library Tracks tab style controls", () => {

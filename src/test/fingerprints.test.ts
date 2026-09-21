@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  fingerprintTracks,
-  fingerprintWaypoints,
-} from "../lib/stores";
+import { fingerprintTracks, fingerprintWaypoints } from "../lib/stores";
 import type { LayerSummaryDto, TrackSummary } from "../lib/types";
 
 /**
@@ -40,8 +37,14 @@ function track(
 
 describe("fingerprintTracks", () => {
   it("returns a stable string for identical input", () => {
-    const a = fingerprintTracks([TRACK_LAYER], [track({ layer_id: 1, track_id: 1 })]);
-    const b = fingerprintTracks([TRACK_LAYER], [track({ layer_id: 1, track_id: 1 })]);
+    const a = fingerprintTracks(
+      [TRACK_LAYER],
+      [track({ layer_id: 1, track_id: 1 })],
+    );
+    const b = fingerprintTracks(
+      [TRACK_LAYER],
+      [track({ layer_id: 1, track_id: 1 })],
+    );
     expect(a).toBe(b);
   });
 
@@ -64,7 +67,10 @@ describe("fingerprintTracks", () => {
   });
 
   it("changes when a track is added", () => {
-    const a = fingerprintTracks([TRACK_LAYER], [track({ layer_id: 1, track_id: 1 })]);
+    const a = fingerprintTracks(
+      [TRACK_LAYER],
+      [track({ layer_id: 1, track_id: 1 })],
+    );
     const b = fingerprintTracks(
       [TRACK_LAYER],
       [
@@ -149,7 +155,9 @@ describe("fingerprintTracks", () => {
   });
 
   it("is stable across null/undefined sentinels", () => {
-    expect(fingerprintTracks(null, null)).toBe(fingerprintTracks(undefined, undefined));
+    expect(fingerprintTracks(null, null)).toBe(
+      fingerprintTracks(undefined, undefined),
+    );
     expect(fingerprintTracks([], [])).toBe(fingerprintTracks(null, null));
   });
 });

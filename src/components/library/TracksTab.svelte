@@ -529,7 +529,7 @@
         </div>
         <Tooltip.Root>
           <Tooltip.Trigger
-            class="text-muted-foreground hover:text-foreground shrink-0 border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
+            class="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0"
             aria-label={$i18n("tracksTab.showAll")}
             onclick={() => handleSetAllVisible(true)}
             data-testid="tracks-show-all"
@@ -540,7 +540,7 @@
         </Tooltip.Root>
         <Tooltip.Root>
           <Tooltip.Trigger
-            class="text-muted-foreground hover:text-foreground shrink-0 border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
+            class="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0"
             aria-label={$i18n("tracksTab.hideAll")}
             onclick={() => handleSetAllVisible(false)}
             data-testid="tracks-hide-all"
@@ -628,17 +628,13 @@
                 ? $i18n("track.durationTooltip")
                 : undefined}
             >
-              {formatTrackStats(
-                t.distanceKm,
-                t.durationSeconds,
-                t.pointCount,
-              )}
+              {formatTrackStats(t.distanceKm, t.durationSeconds, t.pointCount)}
             </span>
           {/snippet}
           {#snippet trailingControl()}
             <Tooltip.Root>
               <Tooltip.Trigger
-                class="text-muted-foreground hover:text-foreground border-0 bg-transparent p-0 inline-flex size-6 items-center justify-center rounded-sm"
+                class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm border-0 bg-transparent p-0"
                 aria-label={$i18n("track.showOnMap")}
                 onclick={() => requestTrackFocus(t.layerId, t.trackId)}
                 data-testid="track-show-on-map"
@@ -662,7 +658,7 @@
             <DropdownMenu.Separator />
             <Popover.Root>
               <Popover.Trigger
-                class="hover:bg-accent hover:text-accent-foreground border-0 bg-transparent relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-xs"
+                class="hover:bg-accent hover:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm border-0 bg-transparent px-2 py-1.5 text-xs select-none"
                 onclick={(e: Event) => e.stopPropagation()}
               >
                 Set line width
@@ -723,8 +719,7 @@
                 onCheckedChange={(v) => {
                   simplifyLivePreview = v;
                   if (v) schedulePreview();
-                  else
-                    simplifyState.update((s) => ({ ...s, preview: null }));
+                  else simplifyState.update((s) => ({ ...s, preview: null }));
                 }}
               />
               <Label class="text-xs">Live preview</Label>

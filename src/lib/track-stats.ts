@@ -42,7 +42,7 @@ export function formatPointCount(pointCount: number): string {
 export function formatTrackStats(
   distanceKm: number,
   durationSeconds: number | null | undefined,
-  pointCount: number
+  pointCount: number,
 ): string {
   const segments = [formatDistanceKm(distanceKm)];
   if (durationSeconds !== null && durationSeconds !== undefined) {

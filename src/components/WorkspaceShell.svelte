@@ -103,31 +103,23 @@
 
   <div class="canvas-column">
     <div class="context-bar">
-      <div class="mode-chips" role="group" aria-label="Mode (inert placeholder)">
-        <button
-          type="button"
-          class="chip"
-          tabindex="-1"
-          aria-disabled="true"
-        >{$t("shell.modeView")}</button>
-        <button
-          type="button"
-          class="chip"
-          tabindex="-1"
-          aria-disabled="true"
-        >{$t("shell.modeDraw")}</button>
-        <button
-          type="button"
-          class="chip"
-          tabindex="-1"
-          aria-disabled="true"
-        >{$t("shell.modeEdit")}</button>
-        <button
-          type="button"
-          class="chip"
-          tabindex="-1"
-          aria-disabled="true"
-        >{$t("shell.modeMeasure")}</button>
+      <div
+        class="mode-chips"
+        role="group"
+        aria-label="Mode (inert placeholder)"
+      >
+        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
+          >{$t("shell.modeView")}</button
+        >
+        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
+          >{$t("shell.modeDraw")}</button
+        >
+        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
+          >{$t("shell.modeEdit")}</button
+        >
+        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
+          >{$t("shell.modeMeasure")}</button
+        >
         <span class="chips-divider" aria-hidden="true"></span>
       </div>
       <!--

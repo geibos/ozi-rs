@@ -113,7 +113,11 @@ const round = (value: number, digits = 1): number => {
   return Math.round(value * factor) / factor;
 };
 
-export function formatHslTriplet(hsl: { h: number; s: number; l: number }): string {
+export function formatHslTriplet(hsl: {
+  h: number;
+  s: number;
+  l: number;
+}): string {
   return `${round(hsl.h)} ${round(hsl.s * 100)}% ${round(hsl.l * 100)}%`;
 }
 
@@ -189,10 +193,14 @@ function resolveCatppuccin(name: ThemeName): FlavorName {
 
 export function applySemanticTokens(name: FlavorName): void {
   const palette = flavors[name].colors;
-  const map: SemanticMap = name === "latte" ? SEMANTIC_MAP_LIGHT : SEMANTIC_MAP_DARK;
+  const map: SemanticMap =
+    name === "latte" ? SEMANTIC_MAP_LIGHT : SEMANTIC_MAP_DARK;
   const root = document.documentElement;
 
-  for (const [token, colorName] of Object.entries(map) as [SemanticToken, ColorName][]) {
+  for (const [token, colorName] of Object.entries(map) as [
+    SemanticToken,
+    ColorName,
+  ][]) {
     const color = palette[colorName];
     root.style.setProperty(`--${token}`, formatHslTriplet(color.hsl));
   }
@@ -265,7 +273,8 @@ export function applyStoredTheme(): void {
 export function installAutoThemeListener(): () => void {
   const mql = window.matchMedia("(prefers-color-scheme: dark)");
   const handler = () => {
-    const stored = (localStorage.getItem("theme") ?? "native-auto") as ThemeName;
+    const stored = (localStorage.getItem("theme") ??
+      "native-auto") as ThemeName;
     if (stored === "auto" || stored === "native-auto") {
       void applyTheme(stored);
     }

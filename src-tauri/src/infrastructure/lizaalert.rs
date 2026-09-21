@@ -381,8 +381,15 @@ fn ensure_tracks_dir(root: &Path, project_slug: &str) {
     let _ = fs::create_dir_all(tracks_dir);
 }
 
+/// Download one map package, with cooperative cancellation.
+///
+/// A single-map download used to have no token at all, so a row that had
+/// started downloading could not be stopped and the UI disabled it for the
+/// duration. The token is checked between chunks; cancelling removes the
+/// partial file.
 pub fn download_map<F>(
     selection: ActiveMapSelection,
+    cancel: &CancelToken,
     mut on_progress: F,
 ) -> Result<ActiveMapSelection, String>
 where
@@ -404,7 +411,7 @@ where
     // leaves a truncated file at the canonical path — the cached-map listing
     // treats any file at that path as a fully downloaded map.
     let tmp_path = selection.local_path.with_extension("part");
-    if let Err(err) = stream_response_to_file(&mut response, &tmp_path, &mut on_progress) {
+    if let Err(err) = stream_response_to_file(&mut response, &tmp_path, cancel, &mut on_progress) {
         let _ = fs::remove_file(&tmp_path);
         return Err(err);
     }
@@ -419,6 +426,7 @@ where
 fn stream_response_to_file<F>(
     response: &mut reqwest::blocking::Response,
     path: &Path,
+    cancel: &CancelToken,
     on_progress: &mut F,
 ) -> Result<(), String>
 where
@@ -430,6 +438,9 @@ where
     let mut buffer = [0u8; 16 * 1024];
 
     loop {
+        if cancel.is_cancelled() {
+            return Err(CANCEL_ERROR.to_owned());
+        }
         let read_bytes = response.read(&mut buffer).map_err(|err| err.to_string())?;
         if read_bytes == 0 {
             break;
@@ -1878,7 +1889,7 @@ mod tests {
             base_zoom: 16,
         };
 
-        let result = download_map(selection, |_| {});
+        let result = download_map(selection, &super::CancelToken::new(), |_| {});
         server.join().expect("server thread");
 
         assert!(result.is_err(), "truncated download must fail");

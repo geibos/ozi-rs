@@ -11,6 +11,7 @@
     bundleProgress,
     commandPaletteOpen,
     currentDownload,
+    finishDownload,
     projectDirty,
     projectsLoading,
     resetBundleDownloadState,
@@ -19,6 +20,7 @@
   import { loadProjects } from "../lib/api";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
   import { t } from "$lib/i18n";
+  import { toast } from "svelte-sonner";
   import { installIpcErrorToastObserver } from "../lib/ipc";
   import { applyStoredTheme, installAutoThemeListener } from "../lib/theme";
   import MapView from "../components/MapView.svelte";
@@ -29,6 +31,7 @@
   import * as Tooltip from "$lib/components/ui/tooltip";
   import type {
     BundleProgressPayload,
+    DownloadFinishedPayload,
     DownloadProgressPayload,
     LizaProjectSummaryDto,
   } from "../lib/types";
@@ -73,6 +76,16 @@
         listen<LizaProjectSummaryDto[]>("projects-chunk", (event) =>
           appendProjectsChunk(event.payload),
         ),
+        listen<DownloadFinishedPayload>("download-finished", (event) => {
+          const wasShowing = finishDownload(event.payload.download_id);
+          // A failure that only cleared the panel used to look like a
+          // success: the bundle simply never appeared.
+          if (!event.payload.ok && wasShowing) {
+            toast.error(get(t)("download.failed"), {
+              description: event.payload.message ?? undefined,
+            });
+          }
+        }),
       ]);
 
       if (cancelled) {

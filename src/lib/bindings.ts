@@ -59,7 +59,14 @@ async cancelDownload(downloadId: string) : Promise<Result<boolean, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async openSelectedMap(mapName: string) : Promise<Result<null, string>> {
+/**
+ * Open a map, downloading it first when it is not on disk.
+ * 
+ * Returns the download id when a download started, so the caller can show
+ * progress for it and cancel it; an empty string when the map opened from
+ * disk or the request was a no-op.
+ */
+async openSelectedMap(mapName: string) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("open_selected_map", { mapName }) };
 } catch (e) {

@@ -23,6 +23,7 @@
     currentProject,
     downloadingMaps,
     downloadProgress,
+    resetBundleDownloadState,
   } from "$lib/stores";
   import { openSelectedMap, revealBundle } from "$lib/api";
   import { mapsForLibrary } from "$lib/maps-list";
@@ -53,7 +54,9 @@
 
   async function handleSwitchTo(mapName: string) {
     try {
-      await openSelectedMap(mapName);
+      const downloadId = await openSelectedMap(mapName);
+      // A map that has to be fetched gets the progress panel, with a cancel.
+      if (downloadId) resetBundleDownloadState(downloadId);
     } catch (err) {
       toast.error($t("mapsTab.switchFailed"), { description: String(err) });
     }

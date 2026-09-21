@@ -18,15 +18,15 @@
    * updates immutably (a new Map per event), so every byte-level event
    * repaints its file's bar.
    *
-   * Visibility: an active download id AND backend busy — the backend
-   * flips `busy` false when the bundle completes or fails, which is the
-   * only completion signal the frontend gets (nothing clears
-   * `activeDownloadId` on success).
+   * Visibility: an active download id. Both download paths emit
+   * `download-finished` with their id and the layout clears it, so the panel
+   * lasts exactly as long as the download it belongs to — a single-map
+   * download never touches the busy flag, and a catalogue refresh sets it
+   * with nothing downloading.
    */
   import {
     activeDownloadId,
     bundleProgress,
-    busy,
     currentDownload,
     downloadProgress,
   } from "../lib/stores";
@@ -72,7 +72,10 @@
   }
 </script>
 
-{#if $activeDownloadId !== null && $busy}
+<!-- The panel belongs to the download, not to the global busy flag: a
+     single-map download never sets busy, and a catalogue refresh sets it
+     without any download running. `download-finished` clears the id. -->
+{#if $activeDownloadId !== null}
   <div class="download-popup" data-testid="download-popup">
     <div class="popup-header">
       <span class="popup-title">{$t("download.title")}</span>

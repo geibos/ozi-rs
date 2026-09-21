@@ -98,11 +98,11 @@
     </header>
 
     <div class="rail-body" data-active-kind={activeKind ?? "none"}>
-      {#if activeKind ==="track"}
+      {#if activeKind === "track"}
         <TrackInspector />
-      {:else if activeKind ==="waypoint"}
+      {:else if activeKind === "waypoint"}
         <WaypointInspector />
-      {:else if activeKind ==="map"}
+      {:else if activeKind === "map"}
         <MapInspector />
       {:else}
         <div class="empty-state">
@@ -222,7 +222,9 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.12s, color 0.12s;
+    transition:
+      background 0.12s,
+      color 0.12s;
   }
 
   .pin-button:hover {

@@ -5,8 +5,8 @@ import { join } from "path";
 const caps = JSON.parse(
   readFileSync(
     join(__dirname, "../../src-tauri/capabilities/default.json"),
-    "utf-8"
-  )
+    "utf-8",
+  ),
 );
 
 // Every permission listed here must be present in capabilities/default.json.
@@ -24,19 +24,13 @@ const REQUIRED_WINDOWS = ["main"];
 describe("capabilities/default.json", () => {
   it("grants all required permissions", () => {
     for (const perm of REQUIRED_PERMISSIONS) {
-      expect(
-        caps.permissions,
-        `Missing permission: ${perm}`
-      ).toContain(perm);
+      expect(caps.permissions, `Missing permission: ${perm}`).toContain(perm);
     }
   });
 
   it("covers all required window labels", () => {
     for (const label of REQUIRED_WINDOWS) {
-      expect(
-        caps.windows,
-        `Missing window label: ${label}`
-      ).toContain(label);
+      expect(caps.windows, `Missing window label: ${label}`).toContain(label);
     }
   });
 });

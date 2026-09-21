@@ -59,7 +59,8 @@ describe("applySemanticTokens", () => {
       applySemanticTokens(flavour);
 
       const root = document.documentElement;
-      const expectedMap = flavour === "latte" ? SEMANTIC_MAP_LIGHT : SEMANTIC_MAP_DARK;
+      const expectedMap =
+        flavour === "latte" ? SEMANTIC_MAP_LIGHT : SEMANTIC_MAP_DARK;
 
       expect(Object.keys(expectedMap).sort()).toEqual([...ALL_TOKENS].sort());
 
@@ -71,7 +72,9 @@ describe("applySemanticTokens", () => {
 
     it(`toggles the dark class correctly for ${flavour}`, () => {
       applySemanticTokens(flavour);
-      expect(document.documentElement.classList.contains("dark")).toBe(flavour !== "latte");
+      expect(document.documentElement.classList.contains("dark")).toBe(
+        flavour !== "latte",
+      );
     });
   }
 });

@@ -59,7 +59,9 @@ describe("MapView non-destructive waypoint rendering", () => {
   it("keys waypoint markers by owning layer id and waypoint id", () => {
     expect(mapViewSource).toContain("waypointMarkerKey");
     expect(mapViewSource).toContain("`${layerId.toString()}:${waypointId}`");
-    expect(mapViewSource).toContain("waypointMarkers = new Map<string, maplibregl.Marker>");
+    expect(mapViewSource).toContain(
+      "waypointMarkers = new Map<string, maplibregl.Marker>",
+    );
   });
 
   it("renders markers from inactive layers as non-draggable read-only context", () => {

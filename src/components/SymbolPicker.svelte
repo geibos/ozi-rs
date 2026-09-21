@@ -47,35 +47,35 @@
   </Popover.Trigger>
   <Popover.Content class="w-auto p-2">
     <div class="grid grid-cols-5 gap-2">
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          class={buttonVariants({
+            variant: !symbol ? "secondary" : "ghost",
+            size: "icon",
+          })}
+          onclick={() => handleSelect(null)}
+          aria-label="None (default)"
+        >
+          <span class="text-base leading-none">📍</span>
+        </Tooltip.Trigger>
+        <Tooltip.Content>None</Tooltip.Content>
+      </Tooltip.Root>
+
+      {#each SYMBOLS as s (s.value)}
         <Tooltip.Root>
           <Tooltip.Trigger
             class={buttonVariants({
-              variant: !symbol ? "secondary" : "ghost",
+              variant: symbol === s.value ? "secondary" : "ghost",
               size: "icon",
             })}
-            onclick={() => handleSelect(null)}
-            aria-label="None (default)"
+            onclick={() => handleSelect(s.value)}
+            aria-label={s.label}
           >
-            <span class="text-base leading-none">📍</span>
+            <span class="text-base leading-none">{s.emoji}</span>
           </Tooltip.Trigger>
-          <Tooltip.Content>None</Tooltip.Content>
+          <Tooltip.Content>{s.label}</Tooltip.Content>
         </Tooltip.Root>
-
-        {#each SYMBOLS as s (s.value)}
-          <Tooltip.Root>
-            <Tooltip.Trigger
-              class={buttonVariants({
-                variant: symbol === s.value ? "secondary" : "ghost",
-                size: "icon",
-              })}
-              onclick={() => handleSelect(s.value)}
-              aria-label={s.label}
-            >
-              <span class="text-base leading-none">{s.emoji}</span>
-            </Tooltip.Trigger>
-            <Tooltip.Content>{s.label}</Tooltip.Content>
-          </Tooltip.Root>
-        {/each}
-      </div>
+      {/each}
+    </div>
   </Popover.Content>
 </Popover.Root>

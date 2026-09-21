@@ -7,12 +7,14 @@ import { formatTrackStats } from "../lib/track-stats";
 // the `LibraryRail` Tracks tab (`redesign-library-sidebar`).
 const source = readFileSync(
   join(__dirname, "../components/library/TracksTab.svelte"),
-  "utf-8"
+  "utf-8",
 );
 
 describe("Library Tracks tab statistics formatter", () => {
   it("renders distance, duration, and point count joined by · when timestamps are present", () => {
-    expect(formatTrackStats(12.3, 5040, 156)).toBe("12.3 km · 1h 24m · 156 pts");
+    expect(formatTrackStats(12.3, 5040, 156)).toBe(
+      "12.3 km · 1h 24m · 156 pts",
+    );
   });
 
   it("omits the duration segment (and its separator) when duration is null", () => {
@@ -41,7 +43,7 @@ describe("Library Tracks tab statistics formatter", () => {
 // behaviourally by `track-features.test.ts`.
 describe("Library Tracks tab statistics rendering", () => {
   it("imports the formatter and exposes a track-stats element", () => {
-    expect(source).toContain('import { formatTrackStats }');
+    expect(source).toContain("import { formatTrackStats }");
     expect(source).toContain('data-testid="track-stats"');
   });
 
@@ -51,5 +53,4 @@ describe("Library Tracks tab statistics rendering", () => {
     expect(source).toContain("t.durationSeconds");
     expect(source).toContain("t.pointCount");
   });
-
 });

@@ -49,7 +49,10 @@
   import { toast } from "svelte-sonner";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
-  import { initTracksLayer, updateTracksLayer } from "../lib/maplibre/tracks-layer";
+  import {
+    initTracksLayer,
+    updateTracksLayer,
+  } from "../lib/maplibre/tracks-layer";
 
   let mapEl: HTMLDivElement;
   let map: maplibregl.Map;
@@ -72,7 +75,11 @@
     pointIndex: number;
   };
 
-  let contextMenu = $state<{ x: number; y: number; target: PointMenuTarget } | null>(null);
+  let contextMenu = $state<{
+    x: number;
+    y: number;
+    target: PointMenuTarget;
+  } | null>(null);
 
   // FPS counter (toggle with F3)
   let fpsVisible = $state(false);
@@ -87,7 +94,7 @@
       frames++;
       const now = performance.now();
       if (now - last >= 1000) {
-        fps = Math.round(frames * 1000 / (now - last));
+        fps = Math.round((frames * 1000) / (now - last));
         frames = 0;
         last = now;
       }
@@ -221,7 +228,7 @@
     trackId: bigint,
     segment: SegmentDetail,
     point: PointDetail,
-    pointIndex: number
+    pointIndex: number,
   ) {
     const pointElement = document.createElement("div");
     pointElement.className = "track-point-marker";
@@ -236,7 +243,10 @@
       contextMenu = null;
     });
 
-    const marker = new maplibregl.Marker({ element: pointElement, draggable: true })
+    const marker = new maplibregl.Marker({
+      element: pointElement,
+      draggable: true,
+    })
       .setLngLat([point.lon, point.lat])
       .addTo(map);
 
@@ -252,7 +262,7 @@
           trackId,
           BigInt(segment.id),
           BigInt(point.id),
-          [lngLat.lat, lngLat.lng]
+          [lngLat.lat, lngLat.lng],
         );
         await reloadEditableTrackPoints(layerId, trackId);
       } catch (error) {
@@ -263,7 +273,11 @@
     pointMarkers.push(marker);
   }
 
-  function renderEditableTrackPoints(layerId: bigint, trackId: bigint, detail: TrackDetail) {
+  function renderEditableTrackPoints(
+    layerId: bigint,
+    trackId: bigint,
+    detail: TrackDetail,
+  ) {
     clearPointMarkers();
     for (const segment of detail.segments) {
       segment.points.forEach((point, index) => {
@@ -285,7 +299,12 @@
     const { layerId, trackId, segment, point } = contextMenu.target;
     contextMenu = null;
     try {
-      await deleteTrackPoint(layerId, trackId, BigInt(segment.id), BigInt(point.id));
+      await deleteTrackPoint(
+        layerId,
+        trackId,
+        BigInt(segment.id),
+        BigInt(point.id),
+      );
       await reloadEditableTrackPoints(layerId, trackId);
     } catch (error) {
       console.error("Failed to delete track point", error);
@@ -303,7 +322,7 @@
         trackId,
         BigInt(segment.id),
         pointIndex + 1,
-        [point.lat, point.lon]
+        [point.lat, point.lon],
       );
       await reloadEditableTrackPoints(layerId, trackId);
     } catch (error) {
@@ -430,7 +449,10 @@
         }
         el.style.cursor = isActive ? "grab" : "default";
 
-        const marker = new maplibregl.Marker({ element: el, draggable: isActive })
+        const marker = new maplibregl.Marker({
+          element: el,
+          draggable: isActive,
+        })
           .setLngLat([data.lon, data.lat])
           .setPopup(new maplibregl.Popup({ offset: 16 }).setText(data.name))
           .addTo(map);
@@ -445,7 +467,10 @@
             el.style.cursor = "grab";
             const lngLat = marker.getLngLat();
             try {
-              await moveWaypoint(layerId, BigInt(wpId), [lngLat.lat, lngLat.lng]);
+              await moveWaypoint(layerId, BigInt(wpId), [
+                lngLat.lat,
+                lngLat.lng,
+              ]);
             } catch (error) {
               console.error("Failed to move waypoint", error);
               // The state-changed → reconcile pass that follows will pull
@@ -622,11 +647,12 @@
 
   function handleMapClickForDrawing(e: maplibregl.MapMouseEvent) {
     if (
-      !$drawingModeActive
-      || $drawingTrackLayerId === null
-      || $drawingTrackId === null
-      || $drawingSegmentId === null
-    ) return;
+      !$drawingModeActive ||
+      $drawingTrackLayerId === null ||
+      $drawingTrackId === null ||
+      $drawingSegmentId === null
+    )
+      return;
     const layerId = $drawingTrackLayerId;
     const trackId = $drawingTrackId;
     const segmentId = $drawingSegmentId;
@@ -640,7 +666,13 @@
     pendingDrawingClickTimeout = window.setTimeout(async () => {
       pendingDrawingClickTimeout = null;
       try {
-        await insertTrackPoint(layerId, trackId, segmentId, drawingPreviewPoints.length, [lat, lng]);
+        await insertTrackPoint(
+          layerId,
+          trackId,
+          segmentId,
+          drawingPreviewPoints.length,
+          [lat, lng],
+        );
         drawingCommandCount += 1;
         drawingPreviewPoints = [...drawingPreviewPoints, { lat, lon: lng }];
         drawingPointCount.set(drawingPreviewPoints.length);
@@ -693,7 +725,8 @@
         tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
         tileSize: 256,
         maxzoom: 19,
-        attribution: "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+        attribution:
+          "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
       });
       map.addLayer({ id: "osm-tiles", type: "raster", source: "osm" });
 
@@ -780,7 +813,8 @@
       // Remove old map source/layer
       if (currentMapSourceId) {
         if (map.getLayer("map-tiles")) map.removeLayer("map-tiles");
-        if (map.getSource(currentMapSourceId)) map.removeSource(currentMapSourceId);
+        if (map.getSource(currentMapSourceId))
+          map.removeSource(currentMapSourceId);
       }
 
       const sourceId = "active-map";
@@ -813,7 +847,9 @@
       }
 
       // Insert below tracks layer
-      const tracksLayerId = map.getLayer("tracks-lines") ? "tracks-lines" : undefined;
+      const tracksLayerId = map.getLayer("tracks-lines")
+        ? "tracks-lines"
+        : undefined;
 
       map.addLayer(
         {
@@ -822,7 +858,7 @@
           source: sourceId,
           paint: { "raster-opacity": 1 },
         },
-        tracksLayerId
+        tracksLayerId,
       );
 
       // Invariant: track lines/labels must always render ABOVE the active
@@ -949,8 +985,12 @@
     const active = $appState;
     void active;
 
-    reloadEditableTrackPoints($selectedTrack.layerId, $selectedTrack.trackId)
-      .catch((error) => console.error("Failed to load editable track points", error));
+    reloadEditableTrackPoints(
+      $selectedTrack.layerId,
+      $selectedTrack.trackId,
+    ).catch((error) =>
+      console.error("Failed to load editable track points", error),
+    );
   });
 
   $effect(() => {

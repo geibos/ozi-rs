@@ -31,3 +31,30 @@ slug, and the list SHALL report how many projects are shown out of the total.
 
 - **WHEN** a query is active
 - **THEN** the list reports the number shown out of the catalogue total
+
+### Requirement: A single-map download is visible and can be stopped
+
+Downloading one map package SHALL report a download identifier to the caller,
+SHALL show the same progress panel a whole-bundle download shows, and SHALL be
+cancellable. Both download paths SHALL announce when they stop, and a failure
+SHALL be reported to the operator rather than only ending the progress display.
+
+#### Scenario: Opening a map that is not on disk
+
+- **WHEN** the operator opens a map package that has not been downloaded
+- **THEN** the progress panel shows that download and offers to cancel it
+
+#### Scenario: Cancelling a map download
+
+- **WHEN** the operator cancels a running single-map download
+- **THEN** the download stops, the partial file is removed, and the panel closes
+
+#### Scenario: A download that fails
+
+- **WHEN** a download ends in failure
+- **THEN** the operator is told it failed, rather than only seeing the panel disappear
+
+#### Scenario: Two downloads in flight
+
+- **WHEN** one download finishes while another is still running
+- **THEN** the panel keeps showing the running one

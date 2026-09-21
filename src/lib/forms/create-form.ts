@@ -3,7 +3,8 @@ import { validator } from "@felte/validator-zod";
 import type { FormConfigWithoutTransformFn } from "@felte/core";
 import type { ZodTypeAny, z } from "zod";
 
-type ZodData<Schema extends ZodTypeAny> = z.infer<Schema> & Record<string, unknown>;
+type ZodData<Schema extends ZodTypeAny> = z.infer<Schema> &
+  Record<string, unknown>;
 
 /**
  * Wraps felte's `createForm` with a zod schema as the source of truth for
@@ -12,7 +13,10 @@ type ZodData<Schema extends ZodTypeAny> = z.infer<Schema> & Record<string, unkno
  */
 export function createForm<Schema extends ZodTypeAny>(
   schema: Schema,
-  config: Omit<FormConfigWithoutTransformFn<ZodData<Schema>>, "extend" | "validate"> = {},
+  config: Omit<
+    FormConfigWithoutTransformFn<ZodData<Schema>>,
+    "extend" | "validate"
+  > = {},
 ) {
   return felteCreateForm<ZodData<Schema>>({
     ...config,

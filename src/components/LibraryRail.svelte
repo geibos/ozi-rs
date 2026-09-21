@@ -26,30 +26,30 @@
     <Tabs.List class="bg-card mx-2 mt-2 w-[calc(100%-1rem)] gap-1">
       <Tabs.Trigger
         value="maps"
-        class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground px-3 py-1 data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
         {$t("rail.maps")}
       </Tabs.Trigger>
       <Tabs.Trigger
         value="tracks"
-        class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground px-3 py-1 data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
         {$t("rail.tracks")}
       </Tabs.Trigger>
       <Tabs.Trigger
         value="waypoints"
-        class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
+        class="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground px-3 py-1 data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
         {$t("rail.waypoints")}
       </Tabs.Trigger>
     </Tabs.List>
-    <Tabs.Content value="maps" class="flex-1 min-h-0 m-0">
+    <Tabs.Content value="maps" class="m-0 min-h-0 flex-1">
       <MapsTab />
     </Tabs.Content>
-    <Tabs.Content value="tracks" class="flex-1 min-h-0 m-0">
+    <Tabs.Content value="tracks" class="m-0 min-h-0 flex-1">
       <TracksTab />
     </Tabs.Content>
-    <Tabs.Content value="waypoints" class="flex-1 min-h-0 m-0">
+    <Tabs.Content value="waypoints" class="m-0 min-h-0 flex-1">
       <WaypointsTab />
     </Tabs.Content>
   </Tabs.Root>

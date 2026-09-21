@@ -14,7 +14,13 @@ const { getAppState } = vi.hoisted(() => ({
 
 vi.mock("$lib/api", () => ({ getAppState }));
 
-import { appState, activeDownloadId, busy } from "../lib/stores";
+import {
+  appState,
+  activeDownloadId,
+  busy,
+  downloadProgress,
+  finishDownload,
+} from "../lib/stores";
 import type { AppStateDto } from "../lib/types";
 
 const state = (over: Record<string, unknown> = {}) =>
@@ -39,32 +45,46 @@ afterEach(() => {
 });
 
 describe("the progress panel belongs to the running download", () => {
-  it("drops the download id when the backend stops being busy", async () => {
+  it("clears the panel for the download that finished", () => {
     activeDownloadId.set("download-1");
+    downloadProgress.set(
+      new Map([
+        [
+          "map.sqlitedb",
+          {
+            download_id: "download-1",
+            package_name: "map.sqlitedb",
+            downloaded_bytes: 1,
+            total_bytes: 2,
+          },
+        ],
+      ]),
+    );
 
-    getAppState.mockResolvedValue(state({ busy: true }));
-    await appState.refresh();
-    expect(get(busy)).toBe(true);
-    expect(get(activeDownloadId)).toBe("download-1");
+    expect(finishDownload("download-1")).toBe(true);
 
-    getAppState.mockResolvedValue(state({ busy: false }));
-    await appState.refresh();
-
-    expect(get(busy)).toBe(false);
     expect(get(activeDownloadId)).toBeNull();
+    expect(get(downloadProgress).size).toBe(0);
+  });
+
+  it("ignores a finish for a download the panel is not showing", () => {
+    // A bundle download ending must not close the panel of a map download
+    // that is still running.
+    activeDownloadId.set("map-download");
+
+    expect(finishDownload("some-older-bundle")).toBe(false);
+    expect(get(activeDownloadId)).toBe("map-download");
   });
 
   it("does not resurrect a finished download when something else makes the app busy", async () => {
     activeDownloadId.set("download-1");
-    getAppState.mockResolvedValue(state({ busy: true }));
-    await appState.refresh();
-    getAppState.mockResolvedValue(state({ busy: false }));
-    await appState.refresh();
+    finishDownload("download-1");
 
     // A later refresh of the project list makes the app busy again.
     getAppState.mockResolvedValue(state({ busy: true }));
     await appState.refresh();
 
+    expect(get(busy)).toBe(true);
     expect(get(activeDownloadId)).toBeNull();
   });
 });

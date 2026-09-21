@@ -116,8 +116,12 @@ export async function cancelDownload(downloadId: string): Promise<boolean> {
   return unwrap("cancel_download", commands.cancelDownload(downloadId));
 }
 
-export async function openSelectedMap(mapName: string): Promise<void> {
-  await unwrap("open_selected_map", commands.openSelectedMap(mapName));
+/**
+ * Open a map. Returns the download id when the map had to be fetched, or an
+ * empty string when it opened from disk — the caller shows progress for it.
+ */
+export async function openSelectedMap(mapName: string): Promise<string> {
+  return await unwrap("open_selected_map", commands.openSelectedMap(mapName));
 }
 
 export async function openLocalBundle(dir: string): Promise<string> {

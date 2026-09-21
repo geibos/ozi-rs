@@ -189,6 +189,18 @@ fn to_project_summary_dtos(
 }
 
 // Events
+/// Emitted once, by whichever path owns a download, when it stops running.
+///
+/// Both the bundle download and the single-map download used to end with
+/// nothing but a `state-changed`, so the frontend could not tell whose
+/// progress it was still showing. The panel is tied to this id.
+#[derive(serde::Serialize, specta::Type, Clone)]
+pub struct DownloadFinishedPayload {
+    pub download_id: String,
+    pub ok: bool,
+    pub message: Option<String>,
+}
+
 #[derive(serde::Serialize, specta::Type, Clone)]
 struct DownloadProgressPayload {
     download_id: String,
@@ -598,9 +610,15 @@ pub fn load_project(
 
         downloads_arc.remove(&download_id_for_task);
 
+        let finished = DownloadFinishedPayload {
+            download_id: download_id_for_task.clone(),
+            ok: result.is_ok(),
+            message: result.as_ref().err().cloned(),
+        };
         if let Ok(mut s) = lock_app_state(&state_arc) {
             s.apply_project_loaded(result);
         }
+        let _ = app.emit("download-finished", finished);
         let _ = app.emit("state-changed", ());
     });
 
@@ -618,14 +636,20 @@ pub fn cancel_download(
 
 #[tauri::command]
 #[specta::specta]
+/// Open a map, downloading it first when it is not on disk.
+///
+/// Returns the download id when a download started, so the caller can show
+/// progress for it and cancel it; an empty string when the map opened from
+/// disk or the request was a no-op.
 pub fn open_selected_map(
     map_name: String,
     state: State<SharedState>,
+    downloads: State<SharedDownloads>,
     app: AppHandle,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let request = lock_app_state(state.inner())?.begin_open_map(&map_name);
     let Some(request) = request else {
-        return Ok(());
+        return Ok(String::new());
     };
 
     match request {
@@ -645,15 +669,20 @@ pub fn open_selected_map(
         OpenMapRequest::Download(selection) => {
             let _ = app.emit("state-changed", ());
             let state_arc = Arc::clone(&state);
+            let downloads_arc = Arc::clone(&downloads);
             let package_name = selection.package_name.clone();
             let download_id = uuid::Uuid::new_v4().to_string();
+            let cancel = CancelToken::new();
+            downloads.register(download_id.clone(), cancel.clone());
+            let download_id_for_task = download_id.clone();
             thread::spawn(move || {
                 let pkg = package_name.clone();
-                let result = lizaalert::download_map(selection, |progress| {
+                let progress_id = download_id_for_task.clone();
+                let result = lizaalert::download_map(selection, &cancel, |progress| {
                     let _ = app.emit(
                         "download-progress",
                         DownloadProgressPayload {
-                            download_id: download_id.clone(),
+                            download_id: progress_id.clone(),
                             package_name: pkg.clone(),
                             downloaded_bytes: progress.downloaded_bytes,
                             total_bytes: progress.total_bytes,
@@ -662,15 +691,23 @@ pub fn open_selected_map(
                         },
                     );
                 });
+                downloads_arc.remove(&download_id_for_task);
+                let finished = DownloadFinishedPayload {
+                    download_id: download_id_for_task.clone(),
+                    ok: result.is_ok(),
+                    message: result.as_ref().err().cloned(),
+                };
                 if let Ok(mut s) = lock_app_state(&state_arc) {
                     s.apply_map_downloaded(&package_name, result);
                 }
+                let _ = app.emit("download-finished", finished);
                 let _ = app.emit("state-changed", ());
             });
+            return Ok(download_id);
         }
     }
 
-    Ok(())
+    Ok(String::new())
 }
 
 #[tauri::command]

@@ -9,25 +9,22 @@ import { join } from "path";
 //     bar with the cancel button and current-file label.
 const loaderSource = readFileSync(
   join(__dirname, "../components/BundleLoader.svelte"),
-  "utf-8"
+  "utf-8",
 );
 const pageSource = readFileSync(
   join(__dirname, "../routes/+page.svelte"),
-  "utf-8"
+  "utf-8",
 );
 const layoutSource = readFileSync(
   join(__dirname, "../routes/+layout.svelte"),
-  "utf-8"
+  "utf-8",
 );
-const storesSource = readFileSync(
-  join(__dirname, "../lib/stores.ts"),
-  "utf-8"
-);
+const storesSource = readFileSync(join(__dirname, "../lib/stores.ts"), "utf-8");
 const apiSource = readFileSync(join(__dirname, "../lib/api.ts"), "utf-8");
 const typesSource = readFileSync(join(__dirname, "../lib/types.ts"), "utf-8");
 const commandsSource = readFileSync(
   join(__dirname, "../../src-tauri/src/commands/mod.rs"),
-  "utf-8"
+  "utf-8",
 );
 
 describe("bundle loader per-file progress UI", () => {
@@ -35,7 +32,7 @@ describe("bundle loader per-file progress UI", () => {
     expect(pageSource).toContain("currentFileLabel");
     expect(pageSource).toContain("file_index");
     expect(pageSource).toContain("file_count");
-    expect(pageSource).toContain("data-testid=\"current-file-label\"");
+    expect(pageSource).toContain('data-testid="current-file-label"');
     // Source of truth: the `download-progress` listener lives in
     // `+layout.svelte` (single-owner rule, `consolidate-state-event-flow`)
     // and writes the payload into the `currentDownload` store; the page
@@ -61,20 +58,20 @@ describe("bundle loader per-file progress UI", () => {
     expect(loaderSource).not.toMatch(/listen<[^>]*>\(\s*"bundle-file-ready"/);
     // The ready-files affordance and the Open bundle now button are gone;
     // the Maps column's per-row badge replaces them.
-    expect(loaderSource).not.toContain("data-testid=\"ready-files\"");
-    expect(loaderSource).not.toContain("data-testid=\"open-bundle-now\"");
+    expect(loaderSource).not.toContain('data-testid="ready-files"');
+    expect(loaderSource).not.toContain('data-testid="open-bundle-now"');
     expect(storesSource).not.toContain("readyBundleFiles");
     expect(storesSource).not.toContain("noteBundleFileReady");
   });
 
   it("renders an indeterminate animation when total_bytes is missing", () => {
-    expect(pageSource).toContain("data-testid=\"indeterminate-bar\"");
+    expect(pageSource).toContain('data-testid="indeterminate-bar"');
     expect(pageSource).toContain("indeterminate-bar");
     expect(pageSource).toContain("$currentDownload.total_bytes == null");
   });
 
   it("exposes a cancel button wired to cancelDownload(activeDownloadId)", () => {
-    expect(pageSource).toContain("data-testid=\"cancel-download\"");
+    expect(pageSource).toContain('data-testid="cancel-download"');
     expect(pageSource).toContain("cancelDownload");
     expect(pageSource).toContain("handleCancelDownload");
     expect(apiSource).toContain("export async function cancelDownload");
