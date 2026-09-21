@@ -10,6 +10,43 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — a waiver that cannot rot
+
+I have declined the MapLibre 4 → 6 upgrade three times, each time for the same
+reason, and never once checked whether the grounds for declining still held.
+That is how a waived critical advisory turns into an unwaived one without
+anyone noticing.
+
+Its own recheck condition names the code I had spent the day changing: "if any
+code starts calling `Popup.setHTML()`, Marker with custom HTML, or custom
+attribution strings". Waypoint glyphs, waypoint colours, the measuring layer —
+all of it touches markers.
+
+It still holds. Popups use `setText`, markers set `textContent`, there is no
+`innerHTML` and no custom attribution anywhere in `src/`.
+
+But "we promise not to call it" is not a defence, so the premise is a test now.
+It fails on `setHTML`, `innerHTML` or `customAttribution` anywhere in the
+source, naming the file and line, and says in its failure message that the
+alternative is to remove the waiver and upgrade. I checked it bites by writing
+`el.innerHTML = waypointGlyph(...)` in the marker and watching it name the
+line.
+
+The version facts, so nobody has to re-derive them: `npm audit` says vulnerable
+`<=6.4.0`, fixed in **6.10.0 only**. There is no 5.x backport — the 5 line ends
+at 5.24.0 and is still vulnerable — so the pinned 4.7.x cannot be patched into
+safety and the route really is two majors. The waiver in
+`scripts/npm-audit-gate.mjs` now carries that, dated, with the command that
+produced it.
+
+| | |
+|---|---|
+| Evidence | the premise re-checked against the code; the guard, verified red |
+| Evidence | `npm audit --json`: `range <=6.4.0`, `fixAvailable 6.10.0`, `isSemVerMajor` |
+| Automated gates | `just ci` green (320 Rust, 431 frontend); the audit gate passes with one waiver |
+
+---
+
 ## 2026-09-22 — walking the recording
 
 The last ADR-0020 item, and not the onboarding tour the word "walkthrough" had

@@ -5,8 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **walking the recording** (2026-09-22) — a track's points
-can be stepped through, with the map following; after trimming the drive to
+Last merged slice: **a waiver that cannot rot** (2026-09-22) — the MapLibre
+advisory's waiver re-checked against the code and its premise turned into a
+test; after walking the recording, where a track's points
+became steppable with the map following, and after trimming the drive to
 the start, where a track
 became trimmable at a point in either direction as one undoable step, and
 after a
@@ -99,7 +101,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 320 Rust tests and 430 frontend tests;
+rustfmt, clippy, type-checks, 320 Rust tests and 431 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -158,7 +160,10 @@ re-ordered rather than followed blindly.
 5. **MapLibre 4 → 6**, which clears the waived critical advisory. Deliberately
    not attempted while the E2E gate is down: the map is the product, and the
    stand stubs its tiles, so a major upgrade would ship verified only by type
-   checks and a browser.
+   checks and a browser. Checked 2026-09-22: vulnerable `<=6.4.0`, fixed in
+   6.10.0 only, no 5.x backport, so there is no smaller step. The waiver's
+   premise — that nothing here reaches the vulnerable sink — is enforced by
+   `src/test/maplibre-waiver.test.ts` rather than by remembering to look.
 6. ~~Field tools declared in scope and absent.~~ All three — distance, radius
    ring, projection — were built on 2026-09-22 and live in the command palette.
    Their rendered pixels are unverified; see the change's task 6.1 for why the

@@ -27,16 +27,25 @@ const ALLOWED = [
     id: "GHSA-jrc7-96c5-q579",
     package: "maplibre-gl",
     reason:
-      "XSS sanitizer bypass in DOM.sanitize(), reachable through setHTML() " +
-      "and custom attribution HTML. ozi-rs renders map popups with " +
-      "Popup.setText() (MapView.svelte) and uses no innerHTML anywhere, so " +
-      "the affected sink is never called. The advisory is only fixed in " +
-      "maplibre-gl 6.10, two major versions ahead of the pinned 4.x, and a " +
-      "major map-engine upgrade needs its own slice with visual verification.",
+      "XSS sanitizer bypass in DOM.sanitize(), reachable through setHTML(), " +
+      "markers built from HTML strings and custom attribution HTML. ozi-rs " +
+      "renders popups with Popup.setText() and sets marker content with " +
+      "textContent, so the affected sink is never called. Re-checked against " +
+      "the code on 2026-09-22, after a day of map changes (waypoint glyphs " +
+      "and colours, the measuring layer): still true, and now enforced by " +
+      "src/test/maplibre-waiver.test.ts, which fails on setHTML, innerHTML " +
+      "or customAttribution anywhere in src/ — a waiver whose premise is only " +
+      "a promise decays the first time someone writes the call without " +
+      "reading this file. " +
+      "Fix availability, checked 2026-09-22 with `npm audit --json`: " +
+      "vulnerable <=6.4.0, fixed in 6.10.0 only. There is no 5.x backport, " +
+      "so the pinned 4.7.x cannot be patched into safety and the only route " +
+      "is a two-major upgrade, which needs its own slice with visual " +
+      "verification — deliberately not attempted while the customer-journey " +
+      "smoke gate is down (see docs/STATE.md).",
     recheck:
-      "When the MapLibre 6 upgrade slice lands, or immediately if any code " +
-      "starts calling Popup.setHTML(), Marker with custom HTML, or custom " +
-      "attribution strings.",
+      "When the MapLibre 6 upgrade slice lands. The code-side premise no " +
+      "longer needs a human recheck: the test above fails instead.",
   },
 ];
 
