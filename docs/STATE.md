@@ -50,9 +50,10 @@ errors surfaced.
 - **Slice 0.2 still owes its customer-journey smoke.** Screenshots are done
   and in the gallery; the smoke run has not been driven yet.
 - **Appium clicks do not land.** Sessions start again, but `appium_click`
-  returns success for the rail's "Точки" tab without the tab changing, and
-  `appium_screenshot` answers 404 against Appium 3.4.2 — the prebuilt MCP
-  binary predates the endpoint move. Window capture is fine:
+  returns success for the rail's "Точки" tab twice without the tab changing.
+  (`appium_screenshot` returned 404 in the same run, but against a session that
+  had already terminated, so that is not evidence about the endpoint.) Window
+  capture is fine:
   `screencapture -x -o -l <windowid>`, with the id from
   `CGWindowListCopyWindowInfo` (a five-line Swift script; `python3` here has no
   `Quartz`). A Mac2 session also quits the app when it ends, and its

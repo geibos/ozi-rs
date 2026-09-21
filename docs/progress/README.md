@@ -34,11 +34,10 @@ unnoticed.
 | On screen | not confirmed — see below |
 
 The native-QA harness could not be driven this time: `appium_click` reported
-success on the rail's "Точки" tab twice without the tab changing, and the MCP
-server's `appium_screenshot` returns HTTP 404 against Appium 3.4.2 (the endpoint
-moved; the bundled binary is from May). Per `CLAUDE.md` the run stopped after two
-attempts. The window capture itself works — `screencapture -x -o -l <windowid>`
-with the id from `CGWindowListCopyWindowInfo`; only the clicking is broken.
+success on the rail's "Точки" tab twice without the tab changing. Per
+`CLAUDE.md` the run stopped after two attempts. The window capture itself works
+— `screencapture -x -o -l <windowid>` with the id from
+`CGWindowListCopyWindowInfo`; what is broken is the click.
 
 ---
 
