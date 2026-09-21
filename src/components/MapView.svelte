@@ -50,6 +50,7 @@
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { createLatestRun } from "$lib/latest-run";
+  import { reportEditFailure } from "$lib/edit-failure";
   import {
     initTracksLayer,
     updateTracksLayer,
@@ -164,7 +165,7 @@
       // the project marked as changed although nothing had changed.
       await cancelDrawing(commandCount);
     } catch (error) {
-      console.error("Failed to cancel drawing mode", error);
+      reportEditFailure("map.cancelDrawingFailed", error);
     } finally {
       drawingModeActive.set(false);
       drawingTrackLayerId.set(null);
@@ -269,7 +270,10 @@
         );
         await reloadEditableTrackPoints(layerId, trackId);
       } catch (error) {
-        console.error("Failed to move track point", error);
+        reportEditFailure("map.movePointFailed", error);
+        // The marker is where the operator dropped it and the data is not, so
+        // the map would otherwise go on showing a point that is not there.
+        await reloadEditableTrackPoints(layerId, trackId).catch(() => {});
       }
     });
 
@@ -310,7 +314,7 @@
       );
       await reloadEditableTrackPoints(layerId, trackId);
     } catch (error) {
-      console.error("Failed to delete track point", error);
+      reportEditFailure("map.deletePointFailed", error);
     }
   }
 
@@ -329,7 +333,7 @@
       );
       await reloadEditableTrackPoints(layerId, trackId);
     } catch (error) {
-      console.error("Failed to insert track point", error);
+      reportEditFailure("map.insertPointFailed", error);
     }
   }
 
@@ -489,7 +493,7 @@
                 lngLat.lng,
               ]);
             } catch (error) {
-              console.error("Failed to move waypoint", error);
+              reportEditFailure("map.moveWaypointFailed", error);
               // The state-changed → reconcile pass that follows will pull
               // the authoritative coords; we just reset to the last
               // applied snapshot to avoid a flash at a wrong location.
@@ -534,7 +538,7 @@
       await addWaypoint(layerId, lat, lng, `Waypoint ${nextIndex}`);
       await refreshWaypointMarkers();
     } catch (error) {
-      console.error("Failed to add waypoint:", error);
+      reportEditFailure("map.addWaypointFailed", error);
     } finally {
       addWaypointMode.set(false);
     }
@@ -695,7 +699,7 @@
         drawingPointCount.set(drawingPreviewPoints.length);
         updateDrawingPreview();
       } catch (error) {
-        console.error("Failed to add drawing point", error);
+        reportEditFailure("map.addDrawingPointFailed", error);
       }
     }, 220);
   }
@@ -1209,7 +1213,7 @@
         { padding: 60, maxZoom: 16 },
       );
     } catch (error) {
-      console.error("Failed to fit all tracks", error);
+      reportEditFailure("map.fitAllTracksFailed", error);
     }
   }
 

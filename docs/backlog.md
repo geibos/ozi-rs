@@ -34,6 +34,12 @@ decision.
 
 ## Engineering
 
+- **Three guards now watch for a defect class rather than an instance**: a
+  literal label in a component, English assembled into one, and a `catch` that
+  logs and tells nobody. Each found something on its first run that the sweep
+  which prompted it had missed. When a defect turns up twice, the third fix is
+  a test over the shape, not another sweep.
+
 - **An async reload that writes to shared state needs `createLatestRun`.**
   Found five times: the bundle preview, both library tabs, and the map's
   marker refresh and track-geometry fetch. Anything that reloads on

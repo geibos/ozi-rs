@@ -10,6 +10,42 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a refused edit says so
+
+The backlog had run thin on things that are not the owner's to decide, so I
+audited the one field path never audited: editing a track.
+
+Ten failures reached `console.error` and nothing else, and the error reporter
+is disabled outside dev builds. In a release build they were silent. Not
+peripheral ones either — dragging a track point, deleting one, inserting one,
+adding a waypoint, placing a point while drawing, cancelling a draw, fitting
+the tracks on screen, loading either inspector. That list is the field
+workflow.
+
+The track-point drag was worse than silent. On failure the marker stayed where
+the operator dropped it while the data kept the old position, so the map went
+on showing a point that was not there.
+
+The loader was given exactly this treatment months ago, in `honest-bundle-flow`
+— "every failure in the loader was swallowed by an empty `catch`". The map
+never was, and nothing was watching. Now something is: a test that scans every
+component for a `catch` that logs and tells nobody. Two are allowed through,
+each with its reason written next to it — OZF2 metadata, which is meant to fail
+for SQLite maps, and the per-file import failure, which is reported in
+aggregate afterwards so one bad file does not bury the summary.
+
+That is the third guard of this shape this session. They keep finding things
+the sweep that prompted them had already missed.
+
+| | |
+|---|---|
+| Evidence | tests on the reporter itself; the guard, verified red by putting one `console.error` back |
+| Not covered | the ten call sites — `MapView` and the inspectors need a MapLibre instance |
+| Automated gates | `just ci` green (303 Rust, 375 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — a search that is gone leaves the list
 
 The thing the backlog note meant, done. A search taken down upstream never

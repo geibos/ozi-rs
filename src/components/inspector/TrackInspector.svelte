@@ -13,6 +13,7 @@
    * endpoints in `src/lib/api.ts`. No direct store mutation. No new IPC.
    */
   import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
+  import { reportEditFailure } from "$lib/edit-failure";
   import CalendarClockIcon from "@lucide/svelte/icons/calendar-clock";
   import CropIcon from "@lucide/svelte/icons/crop";
   import DownloadIcon from "@lucide/svelte/icons/download";
@@ -102,7 +103,7 @@
       trackDetail = await getTrackDetail(layerId, trackId);
       detailKey = key;
     } catch (error) {
-      console.error("TrackInspector: getTrackDetail failed", error);
+      reportEditFailure("inspector.trackLoadFailed", error);
       trackDetail = null;
     }
   }

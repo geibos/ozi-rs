@@ -5,9 +5,12 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a search that is gone leaves the list** (2026-09-21) — a
+Last merged slice: **a refused edit says so** (2026-09-21) — ten failures on
+the track- and waypoint-editing path were silent outside dev builds, including
+a drag that left the map showing a point that was not there; after a search
+that is gone leaving the list, where a
 project taken down upstream finally stops being listed and cached, and the
-stand got its catalogue back; after the catalogue leaving application state,
+stand got its catalogue back, and after the catalogue leaving application state,
 where `get_app_state` had been shipping thirteen thousand catalogue rows, about
 a mebibyte of JSON, on every state change, and after walking the catalogue by
 keyboard, where type,
@@ -70,7 +73,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 303 Rust tests and 372 frontend tests;
+rustfmt, clippy, type-checks, 303 Rust tests and 375 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

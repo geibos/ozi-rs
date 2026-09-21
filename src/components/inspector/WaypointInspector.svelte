@@ -9,6 +9,7 @@
    * remains available through the project command bus).
    */
   import EyeIcon from "@lucide/svelte/icons/eye";
+  import { reportEditFailure } from "$lib/edit-failure";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
   import MapPinIcon from "@lucide/svelte/icons/map-pin";
@@ -58,7 +59,7 @@
       waypoint = found;
       if (found && !nameDirty) nameDraft = found.name;
     } catch (error) {
-      console.error("WaypointInspector: getWaypoints failed", error);
+      reportEditFailure("inspector.waypointLoadFailed", error);
       waypoint = null;
     }
   }
