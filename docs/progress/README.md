@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — numbers a crew reads
+
+The first thing the stand was pointed at was the Track Inspector, which nobody
+had examined since it was built. It reported `1.1 km · 5h 1m · 5 pts` and
+`Начало 2026-07-08T09:00:00+00:00` in an otherwise Russian window, and the
+segments table said `SEGMENT 1 · 3 PTS`, `Edit Mode`, and repeated the RFC3339
+string under every point in the list.
+
+Units follow the interface language now, and an instant is formatted for a
+person — `08.07.2026, 12:00`, in the operator's own clock.
+
+| | |
+|---|---|
+| Before | [the inspector](2026-09-21-readable-numbers/before-inspector.png) |
+| After | [the inspector](2026-09-21-readable-numbers/after-inspector.png) |
+| Automated gates | `just ci` green (289 Rust, 334 frontend) |
+
+The stand needed two fixes of its own in the process, both of the same class it
+exists to catch. Its `get_waypoints` ignored the layer id and answered every
+layer with the same waypoints, which listed each of them twice in the rail and
+read exactly like an app defect until the call transcript showed two calls with
+different ids. And tile requests threw, burying the screen under error toasts;
+they answer with a transparent pixel now, cartographic fidelity being
+explicitly out of scope.
+
+Also: `bindings.ts` and the fixtures are prettier-ignored. Formatting them made
+their own up-to-date tests fail on the next run, which cost a confusing minute
+every time the frontend was formatted.
+
+---
+
 ## 2026-09-21 — a stand, so a screen can be looked at
 
 Every visual check in this repository has cost a full `just build`, an Appium
