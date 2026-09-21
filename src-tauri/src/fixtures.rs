@@ -288,7 +288,13 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
     let track_detail = crate::commands::track_detail_dto(track);
     let waypoints = crate::commands::waypoint_dtos(state.project_waypoint_layers()[0].waypoints());
 
-    let cold = crate::commands::app_state_dto(&cold_start_app_state());
+    let cold_state = cold_start_app_state();
+    let cold = crate::commands::app_state_dto(&cold_state);
+    // The catalogue is its own stream now, not part of the state snapshot, so
+    // it needs a fixture of its own — otherwise the stand shows an empty
+    // project list, which is exactly what happened when it left the snapshot.
+    let catalogue =
+        crate::commands::to_project_summary_dtos(cold_state.fixture_catalogue(), &cached_slugs());
 
     let files: Vec<(&str, serde_json::Value)> = vec![
         (
@@ -306,6 +312,10 @@ pub fn write_fixtures(dir: &Path) -> std::io::Result<Vec<PathBuf>> {
         // not the map's features: the map omits a track it cannot draw, and a
         // list that inherited that omission was how a one-point track ended up
         // with no row at all.
+        (
+            "catalogue.json",
+            serde_json::to_value(&catalogue).expect("serialize catalogue chunk"),
+        ),
         (
             "tracks-list.json",
             serde_json::to_value(&tracks_list).expect("serialize track rows"),

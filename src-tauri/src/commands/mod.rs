@@ -197,7 +197,7 @@ fn to_track_summary_dto(layer_id: u64, track: &crate::domain::Track) -> TrackSum
     }
 }
 
-fn to_project_summary_dtos(
+pub fn to_project_summary_dtos(
     projects: &[LizaProjectSummary],
     cached: &std::collections::HashSet<String>,
 ) -> Vec<LizaProjectSummaryDto> {
@@ -251,6 +251,15 @@ struct BundleProgressPayload {
     total: Option<u64>,
     downloaded_bytes: Option<u64>,
     total_bytes: Option<u64>,
+}
+
+/// Emitted when a catalogue walk ends.
+///
+/// `complete` is what lets the interface prune: only a walk that ran to the
+/// end knows what no longer exists. A stopped one read a prefix.
+#[derive(serde::Serialize, specta::Type, Clone)]
+struct CatalogueRefreshFinishedPayload {
+    complete: bool,
 }
 
 #[derive(serde::Serialize, specta::Type, Clone)]
@@ -511,6 +520,11 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
         );
     }
 
+    // After the cached chunk and before the walk, so the interface collects
+    // only what this walk sends and does not count yesterday's cache as proof
+    // that a search still exists.
+    let _ = app.emit("catalogue-refresh-started", ());
+
     let state_arc = Arc::clone(&state);
     thread::spawn(move || {
         let chunk_state = Arc::clone(&state_arc);
@@ -532,9 +546,14 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
             let _ = lizaalert::save_project_summaries_cache(&bundles_root, &walk.projects);
         }
 
+        let complete = matches!(&result, Ok(walk) if !walk.cancelled);
         if let Ok(mut s) = lock_app_state(&state_arc) {
             s.apply_projects_loaded(result);
         }
+        let _ = app.emit(
+            "catalogue-refresh-finished",
+            CatalogueRefreshFinishedPayload { complete },
+        );
         let _ = app.emit("state-changed", ());
     });
 

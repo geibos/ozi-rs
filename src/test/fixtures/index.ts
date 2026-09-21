@@ -12,9 +12,11 @@ import appStateJson from "./app-state.json";
 import coldStartJson from "./app-state-cold.json";
 import tracksGeojsonJson from "./tracks-geojson.json";
 import tracksListJson from "./tracks-list.json";
+import catalogueJson from "./catalogue.json";
 import trackDetailJson from "./track-detail.json";
 import waypointsJson from "./waypoints.json";
 
+import type { LizaProjectSummaryDto } from "$lib/types";
 import type {
   AppStateDto,
   TrackDetailDto,
@@ -24,6 +26,14 @@ import type {
 
 /** A project shaped like one search: two tracks, one of them hidden. */
 export const appStateFixture = appStateJson as AppStateDto;
+
+/**
+ * The catalogue, as the `projects-chunk` stream delivers it.
+ *
+ * Its own fixture because it is its own stream: it left the state snapshot on
+ * 2026-09-21, and the stand's project list went empty until this replaced it.
+ */
+export const catalogueFixture = catalogueJson as LizaProjectSummaryDto[];
 
 /** The app's first screen: the catalogue is loaded, nothing is open. */
 export const coldStartFixture = coldStartJson as unknown as AppStateDto;

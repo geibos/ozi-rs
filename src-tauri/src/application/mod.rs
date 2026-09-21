@@ -405,6 +405,14 @@ impl AppState {
         self.lizaalert.listing_cancel = None;
         match result {
             Ok(walk) => {
+                // A walk that ran to the end is the whole truth about what
+                // exists, so it replaces the list rather than merging into it:
+                // otherwise a search taken down upstream stayed for good, in
+                // the list and then in the cache, and clicking it failed. A
+                // stopped walk read only a prefix and may remove nothing.
+                if !walk.cancelled {
+                    self.lizaalert.projects = walk.projects.clone();
+                }
                 let count = self.lizaalert.projects.len();
                 // A stopped walk is not a failure and not a complete list
                 // either. Saying which it was is the difference between "there
@@ -695,11 +703,20 @@ impl AppState {
         &mut self.project
     }
 
+    /// Read back a catalogue installed by `set_fixture_catalogue`.
+    ///
+    /// The catalogue left the state snapshot, so the fixture writer can no
+    /// longer read it out of a DTO and needs this instead.
     #[cfg(test)]
+    pub(crate) fn fixture_catalogue(&self) -> &[LizaProjectSummary] {
+        &self.lizaalert.projects
+    }
+
     /// Install a catalogue state without a network, for fixtures and tests.
     ///
     /// The LizaAlert state is otherwise only reachable through the download
     /// paths, and a fixture that had to run those would need a server.
+    #[cfg(test)]
     pub(crate) fn set_fixture_catalogue(
         &mut self,
         projects: Vec<LizaProjectSummary>,
@@ -2182,6 +2199,59 @@ mod tests {
         assert!(
             state.lizaalert.busy,
             "the preview did not take the busy flag and must not release it"
+        );
+    }
+
+    /// A search that has been taken down upstream used to stay in the list for
+    /// good: chunks are merged, and nothing ever removed anything. Offline it
+    /// then sat in the cache too, and clicking it failed.
+    ///
+    /// A walk that ran to the end knows exactly what exists. One that was
+    /// stopped knows only a prefix, so it must not prune anything.
+    #[test]
+    fn a_complete_walk_drops_a_search_that_is_gone() {
+        let mut state = AppState::new();
+        state.apply_projects_chunk(vec![
+            summary_for("2026-09-01_old", "Old"),
+            summary_for("2026-09-20_current", "Current"),
+        ]);
+
+        state.apply_projects_loaded(Ok(lizaalert::CatalogueWalk {
+            projects: vec![summary_for("2026-09-20_current", "Current")],
+            pages: 3,
+            cancelled: false,
+        }));
+
+        assert_eq!(
+            state
+                .lizaalert
+                .projects
+                .iter()
+                .map(|p| p.slug.as_str())
+                .collect::<Vec<_>>(),
+            vec!["2026-09-20_current"],
+            "a complete walk is the whole truth about what exists"
+        );
+    }
+
+    #[test]
+    fn a_stopped_walk_prunes_nothing() {
+        let mut state = AppState::new();
+        state.apply_projects_chunk(vec![
+            summary_for("2026-09-01_old", "Old"),
+            summary_for("2026-09-20_current", "Current"),
+        ]);
+
+        state.apply_projects_loaded(Ok(lizaalert::CatalogueWalk {
+            projects: vec![summary_for("2026-09-20_current", "Current")],
+            pages: 1,
+            cancelled: true,
+        }));
+
+        assert_eq!(
+            state.lizaalert.projects.len(),
+            2,
+            "a stopped walk read only a prefix and may not remove anything"
         );
     }
 

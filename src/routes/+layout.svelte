@@ -7,6 +7,8 @@
   import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
   import {
     appendProjectsChunk,
+    beginCatalogueRefresh,
+    finishCatalogueRefresh,
     applyBundleProgress,
     catalogueError,
     appState,
@@ -87,6 +89,15 @@
         }),
         listen<LizaProjectSummaryDto[]>("projects-chunk", (event) =>
           appendProjectsChunk(event.payload),
+        ),
+        // The boundaries of a catalogue walk. Between them the store collects
+        // what the walk sends; on a complete one it drops everything else, so
+        // a search taken down upstream finally leaves the list.
+        listen<void>("catalogue-refresh-started", () =>
+          beginCatalogueRefresh(),
+        ),
+        listen<{ complete: boolean }>("catalogue-refresh-finished", (event) =>
+          finishCatalogueRefresh(event.payload.complete),
         ),
         listen<BundleFileReadyPayload>("bundle-file-ready", (event) => {
           // A bundle is fetched whole: the 16 MiB topo layer lands long

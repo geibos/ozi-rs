@@ -118,14 +118,10 @@ and the palette slice; these were not.
   hint states how many projects are listed so far, which is what the decision
   to stop is actually made on — a page number would have said less.
 
-  Still open, and this is what "the cache only ever grows" really means: a
-  project deleted upstream is never removed. `apply_projects_chunk` appends
-  what it has not seen and removes nothing, on both sides, so a search that
-  vanished from the server stays in the list and in the cache for good.
-  Pruning needs the frontend to know a walk completed rather than was stopped:
-  emit the refresh's start and its clean finish, collect the slugs seen
-  between them, drop the rest. The backend half is easier — a complete
-  `CatalogueWalk` already holds exactly the right list.
+  ~~A project deleted upstream is never removed.~~ Done on 2026-09-21 in
+  `a-search-that-is-gone-leaves-the-list`: a complete walk replaces the list,
+  a stopped one changes nothing, and the walk's boundaries are emitted so the
+  interface knows which it was.
 - **Small targets.** 28px rows and 10px badges in the catalogue. The keyboard
   half of this is done on 2026-09-21 in `walk-the-catalogue-by-keyboard`: the
   list is a listbox with an `aria-activedescendant` position, walked with the

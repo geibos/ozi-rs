@@ -256,8 +256,43 @@ function syncActiveLayer(
  * matches the `lizaalert-integration` spec for stale-while-revalidate
  * refresh semantics.
  */
+/**
+ * The slugs this catalogue walk has sent, while one is running.
+ *
+ * `null` means no walk is in progress, and then nothing is collected and
+ * nothing can be pruned. The cached chunk that `load_projects` emits from disk
+ * arrives before the walk starts, deliberately outside this window: counting
+ * yesterday's cache as proof that a search still exists would defeat the
+ * point.
+ */
+let walkedSlugs: Set<string> | null = null;
+
+/** A catalogue walk has started: begin collecting what it sends. */
+export function beginCatalogueRefresh(): void {
+  walkedSlugs = new Set();
+}
+
+/**
+ * A catalogue walk has ended.
+ *
+ * Only a walk that ran to the end knows what no longer exists, so only a
+ * complete one prunes. A stopped walk read a prefix of the catalogue; pruning
+ * on that would make "stop" mean "delete most of the list".
+ */
+export function finishCatalogueRefresh(complete: boolean): void {
+  const seen = walkedSlugs;
+  walkedSlugs = null;
+  if (!complete || seen === null) return;
+  projectsStore.update((current) =>
+    current.filter((project) => seen.has(project.slug)),
+  );
+}
+
 export function appendProjectsChunk(chunk: LizaProjectSummaryDto[]) {
   if (chunk.length === 0) return;
+  if (walkedSlugs !== null) {
+    for (const project of chunk) walkedSlugs.add(project.slug);
+  }
   projectsStore.update((current) => {
     const indexBySlug = new Map<string, number>();
     current.forEach((project, index) => indexBySlug.set(project.slug, index));

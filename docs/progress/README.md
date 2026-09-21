@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a search that is gone leaves the list
+
+The thing the backlog note meant, done. A search taken down upstream never
+left: chunks are merged — append what has not been seen, remove nothing — on
+both sides, so it stayed in the list, then in the cache, and offline it was
+still there to click and fail on.
+
+The whole difficulty is one fact: whether the walk ran to the end. A stopped
+walk read a prefix, and pruning on that would make "stop" mean "delete most of
+the list". So the walk's boundaries are emitted now, and between them the
+interface collects what the walk sent; on a complete walk it drops the rest.
+The cached chunk goes out *before* the window opens, deliberately — counting
+yesterday's cache as proof that a search still exists would defeat the point,
+and there is a test for exactly that.
+
+And a correction to the last slice. Taking the catalogue out of the state
+snapshot left the stand with an empty project list, which I did not see because
+I had stopped the stand before making the change. The core writes
+`catalogue.json` now, and the stand plays the real sequence — cached chunk,
+started, the walk's chunk, finished — so it exercises the pruning rather than
+hiding it. Three rows, "3 из 3", not emptied by the complete walk.
+
+| | |
+|---|---|
+| Evidence | two Rust tests (complete walk replaces, stopped walk does not) and five on the store, including the chunk that arrives before the window |
+| Evidence | walked on the stand: the catalogue is back and survives a complete walk |
+| Automated gates | `just ci` green (303 Rust, 372 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — the catalogue is not application state
 
 I went looking for the backlog's note that the catalogue cache "only ever

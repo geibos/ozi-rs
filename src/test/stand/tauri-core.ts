@@ -21,6 +21,7 @@ import {
   trackDetailFixture,
   tracksGeojsonFixture,
   tracksListFixture,
+  catalogueFixture,
   waypointsFixture,
 } from "../fixtures";
 
@@ -44,11 +45,7 @@ const TRANSPARENT_PNG = Uint8Array.from([
  * "refreshing…" hint, and only a state update clears it, so the hint sat there
  * forever and the first screen always looked like it was still loading.
  */
-const EMITS_STATE_CHANGED = new Set([
-  "load_projects",
-  "preview_project",
-  "set_bundles_root",
-]);
+const EMITS_STATE_CHANGED = new Set(["preview_project", "set_bundles_root"]);
 
 const ACCEPTED_WITHOUT_DATA = new Set([
   "set_all_tracks_visible",
@@ -70,7 +67,6 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "save_project",
   "set_bundles_root",
   "reveal_bundle",
-  "load_projects",
   "cancel_project_listing",
   "export_gpx",
   "export_all_tracks_gpx",
@@ -172,6 +168,20 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
     return id;
   },
   open_local_bundle: () => "",
+  // The catalogue arrives as a stream, so the stand sends one: the cached
+  // chunk first, then the walk's boundaries around the walk's own chunk. The
+  // interface prunes on a complete walk, and a stand that skipped the
+  // boundaries would never exercise that.
+  load_projects: () => {
+    standEmit("projects-chunk", catalogueFixture);
+    queueMicrotask(() => {
+      standEmit("catalogue-refresh-started", undefined);
+      standEmit("projects-chunk", catalogueFixture);
+      standEmit("catalogue-refresh-finished", { complete: true });
+      standEmit("state-changed", undefined);
+    });
+    return null;
+  },
   preview_project: (args) => {
     previewedSlug = typeof args?.slug === "string" ? args.slug : null;
     return null;
