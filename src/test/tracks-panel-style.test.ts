@@ -9,8 +9,9 @@ const source = readFileSync(
 
 describe("Library Tracks tab style controls", () => {
   it("reads track line width from GeoJSON properties", () => {
-    expect(source).toContain("lineWidth");
-    expect(source).toContain('f.properties!.line_width');
+    // The property read itself is exercised in `track-features.test.ts`;
+    // here we only confirm the tab still binds the row field.
+    expect(source).toContain("t.lineWidth");
   });
 
   it("uses typed API wrappers for color and line width mutations", () => {

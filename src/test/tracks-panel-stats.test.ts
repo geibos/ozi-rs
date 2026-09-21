@@ -36,19 +36,13 @@ describe("Library Tracks tab statistics formatter", () => {
   });
 });
 
+// Reading GeoJSON properties into row fields, and treating a missing
+// duration as absent, moved to `src/lib/track-features.ts` and are covered
+// behaviourally by `track-features.test.ts`.
 describe("Library Tracks tab statistics rendering", () => {
   it("imports the formatter and exposes a track-stats element", () => {
     expect(source).toContain('import { formatTrackStats }');
     expect(source).toContain('data-testid="track-stats"');
-  });
-
-  it("loads the new GeoJSON properties for distance, duration, and point count", () => {
-    expect(source).toContain("distance_km");
-    expect(source).toContain("duration_seconds");
-    expect(source).toContain("point_count");
-    expect(source).toContain("distanceKm:");
-    expect(source).toContain("durationSeconds:");
-    expect(source).toContain("pointCount:");
   });
 
   it("passes the loaded statistics through formatTrackStats", () => {
@@ -58,7 +52,4 @@ describe("Library Tracks tab statistics rendering", () => {
     expect(source).toContain("t.pointCount");
   });
 
-  it("treats null/undefined duration as missing so the segment is hidden", () => {
-    expect(source).toContain("rawDuration === null || rawDuration === undefined");
-  });
 });

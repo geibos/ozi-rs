@@ -68,18 +68,10 @@
   import { t as i18n } from "$lib/i18n";
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
-
-  interface TrackFeature {
-    layerId: bigint;
-    trackId: bigint;
-    name: string;
-    color: string;
-    lineWidth: number;
-    visible: boolean;
-    distanceKm: number;
-    durationSeconds: number | null;
-    pointCount: number;
-  }
+  import {
+    trackFeaturesFromGeojson,
+    type TrackFeature,
+  } from "$lib/track-features";
 
   let tracks: TrackFeature[] = $state([]);
   // Inline-popover live-preview toggle. The popover writes through the
@@ -106,40 +98,9 @@
     }
   });
 
-  // Sort by (layer, trackId) so rows from one layer cluster.
-  function sortKey(t: TrackFeature): string {
-    const layerStr = t.layerId.toString().padStart(20, "0");
-    const trackStr = t.trackId.toString().padStart(20, "0");
-    return `${layerStr}:${trackStr}`;
-  }
-
   async function loadTracks() {
     try {
-      const geojson = await getTracksGeojson();
-      const next = geojson.features
-        .filter((f) => f.geometry.type === "LineString")
-        .map((f) => {
-          const rawDuration = f.properties!.duration_seconds as
-            | number
-            | null
-            | undefined;
-          return {
-            layerId: BigInt(f.properties!.layer_id as number),
-            trackId: BigInt(f.properties!.track_id as number),
-            name: f.properties!.name as string,
-            color: f.properties!.color as string,
-            lineWidth: Number(f.properties!.line_width ?? 3),
-            visible: f.properties!.visible as boolean,
-            distanceKm: Number(f.properties!.distance_km ?? 0),
-            durationSeconds:
-              rawDuration === null || rawDuration === undefined
-                ? null
-                : Number(rawDuration),
-            pointCount: Number(f.properties!.point_count ?? 0),
-          } as TrackFeature;
-        });
-      next.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-      tracks = next;
+      tracks = trackFeaturesFromGeojson(await getTracksGeojson());
     } catch (err) {
       console.error("Failed to load tracks", err);
       toast.error("Failed to load tracks", { description: String(err) });
