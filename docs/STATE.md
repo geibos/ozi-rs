@@ -49,16 +49,16 @@ errors surfaced.
 
 - **Slice 0.2 still owes its customer-journey smoke.** Screenshots are done
   and in the gallery; the smoke run has not been driven yet.
-- **Appium clicks do not land.** Sessions start again, but `appium_click`
-  returns success for the rail's "Точки" tab twice without the tab changing.
-  (`appium_screenshot` returned 404 in the same run, but against a session that
-  had already terminated, so that is not evidence about the endpoint.) Window
-  capture is fine:
-  `screencapture -x -o -l <windowid>`, with the id from
-  `CGWindowListCopyWindowInfo` (a five-line Swift script; `python3` here has no
-  `Quartz`). A Mac2 session also quits the app when it ends, and its
-  WebDriverAgent is one-shot — kill `WebDriverAgentRunner-Runner` before the
-  next session.
+- **An Appium click only lands when the app window is frontmost.** A Mac2
+  session starts the app but does not raise it, and a click on a background
+  window reports success while the event goes to whatever is on top. Run
+  `open <path to .app>` first. Other harness facts confirmed on 2026-09-21: the
+  session quits the app when it ends; WebDriverAgent is one-shot, so kill
+  `WebDriverAgentRunner-Runner` before the next session; window capture is
+  `screencapture -x -o -l <windowid>` with the id from
+  `CGWindowListCopyWindowInfo` (a five-line Swift script — the `python3` on this
+  machine has no `Quartz`); `appium_type_text` into the search field did not
+  reach it and triggered a shortcut instead, which is still open.
 - **The native-QA MCP server now builds from source** (`.mcp.json` runs
   `cargo run -p ozi-rs-mcp --`, as `opencode.json` already did). Until
   2026-09-21 it ran a binary compiled in May, so July's fixes never reached

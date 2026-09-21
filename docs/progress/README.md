@@ -30,14 +30,16 @@ unnoticed.
 
 | | |
 |---|---|
+| After | [the tab in use](2026-09-21-waypoints-parity/after-waypoints-tab.png) |
 | Automated gates | `just ci` green (269 Rust, 295 frontend) |
-| On screen | not confirmed — see below |
 
-The native-QA harness could not be driven this time: `appium_click` reported
-success on the rail's "Точки" tab twice without the tab changing. Per
-`CLAUDE.md` the run stopped after two attempts. The window capture itself works
-— `screencapture -x -o -l <windowid>` with the id from
-`CGWindowListCopyWindowInfo`; what is broken is the click.
+Confirmed on screen: the search field, the show-all / hide-all pair, and every
+row carrying its coordinates, a locate button and an actions menu.
+
+The clicks only started landing once the app window was frontmost. A Mac2
+session launches the app without raising it, and a click on a background window
+reports success while the event goes to whatever is on top — two earlier
+attempts failed silently that way. `open <path to .app>` before driving it.
 
 ---
 
