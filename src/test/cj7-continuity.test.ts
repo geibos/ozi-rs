@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { dictionaryKeys } from "../lib/i18n";
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -119,15 +120,22 @@ describe("CJ-7 command palette (CommandPalette.svelte)", () => {
 
   it("has a language toggle item in the Settings group", () => {
     expect(paletteSource).toContain("toggleLocale");
-    expect(paletteSource).toContain('$t("palette.language")');
+    expect(paletteSource).toContain('"palette.language"');
     expect(paletteSource).toContain('value="setting:language"');
   });
 
+  // The keys, not the spelling of the store read: the palette imports the
+  // i18n store under an alias because its tracks loop binds `t`.
   it("localizes the project action labels", () => {
-    expect(paletteSource).toContain('$t("palette.openProject")');
-    expect(paletteSource).toContain('$t("palette.saveProject")');
-    expect(paletteSource).toContain('$t("palette.undo")');
-    expect(paletteSource).toContain('$t("palette.redo")');
+    for (const key of [
+      "palette.openProject",
+      "palette.saveProject",
+      "palette.undo",
+      "palette.redo",
+    ]) {
+      expect(paletteSource).toContain(`"${key}"`);
+      expect(dictionaryKeys("ru")).toContain(key);
+    }
   });
 });
 

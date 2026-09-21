@@ -35,6 +35,7 @@
     activeWaypointLayerId,
     appState,
     bundleLoaderOpen,
+    bundleLoaderPreselect,
     commandPaletteOpen,
     currentProject,
     projects,
@@ -53,10 +54,16 @@
     revealBundle,
   } from "$lib/api";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
-  import { t, toggleLocale } from "$lib/i18n";
-  import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+  // Aliased: the tracks loop below binds `t`, and a store read inside it
+  // would resolve to the loop variable.
+  import { t as i18n, toggleLocale } from "$lib/i18n";
+  import {
+    open as openDialog,
+    save as saveDialog,
+  } from "@tauri-apps/plugin-dialog";
   import { appendRecentFile, getRecentFiles } from "$lib/recentFiles";
   import { toast } from "svelte-sonner";
+  import { paletteProjects } from "$lib/palette-projects";
   import type { WaypointData } from "$lib/types";
 
   // ── Internal state ──────────────────────────────────────────────────────
@@ -107,7 +114,16 @@
     })) ?? [],
   );
 
-  const projectList = $derived($projects);
+  /**
+   * The catalogue is ~13k projects since the listing started paginating, and
+   * `cmdk` renders and re-filters every item it is given on each keystroke.
+   * Filter here and hand it a screenful: without a query the most recent
+   * entries, with one the matches by name or slug.
+   */
+  const PALETTE_PROJECT_LIMIT = 40;
+  const projectList = $derived(
+    paletteProjects($projects, value, PALETTE_PROJECT_LIMIT),
+  );
   const recentFiles = $derived.by(() =>
     $commandPaletteOpen ? getRecentFiles() : [],
   );
@@ -132,20 +148,19 @@
         await goto(resolve("/project"));
       }
     } catch (error) {
-      toast.error("Failed to open map", { description: String(error) });
+      toast.error($i18n("palette.openMapFailed"), {
+        description: String(error),
+      });
     }
   }
 
   function handleSwitchProject(slug: string) {
     close();
+    // The loader reads this and selects the project itself — finding it by
+    // hand in a thirteen-thousand-row list is not a "switch".
+    bundleLoaderPreselect.set(slug);
     bundleLoaderOpen.set(true);
     void goto(resolve("/"));
-    // The bundle-loader Sheet (or current loader UI) reads `bundleLoaderOpen`
-    // and renders. Pre-scroll into the chosen project is a UX nice-to-have
-    // we defer — clicking the row in the sheet remains required.
-    toast.message(`Switch to ${slug}`, {
-      description: "Pick the bundle in the loader to continue.",
-    });
   }
 
   function handleFindTrack(layerId: bigint, trackId: bigint) {
@@ -163,11 +178,15 @@
     close();
     try {
       const path = await openDialog({
-        filters: [{ name: "OziRS project", extensions: ["json"] }],
+        filters: [
+          { name: $i18n("palette.projectFileType"), extensions: ["json"] },
+        ],
       } as Parameters<typeof openDialog>[0]);
       if (path) await loadProjectFile(path as string);
     } catch (error) {
-      toast.error("Failed to open project", { description: String(error) });
+      toast.error($i18n("palette.openProjectFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -197,19 +216,19 @@
 
   function handleThemeSetting() {
     close();
-    toast.message("Theme picker", {
+    toast.message($i18n("palette.theme"), {
       description: "Use the existing Theme Picker in the sidebar.",
     });
   }
 
   function handleUnitsSetting() {
     close();
-    toast.message("Units — coming soon");
+    toast.message(`${$i18n("palette.units")} — ${$i18n("palette.comingSoon")}`);
   }
 
   function handleGpsSetting() {
     close();
-    toast.message("GPS — coming soon");
+    toast.message(`${$i18n("palette.gps")} — ${$i18n("palette.comingSoon")}`);
   }
 
   // ── Secondary actions ───────────────────────────────────────────────────
@@ -222,7 +241,9 @@
       });
       if (path) await exportGpx(layerId, path);
     } catch (error) {
-      toast.error("Failed to export track", { description: String(error) });
+      toast.error($i18n("palette.exportTrackFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -235,7 +256,7 @@
       });
       if (path) await exportWptWaypoints(layerId, path);
     } catch (error) {
-      toast.error("Failed to export waypoints", {
+      toast.error($i18n("palette.exportWaypointsFailed"), {
         description: String(error),
       });
     }
@@ -245,7 +266,9 @@
     try {
       await revealBundle();
     } catch (error) {
-      toast.error("Failed to reveal map", { description: String(error) });
+      toast.error($i18n("palette.revealMapFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -257,7 +280,9 @@
    * tell us. Each result uses an opaque token like `track:LAYER:TRACK:name`
    * as its primitive value.
    */
-  function parseHighlighted(token: string):
+  function parseHighlighted(
+    token: string,
+  ):
     | { kind: "track"; layerId: bigint; trackId: bigint; name: string }
     | { kind: "waypoint"; layerId: bigint; id: bigint; name: string }
     | { kind: "map"; name: string }
@@ -321,23 +346,23 @@
   onOpenChange={(v) => commandPaletteOpen.set(v)}
 >
   <Dialog.Content
-    class="rounded-xl! top-1/3 max-w-xl translate-y-0 overflow-hidden p-0"
+    class="top-1/3 max-w-xl translate-y-0 overflow-hidden rounded-xl! p-0"
     showCloseButton={false}
   >
     <Dialog.Header class="sr-only">
-      <Dialog.Title>Command palette</Dialog.Title>
-      <Dialog.Description>Search for an action or item.</Dialog.Description>
+      <Dialog.Title>{$i18n("palette.title")}</Dialog.Title>
+      <Dialog.Description>{$i18n("palette.description")}</Dialog.Description>
     </Dialog.Header>
     <Command.Root bind:value class="rounded-lg border-none shadow-md">
       <Command.Input
         bind:ref={inputRef}
-        placeholder="Search or jump to…"
+        placeholder={$i18n("palette.searchPlaceholder")}
       />
       <Command.List class="max-h-[60vh]">
-        <Command.Empty>No matches.</Command.Empty>
+        <Command.Empty>{$i18n("palette.noMatches")}</Command.Empty>
 
         {#if !isColdStart && maps.length > 0}
-          <Command.Group heading="Open map">
+          <Command.Group heading={$i18n("palette.groupOpenMap")}>
             {#each maps as mapName (mapName)}
               <Command.Item
                 value={`map:${mapName}`}
@@ -351,7 +376,7 @@
         {/if}
 
         {#if projectList.length > 0}
-          <Command.Group heading="Switch project">
+          <Command.Group heading={$i18n("palette.groupSwitchProject")}>
             {#each projectList as project (project.slug)}
               <Command.Item
                 value={`project:${project.slug}:${project.name}`}
@@ -367,13 +392,15 @@
         {/if}
 
         {#if !isColdStart && (tracks.length > 0 || waypointsCache.length > 0)}
-          <Command.Group heading="Find track / waypoint">
+          <Command.Group heading={$i18n("palette.groupFind")}>
             {#each tracks as t (`${t.layerId}-${t.trackId}`)}
               <Command.Item
                 value={`track:${t.layerId}:${t.trackId}:${t.name}`}
                 onSelect={() => handleFindTrack(t.layerId, t.trackId)}
               >
-                <span class="text-muted-foreground">Track</span>
+                <span class="text-muted-foreground"
+                  >{$i18n("palette.track")}</span
+                >
                 <span class="flex-1 truncate">{t.name}</span>
                 <Command.Shortcut>⌘E</Command.Shortcut>
               </Command.Item>
@@ -383,7 +410,9 @@
                 value={`waypoint:${$activeWaypointLayerId ?? 0}:${w.id}:${w.name}`}
                 onSelect={() => handleFindWaypoint(BigInt(w.id))}
               >
-                <span class="text-muted-foreground">Waypoint</span>
+                <span class="text-muted-foreground"
+                  >{$i18n("palette.waypoint")}</span
+                >
                 <span class="flex-1 truncate">{w.name}</span>
                 <Command.Shortcut>⌘E</Command.Shortcut>
               </Command.Item>
@@ -392,44 +421,51 @@
         {/if}
 
         {#if !isColdStart}
-          <Command.Group heading="Project actions">
+          <Command.Group heading={$i18n("palette.groupProjectActions")}>
             <Command.Item value="action:open" onSelect={handleProjectOpen}>
-              <span class="flex-1">{$t("palette.openProject")}</span>
+              <span class="flex-1">{$i18n("palette.openProject")}</span>
             </Command.Item>
             <Command.Item value="action:save" onSelect={handleProjectSave}>
-              <span class="flex-1">{$t("palette.saveProject")}</span>
+              <span class="flex-1">{$i18n("palette.saveProject")}</span>
             </Command.Item>
             <Command.Item value="action:undo" onSelect={handleUndo}>
-              <span class="flex-1">{$t("palette.undo")}</span>
+              <span class="flex-1">{$i18n("palette.undo")}</span>
             </Command.Item>
             <Command.Item value="action:redo" onSelect={handleRedo}>
-              <span class="flex-1">{$t("palette.redo")}</span>
+              <span class="flex-1">{$i18n("palette.redo")}</span>
             </Command.Item>
           </Command.Group>
         {/if}
 
-        <Command.Group heading="Settings">
+        <Command.Group heading={$i18n("palette.groupSettings")}>
           <Command.Item value="setting:theme" onSelect={handleThemeSetting}>
-            <span class="flex-1">Theme</span>
+            <span class="flex-1">{$i18n("palette.theme")}</span>
           </Command.Item>
           <!-- The `palette.language` key renders the OTHER language (the
                toggle target), e.g. "Language: Русский" while English is
                active. -->
-          <Command.Item value="setting:language" onSelect={handleLanguageToggle}>
-            <span class="flex-1">{$t("palette.language")}</span>
+          <Command.Item
+            value="setting:language"
+            onSelect={handleLanguageToggle}
+          >
+            <span class="flex-1">{$i18n("palette.language")}</span>
           </Command.Item>
           <Command.Item value="setting:units" onSelect={handleUnitsSetting}>
-            <span class="flex-1">Units</span>
-            <span class="text-muted-foreground text-[10px]">Coming soon</span>
+            <span class="flex-1">{$i18n("palette.units")}</span>
+            <span class="text-muted-foreground text-[10px]"
+              >{$i18n("palette.comingSoon")}</span
+            >
           </Command.Item>
           <Command.Item value="setting:gps" onSelect={handleGpsSetting}>
-            <span class="flex-1">GPS</span>
-            <span class="text-muted-foreground text-[10px]">Coming soon</span>
+            <span class="flex-1">{$i18n("palette.gps")}</span>
+            <span class="text-muted-foreground text-[10px]"
+              >{$i18n("palette.comingSoon")}</span
+            >
           </Command.Item>
         </Command.Group>
 
         {#if recentFiles.length > 0}
-          <Command.Group heading="Recent files">
+          <Command.Group heading={$i18n("palette.groupRecent")}>
             {#each recentFiles as r (r.mapPath)}
               <Command.Item
                 value={`recent:${r.mapPath}`}
@@ -450,7 +486,7 @@
                       localPath: r.mapPath,
                     });
                     toast.message(`Recent — ${r.mapName}`, {
-                      description: `Open project "${r.projectSlug}" from the bundle loader, then this map will be available.`,
+                      description: $i18n("palette.recentNeedsProject"),
                     });
                   }
                 }}

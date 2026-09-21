@@ -29,6 +29,7 @@
     activeDownloadId,
     activeMap,
     bundleLoaderOpen,
+    bundleLoaderPreselect,
     busy,
     currentProject,
     downloadProgress,
@@ -158,6 +159,23 @@
       toast.error($t("loader.previewFailed"), { description: String(error) });
     }
   }
+
+  /**
+   * Honour a project chosen elsewhere (the command palette's "Switch
+   * project"): select it, preview it, and scroll it into view. Consumed once
+   * — a stale slug must not re-select on the next open.
+   */
+  $effect(() => {
+    const slug = $bundleLoaderPreselect;
+    if (slug === null) return;
+    const known = $projects.find((p) => p.slug === slug);
+    if (!known) return;
+    bundleLoaderPreselect.set(null);
+    // Filtering to the name puts the row at the top of the list; scrolling a
+    // virtualized 13k-row list to an index would fight the debounced filter.
+    projectFilter = known.name;
+    void handleSelectProject(slug);
+  });
 
   $effect(() => {
     if (

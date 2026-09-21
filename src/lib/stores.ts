@@ -424,6 +424,15 @@ export function requestAllTracksFocus(): void {
 }
 export const bundleLoaderOpen = writable(false);
 /**
+ * Slug the bundle loader should select as soon as it opens.
+ *
+ * The command palette's "Switch project" used to open the loader and leave the
+ * operator at the top of a catalogue that is now thirteen thousand rows long,
+ * with a toast asking them to find the project a second time. The loader
+ * consumes this once and clears it.
+ */
+export const bundleLoaderPreselect = writable<string | null>(null);
+/**
  * Inspector-rail visibility placeholder for the `redesign-shell-layout`
  * change. When false (default) `WorkspaceShell` omits the right rail from
  * the DOM and the canvas grows into the freed 360px. The `inspector-pane`
