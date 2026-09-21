@@ -459,7 +459,12 @@
           >
             {#if $drawingModeActive}
               <CheckIcon strokeWidth={1.5} />
-              <span class="text-xs">Done ({$drawingPointCount})</span>
+              <span class="text-xs">
+                {$i18n("tracksTab.finishTrackShort").replace(
+                  "{count}",
+                  String($drawingPointCount),
+                )}
+              </span>
             {:else}
               <PencilIcon strokeWidth={1.5} />
             {/if}

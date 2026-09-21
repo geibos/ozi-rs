@@ -15,7 +15,8 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 277 Rust tests and 311 frontend tests;
+rustfmt, clippy, type-checks, 279 Rust tests and 311 frontend tests;
+`just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -38,26 +39,29 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **The rest of slice 0.3** (`revive-ui-cycle` tasks 1b.2, 1b.4, 1b.5): Esc
-   discarding a draw without leaving a redo entry, `qa_observe` capturing
-   again, and HTTP timeouts on both clients. The timeouts matter most — a
-   stalled connection currently freezes a download with no way to tell.
-2. **How big is this download?** Map packages carry no byte size, and the
+1. **How big is this download?** Map packages carry no byte size, and the
    prominent button fetches the whole project directory rather than the chosen
    map. On a tethered phone that is gigabytes with no estimate.
-3. **The loader Sheet hides the download it started** (overlay `z-50` over a
+2. **The loader Sheet hides the download it started** (overlay `z-50` over a
    `z-40` panel), and the toaster lands in the same corner.
+3. **Slice 1.1 — fixtures from the Rust core** (`revive-ui-cycle` section 2),
+   the first step of giving agents eyes that do not need the GUI.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 
-Done from slice 0.3 already: bundles-root persistence, export errors reaching
-the caller, `.kml` classified as unsupported, the unused `lucide-svelte`
+Slice 0.3 is done: bundles-root persistence, Esc discarding a draw without a
+redo entry, map layer ids, `qa_observe`, HTTP timeouts, export errors reaching
+the caller, `.kml` classified as unsupported, and the unused `lucide-svelte`
 dependency dropped.
 
 ## Known broken
 
-- **Slice 0.2 still owes its customer-journey smoke.** Screenshots are done
-  and in the gallery; the smoke run has not been driven yet.
+- ~~Slice 0.2 owes its customer-journey smoke.~~ `just smoke` passes again
+  (18.5s, 2026-09-21). It had been failing since the app started opening in
+  Russian: the journey was fine, the test was matching English labels — and
+  the visible text at that. WKWebView publishes a control's `aria-label`, not
+  the text inside it, so the matchers read the label now and accept either
+  language.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run

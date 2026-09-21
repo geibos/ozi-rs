@@ -67,6 +67,32 @@ fn kill_wedged_wda() {
     }
 }
 
+/// The app opens in Russian and the language is switchable, so every label
+/// this smoke waits for is matched in either language. The run broke when the
+/// default became Russian: the journey was fine, the test was reading English.
+const TRACKS_TAB: [&str; 2] = ["Треки", "Tracks"];
+const WAYPOINTS_TAB: [&str; 2] = ["Точки", "Waypoints"];
+const DRAW_TRACK: [&str; 2] = ["Нарисовать трек", "Draw a track"];
+const SCRATCH_TRACK_NAME: &str = "New Track";
+
+fn contains_any(source: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| source.contains(needle))
+}
+
+/// The drawing-mode toggle with its point count.
+///
+/// WKWebView publishes the button's `aria-label` and not the text inside it,
+/// so this matches the label ("Завершить трек (N точек)"), not the visible
+/// "Готово (N)". Matching the visible text is what silently broke this smoke.
+fn shows_point_count(source: &str, count: usize) -> bool {
+    source.contains(&format!("Завершить трек ({count} точек)"))
+        || source.contains(&format!("Finish the track ({count} points)"))
+}
+
+fn shows_any_point_count(source: &str) -> bool {
+    source.contains("Завершить трек (") || source.contains("Finish the track (")
+}
+
 fn poll_source_until<F: Fn(&str) -> bool>(
     server_url: &str,
     session_id: &str,
@@ -168,7 +194,7 @@ fn smoke_core_workflow_draw_track() {
         sid,
         Duration::from_secs(20),
         "workspace tabs",
-        |s| s.contains("Tracks") && s.contains("Waypoints"),
+        |s| contains_any(s, &TRACKS_TAB) && contains_any(s, &WAYPOINTS_TAB),
     );
     println!("ok: workspace rendered (tabs visible)");
 
@@ -177,7 +203,9 @@ fn smoke_core_workflow_draw_track() {
     // WKWebView maps web tab roles to XCUIElementTypeTab with the text in
     // `title` and an EMPTY `label` — match both attributes, title first.
     let tab_selectors = [
+        "//XCUIElementTypeTab[@title=\"Треки\"]",
         "//XCUIElementTypeTab[@title=\"Tracks\"]",
+        "//*[@title=\"Треки\" or @label=\"Треки\"]",
         "//*[@title=\"Tracks\" or @label=\"Tracks\"]",
     ];
     let mut tracks_tab_open = false;
@@ -189,7 +217,7 @@ fn smoke_core_workflow_draw_track() {
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         while std::time::Instant::now() < deadline {
             if appium_page_source_with_session_id(server, sid)
-                .map(|s| s.contains("Create track") || s.contains("Done ("))
+                .map(|s| contains_any(&s, &DRAW_TRACK) || shows_any_point_count(&s))
                 .unwrap_or(false)
             {
                 tracks_tab_open = true;
@@ -211,11 +239,11 @@ fn smoke_core_workflow_draw_track() {
         let _ = std::fs::write(&dump, &source);
         let tab_nodes: Vec<&str> = source
             .lines()
-            .filter(|line| line.contains("Tracks"))
+            .filter(|line| contains_any(line, &TRACKS_TAB))
             .map(str::trim)
             .collect();
         panic!(
-            "could not open the Tracks tab: no selector produced the \"Create track\" toggle.\n\
+            "could not open the Tracks tab: no selector produced the draw-track toggle.\n\
              full AX tree dumped to {}\nnodes containing \"Tracks\":\n{}",
             dump.display(),
             tab_nodes.join("\n"),
@@ -227,15 +255,21 @@ fn smoke_core_workflow_draw_track() {
     let create = appium_click_with_session_id(
         server,
         sid,
-        Some("//*[@title=\"Create track\" or @label=\"Create track\"]"),
+        Some(
+            "//*[@title=\"Нарисовать трек\" or @label=\"Нарисовать трек\" \
+             or @title=\"Draw a track\" or @label=\"Draw a track\"]",
+        ),
     );
-    assert!(create.ok, "clicking \"Create track\" failed: {create:?}");
+    assert!(
+        create.ok,
+        "clicking the draw-track toggle failed: {create:?}"
+    );
     poll_source_until(
         server,
         sid,
         Duration::from_secs(10),
-        "drawing mode entered (Done (0 points))",
-        |s| s.contains("Done (0 points)"),
+        "drawing mode entered (point count 0)",
+        |s| shows_point_count(s, 0),
     );
     println!("ok: drawing mode entered (create_empty_track IPC works)");
 
@@ -252,8 +286,8 @@ fn smoke_core_workflow_draw_track() {
         server,
         sid,
         Duration::from_secs(10),
-        "3 points registered (Done (3 points))",
-        |s| s.contains("Done (3 points)"),
+        "3 points registered (point count 3)",
+        |s| shows_point_count(s, 3),
     );
     println!("ok: 3 track points inserted (insert_track_point IPC works end-to-end)");
 
@@ -265,8 +299,12 @@ fn smoke_core_workflow_draw_track() {
         server,
         sid,
         Duration::from_secs(10),
-        "drawing cancelled (toggle back to Create track, scratch row gone)",
-        |s| s.contains("Create track") && !s.contains("Done (") && !s.contains("New Track"),
+        "drawing cancelled (toggle back to draw-track, scratch row gone)",
+        |s| {
+            contains_any(s, &DRAW_TRACK)
+                && !shows_any_point_count(s)
+                && !s.contains(SCRATCH_TRACK_NAME)
+        },
     );
     println!("ok: draw cancelled, scratch track removed (delete_track IPC works)");
 
