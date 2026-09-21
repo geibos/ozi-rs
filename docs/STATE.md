@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the first screen** (2026-09-21) — the cold-start route
-speaks Russian, including the catalogue line that used to be the backend's own
-English status, and the default layer names; after the units and instants pass
+Last merged slice: **start before the bundle finishes** (2026-09-21) — a map
+whose file has landed is openable while the rest downloads, which turned out to
+work already and only needed saying; after the first screen speaking Russian,
+including the catalogue line that used to be the backend's own English status,
+and after the units and instants pass
 on the Track Inspector, and after the stand itself, which opens the real screens on fixtures in
 a browser so a layout can be looked at without a build, an Appium session or a
 window to catch, and after the fixtures the core writes,
@@ -25,7 +27,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 289 Rust tests and 336 frontend tests;
+rustfmt, clippy, type-checks, 290 Rust tests and 339 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

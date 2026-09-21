@@ -10,6 +10,26 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — start before the bundle finishes
+
+The owner's July note said a bundle could not be opened while the rest still
+downloaded. Checking it turned up the opposite: the backend has always set a
+map's local path the moment its file lands, and opening it then reads from disk
+instead of starting a second download. A Rust test pins that now.
+
+What was missing was the sentence. The crew watched a file counter — the
+16 MiB topo layer lands in seconds, the 185 MiB satellite layer takes minutes —
+and waited for the whole thing. The first map of a download that becomes
+openable is announced once, with the invitation to start on it while the rest
+continues.
+
+| | |
+|---|---|
+| Automated gates | `just ci` green (290 Rust, 339 frontend) |
+| Not seen on screen | needs a real bundle download in flight; the owner's next one will show it |
+
+---
+
 ## 2026-09-21 — the first screen
 
 The cold-start route had never been examined: the workspace fixture carries an

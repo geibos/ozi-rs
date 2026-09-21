@@ -40,9 +40,9 @@ decision.
 - **Retries and timeouts on bundle downloads.** Timeouts are in slice 0.3;
   retries are not planned yet. A stalled TCP connection currently freezes a
   download indefinitely.
-- **Partial bundle availability.** `ready_bundle_files` exists in `AppState` but
-  no screen uses it, so a bundle cannot be opened while the rest still downloads
-  (owner's July note).
+- ~~Partial bundle availability.~~ Checked on 2026-09-21: it already worked —
+  a map whose file lands gets its local path and opens from disk. What was
+  missing was telling the operator. Done, with a test pinning the capability.
 - **Choose what to download.** The owner rarely needs the Android `.sqlitedb`
   maps; a type filter would cut most of the transfer (owner's July note).
 - **Remove the legacy element defaults from `app.css`.** They are in `@layer
