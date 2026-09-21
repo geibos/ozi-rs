@@ -149,6 +149,16 @@ test-rust:
 test-ui:
     npm test
 
+# Serve the real frontend in a browser, answering IPC from the fixtures.
+#
+# No Rust build, no Appium, no window to catch in the right state: open
+# http://localhost:5273 and look. The data is what the backend sends, because
+# the fixtures come from the same mappers the commands use. It proves how a
+# screen looks and behaves, not that the Rust side works — `just smoke` does
+# that.
+stand:
+    npm exec -- vite --config vite.stand.config.ts
+
 # Regenerate the frontend test fixtures from the Rust core.
 #
 # The generator is a test, and it fails by design when it rewrote a stale

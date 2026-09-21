@@ -39,12 +39,13 @@
 
 ## 3. Browser stand (slice 1.2, one session)
 
-- [ ] 3.1 `src/test/stand/transport.ts`: mock `invoke`/`listen` answering from fixtures; per-command latency and error injection via a `window.__stand` control object; scripted event replay for `state-changed`, `projects-chunk`, `download-progress`, `bundle-progress`, `bundle-file-ready`; unmocked commands reject and toast
-- [ ] 3.2 Vite: alias `@tauri-apps/api/core` to the mock when `VITE_STAND=1`; serve `example_data/fixtures/tiles/` statically; register a stand tile protocol handler that maps `sqlite://` / `ozi://` requests to the static tiles
-- [ ] 3.3 `justfile`: `just stand` (prints URL); `docs/testing-strategy.md` describes the stand and its limits (chrome, lists, states, interaction — not cartographic fidelity)
-- [ ] 3.4 Unit tests for the transport: fixture answer, injected error, event replay order, unmocked command rejection
-- [ ] 3.5 Manual check on the stand: `/` and `/project` render on fixtures; screenshot committed as the first stand evidence
+- [x] 3.1 `src/test/stand/`: `invoke`/`listen` answered from the fixtures; an unanswered command throws with its name; dialogs answer "cancelled"; `standEmit` delivers an event by hand
+- [x] 3.2 A separate `vite.stand.config.ts` aliases the Tauri modules, rather than a flag inside the app's own config — the app's build stays untouched. Tiles are not served: the stand shows the basemap, and cartographic fidelity is explicitly out of scope
+- [x] 3.3 `justfile`: `just stand`; `src/test/stand/README.md` states what it proves and what it does not
+- [x] 3.4 Unit tests for the transport: fixture answer, mutation accepted, unanswered command rejected by name, call transcript, event delivery and unsubscribe
+- [x] 3.5 `/project` rendered on fixtures, Maps and Tracks tabs photographed; the first run immediately caught an unanswered `get_ozi_metadata`
 - [ ] 3.6 `just ci` green, PR merged, `docs/STATE.md` updated
+- [ ] 3.7 Deferred, with reason: latency and error injection, and scripted replay of the download events. The stand earns its keep on layout and state; the download flow is better exercised against the real backend, where the timing is real
 
 ## 4. Screenshot matrix and evidence policy (slice 1.3, one session)
 
