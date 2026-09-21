@@ -1,6 +1,6 @@
 {
   "active_map": null,
-  "busy": false,
+  "bundle_busy": false,
   "current_project": null,
   "diagnostics": [
     {
@@ -9,6 +9,7 @@
     }
   ],
   "downloading_maps": [],
+  "listing_busy": false,
   "project_dirty": false,
   "project_name": "Untitled Project",
   "project_path": null,

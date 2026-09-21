@@ -585,7 +585,16 @@ project_dirty: boolean;
  * Current .ozp path when the project has been saved/loaded; lets the
  * frontend quick-save (Cmd+S) without a dialog.
  */
-project_path: string | null; status: string; busy: boolean; downloading_maps: string[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
+project_path: string | null; status: string; 
+/**
+ * The catalogue walk is running. Blocks another refresh; blocks nothing
+ * else — see `LizaAlertState::listing_busy`.
+ */
+listing_busy: boolean; 
+/**
+ * A bundle is being downloaded or opened from disk. Blocks another one.
+ */
+bundle_busy: boolean; downloading_maps: string[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
 export type BundleEntryDto = { name: string; is_dir: boolean; size_bytes: number | null }
 export type DiagnosticDto = { level: string; message: string }
 /**

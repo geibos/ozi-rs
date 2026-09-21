@@ -73,7 +73,11 @@ pub struct AppStateDto {
     /// frontend quick-save (Cmd+S) without a dialog.
     pub project_path: Option<String>,
     pub status: String,
-    pub busy: bool,
+    /// The catalogue walk is running. Blocks another refresh; blocks nothing
+    /// else — see `LizaAlertState::listing_busy`.
+    pub listing_busy: bool,
+    /// A bundle is being downloaded or opened from disk. Blocks another one.
+    pub bundle_busy: bool,
     pub downloading_maps: Vec<String>,
     // The catalogue is deliberately absent. It is thirteen thousand rows, and
     // this DTO is fetched on every `state-changed` — once per file during a
@@ -376,7 +380,8 @@ pub fn app_state_dto(s: &crate::application::AppState) -> AppStateDto {
         project_dirty: s.project_dirty(),
         project_path: s.project_file_path().map(|p| p.display().to_string()),
         status: s.lizaalert_status().to_owned(),
-        busy: s.lizaalert_busy(),
+        listing_busy: s.lizaalert_listing_busy(),
+        bundle_busy: s.lizaalert_bundle_busy(),
         downloading_maps: s.downloading_maps().iter().cloned().collect(),
         current_project,
         active_map,

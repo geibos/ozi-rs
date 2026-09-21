@@ -16,6 +16,7 @@
     activeMap,
     appState,
     bundleProgress,
+    bundleBusy,
     busy,
     catalogueError,
     currentDownload,
@@ -31,10 +32,12 @@
 
   $effect(() => {
     const s = $appState;
-    if (s && !s.busy) {
-      projectsLoading.set(false);
-      bundleProgress.set(null);
-    }
+    if (!s) return;
+    // Two flags, two things to clear: the "refreshing…" hint belongs to the
+    // catalogue walk, the progress line to the bundle. They used to share one
+    // flag, so finishing the walk wiped a running download's progress line.
+    if (!s.listing_busy) projectsLoading.set(false);
+    if (!s.bundle_busy) bundleProgress.set(null);
   });
 
   onMount(() => {
@@ -164,7 +167,7 @@
     </div>
 
     <div class="status-actions">
-      {#if $activeDownloadId && $busy}
+      {#if $activeDownloadId && $bundleBusy}
         <button
           class="action-btn"
           data-testid="cancel-download"

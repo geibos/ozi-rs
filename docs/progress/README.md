@@ -10,6 +10,47 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — one wait does not block the other
+
+One `busy` flag guarded three unrelated things: the catalogue walk, a bundle
+download, and opening a bundle from disk. The walk runs at every launch, is up
+to a thousand pages, and holds the flag for all of it — so on a field link the
+only download button in the application sat disabled for minutes after every
+launch, and the remedy was to press Stop on a refresh the crew actually wanted.
+
+An earlier slice made that refusal visible, so the button says why it is
+disabled. That was right and it was half the question. The other half is why it
+is disabled at all: the walk reads a remote HTML listing, a download fetches
+files into the bundles root. They do not touch the same thing — and a download
+writes through a `.part` file before renaming, so a walk scanning the root
+while one runs cannot read a half-written map either.
+
+So the flag became two. A walk blocks another walk; a bundle operation blocks
+another bundle operation; neither blocks the other. Each is released by the
+completion of its own operation, which fixed something I had not gone looking
+for: finishing the walk used to clear a running download's progress line,
+because both hung off the same `!busy`.
+
+Driven on the stand through both flags:
+
+| State | Refresh | Download |
+|---|---|---|
+| Walking the catalogue | disabled | offered |
+| Downloading a bundle | free | disabled, "открывается другой бандл" |
+| Idle | free | offered |
+
+That last cell is why looking is worth it. The disabled button still read
+«Подождите — список проектов ещё грузится» — the old reason, now the only one
+it cannot mean. The tests were green; the screen was wrong.
+
+| | |
+|---|---|
+| Change | `openspec/changes/one-wait-does-not-block-the-other/` |
+| Automated gates | `just ci` green (324 Rust, 488 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — yesterday's work on the first screen
 
 A saved `.ozp` could be opened from exactly one place: the command palette. The

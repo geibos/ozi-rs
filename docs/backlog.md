@@ -220,12 +220,12 @@ and the palette slice; these were not.
   backend's English wording is the fallback. Still English: the `AppState`
   status line's own 44 messages, which no surface currently renders — convert
   them the same way if one starts to.
-- **The catalogue is walked in full at every launch**, holding the busy flag.
-  The "no way to stop it" half is done on 2026-09-21 in
-  `stop-waiting-for-the-catalogue`: the walk is cancellable, the loader offers
-  a stop while it runs, and a stopped walk is not written over the cache. The
-  hint states how many projects are listed so far, which is what the decision
-  to stop is actually made on — a page number would have said less.
+- ~~The catalogue is walked in full at every launch, holding the busy flag.~~
+  Both halves are done. It is stoppable since 2026-09-21
+  (`stop-waiting-for-the-catalogue`), and since 2026-09-22 it holds a flag of
+  its own (`one-wait-does-not-block-the-other`), so it blocks only another
+  refresh — a download may start while it runs. Still open, and smaller now:
+  the walk still happens at every launch rather than when the cache is stale.
 
   ~~A project deleted upstream is never removed.~~ Done on 2026-09-21 in
   `a-search-that-is-gone-leaves-the-list`: a complete walk replaces the list,

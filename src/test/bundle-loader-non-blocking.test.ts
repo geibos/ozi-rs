@@ -68,13 +68,13 @@ describe("bundle loader main-thread responsiveness", () => {
   it("project list is not blanket-disabled while a download is in flight", () => {
     // The blanket `disabled={$busy}` on project list-item buttons was
     // removed so the user can switch projects mid-download. The refresh
-    // button keeps its `disabled={$busy}` because that path duplicates an
+    // button keeps its disabled state because that path duplicates an
     // in-flight loadProjects call.
     expect(loaderSource).not.toMatch(
       /class="list-item[^"]*"[^>]*disabled=\{\$busy\}/,
     );
     expect(loaderSource).toMatch(
-      /onclick=\{handleRefresh\}[^>]*disabled=\{\$busy\}/,
+      /onclick=\{handleRefresh\}[\s\S]*?disabled=\{\$listingBusy\}/,
     );
   });
 

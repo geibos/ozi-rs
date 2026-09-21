@@ -171,8 +171,17 @@ struct LizaAlertState {
     active_map: Option<ActiveMapSelection>,
     diagnostics: VecDeque<DiagnosticEntry>,
     status: String,
-    /// True while project list or project metadata is loading (blocks re-entry).
-    busy: bool,
+    /// True while the catalogue walk is running (blocks a second walk).
+    ///
+    /// Separate from `bundle_busy` since 2026-09-22. One flag for both meant
+    /// the launch-time walk — up to a thousand pages — disabled the only
+    /// download button in the application for minutes, although the two do
+    /// unrelated work: the walk reads a remote listing, a download fetches
+    /// files into the bundles root.
+    listing_busy: bool,
+    /// True while a bundle is being downloaded or opened from disk (blocks a
+    /// second one).
+    bundle_busy: bool,
     /// Package names currently being downloaded (allows parallel map downloads).
     downloading: HashSet<String>,
     /// Files that have finished downloading in the active bundle. Lets the UI
@@ -218,7 +227,7 @@ pub enum LoadProjectRefusal {
 impl LoadProjectRefusal {
     pub const fn message(self) -> &'static str {
         match self {
-            Self::Busy => "busy: another bundle operation is still running",
+            Self::Busy => "busy: another bundle is still being opened",
             Self::UnknownProject => "unknown project",
         }
     }
@@ -251,7 +260,8 @@ impl AppState {
                     "Load projects from maps.lizaalert.ru".to_owned(),
                 )]),
                 status: "Load projects from maps.lizaalert.ru".to_owned(),
-                busy: false,
+                listing_busy: false,
+                bundle_busy: false,
                 downloading: HashSet::new(),
                 ready_bundle_files: Vec::new(),
                 listing_cancel: None,
@@ -276,10 +286,10 @@ impl AppState {
     /// Returns `None` if already busy; otherwise sets busy and returns the
     /// bundles root path together with the token that stops this walk.
     pub fn begin_load_projects(&mut self) -> Option<(PathBuf, lizaalert::CancelToken)> {
-        if self.lizaalert.busy {
+        if self.lizaalert.listing_busy {
             return None;
         }
-        self.lizaalert.busy = true;
+        self.lizaalert.listing_busy = true;
         let cancel = lizaalert::CancelToken::new();
         self.lizaalert.listing_cancel = Some(cancel.clone());
         self.update_status(DiagnosticLevel::Info, "Loading project list...");
@@ -329,7 +339,7 @@ impl AppState {
         &mut self,
         project_slug: &str,
     ) -> Result<(LizaProjectSummary, PathBuf), LoadProjectRefusal> {
-        if self.lizaalert.busy {
+        if self.lizaalert.bundle_busy {
             return Err(LoadProjectRefusal::Busy);
         }
         let Some(summary) = self
@@ -342,7 +352,7 @@ impl AppState {
             return Err(LoadProjectRefusal::UnknownProject);
         };
 
-        self.lizaalert.busy = true;
+        self.lizaalert.bundle_busy = true;
         self.lizaalert.ready_bundle_files.clear();
         let status = if lizaalert::is_project_cached(&summary.slug, &self.bundles_root) {
             format!("Opening cached project {}...", summary.name)
@@ -387,10 +397,10 @@ impl AppState {
 
     /// Returns `None` if busy; otherwise sets busy and returns directory for thread.
     pub fn begin_open_local_bundle(&mut self, dir: PathBuf) -> Option<PathBuf> {
-        if self.lizaalert.busy {
+        if self.lizaalert.bundle_busy {
             return None;
         }
-        self.lizaalert.busy = true;
+        self.lizaalert.bundle_busy = true;
         self.update_status(
             DiagnosticLevel::Info,
             format!("Opening local bundle: {}", dir.display()),
@@ -401,7 +411,7 @@ impl AppState {
     // ── Background-task completion: "apply" receives results and mutates state ──
 
     pub fn apply_projects_loaded(&mut self, result: Result<lizaalert::CatalogueWalk, String>) {
-        self.lizaalert.busy = false;
+        self.lizaalert.listing_busy = false;
         self.lizaalert.listing_cancel = None;
         match result {
             Ok(walk) => {
@@ -479,7 +489,7 @@ impl AppState {
     }
 
     pub fn apply_project_loaded(&mut self, result: Result<LizaProject, String>) {
-        self.lizaalert.busy = false;
+        self.lizaalert.bundle_busy = false;
         match result {
             Ok(project) => {
                 let name = project.summary.name.clone();
@@ -667,8 +677,14 @@ impl AppState {
         self.lizaalert.diagnostics.iter()
     }
 
-    pub fn lizaalert_busy(&self) -> bool {
-        self.lizaalert.busy
+    /// Whether the catalogue walk is running.
+    pub fn lizaalert_listing_busy(&self) -> bool {
+        self.lizaalert.listing_busy
+    }
+
+    /// Whether a bundle is being downloaded or opened from disk.
+    pub fn lizaalert_bundle_busy(&self) -> bool {
+        self.lizaalert.bundle_busy
     }
 
     pub fn project_name(&self) -> &str {
@@ -2255,13 +2271,16 @@ mod tests {
         state
             .begin_load_project("demo")
             .expect("a download starts while the preview is in flight");
-        assert!(state.lizaalert.busy, "the download owns the busy flag");
+        assert!(
+            state.lizaalert.bundle_busy,
+            "the download owns the bundle flag"
+        );
 
         state.apply_preview_loaded("demo", Ok(previewed_project("demo", "Demo")));
 
         assert!(
-            state.lizaalert.busy,
-            "the preview did not take the busy flag and must not release it"
+            state.lizaalert.bundle_busy,
+            "the preview did not take the bundle flag and must not release it"
         );
     }
 
@@ -2409,31 +2428,104 @@ mod tests {
         );
     }
 
-    /// The catalogue refresh holds the busy flag for as long as it takes to
-    /// walk every page. A download asked for during that window must say so.
-    #[test]
-    fn opening_a_bundle_while_busy_is_refused_with_a_reason() {
+    fn state_with_demo_project() -> AppState {
         let mut state = AppState::new();
         state.lizaalert.projects.push(LizaProjectSummary {
             slug: "2026-09-21_demo".to_owned(),
             name: "Demo".to_owned(),
             url: "https://example.invalid/demo/".to_owned(),
         });
+        state
+    }
 
-        state.lizaalert.busy = true;
+    /// A second download, while one is already running, is still refused with
+    /// a reason the loader can show.
+    #[test]
+    fn opening_a_second_bundle_while_one_downloads_is_refused_with_a_reason() {
+        let mut state = state_with_demo_project();
+
+        state.lizaalert.bundle_busy = true;
         assert_eq!(
             state.begin_load_project("2026-09-21_demo"),
             Err(LoadProjectRefusal::Busy)
         );
 
-        state.lizaalert.busy = false;
+        state.lizaalert.bundle_busy = false;
         assert_eq!(
             state.begin_load_project("nothing-like-this"),
             Err(LoadProjectRefusal::UnknownProject)
         );
 
-        state.lizaalert.busy = false;
         assert!(state.begin_load_project("2026-09-21_demo").is_ok());
+    }
+
+    /// The catalogue walk is up to a thousand pages, and it used to share one
+    /// `busy` flag with downloading. On a field link that disabled the only
+    /// download button in the application for minutes after every launch, for
+    /// no reason: the walk reads a remote listing, the download fetches files.
+    #[test]
+    fn a_download_may_start_while_the_catalogue_is_being_walked() {
+        let mut state = state_with_demo_project();
+
+        let walk = state.begin_load_projects();
+        assert!(walk.is_some(), "the walk takes its own flag");
+        assert!(state.lizaalert.listing_busy);
+
+        assert!(
+            state.begin_load_project("2026-09-21_demo").is_ok(),
+            "a download must not wait for the listing"
+        );
+    }
+
+    /// Two walks at once would fight over the same list, so the listing flag
+    /// still guards its own re-entry.
+    #[test]
+    fn a_second_catalogue_walk_is_refused_while_one_runs() {
+        let mut state = AppState::new();
+        assert!(state.begin_load_projects().is_some());
+        assert!(state.begin_load_projects().is_none());
+    }
+
+    /// Each flag is released by the completion of its own operation. Sharing
+    /// one release point is how a finished preview used to free a download.
+    #[test]
+    fn finishing_one_operation_does_not_release_the_other() {
+        let mut state = state_with_demo_project();
+        state.begin_load_projects();
+        state.begin_load_project("2026-09-21_demo").expect("start");
+
+        state.apply_projects_loaded(Ok(lizaalert::CatalogueWalk {
+            projects: Vec::new(),
+            pages: 0,
+            cancelled: true,
+        }));
+        assert!(!state.lizaalert.listing_busy, "the walk released its flag");
+        assert!(
+            state.lizaalert.bundle_busy,
+            "the download still owns its own"
+        );
+
+        state.apply_project_loaded(Err("stopped".to_owned()));
+        assert!(!state.lizaalert.bundle_busy);
+    }
+
+    /// Opening a bundle from disk is a bundle operation, not a listing one.
+    #[test]
+    fn opening_a_local_bundle_takes_the_bundle_flag() {
+        let mut state = AppState::new();
+        assert!(
+            state
+                .begin_open_local_bundle(PathBuf::from("/tmp/bundle"))
+                .is_some()
+        );
+        assert!(state.lizaalert.bundle_busy);
+        assert!(!state.lizaalert.listing_busy);
+        assert!(
+            state
+                .begin_open_local_bundle(PathBuf::from("/tmp/other"))
+                .is_none(),
+            "a second one is refused"
+        );
     }
 
     /// A fresh project must have exactly one layer of each kind. It used to

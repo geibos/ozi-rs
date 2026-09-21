@@ -25,7 +25,8 @@ import type { AppStateDto } from "../lib/types";
 
 const state = (over: Record<string, unknown> = {}) =>
   ({
-    busy: false,
+    listing_busy: false,
+    bundle_busy: false,
     status: "",
     diagnostics: [],
     track_layers: [],
@@ -81,7 +82,7 @@ describe("the progress panel belongs to the running download", () => {
     finishDownload("download-1");
 
     // A later refresh of the project list makes the app busy again.
-    getAppState.mockResolvedValue(state({ busy: true }));
+    getAppState.mockResolvedValue(state({ listing_busy: true }));
     await appState.refresh();
 
     expect(get(busy)).toBe(true);

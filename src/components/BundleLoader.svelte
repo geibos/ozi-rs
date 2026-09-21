@@ -32,7 +32,8 @@
     bundleLoaderOpen,
     bundleLoaderPreselect,
     bundleLoaderView,
-    busy,
+    bundleBusy,
+    listingBusy,
     currentProject,
     downloadProgress,
     downloadingMaps,
@@ -503,8 +504,12 @@
   <div class="col">
     <div class="col-header">
       <span>{$t("loader.projects")}</span>
-      <button onclick={handleRefresh} disabled={$busy} class="refresh-btn">
-        {$busy ? "…" : "↻"}
+      <button
+        onclick={handleRefresh}
+        disabled={$listingBusy}
+        class="refresh-btn"
+      >
+        {$listingBusy ? "…" : "↻"}
       </button>
     </div>
 
@@ -686,10 +691,10 @@
           class="open-bundle-btn"
           data-testid="open-bundle"
           onclick={handleOpenBundle}
-          disabled={$busy}
-          title={$busy ? $t("loader.openBundleBusy") : undefined}
+          disabled={$bundleBusy}
+          title={$bundleBusy ? $t("loader.openBundleBusy") : undefined}
         >
-          {$busy ? $t("loader.openBundleBusy") : $t("loader.openBundle")}
+          {$bundleBusy ? $t("loader.openBundleBusy") : $t("loader.openBundle")}
         </button>
       </div>
     {/if}

@@ -161,7 +161,7 @@ describe("instant catalog + non-blocking refresh", () => {
     expect(loaderSource).toContain('$t("loader.refreshing")');
     // Route-independent clear lives in stores, not in a page effect.
     expect(storesSource).toContain(
-      "if (s && !s.busy) projectsLoading.set(false);",
+      "if (s && !s.listing_busy) projectsLoading.set(false);",
     );
   });
 });

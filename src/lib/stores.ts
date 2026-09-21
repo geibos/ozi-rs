@@ -101,7 +101,21 @@ function createAppStore() {
 
 export const appState = createAppStore();
 
-export const busy = derived(appState, ($s) => $s?.busy ?? false);
+/**
+ * The catalogue walk is running.
+ *
+ * Split from `bundleBusy` on 2026-09-22: one flag for both meant the
+ * launch-time walk disabled the only download button for minutes, although
+ * the two do unrelated work.
+ */
+export const listingBusy = derived(appState, ($s) => $s?.listing_busy ?? false);
+/** A bundle is being downloaded or opened from disk. */
+export const bundleBusy = derived(appState, ($s) => $s?.bundle_busy ?? false);
+/** Either of the two — for anything that just wants "something is happening". */
+export const busy = derived(
+  appState,
+  ($s) => ($s?.listing_busy ?? false) || ($s?.bundle_busy ?? false),
+);
 export const status = derived(appState, ($s) => $s?.status ?? "");
 export const diagnostics = derived(appState, ($s) => $s?.diagnostics ?? []);
 // CJ-7: unsaved-changes signal and the current .ozp path. `projectDirty`
@@ -137,7 +151,7 @@ export const catalogueError = writable<string | null>(null);
 // (instead of in a page-level effect) keeps the hint honest when the
 // BundleLoader is mounted inside the workspace Sheet on `/project`.
 appState.subscribe((s) => {
-  if (s && !s.busy) projectsLoading.set(false);
+  if (s && !s.listing_busy) projectsLoading.set(false);
 });
 export const currentProject = derived(
   appState,
