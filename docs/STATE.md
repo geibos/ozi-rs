@@ -5,7 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the button that was not there** (2026-09-22) — the context
+Last merged slice: **what the ground does** (2026-09-22) — the inspector's
+elevation card promised a chart "in a follow-up change" while the elevation had
+been in the DTO all along, and now draws it; after the button that was not
+there, where the context
 bar overflowed its grid column and ran under the inspector, so selecting a
 track made Save, Undo, Redo and ⌘K unclickable; after the third way to open a
 map, where the command
@@ -141,7 +144,7 @@ re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the forty OpenSpec changes.** Folding their requirements
+1. **Archive the forty-one OpenSpec changes.** Folding their requirements
    into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on
@@ -164,7 +167,7 @@ re-ordered rather than followed blindly.
 
 4. **`just smoke`.** The Mac2 driver host dies at session creation; every
    piece works when run by hand and only fails when Appium spawns it. What has
-   been ruled out, and by which command, is under "Known broken". Thirty-one
+   been ruled out, and by which command, is under "Known broken". Thirty-two
    changes carry an unchecked "smoke green" task waiting on it.
 
 ### An agent can still do these
@@ -244,7 +247,7 @@ existing requirements before writing a delta against it.
   and the earlier `com.apple.LocalAuthentication` block, which was a different
   error and is cleared.
 
-  Thirty-one changes carry an unchecked "smoke green" task waiting on this.
+  Thirty-two changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run

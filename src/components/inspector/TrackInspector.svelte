@@ -21,6 +21,7 @@
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
   import LineChartIcon from "@lucide/svelte/icons/line-chart";
+  import { elevationProfile, profilePath } from "$lib/elevation-profile";
   import LocateIcon from "@lucide/svelte/icons/locate";
   import SlidersHorizontalIcon from "@lucide/svelte/icons/sliders-horizontal";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
@@ -60,6 +61,11 @@
   import TrackSegmentsTable from "./TrackSegmentsTable.svelte";
 
   let trackDetail = $state<TrackDetail | null>(null);
+  // Built from the detail the card above already loads — no second
+  // round trip for a chart forty pixels tall.
+  const elevation = $derived(
+    trackDetail ? elevationProfile(trackDetail.segments) : null,
+  );
   let detailKey = $state<string | null>(null);
   let lineWidthDraft = $state(3);
 
@@ -406,14 +412,49 @@
     aria-label={$t("inspector.elevation")}
   >
     <h3
-      class="text-muted-foreground/80 mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase"
+      class="text-muted-foreground/80 mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold tracking-wider uppercase"
     >
-      <LineChartIcon class="size-3" />
-      {$t("inspector.elevation")}
+      <span class="flex items-center gap-1.5">
+        <LineChartIcon class="size-3" />
+        {$t("inspector.elevation")}
+      </span>
+      {#if elevation}
+        <span
+          class="font-mono text-[10px] normal-case"
+          data-testid="elevation-range"
+        >
+          {$t("inspector.elevationRange")
+            .replace("{min}", String(Math.round(elevation.minMetres)))
+            .replace("{max}", String(Math.round(elevation.maxMetres)))}
+        </span>
+      {/if}
     </h3>
-    <p class="text-muted-foreground text-[11px] italic">
-      {$t("inspector.elevationSoon")}
-    </p>
+    {#if elevation}
+      <!-- `preserveAspectRatio="none"` stretches the 100x40 path across the
+           card; `non-scaling-stroke` keeps the line one pixel wide anyway. -->
+      <svg
+        class="block h-12 w-full"
+        viewBox="0 0 100 40"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={$t("inspector.elevationChart")}
+        data-testid="elevation-chart"
+      >
+        <path
+          d={profilePath(elevation, 100, 40)}
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+          vector-effect="non-scaling-stroke"
+          class="text-primary"
+        />
+      </svg>
+    {:else}
+      <p class="text-muted-foreground text-[11px]">
+        {$t("inspector.elevationNone")}
+      </p>
+    {/if}
   </section>
 
   <section

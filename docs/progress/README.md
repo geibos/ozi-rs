@@ -10,6 +10,42 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — what the ground does
+
+The track inspector carried a card headed «Высота» whose whole content was
+«График высоты — будет в следующем изменении». `PointDetailDto` has carried
+`elevation` since the first import path was written, so the data had been there
+the entire time and the card was a promise shown to a crew instead of an
+answer.
+
+It matters for the work: a leg that climbs out of a river valley takes an hour
+where the same distance on the flat takes twenty minutes, and reading somebody
+else's recording is the one moment you cannot ask them.
+
+The card draws the profile against distance, with the range beside the heading
+— on the stand's fixture, `M0,40 L6.58,20 L8.76,0 L84.1,40 L100,20` in a 306×39
+box and «30–32 м». A recording with no elevation, or one lonely reading, says
+so rather than drawing a line through nothing. It costs no round trip: the
+statistics card above it already loads the detail.
+
+Two decisions worth naming. A point with no elevation still counts towards
+distance, so a gap in the data does not slide the readings around it towards
+each other — that one has a test, because it is the kind of thing that looks
+right on a fixture where every point has a reading. And there is no ascent or
+descent total: summing every rise in a GPS track sums its own noise, and the
+threshold that fixes that is a decision about the data rather than about the
+chart. It is in the backlog next to the moving-time threshold, which is the
+same question asked about time.
+
+| | |
+|---|---|
+| After | [the card with a profile](2026-09-22-elevation/after-elevation-card.png) |
+| Change | `openspec/changes/what-the-ground-does/` |
+| Automated gates | `just ci` green (320 Rust, 471 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the button that was not there
 
 Selecting a track opens the inspector. Opening the inspector put Save, Undo,

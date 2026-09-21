@@ -25,6 +25,11 @@ decision.
   2026-09-21: every layer-creating import path — single `.plt`, archived GPX
   tracks and archived GPX waypoints — names the layer through
   `source_file_label`, which keeps the file name and drops the path.
+- **Ascent and descent as track statistics.** The elevation profile landed on
+  2026-09-22 without them on purpose: summing every rise in a GPS recording
+  sums its own noise, so a naive total reads high by a wide margin. It needs a
+  threshold below which a change is not a climb — the same shape of decision as
+  the moving-time threshold below, and best answered together with it.
 - **Moving time as a track statistic.** `duration_seconds` is the span between
   the first and last point, which reads oddly for multi-day recordings even now
   that it is formatted in days. Moving time needs a stop threshold the owner has
