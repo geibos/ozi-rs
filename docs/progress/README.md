@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the first screen
+
+The cold-start route had never been examined: the workspace fixture carries an
+active map, so the redirect always won. The stand grew a second state
+(`?state=cold`) and the screen a crew actually launches into finally came up.
+
+The bottom line read `Load projects from maps.lizaalert.ru` — the backend's own
+status text, in English, as the first thing on screen. When the frontend knows
+the answer it says so in the interface language now: `Проектов: 13440 —
+выберите слева`, or that the list is loading, or that it is empty. Anything the
+backend has that the frontend cannot derive — a transient message, a download's
+phase, an error — still wins the line.
+
+The layer selector said `Tracks` and `Waypoints`. The core creates those names
+and they live in the saved file, so they are translated for display rather than
+renamed: a project written today still opens in an older build, and an English
+build still shows what it stored.
+
+| | |
+|---|---|
+| Before | [the first screen](2026-09-21-first-screen/before-cold-start.png) |
+| After | [the first screen](2026-09-21-first-screen/after-cold-start.png) |
+| Automated gates | `just ci` green (289 Rust, 336 frontend) |
+
+The stand also learned to emit `state-changed` after the commands whose real
+implementations do. Without it the "refreshing…" hint sat there forever and the
+first screen always looked mid-flight — a stand that stops halfway through the
+app's own sequence is telling a half-truth.
+
+---
+
 ## 2026-09-21 — numbers a crew reads
 
 The first thing the stand was pointed at was the Track Inspector, which nobody

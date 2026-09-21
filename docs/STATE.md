@@ -5,9 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **numbers a crew reads** (2026-09-21) — units and instants
-follow the interface language, found by pointing the new stand at the Track
-Inspector; after the stand itself, which opens the real screens on fixtures in
+Last merged slice: **the first screen** (2026-09-21) — the cold-start route
+speaks Russian, including the catalogue line that used to be the backend's own
+English status, and the default layer names; after the units and instants pass
+on the Track Inspector, and after the stand itself, which opens the real screens on fixtures in
 a browser so a layout can be looked at without a build, an Appium session or a
 window to catch, and after the fixtures the core writes,
 whose first run exposed two default layers sharing one id in every fresh
@@ -24,7 +25,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 289 Rust tests and 334 frontend tests;
+rustfmt, clippy, type-checks, 289 Rust tests and 336 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -52,11 +53,10 @@ than followed blindly.
    weighs, but it is still the whole directory — print maps and Android
    packages included. The owner's July note asks for a type filter; that is
    the next step, and it needs their call on what to skip by default.
-2. **Keep walking the screens on the stand.** The Track Inspector is done;
-   the bundle loader's states (empty, loading, error), the Waypoints tab's row
-   menu and the whole shell at a narrow window have still not been examined.
-   The default layer names are "Tracks" and "Waypoints" — English, in the
-   layer selector of a Russian window.
+2. **Keep walking the screens on the stand.** Done: the Track Inspector, the
+   cold-start route. Not yet: a download in flight, an error state, the
+   Waypoints row menu, and the whole shell at a narrow window. Each needs a
+   fixture state, which is now a few lines in `src-tauri/src/fixtures.rs`.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 
