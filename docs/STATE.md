@@ -5,8 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **waypoints can leave the app** (2026-09-21) — GPX export
-beside the OziExplorer WPT one, in the Waypoints tab and the Inspector — after
+Last merged slice: **fixtures written by the core** (2026-09-21) — the frontend
+renders against the same bytes the backend sends, and the generator's first run
+exposed two default layers sharing one id in every fresh project — after
+waypoints gaining a GPX export beside the OziExplorer WPT one,
 the bundle download learning to state its weight, every map row stating its
 size, slice 0.3 closing (timeouts, Esc discarding
 a draw, `qa_observe`, exports returning errors), the project list marking
@@ -18,7 +20,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 286 Rust tests and 317 frontend tests;
+rustfmt, clippy, type-checks, 289 Rust tests and 325 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -46,8 +48,9 @@ than followed blindly.
    weighs, but it is still the whole directory — print maps and Android
    packages included. The owner's July note asks for a type filter; that is
    the next step, and it needs their call on what to skip by default.
-2. **Slice 1.1 — fixtures from the Rust core** (`revive-ui-cycle` section 2),
-   the first step of giving agents eyes that do not need the GUI.
+2. **Slice 1.2 — the stand** (`revive-ui-cycle` section 3): serve the app with
+   the Tauri transport swapped for the fixtures, so a screen can be opened and
+   photographed without a backend. The fixtures it needs are in place.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.
 

@@ -10,6 +10,34 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — fixtures the frontend can trust
+
+The frontend's tests mocked the backend by hand, and the mocks drifted. That is
+how the Tracks tab came to filter for a geometry type the backend had stopped
+emitting while 278 tests passed — the rail was empty on screen and green in CI.
+
+The core now writes the fixtures. `src-tauri/src/fixtures.rs` builds a project
+shaped like one search — two tracks (one hidden, one recorded in two sittings),
+Cyrillic names, three waypoints with and without symbols, a catalogue where one
+bundle is on disk and one is not — and serialises the wire snapshots through the
+same mappers the commands use. `just fixtures` regenerates them, and
+`fixtures_are_up_to_date` fails the Rust suite when a DTO change has not been.
+
+Writing the generator found a defect nobody had noticed: `AppState::new` added
+"Tracks" and "Waypoints" layers that `Project::default()` had already created,
+so **every fresh project carried two layers of each kind, both with id 1**. The
+layer selector listed "Tracks" twice, the second was unreachable because
+everything addresses a layer by id, and saving then loading silently renumbered
+it. It showed up as three lines of duplicated JSON the moment the first fixture
+was written.
+
+| | |
+|---|---|
+| Automated gates | `just ci` green (289 Rust, 325 frontend) |
+| What this buys | a screen can be rendered against real backend data without a backend — the first half of giving agents eyes that do not need the GUI |
+
+---
+
 ## 2026-09-21 — a waypoint that can leave the app
 
 The waypoints spec has required a GPX export since it was written, and the XML
