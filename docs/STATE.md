@@ -5,9 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **how big is this download** (2026-09-21) — every map row
-states its size, read from the listing the app already parses, with one shared
-locale-aware byte formatter — after slice 0.3 closing (timeouts, Esc discarding
+Last merged slice: **waypoints can leave the app** (2026-09-21) — GPX export
+beside the OziExplorer WPT one, in the Waypoints tab and the Inspector — after
+the bundle download learning to state its weight, every map row stating its
+size, slice 0.3 closing (timeouts, Esc discarding
 a draw, `qa_observe`, exports returning errors), the project list marking
 downloaded bundles, single-map downloads getting a panel and a cancel, and the
 bundle flow slice (refusals carry a reason, loader failures are visible, the
@@ -17,7 +18,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 283 Rust tests and 317 frontend tests;
+rustfmt, clippy, type-checks, 286 Rust tests and 317 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

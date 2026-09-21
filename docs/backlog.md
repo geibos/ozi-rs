@@ -28,9 +28,8 @@ decision.
   the first and last point, which reads oddly for multi-day recordings even now
   that it is formatted in days. Moving time needs a stop threshold the owner has
   not chosen.
-- **Waypoint export to GPX.** The requirement exists in the `waypoints` spec and
-  `build_waypoint_gpx_xml` exists in the code, but no command or UI reaches it.
-  Owner wants it kept (2026-09-19); scheduled with CJ-6.
+- ~~Waypoint export to GPX.~~ Done on 2026-09-21: both the Waypoints tab row
+  menu and the Waypoint Inspector offer GPX and WPT.
 
 ## Engineering
 

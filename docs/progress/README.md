@@ -10,6 +10,27 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — a waypoint that can leave the app
+
+The waypoints spec has required a GPX export since it was written, and the XML
+builder has been in the code the whole time with nothing calling it — a dead
+`const _: fn(&[Waypoint]) -> String` kept the compiler quiet about it. So the
+only way a mark left this app was OziExplorer's own WPT, which a phone, a
+navigator and the other groups' software do not read. A crew that marks a
+found object has to hand it over in the format the receiver has.
+
+Both surfaces now offer both formats — the row menu in the Waypoints tab and
+the Waypoint Inspector — the suggested file name follows the chosen format,
+and a failed export reaches a toast instead of only the status line.
+
+| | |
+|---|---|
+| Automated gates | `just ci` green (286 Rust, 317 frontend) |
+| Tests | a GPX written from a real waypoint carries its position, its Cyrillic name and its symbol; both failure paths return an error; the suggested name follows the format |
+| Not seen on screen | the menu items. Two attempts: the row dropdown holds focus and swallowed the following clicks, so the run stopped per `CLAUDE.md` rather than fighting it. |
+
+---
+
 ## 2026-09-21 — what the bundle download weighs
 
 One button fetches the project's whole directory tree — every subdirectory,
