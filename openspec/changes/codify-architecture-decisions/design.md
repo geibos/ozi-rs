@@ -114,10 +114,12 @@ Delta inventory: 13 capability deltas, 63 requirements (54 ADDED, 9 MODIFIED, 2 
 
 ### Findings that need a decision or a fix (not resolved by this change)
 
-Spec contradicts code — owner decides fix-code vs modify-spec:
-- `map-bundles` "Bundles root directory is user-configurable" promises persistence across restarts; `set_bundles_root` is in-memory only (application/mod.rs:565-567), session file has no field.
-- `waypoints` "System exports waypoints to GPX" has no command or UI (only `build_waypoint_gpx_xml`, export/gpx.rs:29); CJ-6 marks it missing.
-- `ui-shell` theme requirements presume a reachable picker; `ThemePicker.svelte` is mounted nowhere.
+Spec contradicts code — owner decides fix-code vs modify-spec. Re-checked
+against the code on 2026-09-21; two of the three have since been closed by
+fixing the code, which is owner decision 1:
+- ~~`map-bundles` "Bundles root directory is user-configurable" promises persistence across restarts; `set_bundles_root` is in-memory only.~~ Closed in slice 0.3: `PersistedAppSession` carries `bundles_root` (infrastructure/persistence.rs:19).
+- ~~`waypoints` "System exports waypoints to GPX" has no command or UI.~~ Closed on 2026-09-21: `export_gpx_waypoints` is registered (lib.rs:122) and reached from the Waypoint Inspector and the Waypoints tab row menu.
+- `ui-shell` theme requirements presume a reachable picker; `ThemePicker.svelte` is imported by nothing. **Still true.** Both stores behind it work; only the placement is missing, and that is a design call — see `docs/backlog.md`.
 
 Process decisions for the owner (raised by the QA slice):
 - Keep `docs/qa/smoke-*.md` as a manual layer beside per-CJ tests (codified) or make CJ tests the only artifact.
@@ -126,7 +128,13 @@ Process decisions for the owner (raised by the QA slice):
 
 Documentation bugs (make `documentation` scenarios pass): feature-status and roadmap mark sort/crop/split-join and ZIP as absent though present; command preamble says 45 commands and commands-reference omits `sort_track_points`, `crop_track_to_*`, `toggle_waypoint_visible`, `ReorderTrackPoints`, `CropTrackPoints`; seven feature-status rows use `TBD`; conventions.md "no async runtime"; architecture.md "local ozf2 crate"; glossary "DTO mirrored manually"; frontend-architecture.md "no Ctrl+Z"; persistence-session.md legacy paths and "bundles webview"; native-qa-mcp.md `qa_observe` description.
 
-Code findings for `docs/backlog.md`: map `LayerId` allocation by `len()+1`; `qa_observe` captures nothing (tools/ozi-rs-mcp/src/native.rs:107-124); no HTTP timeouts on either reqwest client; zip-slip guard absent on the track-import archive path; `.kml` classified Supported without a parser (import/archive.rs:65,210); unused `lucide-svelte` dependency; cp1251 unrepresentable characters produce `&#NNNN;` not `?` (untested); GPX/WPT export errors reach only the status string; waypoint map markers draw no symbol glyph; `get_ozi_tile` registered but unused; declared-but-absent ADR-0020 items (open-by-URL, on-map tools, crop by selection, walkthrough, waypoint colour, recent `.ozp`).
+Code findings for `docs/backlog.md`, re-checked against the code on 2026-09-21:
+
+Closed since, by slice 0.3 and the slices after it: map `LayerId` allocation by `len()+1`; `qa_observe` captures nothing; no HTTP timeouts on either reqwest client; `.kml` classified Supported without a parser; unused `lucide-svelte` dependency; GPX/WPT export errors reach only the status string.
+
+Was never true as written: **zip-slip guard absent on the track-import archive path** — `extract_zip_entries_to_directory` has always used `enclosed_name()`, which refuses an entry that escapes, and both extraction paths (track import and cached bundle archives) go through it. What was missing was a test, since a one-call guard is exactly what a refactor drops silently; there are two now (`import/archive.rs`).
+
+Still open, and in `docs/backlog.md`: cp1251 unrepresentable characters produce `&#NNNN;` not `?` (untested); waypoint map markers draw no symbol glyph; `get_ozi_tile` registered but unused; declared-but-absent ADR-0020 items (open-by-URL, on-map tools, crop by selection, walkthrough, waypoint colour, recent `.ozp`).
 
 ### Owner decisions (2026-09-19)
 

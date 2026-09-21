@@ -241,6 +241,63 @@ mod tests {
     use zip::write::SimpleFileOptions;
     use zip::{CompressionMethod, ZipWriter};
 
+    /// A ZIP is untrusted input: a crew imports one another group sent them.
+    /// An entry named `../../something` would, extracted naively, write outside
+    /// the directory chosen for it — over a project file, a shell profile,
+    /// whatever the path reaches.
+    ///
+    /// The guard is `enclosed_name`, which is one call and easy to lose in a
+    /// refactor precisely because nothing visible depends on it. This is what
+    /// depends on it.
+    #[test]
+    fn an_entry_that_escapes_its_directory_is_refused() {
+        let mut buffer = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut buffer);
+            let options =
+                SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+            zip.start_file("../escaped.gpx", options).expect("entry");
+            zip.write_all(b"<gpx/>").expect("write");
+            zip.finish().expect("finish");
+        }
+        buffer.set_position(0);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let destination = dir.path().join("into");
+        let result = extract_zip_entries_to_directory(buffer, &destination);
+
+        assert!(
+            matches!(result, Err(super::ArchiveExtractError::InvalidEntryPath(ref p)) if p.contains("escaped")),
+            "the entry must be refused by name, got {result:?}"
+        );
+        assert!(
+            !dir.path().join("escaped.gpx").exists(),
+            "and nothing may be written beside the destination"
+        );
+    }
+
+    /// The inventory is shown to the operator before they commit to an import.
+    /// It reads names rather than writing files, so it cannot escape anything —
+    /// but it must not silently drop the entry either, or the listing would
+    /// disagree with what the extraction refuses.
+    #[test]
+    fn the_inventory_lists_an_escaping_entry_rather_than_hiding_it() {
+        let mut buffer = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut buffer);
+            let options =
+                SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
+            zip.start_file("../escaped.gpx", options).expect("entry");
+            zip.write_all(b"<gpx/>").expect("write");
+            zip.finish().expect("finish");
+        }
+        buffer.set_position(0);
+
+        let entries = super::inventory_zip_entries(buffer).expect("inventory");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].path(), "../escaped.gpx");
+    }
+
     #[test]
     fn archive_file_name_returns_last_path_segment() {
         assert_eq!(archive_file_name("nested/track.gpx"), "track.gpx");

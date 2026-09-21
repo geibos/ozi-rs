@@ -10,6 +10,39 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — re-reading the findings before the owner does
+
+`codify-architecture-decisions` carries two lists of findings the owner reads
+at review. They were written on 19 September, and a fortnight of slices has
+happened to them. Re-checked against the code, every line:
+
+Of the three "spec contradicts code" items, two are closed by the code having
+been fixed, which is the owner's own decision 1 — bundles-root persistence
+landed in slice 0.3, and waypoint GPX export is registered and reached from two
+surfaces. The third stands: the theme picker is still imported by nothing.
+
+Of the code findings, six are closed. One **was never true as written**: "zip-slip
+guard absent on the track-import archive path". `extract_zip_entries_to_directory`
+has always used `enclosed_name()`, which refuses an entry that escapes its
+directory, and both extraction paths — track import and cached bundle archives
+— go through it.
+
+What was actually missing there was a test. A ZIP is untrusted input: a crew
+imports one another group sent them, and an entry named `../../something`
+would, extracted naively, write over whatever the path reaches. The guard is a
+single call with nothing visible depending on it, which is exactly what a
+refactor drops without noticing. Two tests depend on it now — one that the
+extraction refuses such an entry and writes nothing, one that the inventory
+shown to the operator beforehand lists it rather than hiding it, so the listing
+and the refusal agree.
+
+| | |
+|---|---|
+| Evidence | a crafted archive with a `../escaped.gpx` entry: refused by name, nothing written beside the destination |
+| Automated gates | `just ci` green (312 Rust, 375 frontend) |
+
+---
+
 ## 2026-09-21 — the docs stop lying
 
 `docs/STATE.md` has carried "human-facing docs still lie in places" under Known
