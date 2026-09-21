@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_WAYPOINT_GLYPH,
+  DEFAULT_WAYPOINT_HEX,
   WAYPOINT_SYMBOLS,
+  waypointColorCss,
+  waypointColorHex,
   waypointGlyph,
 } from "../lib/waypoint-symbols";
 
@@ -38,5 +41,30 @@ describe("the glyph a waypoint shows", () => {
       expect(symbol.emoji, symbol.value).not.toBe("");
       expect(symbol.labelKey, symbol.value).toMatch(/^symbol\./);
     }
+  });
+});
+
+/**
+ * Three surfaces draw a waypoint — the marker on the map, the row in the list
+ * and the inspector — and a crew reads the list to find what they are looking
+ * at on the map. One conversion, so they cannot disagree.
+ */
+describe("the colour a waypoint is drawn in", () => {
+  it("is the waypoint's own, with its alpha", () => {
+    expect(waypointColorCss([37, 99, 235, 255])).toBe("rgba(37, 99, 235, 1)");
+    expect(waypointColorCss([37, 99, 235, 128])).toBe(
+      "rgba(37, 99, 235, 0.5019607843137255)",
+    );
+  });
+
+  it("is the default when the waypoint has none of its own", () => {
+    expect(waypointColorCss(null)).toBe(DEFAULT_WAYPOINT_HEX);
+    expect(waypointColorCss(undefined)).toBe(DEFAULT_WAYPOINT_HEX);
+  });
+
+  it("converts to hex for the swatch, padding a single digit", () => {
+    expect(waypointColorHex([37, 99, 235, 255])).toBe("#2563eb");
+    expect(waypointColorHex([0, 8, 15, 255])).toBe("#00080f");
+    expect(waypointColorHex(null)).toBe(DEFAULT_WAYPOINT_HEX);
   });
 });

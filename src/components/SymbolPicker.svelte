@@ -5,15 +5,19 @@
     WAYPOINT_SYMBOLS,
     DEFAULT_WAYPOINT_GLYPH,
     waypointGlyph,
+    waypointColorCss,
   } from "$lib/waypoint-symbols";
   import * as Popover from "$lib/components/ui/popover";
   import * as Tooltip from "$lib/components/ui/tooltip";
 
   let {
     symbol = null,
+    color = null,
     onSelect,
   }: {
     symbol?: string | null;
+    /** Drawn behind the glyph, so the row reads like the marker on the map. */
+    color?: [number, number, number, number] | null;
     onSelect: (symbol: string | null) => void;
   } = $props();
 
@@ -27,7 +31,8 @@
 
 <Popover.Root bind:open>
   <Popover.Trigger
-    class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+    class={`${buttonVariants({ variant: "ghost", size: "icon-sm" })} waypoint-swatch`}
+    style={`--waypoint-color: ${waypointColorCss(color)}`}
     aria-label={symbol
       ? $t("symbol.named").replace("{symbol}", symbol)
       : $t("symbol.default")}
@@ -68,3 +73,12 @@
     </div>
   </Popover.Content>
 </Popover.Root>
+
+<style>
+  /* The same disc the map draws, so a row and its marker read as one thing. */
+  :global(.waypoint-swatch) {
+    background: var(--waypoint-color);
+    border: 1px solid var(--ctp-crust, #232634);
+    border-radius: 50%;
+  }
+</style>

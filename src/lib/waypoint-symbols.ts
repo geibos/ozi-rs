@@ -48,3 +48,36 @@ export function waypointGlyph(symbol: string | null | undefined): string {
     DEFAULT_WAYPOINT_GLYPH
   );
 }
+
+/** The default a marker takes when a waypoint carries no colour of its own. */
+export const DEFAULT_WAYPOINT_HEX = "#e5c890";
+
+/**
+ * A waypoint's colour as CSS, or the default.
+ *
+ * Three surfaces draw a waypoint — the map marker, the row in the list and the
+ * inspector — and a crew reads the list to find what they are looking at on
+ * the map. They have to agree, so the conversion lives here rather than three
+ * times.
+ */
+export function waypointColorCss(
+  color: [number, number, number, number] | null | undefined,
+): string {
+  if (!color) return DEFAULT_WAYPOINT_HEX;
+  const [r, g, b, a] = color;
+  return `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+}
+
+/** The same colour as a hex value, which is what an `<input type="color">` takes. */
+export function waypointColorHex(
+  color: [number, number, number, number] | null | undefined,
+): string {
+  if (!color) return DEFAULT_WAYPOINT_HEX;
+  return (
+    "#" +
+    color
+      .slice(0, 3)
+      .map((c) => c.toString(16).padStart(2, "0"))
+      .join("")
+  );
+}

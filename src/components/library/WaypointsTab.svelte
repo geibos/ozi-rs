@@ -381,6 +381,7 @@
           {#snippet leadingControl()}
             <SymbolPicker
               symbol={r.wp.symbol}
+              color={r.wp.color}
               onSelect={(sym) => handleSetSymbol(r, sym)}
             />
           {/snippet}

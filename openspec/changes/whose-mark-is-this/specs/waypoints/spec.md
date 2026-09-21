@@ -15,10 +15,14 @@ colour that resembles it.
 Setting or clearing a colour SHALL be undoable. A project saved before
 waypoints could carry a colour SHALL load with every waypoint uncoloured.
 
+Every surface that draws a waypoint — the marker, the row in the list and the
+inspector — SHALL draw it in the same colour, because the list is what a crew
+reads to find what they are looking at on the map.
+
 #### Scenario: Two groups' marks on one map
 
 - **WHEN** one waypoint is given a colour and another is left without
-- **THEN** the map draws the first in that colour and the second in the default
+- **THEN** the map draws the first in that colour and the second in the default, and each row in the list matches its marker
 
 #### Scenario: Clearing a colour
 

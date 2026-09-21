@@ -42,11 +42,18 @@ through because it *does* toast; the label guard does not look inside `toast`
 calls. Fourth miss, same shape as the others: a guard on syntax catches the
 careless version.
 
+Then the obvious hole in my own feature: the colour was on the map and in the
+inspector, and the **list** — the thing a crew actually reads to find what they
+are looking at on the map — knew nothing about it. The row's symbol button is a
+disc now, the same disc the marker draws, from the same conversion. Three
+surfaces, one function, so they cannot disagree.
+
 | | |
 |---|---|
 | Evidence | a Rust test over set, set again, undo, redo, and clearing back to the default |
-| Evidence | walked on the stand: the flagged waypoint draws 🏁 on `rgb(37, 99, 235)`, the uncoloured one 📍 on the default |
-| Automated gates | `just ci` green (314 Rust, 392 frontend) |
+| Evidence | walked on the stand: 🏁 on `rgb(37, 99, 235)` in the row *and* on the marker, the others on the default in both |
+| Evidence | tests on the shared conversion, including alpha and a single-digit channel |
+| Automated gates | `just ci` green (314 Rust, 395 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

@@ -51,7 +51,7 @@
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { createLatestRun } from "$lib/latest-run";
   import { reportEditFailure } from "$lib/edit-failure";
-  import { waypointGlyph } from "$lib/waypoint-symbols";
+  import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
   import {
     initTracksLayer,
     updateTracksLayer,
@@ -480,8 +480,7 @@
         // uncoloured waypoint keeps the stylesheet's default, so changing that
         // default later moves every uncoloured marker with it.
         if (data.color) {
-          const [r, g, b, a] = data.color;
-          el.style.background = `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+          el.style.background = waypointColorCss(data.color);
         }
         if (!isActive) {
           el.classList.add("inactive-layer");

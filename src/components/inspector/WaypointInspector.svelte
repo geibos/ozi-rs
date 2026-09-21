@@ -38,6 +38,7 @@
   import { toast } from "svelte-sonner";
   import type { WaypointData } from "$lib/types";
   import SymbolPicker from "../SymbolPicker.svelte";
+  import { waypointColorHex } from "$lib/waypoint-symbols";
 
   // `$state<T>(...)` rather than an annotated `let`: with the annotation,
   // TypeScript's flow analysis narrows the variable to `null` at any point
@@ -163,19 +164,7 @@
         "Drag-to-move on the map is wired by the existing waypoint layer.",
     });
   }
-  /** The swatch needs a hex value; an uncoloured waypoint shows the default. */
-  const DEFAULT_WAYPOINT_HEX = "#e5c890";
-
-  function toHex(color: [number, number, number, number] | null): string {
-    if (!color) return DEFAULT_WAYPOINT_HEX;
-    const [r, g, b] = color;
-    return (
-      "#" +
-      [r, g, b].map((c: number) => c.toString(16).padStart(2, "0")).join("")
-    );
-  }
-
-  const waypointColorHex = $derived(toHex(waypoint?.color ?? null));
+  const swatchHex = $derived(waypointColorHex(waypoint?.color));
 
   async function applyColor(color: [number, number, number, number] | null) {
     const wp = waypoint;
@@ -197,14 +186,18 @@
 
 <div class="flex h-full flex-col gap-4 overflow-y-auto p-4">
   <header class="flex items-start gap-3">
-    <SymbolPicker symbol={waypoint?.symbol} onSelect={handleSetSymbol} />
+    <SymbolPicker
+      symbol={waypoint?.symbol}
+      color={waypoint?.color}
+      onSelect={handleSetSymbol}
+    />
     <!-- The symbol says what a mark is; the colour says whose it is. Clearing
          returns it to the default rather than to a colour that looks like it. -->
     <div class="flex shrink-0 flex-col items-center gap-1">
       <input
         class="border-border h-8 w-10 rounded-sm border bg-transparent p-0"
         type="color"
-        value={waypointColorHex}
+        value={swatchHex}
         aria-label={$t("inspector.waypointColor")}
         data-testid="waypoint-color"
         onchange={handleColorChange}

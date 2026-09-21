@@ -11,6 +11,7 @@
 - [x] 2.2 `WaypointDto.color` and the `api.ts` wrapper
 - [x] 2.3 The inspector's swatch and its "default colour" control
 - [x] 2.4 The map marker's background
+- [x] 2.6 The row in the Waypoints tab and the inspector's picker draw the same disc, from one shared conversion — a crew reads the list to find what they are looking at on the map, so the two have to agree
 - [x] 2.5 The fixture gives one waypoint a colour and leaves another without, so the stand shows both cases
 
 ## 3. Evidence
