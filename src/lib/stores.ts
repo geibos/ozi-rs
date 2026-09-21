@@ -587,6 +587,15 @@ export function requestWaypointFocus(lat: number, lon: number): void {
   mapFocusRequest.set({ kind: "waypoint", lat, lon, nonce: mapFocusNonce });
 }
 
+/**
+ * Centre the map on a track point — the same request, since what the map needs
+ * is a pair of coordinates and it does not care what kind of thing they name.
+ *
+ * Used when stepping through a recording point by point: a walkthrough that
+ * left the map where it was would be a list, not a walkthrough.
+ */
+export const focusTrackPoint = requestWaypointFocus;
+
 export function requestAllTracksFocus(): void {
   mapFocusNonce += 1;
   mapFocusRequest.set({ kind: "all-tracks", nonce: mapFocusNonce });

@@ -21,6 +21,7 @@
     selectedPointId,
     selectedTrack,
     tracksGeometryVersion,
+    focusTrackPoint,
   } from "$lib/stores";
   import {
     formatPointCoords,
@@ -35,9 +36,12 @@
   import { toast } from "svelte-sonner";
   import type { SegmentDetail, TrackDetail } from "$lib/types";
 
-  let trackDetail: TrackDetail | null = $state(null);
+  // `$state<T>(...)`, not an annotated `let`: with the annotation TypeScript
+  // narrows the variable to `null` at every point before its first assignment,
+  // which is every inline `$derived` below. See `docs/backlog.md`.
+  let trackDetail = $state<TrackDetail | null>(null);
   let expandedSegments: Record<number, boolean> = $state({});
-  let lastLoaded: string | null = $state(null);
+  let lastLoaded = $state<string | null>(null);
 
   $effect(() => {
     const selected = $selectedTrack;
@@ -158,6 +162,45 @@
       reportEditFailure("inspector.trimFailed", error);
     }
   }
+  /**
+   * The track's points in order, across its segments.
+   *
+   * A walkthrough goes through the recording, not through one segment of it:
+   * a track recorded in two sittings is still one walk, and stepping off the
+   * end of the first segment should land on the start of the second.
+   */
+  const orderedPoints = $derived(
+    (trackDetail?.segments ?? []).flatMap((s) =>
+      s.points.map((p) => ({ id: p.id, lat: p.lat, lon: p.lon })),
+    ),
+  );
+
+  const currentPointIndex = $derived(
+    $selectedPointId === null
+      ? -1
+      : orderedPoints.findIndex((p) => BigInt(p.id) === $selectedPointId),
+  );
+
+  /**
+   * Step to the next or previous point and take the map with it.
+   *
+   * A walkthrough that left the map where it was would be a list. With nothing
+   * selected, the first step lands on the first point rather than doing
+   * nothing: that is what "next" means from nowhere.
+   */
+  function stepPoint(delta: number) {
+    if (orderedPoints.length === 0) return;
+    const from = currentPointIndex;
+    const to =
+      from === -1
+        ? delta > 0
+          ? 0
+          : orderedPoints.length - 1
+        : Math.min(orderedPoints.length - 1, Math.max(0, from + delta));
+    const point = orderedPoints[to];
+    selectedPointId.set(BigInt(point.id));
+    focusTrackPoint(point.lat, point.lon);
+  }
 </script>
 
 <!-- `shrink-0`: this card was the only shrinkable child of the inspector
@@ -175,6 +218,37 @@
       class="text-muted-foreground/80 text-[10px] font-semibold tracking-wider uppercase"
       >{$t("inspector.segmentsPoints")}</span
     >
+    <!-- Stepping through the points is how a recording is reviewed; without
+         controls the only way was to click each row, which loses your place
+         the moment the list scrolls. -->
+    <span class="flex items-center gap-1">
+      {#if orderedPoints.length > 0 && currentPointIndex >= 0}
+        <span
+          class="text-muted-foreground text-[10px] tabular-nums"
+          data-testid="point-position"
+          >{$t("inspector.pointPosition")
+            .replace("{i}", String(currentPointIndex + 1))
+            .replace("{n}", String(orderedPoints.length))}</span
+        >
+      {/if}
+      <button
+        class="text-muted-foreground hover:text-foreground border-0 bg-transparent px-1 leading-none disabled:opacity-40"
+        title={$t("inspector.previousPoint")}
+        aria-label={$t("inspector.previousPoint")}
+        data-testid="previous-point"
+        disabled={orderedPoints.length === 0 || currentPointIndex === 0}
+        onclick={() => stepPoint(-1)}>↑</button
+      >
+      <button
+        class="text-muted-foreground hover:text-foreground border-0 bg-transparent px-1 leading-none disabled:opacity-40"
+        title={$t("inspector.nextPoint")}
+        aria-label={$t("inspector.nextPoint")}
+        data-testid="next-point"
+        disabled={orderedPoints.length === 0 ||
+          currentPointIndex === orderedPoints.length - 1}
+        onclick={() => stepPoint(1)}>↓</button
+      >
+    </span>
     <Button
       variant={$editModeActive ? "default" : "outline"}
       size="xs"

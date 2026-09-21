@@ -10,6 +10,45 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — walking the recording
+
+The last ADR-0020 item, and not the onboarding tour the word "walkthrough" had
+me expecting: stepping through a track's points one at a time. Points were
+click-selectable and that was all, so reviewing a recording meant clicking each
+row and losing your place the moment the list scrolled.
+
+Previous and next in the points table's header, with "3 из 128" beside them so
+the operator knows where in the recording they are. Stepping takes the map with
+it — a walkthrough that left the map where it was would be a list. The order is
+the track's own across its segments, because a recording made in two sittings
+is one walk and stepping off the end of the first should land on the start of
+the second. From nothing selected, next goes to the first point and previous to
+the last; that is what they mean from nowhere. Neither wraps: a silent jump
+from the last point to the first reads as a fault.
+
+**And the backlog paid for itself.** The first `$derived` over `trackDetail`
+failed with "Property 'segments' does not exist on type 'never'" — the exact
+trap I had recorded two slices earlier, in a different file, after losing time
+to it once. This time it took a minute, because the note said what it was:
+`let x: T | null = $state(null)` is narrowed to `null` by flow analysis at
+every point before its first assignment, which is where every inline derived
+sits.
+
+Four other declarations carried it latently — compiling only because nothing
+read them in a derived yet. They are converted, and there is a guard now,
+scoped to `$state(null)`: an array narrows to `never[]`, which is assignable to
+anything and harmless, and a guard that flagged those would be one somebody
+turns off.
+
+| | |
+|---|---|
+| Evidence | walked on the stand — nothing selected, then "1 из 5", "3 из 5", back to "2 из 5", crossing the segment boundary |
+| Evidence | the guard, verified red by putting one declaration back |
+| Automated gates | `just ci` green (320 Rust, 430 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-22 — trimming the drive to the start
 
 ADR-0020 declares cropping a track by selection; crop by extent and crop by

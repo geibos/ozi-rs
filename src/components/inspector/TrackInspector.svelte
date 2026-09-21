@@ -59,8 +59,8 @@
   import type { TrackDetail, TrackSummary } from "$lib/types";
   import TrackSegmentsTable from "./TrackSegmentsTable.svelte";
 
-  let trackDetail: TrackDetail | null = $state(null);
-  let detailKey: string | null = $state(null);
+  let trackDetail = $state<TrackDetail | null>(null);
+  let detailKey = $state<string | null>(null);
   let lineWidthDraft = $state(3);
 
   const summary: TrackSummary | null = $derived.by(() => {

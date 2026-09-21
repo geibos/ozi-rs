@@ -19,9 +19,9 @@
   import { toast } from "svelte-sonner";
   import type { OziMetadataDto } from "$lib/types";
 
-  let metadata: OziMetadataDto | null = $state(null);
+  let metadata = $state<OziMetadataDto | null>(null);
   let loading = $state(false);
-  let lastLoadedPath: string | null = $state(null);
+  let lastLoadedPath = $state<string | null>(null);
 
   $effect(() => {
     const info = $selectedMapInfo;
