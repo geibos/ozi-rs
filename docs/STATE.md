@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **Russian by default** (2026-09-21), after track search, catalogue repair, row density, dev signing and 0.2 visible fixes. `main` is pushed and
+Last merged slice: **track triage** (2026-09-21) — bulk visibility, isolate one
+track, shorter import layer names — after Russian by default, track search,
+catalogue repair, row density, dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 248 Rust tests and 278 frontend tests;
+rustfmt, clippy, type-checks, 263 Rust tests and 286 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -17,6 +19,8 @@ rebuilds the UI development cycle rather than the UI: agents that change
 screens cannot currently see them, most frontend tests assert on source text,
 and there is one end-to-end scenario. `openspec/changes/codify-architecture-decisions`
 is written and validating but not yet archived.
+`openspec/changes/faster-track-triage` has all its tasks done and is ready to
+archive once the owner has used the triage controls in the field.
 
 ## Next slice
 
@@ -26,15 +30,9 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Bulk visibility for tracks.** Show all / hide all, and show only the
-   selected one. With 26 tracks over one basemap, isolating one is currently 26
-   clicks.
-2. **Layer names from imports.** One layer per imported file, each named
-   `Imported tracks: /Users/.../20260708_Veter2.gpx`. The selector is a column
-   of paths; the file name alone would do.
-3. **Waypoints tab parity.** It is localized now but still has no search and a
+1. **Waypoints tab parity.** It is localized now but still has no search and a
    different row rhythm from the tracks tab.
-4. **Bundle flow.** Opening a project still means going through the cold-start
+2. **Bundle flow.** Opening a project still means going through the cold-start
    route; the maps list and the download popup have not been looked at since
    the catalogue was repaired.
 
