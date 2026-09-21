@@ -88,6 +88,8 @@ struct RemoteFileDownload {
     path: PathBuf,
     /// Path relative to the project source root (used for `package_name`).
     relative: String,
+    /// Size from the listing, when it states one.
+    size_bytes: Option<u64>,
 }
 
 /// Default upper bound on concurrent per-file downloads inside a bundle.
@@ -636,19 +638,29 @@ pub async fn download_bundle_concurrent(
 
     sort_remote_files_by_prefix(&mut files);
     let total = files.len();
+    // What the operator is committing to. Files already on disk are skipped
+    // below, so they are left out of the figure — otherwise resuming a
+    // download would announce the whole bundle again.
+    let total_bytes: u64 = files
+        .iter()
+        .filter(|file| !file.path.exists())
+        .filter_map(|file| file.size_bytes)
+        .sum();
 
     let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
         message: format!("Downloading {total} files in parallel"),
         phase: ProjectOpenPhase::Downloading,
         completed: Some(0),
         total: Some(total as u64),
-        downloaded_bytes: None,
-        total_bytes: None,
+        downloaded_bytes: Some(0),
+        total_bytes: (total_bytes > 0).then_some(total_bytes),
     }));
 
     let concurrency = config.concurrency.max(1);
     let sem = Arc::new(Semaphore::new(concurrency));
-    let mut set: JoinSet<Result<(), String>> = JoinSet::new();
+    // Each worker answers with the bytes it actually fetched, so the
+    // aggregate byte progress is a sum and not a guess.
+    let mut set: JoinSet<Result<u64, String>> = JoinSet::new();
     let async_client = async_client(CONNECT_TIMEOUT, READ_TIMEOUT)?;
 
     for (index, file) in files.into_iter().enumerate() {
@@ -669,10 +681,12 @@ pub async fn download_bundle_concurrent(
                 drop(permit);
                 return Err(CANCEL_ERROR.to_owned());
             }
+            let mut fetched_bytes: u64 = 0;
             let RemoteFileDownload {
                 url,
                 path,
                 relative,
+                size_bytes: _,
             } = file;
             let pkg = relative.clone();
             if path.exists() {
@@ -692,6 +706,7 @@ pub async fn download_bundle_concurrent(
                     &path,
                     &cancel,
                     |downloaded, total_bytes| {
+                        fetched_bytes = downloaded;
                         let _ = tx_worker.send(DownloadNotification::FileProgress {
                             package_name: pkg.clone(),
                             downloaded_bytes: downloaded,
@@ -712,25 +727,27 @@ pub async fn download_bundle_concurrent(
                 file_count,
             });
             drop(permit);
-            Ok(())
+            Ok(fetched_bytes)
         });
     }
 
     let mut first_err: Option<String> = None;
     let mut completed_files: u64 = 0;
+    let mut downloaded_bytes: u64 = 0;
     while let Some(joined) = set.join_next().await {
         match joined {
-            Ok(Ok(())) => {
+            Ok(Ok(bytes)) => {
                 // Per-file completion tick so the aggregate progress moves
                 // continuously instead of jumping 0 -> N at the very end.
                 completed_files += 1;
+                downloaded_bytes += bytes;
                 let _ = tx.send(DownloadNotification::Phase(ProjectOpenProgress {
                     message: format!("Downloaded {completed_files} of {total} files"),
                     phase: ProjectOpenPhase::Downloading,
                     completed: Some(completed_files),
                     total: Some(total as u64),
-                    downloaded_bytes: None,
-                    total_bytes: None,
+                    downloaded_bytes: Some(downloaded_bytes),
+                    total_bytes: (total_bytes > 0).then_some(total_bytes),
                 }));
             }
             Ok(Err(e)) => {
@@ -949,6 +966,12 @@ fn collect_remote_files_rel(
     output: &mut Vec<RemoteFileDownload>,
 ) -> Result<(), String> {
     let html = fetch_text(url)?;
+    // The listing states each file's size beside it, so the scan learns what
+    // the whole bundle weighs without a single extra request.
+    let sizes_by_url: std::collections::HashMap<String, u64> = parse_entry_sizes(&html)
+        .into_iter()
+        .filter_map(|(href, bytes)| Some((resolve_listing_href(url, &href)?, bytes)))
+        .collect();
 
     for entry in parse_directory_entries(url, &html)? {
         let child_url = entry.url.clone();
@@ -963,10 +986,12 @@ fn collect_remote_files_rel(
             fs::create_dir_all(&child_path).map_err(|err| err.to_string())?;
             collect_remote_files_rel(&child_url, &child_path, &child_rel, output)?;
         } else {
+            let size_bytes = sizes_by_url.get(&child_url).copied();
             output.push(RemoteFileDownload {
                 url: child_url,
                 path: child_path,
                 relative: child_rel,
+                size_bytes,
             });
         }
     }
@@ -2427,6 +2452,7 @@ mod tests {
             url: format!("https://example.test/{rel}"),
             path: std::path::PathBuf::from(rel),
             relative: rel.to_owned(),
+            size_bytes: None,
         };
         let mut files = vec![
             mk("99-refs.pdf"),
@@ -2555,6 +2581,61 @@ mod bundle_download_tests {
         }
 
         server
+    }
+
+    /// The operator presses one button and the app fetches the whole project
+    /// directory. Until the scan reported a total, the panel could say "3 of
+    /// 47 files" and nothing about whether that was ten megabytes or two
+    /// gigabytes — which on a tethered phone is the whole question.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn the_scan_reports_what_the_bundle_weighs() {
+        let server = MockServer::start().await;
+        // A listing with sizes, in the shape the site serves them.
+        let listing = r#"<table><tbody>
+            <tr><td><a href="/bundle/00-manifest.json">00-manifest.json</a></td><td>2 КиБ</td></tr>
+            <tr><td><a href="/bundle/20-overlay.zip">20-overlay.zip</a></td><td>1,5 МиБ</td></tr>
+        </tbody></table>"#;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(listing))
+            .mount(&server)
+            .await;
+        for name in ["00-manifest.json", "20-overlay.zip"] {
+            Mock::given(method("GET"))
+                .and(path(format!("/bundle/{name}")))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![7u8; 64]))
+                .mount(&server)
+                .await;
+        }
+
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+        let notifications = collect_notifications(rx).await;
+        handle.await.expect("join").expect("download");
+
+        let expected = 2 * 1024 + (1.5_f64 * 1024.0 * 1024.0).round() as u64;
+        let announced: Vec<u64> = notifications
+            .iter()
+            .filter_map(|n| match n {
+                DownloadNotification::Phase(p) => p.total_bytes,
+                _ => None,
+            })
+            .collect();
+        assert!(
+            announced.iter().all(|total| *total == expected),
+            "the scan SHALL announce the bundle's total size ({expected}), got {announced:?}"
+        );
+        assert!(
+            !announced.is_empty(),
+            "a bundle whose listing states sizes SHALL report a total"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

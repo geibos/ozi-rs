@@ -47,6 +47,11 @@
     $currentDownload?.file_count ?? $bundleProgress?.total ?? null,
   );
 
+  const bundleTotalBytes = $derived($bundleProgress?.total_bytes ?? null);
+  const bundleDownloadedBytes = $derived(
+    $bundleProgress?.downloaded_bytes ?? 0,
+  );
+
   // Files fully on disk: rows whose byte counter reached its known total.
   // `bundle-progress.completed` only ever reports 0 or N (see above), but
   // taking the max folds in resume-skipped files that never stream any
@@ -76,11 +81,6 @@
   <div class="download-popup" data-testid="download-popup">
     <div class="popup-header">
       <span class="popup-title">{$t("download.title")}</span>
-      {#if fileTotal != null}
-        <span class="popup-count" data-testid="popup-file-count">
-          {$t("download.files")}: {filesDone}/{fileTotal}
-        </span>
-      {/if}
       <button
         class="popup-cancel"
         data-testid="popup-cancel-download"
@@ -89,6 +89,27 @@
         {$t("download.cancel")}
       </button>
     </div>
+
+    {#if fileTotal != null || bundleTotalBytes != null}
+      <div class="popup-meta">
+        {#if fileTotal != null}
+          <span class="popup-count" data-testid="popup-file-count">
+            {$t("download.files")}: {filesDone}/{fileTotal}
+          </span>
+        {/if}
+        {#if bundleTotalBytes != null}
+          <!-- What the whole bundle weighs, learned from the listing during
+               the scan. A file count alone never answered "will this finish
+               on a phone tether?". -->
+          <span class="popup-bytes" data-testid="popup-bundle-bytes">
+            {formatBytes(bundleDownloadedBytes, $locale)} / {formatBytes(
+              bundleTotalBytes,
+              $locale,
+            )}
+          </span>
+        {/if}
+      </div>
+    {/if}
 
     <div class="popup-rows">
       {#each rows as p (p.package_name)}
@@ -129,7 +150,9 @@
     position: fixed;
     right: 12px;
     bottom: 12px;
-    z-index: 40;
+    /* Above the bundle-loader Sheet's overlay (z-50): opening the loader to
+       queue the next map used to hide the download it had just started. */
+    z-index: 60;
     width: 320px;
     max-height: 40vh;
     display: flex;
@@ -160,6 +183,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .popup-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 10px;
+    border-bottom: 1px solid hsl(var(--secondary));
+    flex-shrink: 0;
+  }
+
+  .popup-bytes {
+    font-size: 11px;
+    color: hsl(var(--muted-foreground));
+    font-variant-numeric: tabular-nums;
   }
 
   .popup-count {
