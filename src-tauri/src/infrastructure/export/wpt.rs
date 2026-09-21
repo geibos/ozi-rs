@@ -118,9 +118,15 @@ pub fn map_symbol_to_code(symbol: Option<&str>) -> u16 {
 
 /// Encode `line + "\r\n"` as Windows-1251 and append to writer.
 ///
-/// `encoding_rs::WINDOWS_1251.encode()` uses '?' as the unmappable replacement,
-/// which matches what legacy OziExplorer expects when it encounters characters
-/// outside cp1251.
+/// A character cp1251 cannot hold becomes an HTML numeric reference:
+/// `encoding_rs` does that for every legacy encoding, so a Ukrainian `і`
+/// reaches the file as `&#1110;`. This comment used to claim it becomes `?`,
+/// which was never true.
+///
+/// Which of the two a legacy OziExplorer would rather read is not something
+/// this code can determine; `&#1110;` at least keeps the character recoverable
+/// where `?` destroys it. Pinned by a test, and flagged in `docs/backlog.md`
+/// for whoever has OziExplorer in front of them.
 fn write_line(writer: &mut impl Write, line: &str) -> Result<(), ExportError> {
     let mut buf = String::with_capacity(line.len() + 2);
     buf.push_str(line);
@@ -208,6 +214,46 @@ mod tests {
             let cols: Vec<&str> = row.split(',').collect();
             assert_eq!(cols.len(), 24, "row {i} should have 24 fields: {row}");
         }
+    }
+
+    /// What happens to a character cp1251 cannot hold.
+    ///
+    /// The comment on `write_line` claimed `encode()` substitutes `?`. It does
+    /// not: `encoding_rs` replaces an unmappable character in a legacy encoding
+    /// with an HTML numeric reference, so an emoji typed on a phone reaches the
+    /// file as `&#128205;`.
+    ///
+    /// Untested until now, and worth pinning either way: whichever of the two
+    /// a legacy OziExplorer would rather read, nobody should have to go to
+    /// `encoding_rs`'s documentation to learn which one this app does.
+    ///
+    /// The first version of this test used a Ukrainian `і`, on the assumption
+    /// that it is outside cp1251. It is not — cp1251 carries `і`, `ї`, `є`,
+    /// `ґ` and `ў` — and the test passed the character through intact, which
+    /// is how the assumption was caught.
+    #[test]
+    fn a_character_cp1251_cannot_hold_becomes_a_numeric_reference() {
+        let mut out = Vec::new();
+        write_wpt(vec![waypoint(1, "Стоянка 📍", 50.4, 30.5, None)], &mut out).expect("write");
+
+        let (decoded, _, _) = WINDOWS_1251.decode(&out);
+        let row = decoded
+            .lines()
+            .find(|l| l.contains("Стоянка"))
+            .expect("the waypoint row");
+
+        assert!(
+            row.contains("&#128205;"),
+            "the character survives as a reference rather than being destroyed: {row:?}"
+        );
+        assert!(
+            !row.contains("Стоянка ?"),
+            "it is not a question mark, whatever the comment used to say: {row:?}"
+        );
+        assert!(
+            row.contains("Стоянка"),
+            "and the rest of the name is untouched Cyrillic: {row:?}"
+        );
     }
 
     #[test]

@@ -34,6 +34,18 @@ decision.
 
 ## Engineering
 
+- **A WPT name with a character cp1251 cannot hold becomes `&#NNNN;`.**
+  `encoding_rs` does that for every legacy encoding; the code's comment claimed
+  it becomes `?`, which was never true and is corrected. Which a legacy
+  OziExplorer would rather read is a question for whoever has one in front of
+  them: `&#128205;` keeps the character recoverable, `?` destroys it, and both
+  look wrong in a waypoint list. Pinned by a test in `export/wpt.rs`. Note that
+  cp1251 does carry `і`, `ї`, `є`, `ґ` and `ў`, so Ukrainian and Belarusian
+  names are unaffected — it takes an emoji or a Latin-Extended character.
+- **`get_ozi_tile` is registered but nothing calls it.** The map renders OZF2
+  through `get_ozi_tile_projected`, via the `ozi://` protocol. Dead IPC
+  surface, not a missing feature: it costs a generated binding and a line in
+  the registry.
 - **A label looked up from a data table escapes the label guard.** The symbol
   picker carried ten English labels inside its own table; the guard checks what
   is written into an `aria-label`, not what a table hands it. Third miss of

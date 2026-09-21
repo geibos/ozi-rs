@@ -134,7 +134,9 @@ Closed since, by slice 0.3 and the slices after it: map `LayerId` allocation by 
 
 Was never true as written: **zip-slip guard absent on the track-import archive path** — `extract_zip_entries_to_directory` has always used `enclosed_name()`, which refuses an entry that escapes, and both extraction paths (track import and cached bundle archives) go through it. What was missing was a test, since a one-call guard is exactly what a refactor drops silently; there are two now (`import/archive.rs`).
 
-Still open, and in `docs/backlog.md`: cp1251 unrepresentable characters produce `&#NNNN;` not `?` (untested); waypoint map markers draw no symbol glyph; `get_ozi_tile` registered but unused; declared-but-absent ADR-0020 items (open-by-URL, on-map tools, crop by selection, walkthrough, waypoint colour, recent `.ozp`).
+Closed on 2026-09-21: waypoint map markers draw no symbol glyph (`a-waypoint-looks-like-what-it-is`); cp1251 unrepresentable characters — pinned by a test, and the `write_line` comment corrected: it claimed `?`, which was never what `encoding_rs` does. Whether `&#NNNN;` or `?` suits a legacy OziExplorer better is a question for whoever has one in front of them, and is in `docs/backlog.md`.
+
+Still open, and in `docs/backlog.md`: `get_ozi_tile` registered but unused — the map renders OZF2 through `get_ozi_tile_projected`, so this is dead IPC surface rather than a missing feature; declared-but-absent ADR-0020 items (open-by-URL, on-map tools, crop by selection, walkthrough, waypoint colour, recent `.ozp`).
 
 ### Owner decisions (2026-09-19)
 

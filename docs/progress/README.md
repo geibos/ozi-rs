@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the last of the findings
+
+Two lines left on the code-findings list, both now answered rather than
+carried.
+
+**`get_ozi_tile` registered but unused** is true and harmless: the map renders
+OZF2 through `get_ozi_tile_projected`, via the `ozi://` protocol. Dead IPC
+surface, not a missing feature. Worth knowing before someone reads it as "OZF2
+maps do not display".
+
+**cp1251 unrepresentable characters** turned out to be a finding about a
+comment. The code says `encode()` substitutes `?` "which matches what legacy
+OziExplorer expects"; `encoding_rs` substitutes an HTML numeric reference for
+every legacy encoding, so it was never true, and the second half of the
+sentence is a claim about a third-party program that this code cannot check.
+Both are gone. The behaviour is pinned instead, and the question of which a
+real OziExplorer would rather read is in the backlog for whoever has one.
+
+The test caught me first. I wrote it with a Ukrainian `і`, assuming that is
+outside cp1251. It is not — cp1251 carries `і`, `ї`, `є`, `ґ` and `ў` — and the
+character came through intact, which is how the assumption was caught rather
+than recorded. It takes an emoji or a Latin-Extended character to reach the
+replacement path, and an emoji typed on a phone is the likelier one anyway.
+
+| | |
+|---|---|
+| Evidence | a waypoint named with an emoji: the file carries `&#128205;`, the Cyrillic around it untouched |
+| Automated gates | `just ci` green (313 Rust, 379 frontend) |
+
+---
+
 ## 2026-09-21 — a waypoint looks like what it is
 
 Every waypoint on the map was the same yellow dot. The symbol a crew picks —
