@@ -17,10 +17,13 @@ a visible string only shows itself if someone opens that screen in Russian.
 
 - Every remaining literal above comes from the dictionaries.
 - A test scans every component for a literal `aria-label`, `title` or
-  `placeholder` whose value contains a Latin letter, and fails on it. Anything
-  computed, translated or interpolated passes, so the test constrains only
-  where a label comes from, not how it is built. It carries an allowlist of one
-  entry, with its reason.
+  `placeholder` whose value contains a Latin letter, and fails on it. It
+  carries an allowlist of one entry, with its reason.
+- A second rule covers the labels built in an expression, which the first
+  cannot see and which is where the last two hid: the waypoint rows'
+  `` `Symbol: ${symbol}` `` and the inspector rail's pinned/unpinned ternary.
+  It strips the `$t(…)` and `$i18n(…)` calls — whose keys are Latin by design —
+  and fails on any English left in a string in what remains.
 
 ## Impact
 

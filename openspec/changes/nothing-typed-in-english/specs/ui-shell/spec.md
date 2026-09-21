@@ -15,6 +15,11 @@ implicit.
 - **WHEN** a component is given an `aria-label`, `title` or `placeholder` written as a literal
 - **THEN** the test suite fails and names the file and the value
 
+#### Scenario: A label assembled in an expression
+
+- **WHEN** a component builds such a label from English text in an expression rather than from a dictionary lookup
+- **THEN** the test suite fails and names the file and the text
+
 #### Scenario: Editing a track on the map in Russian
 
 - **WHEN** the point context menu is opened while the interface is Russian

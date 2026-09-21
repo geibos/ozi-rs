@@ -30,10 +30,18 @@ It earned itself on the first run: two offenders I had already missed twice,
 both accessible names on inspector sections. The allowlist has one entry, an
 inert mode group, with its reason written next to it.
 
+Then the stand found two it still could not see, because they are assembled
+rather than typed: the waypoint rows' `Symbol: flag` and the inspector rail's
+pinned/unpinned ternary. So the guard grew a second rule — strip the `$t(…)`
+calls, whose keys are Latin by design, and fail on English left in what
+remains. The rows read "Значок: flag" and "Значок по умолчанию" now.
+
 | | |
 |---|---|
 | Evidence | the guard test, red on its first run, naming both files it found |
-| Automated gates | `just ci` green (300 Rust, 359 frontend) |
+| Evidence | the second rule, verified red by putting `` `Symbol: ${symbol}` `` back |
+| Evidence | walked on the stand: "Значок: flag", "Значок по умолчанию", "Скрыть: ШТАБ" |
+| Automated gates | `just ci` green (300 Rust, 360 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

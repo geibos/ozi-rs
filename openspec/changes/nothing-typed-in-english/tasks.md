@@ -8,6 +8,8 @@
 
 - [x] 2.1 A test over every component for literal `aria-label` / `title` / `placeholder`
 - [x] 2.2 It found the last two offenders on its first run; allowlist carries one entry with its reason
+- [x] 2.3 A second rule for a label built in an expression: strip the `$t(…)` / `$i18n(…)` calls, fail on English left in what remains
+- [x] 2.4 Verified red by putting `` `Symbol: ${symbol}` `` back
 
 ## 3. Gates
 

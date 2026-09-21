@@ -87,8 +87,8 @@
         class="pin-button"
         onclick={togglePin}
         aria-pressed={pinned}
-        aria-label={pinned ? "Unpin inspector" : "Pin inspector open"}
-        title={pinned ? "Unpin inspector" : "Pin inspector open"}
+        aria-label={$t(pinned ? "shell.unpinInspector" : "shell.pinInspector")}
+        title={$t(pinned ? "shell.unpinInspector" : "shell.pinInspector")}
       >
         {#if pinned}
           <PinOffIcon class="size-3.5" />

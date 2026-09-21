@@ -61,7 +61,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 300 Rust tests and 359 frontend tests;
+rustfmt, clippy, type-checks, 300 Rust tests and 360 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -175,9 +175,10 @@ dependency dropped.
 Localization is done for the shell, the rails, the three library tabs, all four
 inspectors, the Maps tab, the command palette, bundle progress (which travels
 as a key and its arguments) and — since 2026-09-21 — every tooltip and
-accessible name on the library rows and the shell's landmarks. A test now fails
-on a literal `aria-label`, `title` or `placeholder` in any component, so the
-next one cannot reach a screen. What is still English:
+accessible name on the library rows and the shell's landmarks. Two tests now fail on a
+label written into a component — one on a literal `aria-label`, `title` or
+`placeholder`, one on English assembled into the same attributes — so the next
+one cannot reach a screen. What is still English:
 the `AppState` status line's own messages, which no surface currently renders;
 convert them the same way if one starts to. A test now holds both dictionaries to the same key set, so a
 half-finished pass fails instead of falling back to English silently.

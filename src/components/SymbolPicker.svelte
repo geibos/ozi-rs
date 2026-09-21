@@ -42,7 +42,9 @@
 <Popover.Root bind:open>
   <Popover.Trigger
     class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-    aria-label={symbol ? `Symbol: ${symbol}` : "Default symbol"}
+    aria-label={symbol
+      ? $t("symbol.named").replace("{symbol}", symbol)
+      : $t("symbol.default")}
   >
     <span class="text-sm leading-none">{getEmoji(symbol)}</span>
   </Popover.Trigger>
