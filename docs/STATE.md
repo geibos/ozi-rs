@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **choosing what to download** (2026-09-21) — the loader
-shows what a bundle holds and the operator clears what they do not need, the
-owner's July type-filter note answered without the app deciding for them; after
+Last merged slice: **the app gets its padding back** (2026-09-21) — the
+unlayered global reset had been beating every Tailwind spacing utility in the
+app, and fixing it uncovered the inspector's segments card collapsing; after
+the loader letting the operator choose what a download fetches, the owner's
+July type-filter note answered without the app deciding for them, and after
 every track in the project exporting to one GPX, the shape FTP upload will
 need, and after a map being
 openable while the rest of its bundle downloads, which turned out to work

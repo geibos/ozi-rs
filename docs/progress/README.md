@@ -10,6 +10,36 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the app gets its padding back
+
+Opening a row menu on the stand showed the labels flush against the box's
+edge. Measuring in the browser rather than guessing: a dropdown item computed
+`padding: 0px`, and so did the menu itself.
+
+`* { margin: 0; padding: 0 }` in `app.css` sat outside any layer, and an
+unlayered rule beats every `@layer` whatever its specificity. Every Tailwind
+spacing utility in the app had been losing to it — the same landmine that once
+left a 24px icon trigger with no room for its glyph, in its most general form.
+Inside `@layer base` the reset still replaces the browser's defaults and the
+utilities decide from there.
+
+Restoring padding everywhere then uncovered a defect it had been masking: the
+segments card was the only shrinkable child of the inspector column, so the
+moment the rail ran short of room that card — and only it — collapsed, hiding
+the points behind the next card. It does not shrink now; its own cap and the
+rail's scroll do the work.
+
+| | |
+|---|---|
+| Before | [a row menu](2026-09-21-padding-restored/before-menu.png) |
+| After | [the same menu](2026-09-21-padding-restored/after-menu.png), [the inspector](2026-09-21-padding-restored/after-inspector.png) |
+| Automated gates | `just ci` green (293 Rust, 339 frontend) |
+
+Both were found in about ten minutes on the stand. Neither would have been
+visible in a test, and both had been shipping for months.
+
+---
+
 ## 2026-09-21 — choosing what to download
 
 A bundle carries print sheets and Android tile packs this app cannot open, and
