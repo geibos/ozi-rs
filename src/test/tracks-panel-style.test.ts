@@ -23,7 +23,8 @@ describe("Library Tracks tab style controls", () => {
   it("keys and selects tracks by layer and track identity", () => {
     expect(source).toContain("trackKey(t)");
     expect(source).toContain("isSelected(t)");
-    expect(source).toContain("{#each tracks as t (trackKey(t))}");
+    // The loop runs over the filtered view; identity is still (layer, track).
+    expect(source).toContain("{#each visibleTracks as t (trackKey(t))}");
     // Selected state is signalled to the row via the `selected` prop, which
     // LibraryRow translates into the `bg-accent` / `text-accent-foreground`
     // semantic-token utilities — no hand-rolled `.selected` class.

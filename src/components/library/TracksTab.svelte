@@ -70,11 +70,19 @@
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
   import {
+    filterTrackFeatures,
     trackFeaturesFromGeojson,
     type TrackFeature,
   } from "$lib/track-features";
+  import { Input } from "$lib/components/ui/input";
+  import SearchIcon from "@lucide/svelte/icons/search";
+  import XIcon from "@lucide/svelte/icons/x";
 
   let tracks: TrackFeature[] = $state([]);
+  // A field project carries dozens of tracks named by date and call sign, so
+  // finding one by eye is the slowest step in cleaning up a search.
+  let trackQuery = $state("");
+  const visibleTracks = $derived(filterTrackFeatures(tracks, trackQuery));
   // Inline-popover live-preview toggle. The popover writes through the
   // shared `simplifyState` store so MapView's preview overlay effect can
   // render the simplified geometry without a separate coupling path.
@@ -457,15 +465,61 @@
         </Button>
       </div>
     {/if}
+
+    {#if tracks.length > 0}
+      <div class="mt-1.5 flex items-center gap-1">
+        <div class="relative min-w-0 flex-1">
+          <SearchIcon
+            class="text-muted-foreground pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2"
+            strokeWidth={1.5}
+          />
+          <Input
+            bind:value={trackQuery}
+            class="h-7 pr-7 pl-7 text-xs"
+            placeholder={$i18n("tracksTab.searchPlaceholder")}
+            aria-label={$i18n("tracksTab.searchPlaceholder")}
+            data-testid="track-search"
+          />
+          {#if trackQuery !== ""}
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground absolute top-1/2 right-1 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-sm border-0 bg-transparent p-0"
+              aria-label={$i18n("tracksTab.searchClear")}
+              onclick={() => (trackQuery = "")}
+              data-testid="track-search-clear"
+            >
+              <XIcon class="size-3.5" strokeWidth={2} />
+            </button>
+          {/if}
+        </div>
+        {#if trackQuery !== ""}
+          <span
+            class="text-muted-foreground shrink-0 font-mono text-[10px] tabular-nums"
+            data-testid="track-search-count"
+          >
+            {$i18n("tracksTab.searchCount")
+              .replace("{shown}", String(visibleTracks.length))
+              .replace("{total}", String(tracks.length))}
+          </span>
+        {/if}
+      </div>
+    {/if}
   </header>
 
   <div class="flex-1 overflow-y-auto py-1" data-testid="tracks-tab-list">
     {#if tracks.length === 0}
       <div class="text-muted-foreground p-3 text-center text-xs">
-        No tracks loaded
+        {$i18n("tracksTab.empty")}
+      </div>
+    {:else if visibleTracks.length === 0}
+      <div
+        class="text-muted-foreground p-3 text-center text-xs"
+        data-testid="track-search-empty"
+      >
+        {$i18n("tracksTab.searchEmpty")}
       </div>
     {:else}
-      {#each tracks as t (trackKey(t))}
+      {#each visibleTracks as t (trackKey(t))}
         <LibraryRow
           name={t.name}
           visible={t.visible}

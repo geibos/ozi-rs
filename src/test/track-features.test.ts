@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { trackFeaturesFromGeojson } from "../lib/track-features";
+import {
+  filterTrackFeatures,
+  trackFeaturesFromGeojson,
+} from "../lib/track-features";
 
 const properties = (over: Record<string, unknown> = {}) => ({
   layer_id: 2,
@@ -95,5 +98,52 @@ describe("track rows built from the tracks GeoJSON", () => {
       ]),
     );
     expect(rows.map((r) => r.name)).toEqual(["a1", "a2", "b"]);
+  });
+});
+
+/**
+ * A field project carries dozens of tracks named by date and call sign
+ * ("20260709-ЛИСА15"), spread over one layer per imported file. Scanning that
+ * list by eye is the slowest step in cleaning up a search, so the rail needs a
+ * filter that matches the way those names are typed: partial, case-insensitive
+ * and Cyrillic-aware.
+ */
+describe("filtering track rows", () => {
+  const rows = [
+    { name: "20260709-ЛИСА15" },
+    { name: "20260709_Veter2" },
+    { name: "20260710 лиса19" },
+    { name: "Походы на открытом воздухе" },
+  ] as Parameters<typeof filterTrackFeatures>[0];
+
+  it("returns everything for an empty or blank query", () => {
+    expect(filterTrackFeatures(rows, "")).toHaveLength(4);
+    expect(filterTrackFeatures(rows, "   ")).toHaveLength(4);
+  });
+
+  it("matches part of a name anywhere in it", () => {
+    expect(filterTrackFeatures(rows, "Veter").map((r) => r.name)).toEqual([
+      "20260709_Veter2",
+    ]);
+    expect(filterTrackFeatures(rows, "0709").map((r) => r.name)).toEqual([
+      "20260709-ЛИСА15",
+      "20260709_Veter2",
+    ]);
+  });
+
+  it("ignores case in both alphabets", () => {
+    expect(filterTrackFeatures(rows, "лиса").map((r) => r.name)).toEqual([
+      "20260709-ЛИСА15",
+      "20260710 лиса19",
+    ]);
+    expect(filterTrackFeatures(rows, "VETER")).toHaveLength(1);
+  });
+
+  it("ignores surrounding whitespace in the query", () => {
+    expect(filterTrackFeatures(rows, "  лиса15 ")).toHaveLength(1);
+  });
+
+  it("returns nothing when no name matches", () => {
+    expect(filterTrackFeatures(rows, "zzz")).toHaveLength(0);
   });
 });

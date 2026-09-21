@@ -10,6 +10,25 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — finding a track
+
+A field project carries dozens of tracks named by date and call sign, spread
+over one layer per imported file. There was no way to search them: the project
+list had a filter, the track list did not, so finding one track meant scrolling
+past all of them.
+
+The Tracks tab now has a search field with a clear button and a "shown of
+total" counter. Matching is a case-insensitive substring in either alphabet,
+because operators search by call sign as often as by date. Typing `лиса1`
+narrows 26 tracks to 8.
+
+| | |
+|---|---|
+| After | [search in use](2026-09-21-track-search/after-search.png) |
+| Automated gates | `just ci` green (259 Rust, 286 frontend) |
+
+---
+
 ## 2026-09-21 — row density and dev signing
 
 The name-format warning was a full line of orange text under most rows, so a

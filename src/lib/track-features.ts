@@ -53,3 +53,19 @@ export function trackFeaturesFromGeojson(
   rows.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
   return rows;
 }
+
+/**
+ * Narrow the rows to those whose name contains `query`.
+ *
+ * Field names are typed as date plus call sign ("20260709-ЛИСА15"), so the
+ * match is a case-insensitive substring rather than a prefix: an operator
+ * searches by call sign as often as by date, in either alphabet.
+ */
+export function filterTrackFeatures<T extends { name: string }>(
+  rows: T[],
+  query: string,
+): T[] {
+  const needle = query.trim().toLocaleLowerCase();
+  if (needle === "") return rows;
+  return rows.filter((row) => row.name.toLocaleLowerCase().includes(needle));
+}
