@@ -45,7 +45,6 @@
     setProjection,
     currentProject,
     projects,
-    requestAllDataFocus,
     selectedMapInfo,
     selectedTrack,
     selectedWaypointId,
@@ -56,25 +55,21 @@
     getTrackExportDefaultPath,
     getWaypoints,
     getWptExportDefaultPath,
-    loadProjectFile,
     revealBundle,
   } from "$lib/api";
-  import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import {
+    doRedo,
+    doUndo,
+    openProjectFile,
+    quickSave,
+  } from "$lib/actions/project";
   import { openMapShowingDownload } from "$lib/actions/open-map";
   // Aliased: the tracks loop below binds `t`, and a store read inside it
   // would resolve to the loop variable.
   import { t as i18n, toggleLocale } from "$lib/i18n";
-  import {
-    open as openDialog,
-    save as saveDialog,
-  } from "@tauri-apps/plugin-dialog";
+  import { save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { appendRecentFile, getRecentFiles } from "$lib/recentFiles";
-  import { PROJECT_OPEN_EXTENSIONS } from "$lib/project-file";
-  import {
-    forgetProject,
-    getRecentProjects,
-    rememberProject,
-  } from "$lib/recent-projects";
+  import { getRecentProjects } from "$lib/recent-projects";
   import { toast } from "svelte-sonner";
   import { paletteProjects } from "$lib/palette-projects";
   import type { WaypointData } from "$lib/types";
@@ -204,30 +199,11 @@
     close();
   }
 
-  async function handleProjectOpen() {
+  function handleProjectOpen() {
     close();
-    try {
-      const path = await openDialog({
-        filters: [
-          {
-            name: $i18n("palette.projectFileType"),
-            // `.ozp` first, `json` still accepted — see `project-file.ts`.
-            extensions: PROJECT_OPEN_EXTENSIONS,
-          },
-        ],
-      } as Parameters<typeof openDialog>[0]);
-      if (path) {
-        await loadProjectFile(path as string);
-        rememberProject(path as string);
-        // Otherwise the project's tracks land wherever the camera happens to
-        // be pointing, which looks exactly like a project that did not load.
-        requestAllDataFocus();
-      }
-    } catch (error) {
-      toast.error($i18n("palette.openProjectFailed"), {
-        description: String(error),
-      });
-    }
+    // Dialog, remembering and framing live in `$lib/actions/project`: the
+    // launch screen and the recents below ask for the same thing.
+    void openProjectFile();
   }
 
   /**
@@ -237,18 +213,11 @@
    * is on the other machine. Rather than leaving an entry that fails every
    * time it is chosen, a failure drops it and says so.
    */
-  async function handleOpenRecentProject(path: string) {
+  function handleOpenRecentProject(path: string) {
     close();
-    try {
-      await loadProjectFile(path);
-      rememberProject(path);
-      requestAllDataFocus();
-    } catch (error) {
-      forgetProject(path);
-      toast.error($i18n("palette.projectMissing"), {
-        description: String(error),
-      });
-    }
+    // A stale path is dropped by the action — the file moved, the disk is not
+    // mounted, the crew is on the other machine.
+    void openProjectFile(path);
   }
 
   // Save / undo / redo delegate to the shared CJ-7 actions in

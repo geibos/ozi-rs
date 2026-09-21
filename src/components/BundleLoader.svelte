@@ -53,6 +53,8 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import { filterProjects } from "$lib/project-list";
+  import { openProjectFile } from "$lib/actions/project";
+  import { getRecentProjects } from "$lib/recent-projects";
   import { openMapShowingDownload } from "$lib/actions/open-map";
   import { bundleSlugFromUrl } from "$lib/bundle-url";
   import { formatBytes, formatOptionalBytes } from "$lib/format-bytes";
@@ -481,6 +483,20 @@
     const dir = await open({ directory: true, multiple: false });
     if (dir) await setBundlesRoot(dir as string);
   }
+
+  /**
+   * The most recent saved projects, read when the loader mounts.
+   *
+   * Three, not the eight the store keeps: this is a shortcut under a footer
+   * button, and the full list is a keystroke away in the palette. Read once
+   * rather than reactively — the list only changes as a result of opening
+   * something, which replaces this screen.
+   */
+  const recentProjects = getRecentProjects().slice(0, 3);
+
+  function handleOpenProjectFile() {
+    void openProjectFile();
+  }
 </script>
 
 <div class="loader">
@@ -594,6 +610,29 @@
     </div>
 
     <div class="col-footer">
+      <!-- A saved `.ozp` used to be reachable only through ⌘K, so a crew
+           arriving with yesterday's work had to know the palette existed. The
+           launch screen is where they are standing. -->
+      <button
+        onclick={handleOpenProjectFile}
+        class="footer-btn"
+        data-testid="loader-open-project-file"
+      >
+        {$t("loader.openProjectFile")}
+      </button>
+      {#if recentProjects.length > 0}
+        <div class="recent-projects" data-testid="loader-recent-projects">
+          {#each recentProjects as project (project.path)}
+            <button
+              class="recent-project"
+              title={project.path}
+              onclick={() => void openProjectFile(project.path)}
+            >
+              {project.name}
+            </button>
+          {/each}
+        </div>
+      {/if}
       <button onclick={handleOpenLocalBundle} class="footer-btn">
         {$t("loader.openLocalBundle")}
       </button>
@@ -1154,6 +1193,32 @@
     font-size: 12px;
     text-align: left;
     padding: 4px 8px;
+  }
+
+  .recent-projects {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 8px 2px;
+  }
+
+  .recent-project {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    padding: 2px 0;
+    font-size: 11px;
+    text-align: left;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .recent-project:hover {
+    color: hsl(var(--foreground));
+    text-decoration: underline;
   }
 
   .footer-btn.muted {

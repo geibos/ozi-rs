@@ -5,7 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **open a project and see it** (2026-09-22) — the camera was
+Last merged slice: **yesterday's work on the first screen** (2026-09-22) — a
+saved `.ozp` could be opened only from the command palette, so a crew arriving
+with yesterday's work had no route back to it from the screen they were looking
+at; after open a project and see it, where the camera was
 framed on the data only after an import, so opening a saved project left the
 map wherever it was, which looks exactly like a project that failed to load;
 after what the ground does, where the inspector's
@@ -147,7 +150,7 @@ re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the forty-two OpenSpec changes.** Folding their requirements
+1. **Archive the forty-three OpenSpec changes.** Folding their requirements
    into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on
@@ -170,7 +173,7 @@ re-ordered rather than followed blindly.
 
 4. **`just smoke`.** The Mac2 driver host dies at session creation; every
    piece works when run by hand and only fails when Appium spawns it. What has
-   been ruled out, and by which command, is under "Known broken". Thirty-three
+   been ruled out, and by which command, is under "Known broken". Thirty-four
    changes carry an unchecked "smoke green" task waiting on it.
 
 ### An agent can still do these
@@ -250,7 +253,7 @@ existing requirements before writing a delta against it.
   and the earlier `com.apple.LocalAuthentication` block, which was a different
   error and is cleared.
 
-  Thirty-three changes carry an unchecked "smoke green" task waiting on this.
+  Thirty-four changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run

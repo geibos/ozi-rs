@@ -92,6 +92,17 @@ decision.
   the bbox maths, which gained a `NaN` guard the moment it was testable. When
   touching that file, take the arithmetic out with the change.
 
+- **There is no way to start a new project.** Nothing in the backend or the
+  interface creates an empty one: a crew that finishes one search and starts
+  another keeps adding to the same project, and the session restore brings it
+  back on relaunch. Whether that is wrong depends on whether a "project" is a
+  search or a machine's working set — an owner question, not a code one.
+- **The launch screen's status bar reserves 80px for a download that is not
+  running.** Four grid rows, three of them empty, including an outlined
+  progress track that reads as a broken widget. The reservation avoids a jump
+  when a download starts; permanent dead space on the first screen is the
+  worse half of that trade.
+
 - **A grid child can grow its own column.** `.canvas-column` had
   `grid-template-rows` and no `grid-template-columns`, so the implicit column
   was `auto` = max-content and the context bar widened it by 358px, under the

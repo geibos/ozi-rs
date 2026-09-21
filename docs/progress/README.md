@@ -10,6 +10,42 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — yesterday's work on the first screen
+
+A saved `.ozp` could be opened from exactly one place: the command palette. The
+launch screen offers «Открыть локальный бандл…» and «Папка для бандлов…» and
+nothing else. So a crew arriving in the morning with yesterday's work saw a
+catalogue of thirteen thousand LizaAlert searches and no way back to their own
+project, unless somebody had told them about ⌘K.
+
+This repo has already made this exact argument once, when the language switch
+moved into the status bar: "a Russian-speaking crew had to know the palette
+exists to get a Russian interface". A shortcut is not a route.
+
+The first screen now offers «Открыть сохранённый проект…» and, under it, the
+three most recent projects as one click each. The recents list existed already
+— `yesterdays-project-is-one-key-away` built it — it just had nowhere to be
+seen.
+
+While wiring it: «проект» meant two different things and both buttons said so.
+The Maps tab's «Открыть проект…» opens the LizaAlert catalogue; the palette's
+opens a file. The loader's own list is headed «Каталог поисков», so the
+catalogue already had a better word for itself, and the Maps tab now says
+«Выбрать поиск…».
+
+Third surface, so the dialog, the remembering, the framing and the dropping of
+a stale path moved into one `openProjectFile` action rather than a third copy.
+
+| | |
+|---|---|
+| Before | [no way back to a project](2026-09-22-first-screen/before-no-way-back.png) |
+| After | [the recents where they are needed](2026-09-22-first-screen/after-recent-projects.png) |
+| Change | `openspec/changes/yesterdays-work-on-the-first-screen/` |
+| Automated gates | `just ci` green (320 Rust, 488 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — open a project and see it
 
 The camera was fitted to the data in exactly one place: after an import. That

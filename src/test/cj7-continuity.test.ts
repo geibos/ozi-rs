@@ -114,9 +114,12 @@ describe("CJ-7 workspace shell controls (WorkspaceShell.svelte)", () => {
 
 describe("CJ-7 command palette (CommandPalette.svelte)", () => {
   it("delegates save/undo/redo to $lib/actions/project", () => {
-    expect(paletteSource).toContain(
-      'import { doRedo, doUndo, quickSave } from "$lib/actions/project";',
-    );
+    // One import, four names now that opening a project is shared too, so
+    // the assertion is per name rather than on the whole line.
+    for (const name of ["doRedo", "doUndo", "openProjectFile", "quickSave"]) {
+      expect(paletteSource).toContain(`    ${name},`);
+    }
+    expect(paletteSource).toContain('} from "$lib/actions/project";');
     expect(paletteSource).toContain("void quickSave();");
     expect(paletteSource).toContain("void doUndo();");
     expect(paletteSource).toContain("void doRedo();");

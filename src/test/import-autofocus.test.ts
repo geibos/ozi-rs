@@ -14,6 +14,14 @@ const paletteSource = readFileSync(
   join(__dirname, "../components/CommandPalette.svelte"),
   "utf-8",
 );
+const loaderSource = readFileSync(
+  join(__dirname, "../components/BundleLoader.svelte"),
+  "utf-8",
+);
+const projectActionsSource = readFileSync(
+  join(__dirname, "../lib/actions/project.ts"),
+  "utf-8",
+);
 
 /**
  * Regression guard for the owner's hands-on finding "imported tracks don't
@@ -39,18 +47,16 @@ describe("framing the data on the map", () => {
     );
   });
 
-  it("opening a project asks for it, from the dialog and from the recents", () => {
-    // Two call sites, because the recents path drops a stale entry and the
-    // dialog path does not.
-    expect(
-      paletteSource.match(/requestAllDataFocus\(\);/g) ?? [],
-    ).toHaveLength(2);
-    expect(paletteSource).toMatch(
-      /await loadProjectFile\(path as string\);[\s\S]{0,300}requestAllDataFocus\(\)/,
+  it("opening a project asks for it, wherever it was asked for", () => {
+    // The dialog, the remembering and the framing live in one action, which
+    // the palette, its recents list and the launch screen all call. Its own
+    // behaviour is covered in `open-project-action.test.ts`; what matters
+    // here is that nothing loads a project around it.
+    expect(projectActionsSource).toMatch(
+      /await loadProjectFile\(path\);[\s\S]{0,240}requestAllDataFocus\(\)/,
     );
-    expect(paletteSource).toMatch(
-      /await loadProjectFile\(path\);[\s\S]{0,120}requestAllDataFocus\(\)/,
-    );
+    expect(paletteSource).not.toContain("loadProjectFile(");
+    expect(loaderSource).not.toContain("loadProjectFile(");
   });
 
   it("MapView consumes the request and frames tracks and waypoints together", () => {
