@@ -5,7 +5,7 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **row density and dev signing** (2026-09-21), after **0.2 visible fixes**. `main` is pushed and
+Last merged slice: **catalogue repair** (2026-09-21), after row density, dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
 rustfmt, clippy, type-checks, 248 Rust tests and 278 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
@@ -37,10 +37,19 @@ entries as supported. Each one gets its test first.
 Blocked before that, and blocking verification of everything after it: **task
 0.4**, restoring the screen grants (below).
 
+The catalogue works again: the site changed its listing markup in September,
+which silently emptied the project list and the per-project map list. Both are
+fixed and verified against the live site (13439 projects, maps listed for a
+freshly published project).
+
 ## Known broken
 
 - **Slice 0.2 still owes its customer-journey smoke.** Screenshots are done
   and in the gallery; the smoke run has not been driven yet.
+- **Appium stopped accepting sessions** late on 2026-09-21 (`Resource
+  temporarily unavailable`, os error 35) and did not recover from a server
+  restart. Screenshots still work through `screencapture -l`, so verification
+  continued without it, but driven interaction is currently unavailable.
 - **`.mcp.json` still runs a prebuilt `ozi-rs-mcp`** from May, so the July
   fixes to it are absent from agent sessions (`revive-ui-cycle` task 0.3).
 - **MapLibre carries a critical advisory** (`GHSA-jrc7-96c5-q579`) whose fix is
