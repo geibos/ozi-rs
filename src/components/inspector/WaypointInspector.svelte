@@ -31,6 +31,7 @@
     toggleWaypointVisible,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import type { WaypointData } from "$lib/types";
   import SymbolPicker from "../SymbolPicker.svelte";
@@ -167,7 +168,7 @@
         }}
         disabled={!waypoint}
         class="h-8 text-sm font-medium"
-        aria-label="Waypoint name"
+        aria-label={$t("inspector.waypointName")}
       />
     </div>
     <Button
@@ -175,7 +176,9 @@
       size="icon-sm"
       onclick={handleToggleVisible}
       disabled={!waypoint}
-      aria-label={waypoint?.visible ? "Hide waypoint" : "Show waypoint"}
+      aria-label={waypoint?.visible
+        ? $t("inspector.hideWaypoint")
+        : $t("inspector.showWaypoint")}
     >
       {#if waypoint?.visible}
         <EyeIcon class="size-4" />
@@ -187,19 +190,19 @@
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-4"
-    aria-label="Location"
+    aria-label={$t("inspector.location")}
   >
     <h3
-      class="text-muted-foreground/80 mb-3 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
+      class="text-muted-foreground/80 mb-3 flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase"
     >
       <MapPinIcon class="size-3" />
-      Location
+      {$t("inspector.location")}
     </h3>
     {#if waypoint}
       <dl class="grid grid-cols-[3.5rem_1fr] gap-x-3 gap-y-2 text-xs">
-        <dt class="text-muted-foreground">Latitude</dt>
+        <dt class="text-muted-foreground">{$t("inspector.latitude")}</dt>
         <dd class="font-mono">{waypoint.lat.toFixed(6)}</dd>
-        <dt class="text-muted-foreground">Longitude</dt>
+        <dt class="text-muted-foreground">{$t("inspector.longitude")}</dt>
         <dd class="font-mono">{waypoint.lon.toFixed(6)}</dd>
       </dl>
       <Button
@@ -209,14 +212,17 @@
         onclick={handleMoveOnMap}
       >
         <MoveIcon class="size-3.5" />
-        Move on map
+        {$t("inspector.moveOnMap")}
       </Button>
     {:else}
-      <p class="text-muted-foreground text-xs">No waypoint selected.</p>
+      <p class="text-muted-foreground text-xs">{$t("inspector.noWaypoint")}</p>
     {/if}
   </section>
 
-  <section class="flex flex-col gap-2" aria-label="Waypoint actions">
+  <section
+    class="flex flex-col gap-2"
+    aria-label={$t("inspector.waypointActions")}
+  >
     <Button
       variant="outline"
       size="sm"
@@ -225,17 +231,17 @@
       disabled={!waypoint}
     >
       <FileOutputIcon class="size-4" />
-      Export WPT
+      {$t("inspector.exportWpt")}
     </Button>
     <Button
       variant="outline"
       size="sm"
-      class="justify-start gap-2 text-destructive hover:text-destructive"
+      class="text-destructive hover:text-destructive justify-start gap-2"
       onclick={handleDelete}
       disabled={!waypoint}
     >
       <Trash2Icon class="size-4" />
-      Delete waypoint
+      {$t("inspector.deleteWaypoint")}
     </Button>
   </section>
 </div>

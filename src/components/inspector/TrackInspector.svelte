@@ -315,7 +315,9 @@
   }
 </script>
 
-<div class="flex h-full min-w-0 flex-col gap-3 overflow-x-hidden overflow-y-auto p-4">
+<div
+  class="flex h-full min-w-0 flex-col gap-3 overflow-x-hidden overflow-y-auto p-4"
+>
   <header class="flex items-start gap-3">
     <span
       class="mt-1 inline-block size-4 shrink-0 rounded-full border border-black/10"
@@ -324,19 +326,23 @@
     ></span>
     <div class="min-w-0 flex-1">
       <h2
-        class="text-foreground truncate text-sm font-semibold leading-tight"
+        class="text-foreground truncate text-sm leading-tight font-semibold"
         title={summary?.name}
       >
         {summary?.name ?? "—"}
       </h2>
-      <p class="text-muted-foreground mt-0.5 text-[11px]">Track</p>
+      <p class="text-muted-foreground mt-0.5 text-[11px]">
+        {$t("inspector.track")}
+      </p>
     </div>
     <Button
       variant="ghost"
       size="icon-sm"
       onclick={handleToggleVisible}
       disabled={!summary}
-      aria-label={summary?.visible ? "Hide track" : "Show track"}
+      aria-label={summary?.visible
+        ? $t("inspector.hideTrack")
+        : $t("inspector.showTrack")}
     >
       {#if summary?.visible}
         <EyeIcon class="size-4" />
@@ -348,22 +354,22 @@
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-4"
-    aria-label="Track statistics"
+    aria-label={$t("inspector.statistics")}
   >
     <h3
-      class="text-muted-foreground/80 mb-3 text-[10px] font-semibold uppercase tracking-wider"
+      class="text-muted-foreground/80 mb-3 text-[10px] font-semibold tracking-wider uppercase"
     >
-      Statistics
+      {$t("inspector.statistics")}
     </h3>
     {#if summary}
       <dl
         class="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 text-xs tabular-nums"
       >
-        <dt class="text-muted-foreground">Distance</dt>
+        <dt class="text-muted-foreground">{$t("inspector.distance")}</dt>
         <dd class="min-w-0 truncate font-mono">
           {formatDistanceKm(summary!.distance_km)}
         </dd>
-        <dt class="text-muted-foreground">Duration</dt>
+        <dt class="text-muted-foreground">{$t("inspector.duration")}</dt>
         <dd
           class="min-w-0 truncate font-mono"
           title={summary!.duration_seconds !== null
@@ -374,11 +380,11 @@
             ? formatDurationSeconds(summary!.duration_seconds!)
             : "—"}
         </dd>
-        <dt class="text-muted-foreground">Points</dt>
+        <dt class="text-muted-foreground">{$t("inspector.points")}</dt>
         <dd class="min-w-0 truncate font-mono">
           {formatPointCount(summary!.point_count)}
         </dd>
-        <dt class="text-muted-foreground">Start time</dt>
+        <dt class="text-muted-foreground">{$t("inspector.startTime")}</dt>
         <dd
           class="min-w-0 truncate font-mono"
           title={firstTimestamp(trackDetail) ?? undefined}
@@ -387,7 +393,7 @@
         </dd>
       </dl>
     {:else}
-      <p class="text-muted-foreground text-xs">No track selected.</p>
+      <p class="text-muted-foreground text-xs">{$t("inspector.noTrack")}</p>
     {/if}
   </section>
 
@@ -395,29 +401,31 @@
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-4"
-    aria-label="Elevation chart placeholder"
+    aria-label={$t("inspector.elevation")}
   >
     <h3
-      class="text-muted-foreground/80 mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider"
+      class="text-muted-foreground/80 mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase"
     >
       <LineChartIcon class="size-3" />
-      Elevation
+      {$t("inspector.elevation")}
     </h3>
     <p class="text-muted-foreground text-[11px] italic">
-      Elevation chart — coming in a follow-up change
+      {$t("inspector.elevationSoon")}
     </p>
   </section>
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-3"
-    aria-label="Line width"
+    aria-label={$t("inspector.lineWidth")}
   >
     <div class="flex items-center gap-3">
       <SlidersHorizontalIcon
         class="text-muted-foreground size-3.5 shrink-0"
         aria-hidden="true"
       />
-      <span class="text-muted-foreground text-[11px]">Width</span>
+      <span class="text-muted-foreground text-[11px]"
+        >{$t("inspector.width")}</span
+      >
       <input
         type="range"
         min="1"
@@ -425,7 +433,7 @@
         step="1"
         value={lineWidthDraft}
         class="accent-primary flex-1"
-        aria-label="Track line width"
+        aria-label={$t("inspector.lineWidth")}
         onchange={handleLineWidthChange}
         disabled={!summary}
       />
@@ -462,7 +470,7 @@
       disabled={!summary}
     >
       <DownloadIcon class="size-4" />
-      <span class="truncate">Export GPX</span>
+      <span class="truncate">{$t("inspector.exportGpx")}</span>
     </Button>
     <Button
       variant="outline"
@@ -472,7 +480,7 @@
       disabled={!summary}
     >
       <FileOutputIcon class="size-4" />
-      <span class="truncate">Export PLT</span>
+      <span class="truncate">{$t("inspector.exportPlt")}</span>
     </Button>
     <Button
       variant="outline"
@@ -522,7 +530,7 @@
       disabled={!summary}
     >
       <Trash2Icon class="size-4" />
-      <span class="truncate">Delete track</span>
+      <span class="truncate">{$t("inspector.deleteTrack")}</span>
     </Button>
   </section>
 </div>

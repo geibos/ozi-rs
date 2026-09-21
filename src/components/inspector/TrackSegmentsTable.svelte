@@ -133,14 +133,14 @@
 
 <section
   class="bg-card border-border flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-card)] border"
-  aria-label="Segments and points"
+  aria-label={$t("inspector.segmentsPoints")}
 >
   <header
     class="border-border flex items-center justify-between border-b px-3 py-2"
   >
     <span
-      class="text-muted-foreground/80 text-[10px] font-semibold uppercase tracking-wider"
-      >Segments / Points</span
+      class="text-muted-foreground/80 text-[10px] font-semibold tracking-wider uppercase"
+      >{$t("inspector.segmentsPoints")}</span
     >
     <Button
       variant={$editModeActive ? "default" : "outline"}

@@ -49,6 +49,33 @@ describe("i18n locale store", () => {
     expect(get(t)("palette.saveProject")).toBe("Save project…");
   });
 
+  /**
+   * A half-finished translation pass leaves English strings in a Russian UI,
+   * and the fallback in `translate` hides it: the key resolves, so nothing
+   * fails. Comparing the two key sets is the only thing that catches it.
+   */
+  it("keeps both dictionaries on the same key set", async () => {
+    const { dictionaryKeys } = await loadI18n();
+    const en = new Set(dictionaryKeys("en"));
+    const ru = new Set(dictionaryKeys("ru"));
+    expect([...en].filter((k) => !ru.has(k))).toEqual([]);
+    expect([...ru].filter((k) => !en.has(k))).toEqual([]);
+  });
+
+  it("translates every inspector key into Russian, not through the fallback", async () => {
+    const { dictionaryKeys, t, setLocale } = await loadI18n();
+    setLocale("ru");
+    const translate = get(t);
+    const english = await loadI18n();
+    english.setLocale("en");
+    const inEnglish = get(english.t);
+    for (const key of dictionaryKeys("en").filter((k) =>
+      k.startsWith("inspector."),
+    )) {
+      expect(translate(key)).not.toBe(inEnglish(key));
+    }
+  });
+
   it("ignores a corrupted stored locale", async () => {
     localStorage.setItem("ozi:locale", "xx");
     vi.stubGlobal("navigator", { language: "ru-RU" });

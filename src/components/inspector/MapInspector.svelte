@@ -15,6 +15,7 @@
   import { Button } from "$lib/components/ui/button";
   import { getOziMetadata, revealBundle } from "$lib/api";
   import { activeMap, selectedMapInfo } from "$lib/stores";
+  import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import type { OziMetadataDto } from "$lib/types";
 
@@ -85,7 +86,7 @@
     </div>
     <div class="min-w-0 flex-1">
       <h2
-        class="text-foreground truncate text-sm font-semibold leading-tight"
+        class="text-foreground truncate text-sm leading-tight font-semibold"
         title={$selectedMapInfo?.packageName}
       >
         {$selectedMapInfo?.packageName ?? "—"}
@@ -101,32 +102,33 @@
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-4"
-    aria-label="Calibration metadata"
+    aria-label={$t("inspector.calibration")}
   >
     <h3
-      class="text-muted-foreground/80 mb-3 text-[10px] font-semibold uppercase tracking-wider"
+      class="text-muted-foreground/80 mb-3 text-[10px] font-semibold tracking-wider uppercase"
     >
-      Calibration
+      {$t("inspector.calibration")}
     </h3>
     {#if loading}
-      <p class="text-muted-foreground text-xs">Loading metadata…</p>
+      <p class="text-muted-foreground text-xs">
+        {$t("inspector.loadingMetadata")}
+      </p>
     {:else if metadata}
       <dl class="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-2 text-xs">
         <dt class="text-muted-foreground">CRS</dt>
         <dd class="font-mono">{metadata.projection || "—"}</dd>
-        <dt class="text-muted-foreground">Datum</dt>
+        <dt class="text-muted-foreground">{$t("inspector.datum")}</dt>
         <dd class="font-mono">{metadata.datum || "—"}</dd>
-        <dt class="text-muted-foreground">Bounds</dt>
+        <dt class="text-muted-foreground">{$t("inspector.bounds")}</dt>
         <dd class="font-mono text-[11px]">{formatBounds(metadata.bounds)}</dd>
-        <dt class="text-muted-foreground">Resolution</dt>
+        <dt class="text-muted-foreground">{$t("inspector.resolution")}</dt>
         <dd class="font-mono">{formatResolution(metadata.levels)}</dd>
-        <dt class="text-muted-foreground">Native zoom</dt>
+        <dt class="text-muted-foreground">{$t("inspector.nativeZoom")}</dt>
         <dd class="font-mono">{metadata.native_zoom}</dd>
       </dl>
     {:else}
       <p class="text-muted-foreground text-xs">
-        No OZF2 calibration metadata available (this map may be a SQLite
-        bundle).
+        {$t("inspector.noCalibration")}
       </p>
     {/if}
   </section>
@@ -139,7 +141,7 @@
       onclick={handleReveal}
     >
       <FolderOpenIcon class="size-4" />
-      Reveal in Finder
+      {$t("inspector.revealInFinder")}
     </Button>
   </section>
 </div>

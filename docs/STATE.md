@@ -10,7 +10,7 @@ visibility, isolate, coordinates and a locate button on every row — after trac
 triage, Russian by default, track search, catalogue repair, row density, dev
 signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 269 Rust tests and 295 frontend tests;
+rustfmt, clippy, type-checks, 269 Rust tests and 297 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -71,6 +71,7 @@ errors surfaced.
   reference is missing several commands. Listed in the
   `codify-architecture-decisions` design under "Findings", fixed by its task 2.6.
 
-Localization is done for the shell, the rails and the three library tabs. What
-is still English: the Track Inspector's field labels, the command palette's own
-entries, and the bundle loader. Those are the next translation pass.
+Localization is done for the shell, the rails, the three library tabs and all
+four inspectors. What is still English: the command palette's own entries and
+the bundle loader. A test now holds both dictionaries to the same key set, so a
+half-finished pass fails instead of falling back to English silently.
