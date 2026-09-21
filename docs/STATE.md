@@ -193,45 +193,46 @@ existing requirements before writing a delta against it.
   the visible text at that. WKWebView publishes a control's `aria-label`, not
   the text inside it, so the matchers read the label now and accept either
   language.
-- **The Mac2 driver host still dies at session creation** (2026-09-21, late;
-  the authentication block is cleared, the remaining cause is not found).
-  `just smoke` fails with "'GET /status' cannot be proxied to Mac2 Driver
-  server because its process is not running (probably crashed)".
+- **The Mac2 driver cannot enable automation mode** (2026-09-22; the cause is
+  now known and the fix is the owner's). `just smoke` fails at session
+  creation with "'GET /status' cannot be proxied to Mac2 Driver server because
+  its process is not running (probably crashed)". That is the symptom. The
+  cause, visible for the first time because `appium:showServerLogs` is now on
+  (`tools/ozi-rs-mcp/src/appium.rs`):
 
-  What was ruled out, each by running it:
+      Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+      Code=1000 "Timed out while enabling automation mode."
 
-  - *The stale system authentication.* Earlier the WebDriverAgent runner failed
-    with `com.apple.LocalAuthentication Code=-4 "System authentication is
-    running."` because a `coreautha` agent left over from 16:44 never released
-    the session. That agent is gone and the runner now starts silently.
-  - *A wedged Appium server.* It had been up since 11:21. Restarted; the
-    failure is identical.
-  - *The WebDriverAgent build.* The driver's own command,
+  **What this means.** Enabling automation mode is macOS asking for the
+  Accessibility grant that lets a test runner drive the interface. It times out
+  when the grant is missing for the *responsible* application — the one that
+  spawned the chain — or when the permission dialog appeared and nobody
+  answered it. The grant attaches to the application that started `appium`, not
+  to `appium` itself.
 
-        cd ~/.appium/node_modules/appium-mac2-driver
-        xcodebuild build-for-testing test-without-building \
-          -project WebDriverAgentMac/WebDriverAgentMac.xcodeproj \
-          -scheme WebDriverAgentRunner COMPILER_INDEX_STORE_ENABLE=NO
+  That explains everything observed. Run by hand from a shell that already has
+  the grant, every piece works: `xcodebuild build-for-testing
+  test-without-building` reports `** TEST BUILD SUCCEEDED **` and WebDriverAgent
+  opens port 10100 in four seconds. Spawned by an `appium` that was started
+  from a host without the grant, the same command times out here.
 
-    reports `** TEST BUILD SUCCEEDED **`, and WebDriverAgent opens its port
-    within **four seconds** — checked by polling 127.0.0.1:10100 while it runs.
-  - *A leftover process holding that port.* `lsof -nP -iTCP:10100` is empty and
-    no `WebDriverAgentRunner` or `xcodebuild` process is left over.
+  **What to try, in order:**
 
-  So every piece works when run by hand, and only fails when Appium spawns it.
-  The next thing to look at is the environment the driver's child process
-  inherits — the Appium server used here was started from an agent shell, which
-  is not the same environment as a terminal's. **Worth trying first: start the
-  server from your own terminal** (`! appium --address 127.0.0.1 --port 4723`)
-  and run `just smoke` against that.
+  1. Start the Appium server from your own terminal — `! appium --address
+     127.0.0.1 --port 4723` — and run `just smoke` against it. If a permission
+     dialog appears, answer it.
+  2. If it does not appear, add your terminal application (and, if it is listed,
+     `node`) under System Settings → Privacy & Security → **Accessibility**, and
+     restart the terminal so the grant takes effect.
+  3. The stale `coreautha` block from 2026-09-21 is gone and is not this.
 
-  The driver's xcodebuild output was suppressed through all of this, which is
-  why the crash said nothing twice over. `appium:showServerLogs` is on now
-  (`tools/ozi-rs-mcp/src/appium.rs`), so the next failed session carries the
-  reason in the Appium log instead of only the symptom.
+  Ruled out, each by running it: a wedged Appium server (restarted twice, one
+  of them outside the agent's sandbox — identical failure); the WebDriverAgent
+  build; a leftover process holding port 10100 (`lsof -nP -iTCP:10100` empty);
+  and the earlier `com.apple.LocalAuthentication` block, which was a different
+  error and is cleared.
 
-  Two attempts is the limit per `docs/agent-verification.md`, and both were
-  spent, so the gate was not run a third time.
+  Thirty-six changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run
