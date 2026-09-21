@@ -14,4 +14,4 @@
 ## 3. Verification
 
 - [x] 3.1 `just ci` green
-- [ ] 3.2 Screenshot in `docs/progress/`
+- [x] 3.2 Screenshot in `docs/progress/`
