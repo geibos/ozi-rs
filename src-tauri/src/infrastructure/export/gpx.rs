@@ -179,6 +179,138 @@ mod tests {
         WaypointId,
     };
 
+    /// What survives a trip out of the app and back in.
+    ///
+    /// FTP upload of tracks is planned, and what goes up is this file. Until
+    /// now both halves were tested apart — the writer's XML, the reader's
+    /// parse — and nothing checked that a track handed to one comes back from
+    /// the other. A field record is a record: names, the break between two
+    /// sittings, the coordinates, and the times that make a track a timeline
+    /// rather than a shape.
+    #[test]
+    fn a_track_survives_the_trip_out_and_back() {
+        use crate::infrastructure::import::gpx::import_gpx_file;
+        use chrono::{TimeZone, Utc};
+
+        let mut track = Track::new(TrackId::new(1), "20260708_Ветер2");
+        let mut first = TrackSegment::new(TrackSegmentId::new(1));
+        for (i, (lat, lon)) in [(59.95243, 31.59681), (59.95335, 31.60164)]
+            .into_iter()
+            .enumerate()
+        {
+            first.add_point(
+                TrackPoint::new(TrackPointId::new(i as u64 + 1), lat, lon)
+                    .with_timestamp(Utc.with_ymd_and_hms(2026, 7, 8, 9, i as u32, 0).unwrap()),
+            );
+        }
+        // A second sitting: the gap between them is part of the record.
+        let mut second = TrackSegment::new(TrackSegmentId::new(2));
+        for (i, (lat, lon)) in [(59.94455, 31.65927), (59.94659, 31.67108)]
+            .into_iter()
+            .enumerate()
+        {
+            second.add_point(TrackPoint::new(TrackPointId::new(i as u64 + 10), lat, lon));
+        }
+        track.add_segment(first);
+        track.add_segment(second);
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("out.gpx");
+        super::export_tracks_to_gpx_file(std::slice::from_ref(&track), &path).expect("export");
+
+        let back = import_gpx_file(&path).expect("import what we just wrote");
+        let tracks = back.tracks();
+        assert_eq!(tracks.len(), 1, "one track out, one track back");
+        let returned = &tracks[0];
+
+        assert_eq!(
+            returned.name(),
+            "20260708_Ветер2",
+            "the name, Cyrillic and all"
+        );
+        assert_eq!(
+            returned.segments().len(),
+            2,
+            "the break between two sittings is not a detail: joined, the track \
+             claims a straight line across the gap"
+        );
+
+        let out: Vec<(f64, f64)> = track
+            .segments()
+            .iter()
+            .flat_map(|s| s.points().iter().map(|p| (p.latitude(), p.longitude())))
+            .collect();
+        let home: Vec<(f64, f64)> = returned
+            .segments()
+            .iter()
+            .flat_map(|s| s.points().iter().map(|p| (p.latitude(), p.longitude())))
+            .collect();
+        assert_eq!(home, out, "every point, in order, to the same precision");
+
+        let times: Vec<_> = returned.segments()[0]
+            .points()
+            .iter()
+            .map(|p| p.timestamp())
+            .collect();
+        assert_eq!(
+            times,
+            vec![
+                Some(Utc.with_ymd_and_hms(2026, 7, 8, 9, 0, 0).unwrap()),
+                Some(Utc.with_ymd_and_hms(2026, 7, 8, 9, 1, 0).unwrap()),
+            ],
+            "the times that make a track a timeline"
+        );
+        assert!(
+            returned.segments()[1]
+                .points()
+                .iter()
+                .all(|p| p.timestamp().is_none()),
+            "and points that never had one still do not"
+        );
+    }
+
+    /// A known gap, pinned so it is a fact rather than a surprise.
+    ///
+    /// The writer emits the track's colour as `gpxx:DisplayColor`; the reader
+    /// drops it, because the `gpx` crate does not surface extensions at all
+    /// and reading one would need a second pass over the XML. So a track that
+    /// leaves the app and comes back is the default colour.
+    ///
+    /// Nothing about the track itself is lost — the colour lives in the `.ozp`
+    /// project file, and GPX is the interchange format, not the record. When
+    /// this is fixed, this test fails, which is the point of it.
+    #[test]
+    fn a_round_trip_loses_the_track_colour() {
+        use crate::infrastructure::import::gpx::import_gpx_file;
+
+        let mut track = Track::new(TrackId::new(1), "coloured");
+        let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+        segment.add_point(TrackPoint::new(TrackPointId::new(1), 59.9, 31.5));
+        segment.add_point(TrackPoint::new(TrackPointId::new(2), 59.91, 31.51));
+        track.add_segment(segment);
+        // Not the default red: that would come back by coincidence and the
+        // test would record a fact that is not one.
+        track.style_mut().color = [0, 0, 255, 255];
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("coloured.gpx");
+        super::export_tracks_to_gpx_file(std::slice::from_ref(&track), &path).expect("export");
+
+        let written = std::fs::read_to_string(&path).expect("read back");
+        assert!(
+            written.contains("<gpxx:DisplayColor>Blue</gpxx:DisplayColor>"),
+            "the writer does say what colour the track is"
+        );
+
+        let back = import_gpx_file(&path).expect("import");
+        assert_eq!(
+            back.tracks()[0].style().color,
+            [255, 0, 0, 255],
+            "and the reader does not hear it: the track comes back the default \
+             red, not the blue it went out as — see docs/backlog.md"
+        );
+    }
+
     #[test]
     fn rgba_to_garmin_color_maps_pure_red() {
         assert_eq!(rgba_to_garmin_color([255, 0, 0, 255]), "Red");

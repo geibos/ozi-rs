@@ -10,6 +10,37 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — what survives the trip
+
+FTP upload of tracks is planned, and the file that goes up is a GPX this app
+writes. Both halves of that were tested apart — the writer's XML, the reader's
+parse — and nothing checked that a track handed to one comes back from the
+other. For a search record that matters in specifics: the Cyrillic name, the
+break between two sittings, every coordinate in order, and the times that make
+a track a timeline rather than a shape.
+
+It passes. All of that survives, and is now pinned.
+
+What does not is the colour: the writer emits `gpxx:DisplayColor`, the reader
+drops it, because the `gpx` crate does not surface extensions at all and
+reading one needs a second pass over the XML. Nothing about the track is lost
+by that — the colour lives in the `.ozp`, and GPX is the interchange format,
+not the record — so the gap is pinned rather than closed, and the test fails
+when someone closes it.
+
+The first version of that test asserted against red. Red is the default track
+colour, so it would have passed whether or not the colour survived: it would
+have recorded a fact that was not one. It caught itself only because I ran it
+expecting it to fail and it did not.
+
+| | |
+|---|---|
+| Evidence | a round trip over a two-segment track, and the colour gap against a colour that is not the default |
+| Automated gates | `just ci` green (309 Rust, 375 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — reading the specs I had been writing against
 
 Yesterday's slice caught one of my own changes contradicting a baseline

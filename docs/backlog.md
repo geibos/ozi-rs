@@ -34,6 +34,14 @@ decision.
 
 ## Engineering
 
+- **A GPX round trip loses the track's colour.** The writer emits
+  `gpxx:DisplayColor`; the reader drops it, because the `gpx` crate (0.10) does
+  not surface extensions at all — reading one needs a second pass over the XML,
+  matching tracks to colours by order. Pinned by a test in
+  `src-tauri/src/infrastructure/export/gpx.rs`, which fails when this is fixed.
+  Low cost to the record: the colour lives in the `.ozp`, and GPX is the
+  interchange format.
+
 - **A new requirement may already exist, saying the opposite.** Four deltas
   this session were written as ADDED against a baseline requirement that
   already covered the ground with a different rule — the catalogue merge, the
