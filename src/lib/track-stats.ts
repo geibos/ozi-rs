@@ -16,11 +16,13 @@ interface Units {
   h: string;
   m: string;
   pts: string;
+  /** English abbreviates one point as "pt"; the Russian one does not inflect. */
+  pt: string;
 }
 
 const UNITS: Record<Locale, Units> = {
-  ru: { km: "км", d: "д", h: "ч", m: "мин", pts: "тчк" },
-  en: { km: "km", d: "d", h: "h", m: "m", pts: "pts" },
+  ru: { km: "км", d: "д", h: "ч", m: "мин", pts: "тчк", pt: "тчк" },
+  en: { km: "km", d: "d", h: "h", m: "m", pts: "pts", pt: "pt" },
 };
 
 function units(locale: Locale): Units {
@@ -52,7 +54,8 @@ export function formatDurationSeconds(
 }
 
 export function formatPointCount(pointCount: number, locale: Locale): string {
-  return `${pointCount} ${units(locale).pts}`;
+  const u = units(locale);
+  return `${pointCount} ${pointCount === 1 ? u.pt : u.pts}`;
 }
 
 /**
@@ -68,6 +71,14 @@ export function formatTrackStats(
   pointCount: number,
   locale: Locale,
 ): string {
+  // A track of fewer than two points has no length and no elapsed span: it
+  // read "0.0 км · 0мин · 1 тчк", two numbers that measure nothing in front of
+  // the one that does. Such tracks only became visible in the list once the
+  // rows stopped coming from the map's geometry.
+  if (pointCount < 2) {
+    return formatPointCount(pointCount, locale);
+  }
+
   const segments = [formatDistanceKm(distanceKm, locale)];
   if (durationSeconds !== null && durationSeconds !== undefined) {
     segments.push(formatDurationSeconds(durationSeconds, locale));

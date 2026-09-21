@@ -10,6 +10,31 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — numbers that mean something
+
+Two numbers on screen that say nothing.
+
+The one-point track, now that it has a row at all, read `0.0 км · 0мин · 1 тчк`
+— two measurements of nothing standing in front of the one measurement there
+is. A track with fewer than two points has no length and no elapsed span, so it
+says how many points it has and stops. English also says "1 pt" rather than
+"1 pts" now.
+
+And while the catalogue refreshes, the hint said only that it was refreshing.
+The refresh can be stopped as of two slices ago, and the decision to stop rests
+on exactly the fact the hint was keeping back: how much is already there. It
+says "Обновление списка… уже 5 300" now. A crew that came for one search does
+not need the other twelve thousand — but they do need to know whether theirs
+has arrived.
+
+| | |
+|---|---|
+| Evidence | tests on the short track in both languages, and the older `0.0 km · 0m · 0 pts` expectation updated with its reason |
+| Automated gates | `just ci` green (300 Rust, 362 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — nothing typed in English
 
 Having found English on the library rows, I swept the rest of the components

@@ -114,9 +114,10 @@ and the palette slice; these were not.
 - **The catalogue is walked in full at every launch**, holding the busy flag.
   The "no way to stop it" half is done on 2026-09-21 in
   `stop-waiting-for-the-catalogue`: the walk is cancellable, the loader offers
-  a stop while it runs, and a stopped walk is not written over the cache. Still
-  open: no page counter ("page 12 of ?"), and the localStorage cache only ever
-  grows.
+  a stop while it runs, and a stopped walk is not written over the cache. The
+  hint states how many projects are listed so far, which is what the decision
+  to stop is actually made on — a page number would have said less. Still open:
+  the localStorage cache only ever grows.
 - **Small targets and no keyboard path.** 28px rows, 10px badges, and the
   virtualized list renders only the visible rows, so there is no tab order over
   the catalogue and screen readers see a handful of buttons out of thirteen

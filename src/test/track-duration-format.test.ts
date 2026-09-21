@@ -60,3 +60,21 @@ describe("a start time a person can read", () => {
     expect(formatTimestamp("not a date", "ru")).toBe("not a date");
   });
 });
+
+/**
+ * A track of one point has no length and no elapsed span. It showed
+ * "0.0 км · 0мин · 1 тчк" — two numbers that are not measurements of anything,
+ * in front of the one that is. Such tracks became visible in the list on
+ * 2026-09-21; before that they had no row at all.
+ */
+describe("a track with nothing to measure", () => {
+  it("says only how many points it has", () => {
+    expect(formatTrackStats(0, 0, 1, "ru")).toBe("1 тчк");
+    expect(formatTrackStats(0, 0, 1, "en")).toBe("1 pt");
+    expect(formatTrackStats(0, null, 0, "ru")).toBe("0 тчк");
+  });
+
+  it("measures a track that has two points", () => {
+    expect(formatTrackStats(0.4, 120, 2, "ru")).toBe("0.4 км · 2мин · 2 тчк");
+  });
+});

@@ -40,7 +40,9 @@ describe("Library Tracks tab statistics formatter", () => {
     expect(formatTrackStats(12.345, 60, 10, "en")).toBe(
       "12.3 km · 1m · 10 pts",
     );
-    expect(formatTrackStats(0, 0, 0, "en")).toBe("0.0 km · 0m · 0 pts");
+    // A track with fewer than two points has no length and no span to round;
+    // it says how many points it has and nothing else.
+    expect(formatTrackStats(0, 0, 0, "en")).toBe("0 pts");
   });
 });
 

@@ -400,7 +400,15 @@
     {#if $projectsLoading}
       <div class="refresh-hint" data-testid="catalog-refreshing">
         <span class="spinner"></span>
-        {$t("loader.refreshing")}
+        <!-- How far it has got, because that is what the decision to stop is
+             made on: a crew with the search they came for does not need the
+             other twelve thousand. -->
+        {$projects.length === 0
+          ? $t("loader.refreshing")
+          : $t("loader.refreshingCount").replace(
+              "{count}",
+              String($projects.length),
+            )}
         <button
           class="stop-refresh-btn"
           onclick={handleStopRefresh}
