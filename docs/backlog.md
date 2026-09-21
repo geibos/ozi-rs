@@ -46,10 +46,12 @@ decision.
 - ~~Choose what to download.~~ Done on 2026-09-21: the loader lists the
   bundle's top level with sizes and everything checked; clearing an entry
   leaves it on the server. The app does not decide what to skip.
-- **Remove the legacy element defaults from `app.css`.** They are in `@layer
-  base` now so they no longer beat component utilities, but four rules still
-  lean on them. Removing them needs the screenshot matrix to prove nothing
-  regresses.
+- **Remove the legacy element defaults from `app.css`.** All of them are in
+  `@layer base` now (the `input`/`select` pair joined the buttons on
+  2026-09-21, having quietly beaten every `Input` component's utilities until
+  then), so they no longer override a component. Deleting them outright still
+  needs a pass over the raw `<input>`/`<button>` sites that lean on them — the
+  stand makes that cheap now.
 
 ## Bundle flow — from the 2026-09-21 survey
 

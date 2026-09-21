@@ -125,20 +125,26 @@ body,
   }
 }
 
-input,
-select {
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border: 1px solid hsl(var(--input));
-  border-radius: 4px;
-  padding: 3px 6px;
-  font-size: 12px;
-}
+/* Same story as the buttons above: these predate the shadcn primitives and
+ * were still unlayered, so `padding: 3px 6px` and `font-size: 12px` silently
+ * beat the utilities every `Input` component sets. Inside `@layer base` they
+ * are what a raw `<input>` looks like and nothing more. */
+@layer base {
+  input,
+  select {
+    background: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border: 1px solid hsl(var(--input));
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+  }
 
-select:focus,
-input:focus {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: -1px;
+  select:focus,
+  input:focus {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: -1px;
+  }
 }
 
 * {
