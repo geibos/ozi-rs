@@ -168,10 +168,12 @@ and the palette slice; these were not.
   `z-50`, the download popup `z-40`, and the toaster sits in the same corner.
   Opening the loader to queue the next map blocks the map and hides the running
   download.
-- **The filter matches names only and miscounts.** Project names are latin
-  transliterations, so a Cyrillic query finds nothing, and the count beside the
-  box shows the catalogue total rather than the number of matches. No sort, no
-  "recent", no jump to today's search.
+- ~~The filter matches names only and miscounts.~~ Both halves are done: the
+  count reads `N of M` and the row carries a `cached` badge, and a Cyrillic
+  query finds a latin name as of 2026-09-22 in `search-in-the-crews-language`
+  — `src/lib/translit.ts` spells each Russian letter every way the catalogue
+  spells it, because the catalogue is not consistent with itself. Still open:
+  no sort, no "recent", no jump to today's search.
 - ~~The preview timeout is a lie.~~ Done on 2026-09-21 in
   `one-preview-at-a-time`: only the newest preview may land, a preview no
   longer releases a busy flag it never took, the loader matches by slug rather

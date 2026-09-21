@@ -34,4 +34,23 @@ describe("filterProjects", () => {
   it("returns everything for a blank query", () => {
     expect(filterProjects(catalogue, "   ", false)).toHaveLength(3);
   });
+
+  /**
+   * The crew types Russian; the catalogue is spelled in latin. See
+   * `src/lib/translit.ts` for why one letter needs several spellings.
+   */
+  it("finds a latin name from its Russian spelling", () => {
+    expect(filterProjects(catalogue, "Лаврово", false)).toEqual([catalogue[0]]);
+    expect(filterProjects(catalogue, "Колпино", false)).toEqual([catalogue[1]]);
+    expect(filterProjects(catalogue, "Гатчина", false)).toEqual([catalogue[2]]);
+  });
+
+  it("combines a Russian query with the downloaded filter", () => {
+    expect(filterProjects(catalogue, "Гатчина", true)).toEqual([]);
+    expect(filterProjects(catalogue, "Лаврово", true)).toEqual([catalogue[0]]);
+  });
+
+  it("a Russian query that matches nothing still matches nothing", () => {
+    expect(filterProjects(catalogue, "Мурманск", false)).toEqual([]);
+  });
 });

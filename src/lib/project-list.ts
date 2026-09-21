@@ -4,6 +4,8 @@
  * Extracted from the component so the rules are testable: the list is the
  * only way into a bundle and it carries about thirteen thousand rows.
  */
+import { transliteratedPattern } from "./translit";
+
 export interface ProjectRow {
   slug: string;
   name: string;
@@ -17,6 +19,11 @@ export interface ProjectRow {
  * of the slug, so a query that looks like a date has to reach both — and
  * `onlyCached` keeps the bundles that are already on disk, which is the only
  * list that means anything without a signal.
+ *
+ * A Russian query is matched through `transliteratedPattern`: the catalogue is
+ * spelled in latin, so `Лаврово` would otherwise find nothing. The pattern is
+ * built once per call rather than per row — this runs over about thirteen
+ * thousand entries on every debounced keystroke.
  */
 export function filterProjects<T extends ProjectRow>(
   projects: T[],
@@ -24,9 +31,12 @@ export function filterProjects<T extends ProjectRow>(
   onlyCached: boolean,
 ): T[] {
   const needle = query.trim().toLocaleLowerCase();
+  const pattern = transliteratedPattern(query);
   return projects.filter((project) => {
     if (onlyCached && project.cached !== true) return false;
     if (needle === "") return true;
+    if (pattern)
+      return pattern.test(project.name) || pattern.test(project.slug);
     return (
       project.name.toLocaleLowerCase().includes(needle) ||
       project.slug.toLocaleLowerCase().includes(needle)

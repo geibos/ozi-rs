@@ -10,6 +10,43 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — typing the name you were given
+
+The catalogue names every search in latin transliteration — `2026-07-08_Lavrovo`,
+`2026-09-20_Schuvalovo`, `2026-07-14_Sagra` — and the filter matched the query
+as a literal substring. A crew that types `Лаврово`, which is the name on the
+radio and the name of the place they are standing in, got an empty list of
+thirteen thousand rows.
+
+The instruction that would have made it work — "type it in English" — is not one
+a crew should have to remember, and it is not one they could follow reliably
+anyway: the catalogue itself writes `ш` as `sch` in one search and `sh` in the
+next, `ж` as `zh` here and `j` there. So converting the query to a single
+transliteration would have traded one empty list for another.
+
+Instead the query becomes a pattern: each Cyrillic letter matches any of the
+latin spellings in use for it, and itself, so a Cyrillic entry is still found.
+A query with no Cyrillic takes the path it always took — the same results, and
+no pattern built for the common case, which matters at thirteen thousand rows
+per debounced keystroke.
+
+Checked on the stand against the fixtures the Rust core writes:
+
+| Typed | Listed | Count |
+|---|---|---|
+| `Шувалово` | 2026 09 20 Schuvalovo | 1 из 3 |
+| `Лаврово` | 2026 07 08 Lavrovo | 1 из 3 |
+| `Мурманск` | — | 0 из 3 |
+| `Sagra` | 2026 07 14 Sagra | 1 из 3 |
+
+| | |
+|---|---|
+| Change | `openspec/changes/search-in-the-crews-language/` |
+| Automated gates | `just ci` green (320 Rust, 452 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the toast that sat on the download
 
 One tail from the bundle-flow survey went unchecked until now: the toaster and
