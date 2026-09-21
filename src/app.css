@@ -88,33 +88,41 @@ body,
   font-size: 13px;
 }
 
-button {
-  cursor: pointer;
-  background: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  transition: background 0.1s;
-}
+/* These element defaults predate the shadcn primitives and must lose to any
+ * Tailwind utility a component sets. Unlayered rules beat every `@layer`, so
+ * outside a layer `padding: 4px 10px` here silently won over `p-0` on a 24px
+ * icon trigger and left no room for its glyph. Inside `@layer base` the
+ * utilities win, while a component's own scoped `<style>` (also unlayered)
+ * still overrides these. */
+@layer base {
+  button {
+    cursor: pointer;
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    transition: background 0.1s;
+  }
 
-button:hover {
-  background: hsl(var(--accent));
-}
+  button:hover {
+    background: hsl(var(--accent));
+  }
 
-button:active {
-  background: hsl(var(--muted));
-}
+  button:active {
+    background: hsl(var(--muted));
+  }
 
-button.primary {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-color: hsl(var(--primary));
-}
+  button.primary {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary));
+  }
 
-button.primary:hover {
-  filter: brightness(1.1);
+  button.primary:hover {
+    filter: brightness(1.1);
+  }
 }
 
 input,
