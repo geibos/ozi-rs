@@ -1,5 +1,6 @@
 use crate::application::{
-    ActiveMapKind, ActiveMapSelection, LizaMapPackage, LizaProject, LizaProjectSummary, MapCenter,
+    ActiveMapKind, ActiveMapSelection, BundleEntry, LizaMapPackage, LizaProject,
+    LizaProjectSummary, MapCenter,
 };
 use crate::infrastructure::import::{
     ArchiveEntryKind, SupportedArchiveEntryKind, extract_zip_entries_to_directory,
@@ -596,6 +597,13 @@ pub struct BundleDownloadConfig {
     /// Cancellation token; when triggered, in-flight downloads abort and the
     /// orchestrator returns [`CANCEL_ERROR`].
     pub cancel: CancelToken,
+    /// Top-level entries to leave on the server.
+    ///
+    /// A bundle carries print sheets and Android tile packs this app cannot
+    /// open, and on a phone tether they are most of the transfer. The choice
+    /// of what to skip belongs to the operator, so nothing is skipped unless
+    /// it is named here.
+    pub skip_top_level: Vec<String>,
 }
 
 /// Download a LizaAlert project bundle with per-file notifications.
@@ -626,10 +634,11 @@ pub async fn download_bundle_concurrent(
     let mut files = tokio::task::spawn_blocking({
         let url = config.url.clone();
         let local_dir = config.local_dir.clone();
+        let skip = config.skip_top_level.clone();
         move || {
             let mut out = Vec::new();
             let root_rel = String::new();
-            collect_remote_files_rel(&url, &local_dir, &root_rel, &mut out)?;
+            collect_remote_files_rel(&url, &local_dir, &root_rel, &skip, &mut out)?;
             Ok::<_, String>(out)
         }
     })
@@ -797,6 +806,7 @@ pub async fn open_project_async(
     root: PathBuf,
     cancel: CancelToken,
     concurrency: usize,
+    skip_top_level: Vec<String>,
     tx: mpsc::UnboundedSender<DownloadNotification>,
 ) -> Result<LizaProject, String> {
     // Probe the remote listing first. While it is reachable we always run the
@@ -827,6 +837,7 @@ pub async fn open_project_async(
                 url: summary.url.clone(),
                 local_dir: source_root,
                 cancel: cancel.clone(),
+                skip_top_level,
             };
             download_bundle_concurrent(cfg, tx.clone()).await?;
         }
@@ -944,10 +955,14 @@ pub fn preview_project(summary: LizaProjectSummary, root: &Path) -> Result<LizaP
                         parse_center(&read_text_file_lossy(&local).map_err(|e| e.to_string())?)?
                     }
                 };
+            // The same listing already fetched, as the operator's menu of
+            // what not to download.
+            let contents = parse_bundle_contents(&summary.url, &listing);
             Ok(LizaProject {
                 summary,
                 center,
                 maps: ozi,
+                contents,
             })
         }
         Err(err) => {
@@ -963,6 +978,7 @@ fn collect_remote_files_rel(
     url: &str,
     local_dir: &Path,
     rel_prefix: &str,
+    skip_top_level: &[String],
     output: &mut Vec<RemoteFileDownload>,
 ) -> Result<(), String> {
     let html = fetch_text(url)?;
@@ -974,6 +990,11 @@ fn collect_remote_files_rel(
         .collect();
 
     for entry in parse_directory_entries(url, &html)? {
+        // Only the top level is skippable: that is the granularity the
+        // listing shows the operator, so it is the granularity they choose in.
+        if rel_prefix.is_empty() && skip_top_level.iter().any(|name| name == &entry.name) {
+            continue;
+        }
         let child_url = entry.url.clone();
         let child_path = local_dir.join(&entry.name);
         let child_rel = if rel_prefix.is_empty() {
@@ -984,7 +1005,7 @@ fn collect_remote_files_rel(
 
         if entry.is_dir {
             fs::create_dir_all(&child_path).map_err(|err| err.to_string())?;
-            collect_remote_files_rel(&child_url, &child_path, &child_rel, output)?;
+            collect_remote_files_rel(&child_url, &child_path, &child_rel, skip_top_level, output)?;
         } else {
             let size_bytes = sizes_by_url.get(&child_url).copied();
             output.push(RemoteFileDownload {
@@ -1301,11 +1322,55 @@ fn load_cached_project_from_root(
     let center = parse_center(&coordinates_text)?;
     let maps = read_cached_map_packages(root, &summary.slug)?;
 
+    let contents = read_cached_bundle_contents(&project_source_root(root, &summary.slug));
+
     Ok(LizaProject {
         summary,
         center,
         maps,
+        contents,
     })
+}
+
+/// The bundle's top level, from a listing.
+fn parse_bundle_contents(base_url: &str, html: &str) -> Vec<BundleEntry> {
+    let sizes: std::collections::HashMap<String, u64> = parse_entry_sizes(html)
+        .into_iter()
+        .filter_map(|(href, bytes)| Some((resolve_listing_href(base_url, &href)?, bytes)))
+        .collect();
+
+    parse_directory_entries(base_url, html)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|entry| BundleEntry {
+            size_bytes: sizes.get(&entry.url).copied(),
+            name: entry.name,
+            is_dir: entry.is_dir,
+        })
+        .collect()
+}
+
+/// The bundle's top level, from disk — what an offline open can report.
+fn read_cached_bundle_contents(bundle_dir: &Path) -> Vec<BundleEntry> {
+    let Ok(entries) = fs::read_dir(bundle_dir) else {
+        return Vec::new();
+    };
+    let mut contents: Vec<BundleEntry> = entries
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = path.file_name()?.to_str()?.to_owned();
+            let metadata = entry.metadata().ok();
+            let is_dir = metadata.as_ref().is_some_and(|m| m.is_dir());
+            Some(BundleEntry {
+                name,
+                is_dir,
+                size_bytes: metadata.filter(|m| m.is_file()).map(|m| m.len()),
+            })
+        })
+        .collect();
+    contents.sort_by(|a, b| a.name.cmp(&b.name));
+    contents
 }
 
 fn read_cached_map_packages(
@@ -2583,6 +2648,75 @@ mod bundle_download_tests {
         server
     }
 
+    /// The owner's July note: the Android tile packs and the print sheets are
+    /// most of a bundle's weight and this app cannot open either. What to
+    /// leave behind is the operator's call, so nothing is skipped unless they
+    /// name it.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_named_top_level_entry_is_left_on_the_server() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(index_html(&[
+                ("00-manifest.json", false),
+                ("9-Map_4_print", true),
+                ("10-Tracks", true),
+            ])))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/9-Map_4_print/"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(index_html(&[("sheet-1.pdf", false)])),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/bundle/10-Tracks/"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_string(index_html(&[("a.gpx", false)])),
+            )
+            .mount(&server)
+            .await;
+        for file in [
+            "00-manifest.json",
+            "10-Tracks/a.gpx",
+            "9-Map_4_print/sheet-1.pdf",
+        ] {
+            Mock::given(method("GET"))
+                .and(path(format!("/bundle/{file}")))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1u8; 8]))
+                .mount(&server)
+                .await;
+        }
+
+        let tmp = tempdir();
+        let cfg = BundleDownloadConfig {
+            concurrency: DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            url: format!("{}/bundle/", server.uri()),
+            local_dir: tmp.path().to_path_buf(),
+            cancel: CancelToken::new(),
+            skip_top_level: vec!["9-Map_4_print".to_owned()],
+        };
+        let (tx, rx) = mpsc::unbounded_channel();
+        let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
+        let _ = collect_notifications(rx).await;
+        handle.await.expect("join").expect("download");
+
+        assert!(
+            tmp.path().join("00-manifest.json").exists(),
+            "what was not skipped still arrives"
+        );
+        assert!(
+            tmp.path().join("10-Tracks/a.gpx").exists(),
+            "including the folders below the top level"
+        );
+        assert!(
+            !tmp.path().join("9-Map_4_print/sheet-1.pdf").exists(),
+            "the named entry SHALL be left on the server"
+        );
+    }
+
     /// The operator presses one button and the app fetches the whole project
     /// directory. Until the scan reported a total, the panel could say "3 of
     /// 47 files" and nothing about whether that was ten megabytes or two
@@ -2614,6 +2748,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
         let (tx, rx) = mpsc::unbounded_channel();
         let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
@@ -2647,6 +2782,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
 
         let (tx, rx) = mpsc::unbounded_channel();
@@ -2740,6 +2876,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
 
         let (tx, mut rx) = mpsc::unbounded_channel();
@@ -2785,6 +2922,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
         let (tx, rx) = mpsc::unbounded_channel();
         let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
@@ -2841,6 +2979,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
         let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
@@ -2897,6 +3036,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: cancel.clone(),
+            skip_top_level: Vec::new(),
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
         let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));
@@ -2971,6 +3111,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", resume_server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
         let (tx2, rx2) = mpsc::unbounded_channel();
         let handle2 = tokio::spawn(download_bundle_concurrent(cfg2, tx2));
@@ -3052,6 +3193,7 @@ mod bundle_download_tests {
             tmp.path().to_path_buf(),
             CancelToken::new(),
             DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            Vec::new(),
             tx,
         ));
         let _ = collect_notifications(rx).await;
@@ -3105,6 +3247,7 @@ mod bundle_download_tests {
             tmp.path().to_path_buf(),
             CancelToken::new(),
             DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            Vec::new(),
             tx,
         ));
         let _ = collect_notifications(rx).await;
@@ -3168,6 +3311,7 @@ mod bundle_download_tests {
             url: format!("{}/bundle/", server.uri()),
             local_dir: tmp.path().to_path_buf(),
             cancel: CancelToken::new(),
+            skip_top_level: Vec::new(),
         };
         let (tx, rx) = mpsc::unbounded_channel();
         let handle = tokio::spawn(download_bundle_concurrent(cfg, tx));

@@ -12,8 +12,8 @@
 //! it is regenerated with `just fixtures`).
 
 use crate::application::{
-    ActiveMapKind, ActiveMapSelection, AppState, LizaMapPackage, LizaProject, LizaProjectSummary,
-    MapCenter,
+    ActiveMapKind, ActiveMapSelection, AppState, BundleEntry, LizaMapPackage, LizaProject,
+    LizaProjectSummary, MapCenter,
 };
 use crate::domain::{
     LayerId, Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId, Waypoint,
@@ -171,6 +171,33 @@ pub fn sample_app_state() -> AppState {
                     base_zoom: 17,
                     local_path: None,
                     size_bytes: Some(194_093_875),
+                },
+            ],
+            contents: vec![
+                BundleEntry {
+                    name: "2-Coordinates.txt".to_owned(),
+                    is_dir: false,
+                    size_bytes: Some(165),
+                },
+                BundleEntry {
+                    name: "6-Ozi(Win&Android)_Satell.zip".to_owned(),
+                    is_dir: false,
+                    size_bytes: Some(56_623_104),
+                },
+                BundleEntry {
+                    name: "8-Android&iOS".to_owned(),
+                    is_dir: true,
+                    size_bytes: None,
+                },
+                BundleEntry {
+                    name: "9-Map_4_print".to_owned(),
+                    is_dir: true,
+                    size_bytes: None,
+                },
+                BundleEntry {
+                    name: "10-Tracks".to_owned(),
+                    is_dir: true,
+                    size_bytes: None,
                 },
             ],
         }),

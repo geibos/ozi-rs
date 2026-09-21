@@ -12,6 +12,33 @@
   "current_project": {
     "center_lat": 59.95243,
     "center_lon": 31.59681,
+    "contents": [
+      {
+        "is_dir": false,
+        "name": "2-Coordinates.txt",
+        "size_bytes": 165
+      },
+      {
+        "is_dir": false,
+        "name": "6-Ozi(Win&Android)_Satell.zip",
+        "size_bytes": 56623104
+      },
+      {
+        "is_dir": true,
+        "name": "8-Android&iOS",
+        "size_bytes": null
+      },
+      {
+        "is_dir": true,
+        "name": "9-Map_4_print",
+        "size_bytes": null
+      },
+      {
+        "is_dir": true,
+        "name": "10-Tracks",
+        "size_bytes": null
+      }
+    ],
     "maps": [
       {
         "base_zoom": 16,

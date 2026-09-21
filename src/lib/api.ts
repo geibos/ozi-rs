@@ -91,8 +91,11 @@ export async function loadProjects(): Promise<void> {
  * MUST NOT `await` the download via this promise; subscribe to events
  * instead so the main thread stays responsive.
  */
-export async function loadProject(slug: string): Promise<string> {
-  return unwrap("load_project", commands.loadProject(slug));
+export async function loadProject(
+  slug: string,
+  skip: string[] = [],
+): Promise<string> {
+  return unwrap("load_project", commands.loadProject(slug, skip));
 }
 
 /**

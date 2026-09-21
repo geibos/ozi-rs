@@ -43,7 +43,7 @@ describe("bundle loader main-thread responsiveness", () => {
 
   it("loadProject API wrapper returns the download_id string", () => {
     expect(apiSource).toMatch(
-      /export async function loadProject\(slug: string\):\s*Promise<string>/,
+      /export async function loadProject\([\s\S]*?\): Promise<string>/,
     );
   });
 
@@ -59,7 +59,8 @@ describe("bundle loader main-thread responsiveness", () => {
       /async\s+function\s+handleOpenBundle\(\)\s*\{/,
     );
     expect(loaderSource).toMatch(/await\s+cancelDownload\(/);
-    expect(loaderSource).toMatch(/loadProject\(slug\)/);
+    // The call carries the operator's choice of what not to download.
+    expect(loaderSource).toMatch(/loadProject\(slug, Object\.keys\(skipped\)\)/);
   });
 
   it("project list is not blanket-disabled while a download is in flight", () => {

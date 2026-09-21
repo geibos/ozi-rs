@@ -211,6 +211,10 @@ const dictionaries = {
     "loader.selectProject": "Select a project on the left",
     "loader.loadingMaps": "Loading map list…",
     "loader.openBundle": "Open bundle (download)",
+    "loader.contents": "What to download",
+    "loader.contentsHint":
+      "Everything is fetched unless you clear it. Print sheets and Android tile packs are most of the weight and this app opens neither.",
+    "loader.folder": "folder",
     "loader.openLocalBundle": "Open local bundle…",
     "loader.setBundlesRoot": "Set bundles root…",
     "loader.cachedBadge": "cached",
@@ -425,6 +429,10 @@ const dictionaries = {
     "loader.selectProject": "Выберите проект слева",
     "loader.loadingMaps": "Загрузка списка карт…",
     "loader.openBundle": "Открыть бандл (скачать)",
+    "loader.contents": "Что скачивать",
+    "loader.contentsHint":
+      "Берётся всё, что отмечено. Печатные листы и Android-тайлы — бо́льшая часть веса, и приложение их не открывает.",
+    "loader.folder": "папка",
     "loader.openLocalBundle": "Открыть локальный бандл…",
     "loader.setBundlesRoot": "Папка для бандлов…",
     "loader.cachedBadge": "скачано",

@@ -43,8 +43,9 @@ decision.
 - ~~Partial bundle availability.~~ Checked on 2026-09-21: it already worked —
   a map whose file lands gets its local path and opens from disk. What was
   missing was telling the operator. Done, with a test pinning the capability.
-- **Choose what to download.** The owner rarely needs the Android `.sqlitedb`
-  maps; a type filter would cut most of the transfer (owner's July note).
+- ~~Choose what to download.~~ Done on 2026-09-21: the loader lists the
+  bundle's top level with sizes and everything checked; clearing an entry
+  leaves it on the server. The app does not decide what to skip.
 - **Remove the legacy element defaults from `app.css`.** They are in `@layer
   base` now so they no longer beat component utilities, but four rules still
   lean on them. Removing them needs the screenshot matrix to prove nothing

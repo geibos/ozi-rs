@@ -67,6 +67,14 @@
   // thirteen thousand rows and a crew without a signal can open the handful
   // that are already on disk.
   let onlyCached = $state(false);
+  /**
+   * Top-level bundle entries the operator cleared.
+   *
+   * Nothing is skipped by default: what a crew can spare is their call, not
+   * this code's. Print sheets and Android tile packs are usually most of the
+   * weight and this app opens neither, which is what the hint says.
+   */
+  let skipped = $state<Record<string, true>>({});
 
   $effect(() => {
     const value = projectFilter;
@@ -150,6 +158,9 @@
 
   async function handleSelectProject(slug: string) {
     selectedSlug = slug;
+    // A different bundle has different contents; carrying the previous
+    // choice over would silently skip a folder of the new one.
+    skipped = {};
     const name = $projects.find((p) => p.slug === slug)?.name ?? slug;
     previewPendingName = name;
     if (previewTimer !== null) clearTimeout(previewTimer);
@@ -215,7 +226,7 @@
     }
     resetBundleDownloadState(null);
     try {
-      const id = await loadProject(slug);
+      const id = await loadProject(slug, Object.keys(skipped));
       activeDownloadId.set(id || null);
     } catch (error) {
       activeDownloadId.set(null);
@@ -379,6 +390,36 @@
         <span class="project-name">{$currentProject.name}</span>
       {/if}
     </div>
+
+    {#if $currentProject && !previewPendingName && $currentProject.contents.length > 0}
+      <div class="contents-box" data-testid="bundle-contents">
+        <div class="contents-title">{$t("loader.contents")}</div>
+        {#each $currentProject.contents as entry (entry.name)}
+          <label class="contents-row">
+            <input
+              type="checkbox"
+              checked={skipped[entry.name] !== true}
+              onchange={(e) => {
+                const next = { ...skipped };
+                if (e.currentTarget.checked) {
+                  delete next[entry.name];
+                } else {
+                  next[entry.name] = true;
+                }
+                skipped = next;
+              }}
+            />
+            <span class="contents-name" title={entry.name}>{entry.name}</span>
+            <span class="contents-size">
+              {entry.is_dir
+                ? $t("loader.folder")
+                : (formatOptionalBytes(entry.size_bytes, $locale) ?? "")}
+            </span>
+          </label>
+        {/each}
+        <p class="contents-hint">{$t("loader.contentsHint")}</p>
+      </div>
+    {/if}
 
     {#if $currentProject && !previewPendingName}
       <div class="maps-actions">
@@ -658,6 +699,51 @@
     background: hsl(var(--border));
     color: hsl(var(--primary));
     font-weight: 500;
+  }
+
+  .contents-box {
+    border-bottom: 1px solid hsl(var(--secondary));
+    padding: 8px 10px;
+  }
+
+  .contents-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 4px;
+  }
+
+  .contents-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .contents-name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .contents-size {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: hsl(var(--muted-foreground));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .contents-hint {
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: hsl(var(--muted-foreground));
   }
 
   .maps-actions {

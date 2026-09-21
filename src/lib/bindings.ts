@@ -30,9 +30,17 @@ async loadProjects() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async loadProject(slug: string) : Promise<Result<string, string>> {
+/**
+ * Open a bundle, downloading what is missing.
+ * 
+ * `skip` names top-level entries to leave on the server — print sheets and
+ * Android tile packs are most of the transfer and this app cannot open them.
+ * Nothing is skipped unless the caller names it: the choice is the
+ * operator's, not a default this code decides for them.
+ */
+async loadProject(slug: string, skip: string[]) : Promise<Result<string, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("load_project", { slug }) };
+    return { status: "ok", data: await TAURI_INVOKE("load_project", { slug, skip }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -527,6 +535,7 @@ project_dirty: boolean;
  * frontend quick-save (Cmd+S) without a dialog.
  */
 project_path: string | null; status: string; busy: boolean; downloading_maps: string[]; projects: LizaProjectSummaryDto[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
+export type BundleEntryDto = { name: string; is_dir: boolean; size_bytes: number | null }
 export type DiagnosticDto = { level: string; message: string }
 /**
  * Lat/lon bounding box for extent crops — the current map viewport.
@@ -540,7 +549,12 @@ export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: b
  * file for a cached one. `None` is "unknown", not zero.
  */
 size_bytes: number | null }
-export type LizaProjectDto = { name: string; center_lat: number; center_lon: number; maps: LizaMapPackageDto[] }
+export type LizaProjectDto = { name: string; center_lat: number; center_lon: number; maps: LizaMapPackageDto[]; 
+/**
+ * The bundle's top level — what the operator chooses from when deciding
+ * what not to download.
+ */
+contents: BundleEntryDto[] }
 export type LizaProjectSummaryDto = { slug: string; name: string; 
 /**
  * Whether this bundle is already on disk and openable offline.

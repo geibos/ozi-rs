@@ -5,8 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **handing the day over** (2026-09-21) — every track in the
-project exports to one GPX, the shape FTP upload will need; after a map being
+Last merged slice: **choosing what to download** (2026-09-21) — the loader
+shows what a bundle holds and the operator clears what they do not need, the
+owner's July type-filter note answered without the app deciding for them; after
+every track in the project exporting to one GPX, the shape FTP upload will
+need, and after a map being
 openable while the rest of its bundle downloads, which turned out to work
 already and only needed saying, and after the first screen speaking Russian,
 including the catalogue line that used to be the backend's own English status,
@@ -28,7 +31,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 292 Rust tests and 339 frontend tests;
+rustfmt, clippy, type-checks, 293 Rust tests and 339 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -52,10 +55,9 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **The bundle download still fetches everything.** It now says what that
-   weighs, but it is still the whole directory — print maps and Android
-   packages included. The owner's July note asks for a type filter; that is
-   the next step, and it needs their call on what to skip by default.
+1. **Archive the finished OpenSpec changes.** Ten are implemented, gated and
+   waiting on the owner's review: archiving folds their requirements into the
+   baseline specs, which is a step for a person, not for an agent.
 2. **Keep walking the screens on the stand.** Done: the Track Inspector, the
    cold-start route. Not yet: a download in flight, an error state, the
    Waypoints row menu, and the whole shell at a narrow window. Each needs a

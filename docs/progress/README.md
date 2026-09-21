@@ -10,6 +10,26 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — choosing what to download
+
+A bundle carries print sheets and Android tile packs this app cannot open, and
+on a phone tether they are most of the transfer. That is the owner's July note
+asking for a type filter.
+
+What is worth carrying is a field judgement — a crew that also runs
+OziExplorer on a phone wants the Android pack; one working only here does not —
+so the app does not decide. The loader shows what the bundle holds, with the
+sizes the listing states, everything checked. Clearing an entry leaves it on
+the server; clearing nothing fetches the whole bundle exactly as before.
+
+| | |
+|---|---|
+| After | [the loader](2026-09-21-choose-what-to-download/after-contents.png) |
+| Automated gates | `just ci` green (293 Rust, 339 frontend) |
+| Test | a named entry is left on the server while everything else, including folders below the top level, still arrives |
+
+---
+
 ## 2026-09-21 — handing the day over
 
 A folder import makes one track layer per navigator file, so a day of searching

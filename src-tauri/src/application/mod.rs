@@ -51,6 +51,22 @@ pub struct LizaProject {
     pub summary: LizaProjectSummary,
     pub center: MapCenter,
     pub maps: Vec<LizaMapPackage>,
+    /// The bundle's top level, as the site lists it.
+    ///
+    /// This is what the operator chooses from when deciding what not to
+    /// download — print sheets and Android tile packs are most of the weight
+    /// and this app opens neither.
+    #[serde(default)]
+    pub contents: Vec<BundleEntry>,
+}
+
+/// One entry at the top level of a bundle directory.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct BundleEntry {
+    pub name: String,
+    pub is_dir: bool,
+    /// Size from the listing; folders do not state one.
+    pub size_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -1967,6 +1983,7 @@ mod tests {
                 local_path: None,
                 size_bytes: None,
             }],
+            contents: Vec::new(),
         }
     }
 

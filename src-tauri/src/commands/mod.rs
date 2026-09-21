@@ -127,6 +127,16 @@ pub struct LizaProjectDto {
     pub center_lat: f64,
     pub center_lon: f64,
     pub maps: Vec<LizaMapPackageDto>,
+    /// The bundle's top level — what the operator chooses from when deciding
+    /// what not to download.
+    pub contents: Vec<BundleEntryDto>,
+}
+
+#[derive(serde::Serialize, specta::Type)]
+pub struct BundleEntryDto {
+    pub name: String,
+    pub is_dir: bool,
+    pub size_bytes: Option<u64>,
 }
 
 #[derive(serde::Serialize, specta::Type)]
@@ -277,6 +287,15 @@ pub fn app_state_dto(
                 base_zoom: m.base_zoom,
                 downloaded: m.local_path.is_some(),
                 size_bytes: m.size_bytes,
+            })
+            .collect(),
+        contents: p
+            .contents
+            .iter()
+            .map(|entry| BundleEntryDto {
+                name: entry.name.clone(),
+                is_dir: entry.is_dir,
+                size_bytes: entry.size_bytes,
             })
             .collect(),
     });
@@ -513,8 +532,15 @@ pub fn preview_project(
 
 #[tauri::command]
 #[specta::specta]
+/// Open a bundle, downloading what is missing.
+///
+/// `skip` names top-level entries to leave on the server — print sheets and
+/// Android tile packs are most of the transfer and this app cannot open them.
+/// Nothing is skipped unless the caller names it: the choice is the
+/// operator's, not a default this code decides for them.
 pub fn load_project(
     slug: String,
+    skip: Vec<String>,
     state: State<SharedState>,
     downloads: State<SharedDownloads>,
     app: AppHandle,
@@ -615,6 +641,7 @@ pub fn load_project(
             bundles_root,
             cancel,
             DEFAULT_BUNDLE_DOWNLOAD_CONCURRENCY,
+            skip,
             tx,
         )
         .await;

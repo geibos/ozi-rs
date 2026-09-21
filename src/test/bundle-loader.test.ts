@@ -76,7 +76,7 @@ describe("row click = preview, button = download", () => {
     );
     expect(openBody).toContain("await cancelDownload(previousId)");
     expect(openBody).toContain("resetBundleDownloadState(null)");
-    expect(openBody).toContain("await loadProject(slug)");
+    expect(openBody).toContain("await loadProject(slug, Object.keys(skipped))");
     expect(openBody).toContain("activeDownloadId.set(id || null)");
   });
 });
