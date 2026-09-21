@@ -188,10 +188,13 @@ dependency dropped.
 - **MapLibre carries a critical advisory** (`GHSA-jrc7-96c5-q579`) whose fix is
   two major versions ahead. Waived with a reason in
   `scripts/npm-audit-gate.mjs`; the upgrade needs its own slice.
-- **Human-facing docs still lie in places** — feature-status and roadmap mark
-  sort, crop and split/join as absent although they exist; the command
-  reference is missing several commands. Listed in the
-  `codify-architecture-decisions` design under "Findings", fixed by its task 2.6.
+- ~~Human-facing docs still lie in places.~~ Fixed on 2026-09-21 (task 2.6 of
+  `codify-architecture-decisions`), each claim checked against the code first.
+- **`ThemePicker.svelte` is imported nowhere**, while `ui-shell` carries
+  requirements for a theme selector and its persistence. Where the control
+  belongs is a design call, so it is listed rather than placed. Noted in the
+  `codify-architecture-decisions` Findings since 2026-09-19; confirmed still
+  true on 2026-09-21.
 
 Localization is done for the shell, the rails, the three library tabs, all four
 inspectors, the Maps tab, the command palette, bundle progress (which travels

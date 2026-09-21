@@ -48,7 +48,7 @@ Terms used in code, docs, and SAR-domain conversation. Mixed Russian/English jar
 | **`ProjectCommand`** | Enum variant representing one undoable edit. Each has an `apply()` and computed `reverse()`. ADR-0017. |
 | **`CommandDelta`** | Forward + reverse `ProjectCommand` pair stored in the undo stack. |
 | **`apply_or_merge`** | Coalesces consecutive same-target commands (e.g. drag moves) into one undo step. |
-| **DTO** | Plain serializable struct used at the IPC boundary in `commands/mod.rs`. Mirrored in `src/lib/types.ts` manually. |
+| **DTO** | Plain serializable struct used at the IPC boundary in `commands/mod.rs`. Generated into `src/lib/bindings.ts` by tauri-specta from the command signatures; a DTO that travels only as an event payload is not generated and is mirrored by hand in `src/lib/types.ts`. |
 | **Newtype ID** | `LayerId(u64)`, `TrackId(u64)`, etc., with `#[serde(transparent)]`. ADR-0014. |
 | **`AppState`** | Root mutable state. Lives behind `Arc<Mutex<_>>` (`SharedState`) on the Tauri side. |
 

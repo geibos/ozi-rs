@@ -34,6 +34,12 @@ decision.
 
 ## Engineering
 
+- **The theme picker is unreachable.** `ThemePicker.svelte` is imported by
+  nothing, and `ui-shell` requires a selector with five options and persistence
+  across sessions. Both stores behind it work; only the placement is missing,
+  and that is a design call — the toolbar, the palette, or a settings sheet
+  that does not exist yet.
+
 - **A GPX round trip loses the track's colour.** The writer emits
   `gpxx:DisplayColor`; the reader drops it, because the `gpx` crate (0.10) does
   not surface extensions at all — reading one needs a second pass over the XML,

@@ -217,6 +217,8 @@ The frontend uses Tauri events for real-time backend communication:
 | Key | Action |
 |-----|--------|
 | Cmd/Ctrl+K | Open command palette |
+| Cmd/Ctrl+Z | Undo (`+Shift` to redo) — `handleGlobalKeydown`, `src/routes/+layout.svelte` |
+| Cmd/Ctrl+S | Save the project |
 | Cmd/Ctrl+E | (palette open) Export highlighted track (GPX) or waypoint layer (WPT) |
 | Cmd/Ctrl+R | (palette open) Reveal highlighted map in Finder |
 | Enter | Finish drawing |
@@ -224,5 +226,4 @@ The frontend uses Tauri events for real-time backend communication:
 | `` ` `` | Toggle developer console |
 | F3 | Toggle FPS counter |
 
-There are **no Ctrl+Z / Ctrl+Y bindings** — undo/redo is reachable only through the
-command palette (Undo / Redo entries).
+Undo and redo are also on the command palette (Undo / Redo entries).

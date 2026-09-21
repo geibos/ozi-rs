@@ -10,6 +10,52 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the docs stop lying
+
+`docs/STATE.md` has carried "human-facing docs still lie in places" under Known
+broken since the review. It is task 2.6 of `codify-architecture-decisions`, and
+it is not owner-gated — it just needed someone to check each claim against the
+code rather than against the last person who wrote it down.
+
+Every one below was verified before it was edited, and four of them were worse
+than stale — they said a feature does not exist:
+
+- **`sort_track_points` "does not exist".** It is a registered command with an
+  `api.ts` wrapper and a caller in the Track Inspector.
+- **Crop "no backend commands".** `crop_track_to_extent` and
+  `crop_track_to_time` exist and are reached. Crop by selection genuinely does
+  not, and the row says so now instead of lumping all three together.
+- **Split/join "no UI entry point".** The segments table calls both.
+- **ZIP import "not reachable, the picker filters to .gpx/.plt".** The picker
+  takes `["gpx", "plt", "zip"]`.
+
+The rest were plain untruths: "no async runtime" (there is a tokio one, scoped
+to the download path, and the rule about not holding the mutex across an await
+is not decorative there any more); "no Ctrl+Z bindings" (the layout binds
+Cmd/Ctrl+Z and Shift for redo); "`ozf2-rs`, local crate" (it is `ozf2` 0.1 from
+crates.io); and the glossary's "DTO mirrored manually", which is true only of
+the ones that travel as event payloads — the rest are generated.
+
+Seven rows of the status matrix said `TBD`, which is not in the vocabulary that
+capability allows. They say `pending`.
+
+The command reference was missing nine commands. It now also says what it is:
+the registry in `lib.rs` is the list, this page describes it, and when they
+disagree the registry is right. A page that claims to be exhaustive goes stale
+the day someone adds a command; one that says where the truth lives does not.
+
+Found on the way, not fixed because the placement is a design call: **`ThemePicker.svelte`
+is imported nowhere.** The `ui-shell` spec has requirements about a theme
+selector and its persistence; the component is unreachable. I localized its
+labels yesterday, which was polish on dead code.
+
+| | |
+|---|---|
+| Evidence | each claim checked against the code before editing — five commands traced from `lib.rs` through `api.ts` to their callers, the import filter read, `Cargo.toml` read for `ozf2` and `tokio`, the keydown handler read |
+| Automated gates | `just ci` green (310 Rust, 375 frontend) |
+
+---
+
 ## 2026-09-21 — what survives the trip
 
 FTP upload of tracks is planned, and the file that goes up is a GPX this app

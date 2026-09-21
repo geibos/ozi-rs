@@ -41,7 +41,11 @@ non-destructive and immediately visible.
 
 ## Tauri IPC Commands
 
-Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
+Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`, and
+registered in `src-tauri/src/lib.rs` — that registry is the list, and this page
+is a description of it. The tables below name the commands a reader is likely
+to look for rather than all of them; when the two disagree, the registry is
+right.
 
 ### Query Commands (read-only)
 
@@ -53,6 +57,7 @@ Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
 | `get_waypoints` | All waypoints in a layer |
 | `get_simplified_preview` | Preview of Douglas-Peucker without committing |
 | `get_track_export_default_path` | Suggested active-bundle `10-Tracks/<track>.<ext>` export path, or no suggestion if unavailable |
+| `list_tracks` | Every track in the project as a row: name, style, statistics, no geometry. What the Tracks tab reads |
 
 ### Project / Bundle Management
 
@@ -77,6 +82,9 @@ Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
 | `export_track_plt` | Export single track to PLT |
 | `export_wpt_waypoints` | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF) |
 | `get_wpt_export_default_path` | Suggest WPT export path (`<bundle>/<layer>.wpt`) |
+| `export_all_tracks_gpx` | Every track in the project into one GPX, returning how many were written |
+| `export_gpx_waypoints` | Export a waypoint layer to GPX — what phones and other groups' software read |
+| `get_waypoints_export_default_path` | Suggest a waypoint export path for a given format |
 
 ### Track Mutations (via CommandStack, undoable)
 
@@ -91,6 +99,10 @@ Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
 | `delete_track` | Delete a track |
 | `create_empty_track` | Create empty track (for drawing mode) |
 | `simplify_track` | Apply Douglas-Peucker simplification |
+| `sort_track_points` | Sort a track's points by timestamp, as one undoable step |
+| `crop_track_to_extent` | Keep only the points inside the given map extent |
+| `crop_track_to_time` | Keep only the points inside the given time range |
+| `cancel_drawing` | Discard the draw in progress without leaving it on the redo stack |
 
 ### Track Style (non-undoable, bypass CommandStack)
 
@@ -109,6 +121,9 @@ Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`.
 | `delete_waypoint` | Delete a waypoint |
 | `rename_waypoint` | Rename a waypoint |
 | `set_waypoint_symbol` | Set or clear waypoint symbol |
+| `toggle_waypoint_visible` | Flip one waypoint's visibility (style, not an undoable edit) |
+| `set_all_waypoints_visible` | Show or hide every waypoint in one step |
+| `show_only_waypoint` | Show one waypoint and hide the rest |
 
 ### History
 

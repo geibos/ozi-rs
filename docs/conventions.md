@@ -74,10 +74,14 @@ Defined in `src/lib/track-names.ts`; re-validate there if you need parity.
 
 ## Concurrency
 
-- No async runtime. Background work uses `std::thread::spawn` and clones what it needs. ADR-0011.
+- Background work uses `std::thread::spawn` and clones what it needs. ADR-0011.
+- There is a tokio runtime, added for the concurrent bundle download: the
+  multi-file orchestrator, the per-file transfers and their cancellation are
+  async (`infrastructure/lizaalert.rs`). It is scoped to that path — the
+  command layer and `AppState` stay synchronous.
 - Long-running ops emit Tauri events (`download-progress`, `bundle-progress`, `projects-chunk`, `state-changed`) and write back via `apply_*` methods on `AppState` after re-locking the mutex.
 - Frontend does not poll. It listens to `state-changed` and re-fetches via `appState.refresh()`.
-- The shared lock is a `std::sync::Mutex` wrapped in `Arc`; do not hold it across `.await` (there is no await) or across blocking I/O. Use the `lock_app_state` helper.
+- The shared lock is a `std::sync::Mutex` wrapped in `Arc`; do not hold it across `.await` or across blocking I/O. Use the `lock_app_state` helper. The download path does await, which is exactly why this rule is not decorative there.
 
 ## Tauri permissions
 

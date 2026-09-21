@@ -105,7 +105,7 @@ src-tauri/src/
       plt.rs         # PLT import (Windows-1251 encoding)
       ozi_map.rs     # .map file parsing (calibration points)
       ozi_georeference.rs  # Affine transformation (lat/lon ↔ pixel)
-      ozi_raster.rs  # OZF2 tile decoding via ozf2-rs
+      ozi_raster.rs  # OZF2 tile decoding via the `ozf2` crate
       archive.rs     # ZIP entry classification and extraction
     lizaalert.rs     # maps.lizaalert.ru API, bundle download
     persistence.rs   # JSON project save/load
@@ -190,7 +190,7 @@ Both protocols are registered in MapLibre via `addProtocol()`.
 | `gpx` 0.10 | GPX XML parsing |
 | `rusqlite` 0.39 | SQLite tile queries |
 | `reqwest` 0.13 | HTTP (LizaAlert downloads) |
-| `ozf2-rs` | OZF2 raster format decoder (local crate) |
+| `ozf2` 0.1 | OZF2 raster format decoder (published crate) |
 | `chrono` 0.4 | Date/time handling |
 | `zip` 8.4 | ZIP archive handling |
 | `tracing` 0.1 | Structured logging |
