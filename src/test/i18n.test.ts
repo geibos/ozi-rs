@@ -12,19 +12,26 @@ describe("i18n locale store", () => {
     localStorage.clear();
   });
 
-  it("defaults to Russian when navigator reports a ru locale", async () => {
-    vi.stubGlobal("navigator", { language: "ru-RU" });
-    const { locale } = await loadI18n();
-    expect(get(locale)).toBe("ru");
-  });
+  // The users are a Russian-speaking search-and-rescue crew. The OS language
+  // says nothing about that — the owner runs an English system — so the app
+  // opens in Russian and switching is an explicit choice, not a guess.
+  it("defaults to Russian regardless of the system language", async () => {
+    vi.stubGlobal("navigator", { language: "en-US" });
+    expect(get((await loadI18n()).locale)).toBe("ru");
 
-  it("defaults to English for any non-ru locale", async () => {
     vi.stubGlobal("navigator", { language: "de-DE" });
-    const { locale } = await loadI18n();
-    expect(get(locale)).toBe("en");
+    expect(get((await loadI18n()).locale)).toBe("ru");
+
+    vi.stubGlobal("navigator", { language: "ru-RU" });
+    expect(get((await loadI18n()).locale)).toBe("ru");
   });
 
-  it("persists an explicit choice and restores it over the navigator default", async () => {
+  it("defaults to Russian when the environment reports no language at all", async () => {
+    vi.stubGlobal("navigator", undefined);
+    expect(get((await loadI18n()).locale)).toBe("ru");
+  });
+
+  it("persists an explicit choice and restores it over the default", async () => {
     vi.stubGlobal("navigator", { language: "ru-RU" });
     const first = await loadI18n();
     first.setLocale("en");

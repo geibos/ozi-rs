@@ -10,8 +10,10 @@
  *   import { t } from "$lib/i18n";
  *   <span>{$t("palette.saveProject")}</span>
  *
- * Strings are migrated screen-by-screen as CJ slices touch them; untouched
- * screens keep their hardcoded English until their slice lands.
+ * Strings are migrated screen-by-screen as slices touch them. Russian is the
+ * default locale (owner decision, 2026-07-15), so a screen that still carries
+ * hardcoded English is a screen that has not been migrated yet, and reads as a
+ * defect rather than a choice.
  */
 import { derived, writable, type Readable } from "svelte/store";
 
@@ -26,6 +28,16 @@ const dictionaries = {
     "palette.undo": "Undo",
     "palette.redo": "Redo",
     "palette.language": "Language: Русский",
+    "rail.maps": "Maps",
+    "rail.tracks": "Tracks",
+    "rail.waypoints": "Waypoints",
+    "shell.modeView": "View",
+    "shell.modeDraw": "Draw",
+    "shell.modeEdit": "Edit",
+    "shell.modeMeasure": "Measure",
+    "shell.palette": "Command palette",
+    "mapsTab.cached": "cached",
+    "shell.language": "Switch to Russian",
     "shell.save": "Save",
     "shell.saved": "Saved",
     "shell.unsaved": "Unsaved changes",
@@ -76,6 +88,17 @@ const dictionaries = {
     "tracksTab.importFailedFiles": "Failed: {files}",
     "tracksTab.importFolderFailed": "Failed to import folder",
     "tracksTab.nameHint": "Format: YYYYMMDD_Callsign",
+    "waypointsTab.empty": "No waypoints yet",
+    "waypointsTab.layer": "Waypoint layer",
+    "waypointsTab.pickLayer": "Pick a layer",
+    "waypointsTab.add": "Add waypoint",
+    "waypointsTab.addCancel": "Stop adding waypoints",
+    "waypointsTab.exportWpt": "Export WPT",
+    "waypointsTab.delete": "Delete",
+    "waypointsTab.hide": "Hide {name}",
+    "waypointsTab.show": "Show {name}",
+    "waypointsTab.loadFailed": "Failed to load waypoints",
+    "waypointsTab.deleteFailed": "Failed to delete waypoint",
     "track.showOnMap": "Show on map",
     "track.durationTooltip": "Elapsed time from the first to the last point",
     "track.noPoints": "Track has no points",
@@ -103,6 +126,16 @@ const dictionaries = {
     "palette.undo": "Отменить",
     "palette.redo": "Повторить",
     "palette.language": "Language: English",
+    "rail.maps": "Карты",
+    "rail.tracks": "Треки",
+    "rail.waypoints": "Точки",
+    "shell.modeView": "Просмотр",
+    "shell.modeDraw": "Рисование",
+    "shell.modeEdit": "Правка",
+    "shell.modeMeasure": "Измерение",
+    "shell.palette": "Команды",
+    "mapsTab.cached": "В кэше",
+    "shell.language": "Switch to English",
     "shell.save": "Сохранить",
     "shell.saved": "Сохранено",
     "shell.unsaved": "Есть несохранённые изменения",
@@ -153,6 +186,17 @@ const dictionaries = {
     "tracksTab.importFailedFiles": "Не удалось: {files}",
     "tracksTab.importFolderFailed": "Не удалось импортировать папку",
     "tracksTab.nameHint": "Формат: ГГГГММДД_Позывной",
+    "waypointsTab.empty": "Точек пока нет",
+    "waypointsTab.layer": "Слой точек",
+    "waypointsTab.pickLayer": "Выберите слой",
+    "waypointsTab.add": "Добавить точку",
+    "waypointsTab.addCancel": "Закончить добавление",
+    "waypointsTab.exportWpt": "Экспорт WPT",
+    "waypointsTab.delete": "Удалить",
+    "waypointsTab.hide": "Скрыть {name}",
+    "waypointsTab.show": "Показать {name}",
+    "waypointsTab.loadFailed": "Не удалось загрузить точки",
+    "waypointsTab.deleteFailed": "Не удалось удалить точку",
     "track.showOnMap": "Показать на карте",
     "track.durationTooltip": "Время от первой до последней точки",
     "track.noPoints": "В треке нет точек",
@@ -178,6 +222,11 @@ const dictionaries = {
 
 export type MessageKey = keyof (typeof dictionaries)["en"];
 
+/// Russian is the default, whatever the operating system reports.
+///
+/// The users are a Russian-speaking search-and-rescue crew, and the machine's
+/// language says nothing about that — the owner runs an English system. Only
+/// an explicit choice, remembered from last time, overrides it.
 function initialLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -185,9 +234,7 @@ function initialLocale(): Locale {
   } catch {
     // localStorage unavailable (SSR/tests without DOM) — fall through.
   }
-  const language =
-    typeof navigator !== "undefined" ? (navigator.language ?? "") : "";
-  return language.toLowerCase().startsWith("ru") ? "ru" : "en";
+  return "ru";
 }
 
 export const locale = writable<Locale>(initialLocale());

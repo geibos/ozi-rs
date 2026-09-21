@@ -60,7 +60,8 @@ describe("active layer UI wiring", () => {
     expect(tracksTabSource).toContain("Track layer");
     expect(waypointsTabSource).toContain("activeWaypointLayerId");
     expect(waypointsTabSource).toContain("$appState?.waypoint_layers");
-    expect(waypointsTabSource).toContain("Waypoint layer");
+    // The label is localized now; the key is what the tab must render.
+    expect(waypointsTabSource).toContain('waypointsTab.layer');
   });
 
   it("routes drawing workflows through the selected track layer", () => {

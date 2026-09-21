@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "$lib/i18n";
   /**
    * LibraryRail — fills the `library-rail` slot of `WorkspaceShell`. Three
    * persistent tabs: Maps, Tracks, Waypoints. Backed by the shadcn `Tabs`
@@ -27,19 +28,19 @@
         value="maps"
         class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
-        Maps
+        {$t("rail.maps")}
       </Tabs.Trigger>
       <Tabs.Trigger
         value="tracks"
         class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
-        Tracks
+        {$t("rail.tracks")}
       </Tabs.Trigger>
       <Tabs.Trigger
         value="waypoints"
         class="px-3 py-1 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--ring))]"
       >
-        Waypoints
+        {$t("rail.waypoints")}
       </Tabs.Trigger>
     </Tabs.List>
     <Tabs.Content value="maps" class="flex-1 min-h-0 m-0">

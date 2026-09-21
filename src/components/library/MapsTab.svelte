@@ -140,7 +140,7 @@
                 class="bg-muted text-muted-foreground inline-flex h-4 items-center rounded-sm px-1.5 text-[10px] font-medium uppercase tracking-wide"
                 title="Tiles cached locally"
               >
-                cached
+                {$t("mapsTab.cached")}
               </span>
             {:else}
               <span class="size-4"></span>

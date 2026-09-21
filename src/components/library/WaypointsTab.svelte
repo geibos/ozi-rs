@@ -11,6 +11,8 @@
    * Visibility is per-waypoint, not per-layer: each row stores its own
    * `visible` flag, toggled through `toggle_waypoint_visible`.
    */
+  import { get } from "svelte/store";
+  import { t } from "$lib/i18n";
   import { buttonVariants } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
@@ -86,7 +88,9 @@
       rows = collected;
     } catch (err) {
       console.error("Failed to load waypoints", err);
-      toast.error("Failed to load waypoints", { description: String(err) });
+      toast.error(get(t)("waypointsTab.loadFailed"), {
+        description: String(err),
+      });
       rows = [];
     }
   }
@@ -128,7 +132,9 @@
     try {
       await deleteWaypoint(r.layerId, BigInt(r.wp.id));
     } catch (err) {
-      toast.error("Failed to delete waypoint", { description: String(err) });
+      toast.error(get(t)("waypointsTab.deleteFailed"), {
+        description: String(err),
+      });
     }
   }
 
@@ -148,7 +154,9 @@
 <div class="flex h-full min-h-0 flex-col">
   <header class="border-border border-b px-2 py-1.5">
     {#if waypointLayers.length > 0}
-      <Label class="text-muted-foreground text-[10px]">Waypoint layer</Label>
+      <Label class="text-muted-foreground text-[10px]">
+        {$t("waypointsTab.layer")}
+      </Label>
       <div class="flex items-center gap-1">
         <Select.Root
           type="single"
@@ -156,13 +164,13 @@
           onValueChange={(v) => v && activeWaypointLayerId.set(BigInt(v))}
         >
           <Select.Trigger
-            aria-label="Waypoint layer"
+            aria-label={$t("waypointsTab.layer")}
             size="sm"
             class="min-w-0 flex-1"
           >
             {waypointLayers.find(
               (l) => String(l.id) === waypointLayerSelectValue,
-            )?.name ?? "Pick layer"}
+            )?.name ?? $t("waypointsTab.pickLayer")}
           </Select.Trigger>
           <Select.Content>
             {#each waypointLayers as layer (layer.id)}
@@ -179,7 +187,9 @@
               variant: $addWaypointMode ? "default" : "ghost",
               size: $addWaypointMode ? "sm" : "icon-sm",
             })}
-            aria-label={$addWaypointMode ? "Cancel" : "Add waypoint"}
+            aria-label={$addWaypointMode
+              ? $t("waypointsTab.addCancel")
+              : $t("waypointsTab.add")}
             aria-pressed={$addWaypointMode}
             disabled={$drawingModeActive || $activeWaypointLayerId === null}
             onclick={() => addWaypointMode.update((v) => !v)}
@@ -187,11 +197,13 @@
           >
             <MapPinIcon strokeWidth={1.5} />
             {#if $addWaypointMode}
-              <span class="text-xs">Cancel</span>
+              <span class="text-xs">{$t("waypointsTab.addCancel")}</span>
             {/if}
           </Tooltip.Trigger>
           <Tooltip.Content>
-            {$addWaypointMode ? "Cancel add waypoint" : "Add waypoint"}
+            {$addWaypointMode
+              ? $t("waypointsTab.addCancel")
+              : $t("waypointsTab.add")}
           </Tooltip.Content>
         </Tooltip.Root>
       </div>
@@ -201,16 +213,17 @@
   <div class="flex-1 overflow-y-auto py-1" data-testid="waypoints-tab-list">
     {#if rows.length === 0}
       <div class="text-muted-foreground p-3 text-center text-xs">
-        No waypoints
+        {$t("waypointsTab.empty")}
       </div>
     {:else}
       {#each rows as r (rowKey(r))}
         <LibraryRow
           name={r.wp.name}
           visible={r.wp.visible}
-          visibilityLabel={r.wp.visible
-            ? `Hide waypoint ${r.wp.name}`
-            : `Show waypoint ${r.wp.name}`}
+          visibilityLabel={(r.wp.visible
+            ? $t("waypointsTab.hide")
+            : $t("waypointsTab.show")
+          ).replace("{name}", r.wp.name)}
           selected={isSelected(r)}
           onToggleVisibility={() => handleToggleVisible(r)}
           onSelect={() => handleSelectRow(r)}
@@ -226,14 +239,14 @@
             <DropdownMenu.Item
               onSelect={() => handleExportWptForLayer(r.layerId)}
             >
-              Export WPT
+              {$t("waypointsTab.exportWpt")}
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item
               variant="destructive"
               onSelect={() => handleDelete(r)}
             >
-              Delete
+              {$t("waypointsTab.delete")}
             </DropdownMenu.Item>
           {/snippet}
         </LibraryRow>

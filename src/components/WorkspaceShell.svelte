@@ -32,7 +32,7 @@
     projectDirty,
   } from "$lib/stores";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
-  import { t } from "$lib/i18n";
+  import { locale, t, toggleLocale } from "$lib/i18n";
 
   let {
     libraryRail,
@@ -109,25 +109,25 @@
           class="chip"
           tabindex="-1"
           aria-disabled="true"
-        >View</button>
+        >{$t("shell.modeView")}</button>
         <button
           type="button"
           class="chip"
           tabindex="-1"
           aria-disabled="true"
-        >Draw</button>
+        >{$t("shell.modeDraw")}</button>
         <button
           type="button"
           class="chip"
           tabindex="-1"
           aria-disabled="true"
-        >Edit</button>
+        >{$t("shell.modeEdit")}</button>
         <button
           type="button"
           class="chip"
           tabindex="-1"
           aria-disabled="true"
-        >Measure</button>
+        >{$t("shell.modeMeasure")}</button>
         <span class="chips-divider" aria-hidden="true"></span>
       </div>
       <!--
@@ -191,11 +191,11 @@
         <button
           type="button"
           class="cmdk-trigger"
-          aria-label="Open command palette"
-          title="Open command palette (⌘K)"
+          aria-label={$t("shell.palette")}
+          title={`${$t("shell.palette")} (⌘K)`}
           onclick={() => commandPaletteOpen.set(true)}
         >
-          <span class="cmdk-label">Command palette</span>
+          <span class="cmdk-label">{$t("shell.palette")}</span>
           <kbd class="cmdk-glyph">⌘K</kbd>
         </button>
       </div>
@@ -226,6 +226,20 @@
           {/if}
         </span>
       {/if}
+
+      <!-- The language switch lived only in the Cmd-K palette, which means a
+           Russian-speaking crew had to know the palette exists to get a
+           Russian interface. It belongs where it can be found. -->
+      <button
+        type="button"
+        class="status-lang"
+        title={$t("shell.language")}
+        aria-label={$t("shell.language")}
+        onclick={toggleLocale}
+        data-testid="status-language"
+      >
+        {$locale === "ru" ? "RU" : "EN"}
+      </button>
     </div>
   </div>
 
@@ -497,6 +511,25 @@
     padding: 0 10px;
     flex-shrink: 0;
     gap: 8px;
+  }
+
+  .status-lang {
+    margin-left: auto;
+    appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 1px 5px;
+  }
+
+  .status-lang:hover {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
   }
 
   .status-progress {

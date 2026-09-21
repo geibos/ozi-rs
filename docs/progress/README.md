@@ -10,6 +10,25 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — Russian by default
+
+The crew this is built for works in Russian, and the app opened in English
+unless the operating system said otherwise, with the language switch buried in
+the Cmd-K palette. It now starts in Russian whatever the system reports, and the
+switch sits in the status bar as a RU/EN toggle. An explicit choice is still
+remembered.
+
+The chrome that stayed English is translated: the rail tabs, the mode chips,
+the palette button, the cached badge, and the whole Waypoints tab, which had no
+translated string at all.
+
+| | |
+|---|---|
+| After | [workspace in Russian](2026-09-21-russian-default/after-russian.png) |
+| Automated gates | `just ci` green (259 Rust, 286 frontend) |
+
+---
+
 ## 2026-09-21 — finding a track
 
 A field project carries dozens of tracks named by date and call sign, spread
