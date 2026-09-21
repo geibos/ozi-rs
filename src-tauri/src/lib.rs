@@ -1,6 +1,10 @@
 mod application;
 mod commands;
 mod domain;
+// Test-only: the fixture generator is compiled by `cargo test` (and so by
+// `just fixtures`), never into the shipped binary.
+#[cfg(test)]
+mod fixtures;
 mod infrastructure;
 
 use commands::{DownloadRegistry, SharedDownloads, SharedState};

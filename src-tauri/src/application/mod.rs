@@ -203,13 +203,13 @@ impl LoadProjectRefusal {
 
 impl AppState {
     pub fn new() -> Self {
-        let mut project = Project::default();
-        // Ensure default layers exist so the UI can use layerId=1 immediately
-        project.add_track_layer(crate::domain::TrackLayer::new(LayerId::new(1), "Tracks"));
-        project.add_waypoint_layer(crate::domain::WaypointLayer::new(
-            LayerId::new(1),
-            "Waypoints",
-        ));
+        // `Project::default()` already satisfies the `layers` invariant with a
+        // "Tracks" and a "Waypoints" layer, both id 1. Adding them again here
+        // gave every fresh project two layers of each kind sharing one id: the
+        // selector listed "Tracks" twice, the second was unreachable because
+        // everything addresses a layer by id, and saving then loading silently
+        // renumbered it (`deduplicate_layer_ids`).
+        let project = Project::default();
         Self {
             history: CommandStack::default(),
             project,
@@ -602,6 +602,35 @@ impl AppState {
     pub fn set_bundles_root(&mut self, path: PathBuf) {
         self.bundles_root = path;
         self.persist_session_snapshot();
+    }
+
+    #[cfg(test)]
+    /// Mutable project access, for building fixtures and tests.
+    ///
+    /// Production paths go through the command stack; this bypasses it on
+    /// purpose, which is why it is crate-private.
+    pub(crate) fn project_mut(&mut self) -> &mut Project {
+        &mut self.project
+    }
+
+    #[cfg(test)]
+    /// Install a catalogue state without a network, for fixtures and tests.
+    ///
+    /// The LizaAlert state is otherwise only reachable through the download
+    /// paths, and a fixture that had to run those would need a server.
+    pub(crate) fn set_fixture_catalogue(
+        &mut self,
+        projects: Vec<LizaProjectSummary>,
+        selected_project: Option<LizaProject>,
+        active_map: Option<ActiveMapSelection>,
+        status: impl Into<String>,
+    ) {
+        self.lizaalert.selected_project_slug =
+            selected_project.as_ref().map(|p| p.summary.slug.clone());
+        self.lizaalert.projects = projects;
+        self.lizaalert.selected_project = selected_project;
+        self.lizaalert.active_map = active_map;
+        self.lizaalert.status = status.into();
     }
 
     pub fn track_layers(&self) -> &[crate::domain::TrackLayer] {
@@ -1954,6 +1983,23 @@ mod tests {
 
         state.lizaalert.busy = false;
         assert!(state.begin_load_project("2026-09-21_demo").is_ok());
+    }
+
+    /// A fresh project must have exactly one layer of each kind. It used to
+    /// have two of each, both claiming id 1 — the selector showed "Tracks"
+    /// twice and the second was unreachable.
+    #[test]
+    fn a_fresh_project_has_one_layer_of_each_kind() {
+        let state = AppState::new();
+
+        assert_eq!(state.track_layers().len(), 1, "one track layer");
+        assert_eq!(
+            state.project_waypoint_layers().len(),
+            1,
+            "one waypoint layer"
+        );
+        assert_eq!(state.track_layers()[0].id().value(), 1);
+        assert_eq!(state.project_waypoint_layers()[0].id().value(), 1);
     }
 
     /// Esc during a drawing is "forget this", not "undo this": the abandoned

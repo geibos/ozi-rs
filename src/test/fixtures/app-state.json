@@ -1,0 +1,101 @@
+{
+  "active_map": {
+    "base_zoom": 17,
+    "center_lat": 59.95243,
+    "center_lon": 31.59681,
+    "kind": "ozi",
+    "local_path": "/Users/operator/Documents/LizaAlert Maps/2026-07-08_Lavrovo/6-Ozi/2026-07-08_Lavrovo_Satell_z17_ozf.map",
+    "package_name": "2026-07-08_Lavrovo_Satell_z17_ozf.map",
+    "project_name": "2026 07 08 Lavrovo"
+  },
+  "busy": false,
+  "current_project": {
+    "center_lat": 59.95243,
+    "center_lon": 31.59681,
+    "maps": [
+      {
+        "base_zoom": 16,
+        "downloaded": true,
+        "name": "2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb",
+        "size_bytes": 16672522
+      },
+      {
+        "base_zoom": 17,
+        "downloaded": false,
+        "name": "2026-07-08_Lavrovo_Satell_z17.sqlitedb",
+        "size_bytes": 194093875
+      }
+    ],
+    "name": "2026 07 08 Lavrovo"
+  },
+  "diagnostics": [
+    {
+      "level": "info",
+      "message": "Load projects from maps.lizaalert.ru"
+    }
+  ],
+  "downloading_maps": [],
+  "project_dirty": false,
+  "project_name": "Untitled Project",
+  "project_path": null,
+  "project_saved": false,
+  "projects": [
+    {
+      "cached": true,
+      "name": "2026 07 08 Lavrovo",
+      "slug": "2026-07-08_Lavrovo"
+    },
+    {
+      "cached": false,
+      "name": "2026 07 14 Sagra",
+      "slug": "2026-07-14_Sagra"
+    }
+  ],
+  "status": "Loaded project: 2026 07 08 Lavrovo",
+  "track_layer_count": 2,
+  "track_layers": [
+    {
+      "id": 1,
+      "name": "Tracks"
+    },
+    {
+      "id": 2,
+      "name": "20260709_Veter3.gpx"
+    }
+  ],
+  "tracks": [
+    {
+      "color": "rgba(220,38,38,1.000)",
+      "distance_km": 1.0789822365023554,
+      "duration_seconds": 18060,
+      "layer_id": 1,
+      "line_width": 3.0,
+      "name": "20260708_Veter2",
+      "point_count": 5,
+      "track_id": 1,
+      "visible": true
+    },
+    {
+      "color": "rgba(37,99,235,1.000)",
+      "distance_km": 4.864793864902904,
+      "duration_seconds": 60,
+      "layer_id": 1,
+      "line_width": 2.0,
+      "name": "лиса15 вечер",
+      "point_count": 2,
+      "track_id": 2,
+      "visible": false
+    }
+  ],
+  "waypoint_layer_count": 2,
+  "waypoint_layers": [
+    {
+      "id": 1,
+      "name": "Waypoints"
+    },
+    {
+      "id": 2,
+      "name": "Waypoints_20260709.gpx"
+    }
+  ]
+}

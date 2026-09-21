@@ -1,0 +1,77 @@
+{
+  "features": [
+    {
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              31.59681,
+              59.95243
+            ],
+            [
+              31.60164,
+              59.95335
+            ],
+            [
+              31.60305,
+              59.95384
+            ]
+          ],
+          [
+            [
+              31.65927,
+              59.94455
+            ],
+            [
+              31.67108,
+              59.94659
+            ]
+          ]
+        ],
+        "type": "MultiLineString"
+      },
+      "properties": {
+        "color": "rgba(220,38,38,1.000)",
+        "distance_km": 1.0789822365023554,
+        "duration_seconds": 18060,
+        "layer_id": 1,
+        "line_width": 3.0,
+        "name": "20260708_Veter2",
+        "point_count": 5,
+        "track_id": 1,
+        "visible": true
+      },
+      "type": "Feature"
+    },
+    {
+      "geometry": {
+        "coordinates": [
+          [
+            [
+              31.61564,
+              59.95196
+            ],
+            [
+              31.7029,
+              59.94976
+            ]
+          ]
+        ],
+        "type": "MultiLineString"
+      },
+      "properties": {
+        "color": "rgba(37,99,235,1.000)",
+        "distance_km": 4.864793864902904,
+        "duration_seconds": 60,
+        "layer_id": 1,
+        "line_width": 2.0,
+        "name": "лиса15 вечер",
+        "point_count": 2,
+        "track_id": 2,
+        "visible": false
+      },
+      "type": "Feature"
+    }
+  ],
+  "type": "FeatureCollection"
+}

@@ -149,6 +149,16 @@ test-rust:
 test-ui:
     npm test
 
+# Regenerate the frontend test fixtures from the Rust core.
+#
+# The generator is a test, and it fails by design when it rewrote a stale
+# fixture — that is what makes `just ci` catch a DTO change the frontend
+# mocks have not seen. Here the failure is the expected outcome, so the exit
+# code is ignored and the diff is what to look at.
+fixtures:
+    -cargo test --manifest-path src-tauri/Cargo.toml fixtures_are_up_to_date
+    @echo "fixtures written to src/test/fixtures — review the diff" 
+
 # Run a specific Rust test by name filter
 test-filter filter:
     cargo test --manifest-path src-tauri/Cargo.toml {{ filter }}

@@ -243,7 +243,18 @@ struct BundleFileReadyPayload {
 pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
     let s = lock_app_state(state.inner())?;
     let cached_slugs = lizaalert::cached_project_slugs(s.bundles_root());
+    Ok(app_state_dto(&s, &cached_slugs))
+}
 
+/// Build the state snapshot the frontend renders.
+///
+/// Split out of the command so it can be driven without a Tauri runtime: the
+/// test fixtures the frontend renders against come from this exact function,
+/// which is the only way a mock cannot drift from what the app really sends.
+pub fn app_state_dto(
+    s: &crate::application::AppState,
+    cached_slugs: &std::collections::HashSet<String>,
+) -> AppStateDto {
     let projects = s
         .lizaalert_projects()
         .iter()
@@ -325,7 +336,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         })
         .collect();
 
-    Ok(AppStateDto {
+    AppStateDto {
         project_name: s.project_name().to_owned(),
         project_saved: s.project_file_path().is_some(),
         project_dirty: s.project_dirty(),
@@ -342,7 +353,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         track_layer_count: s.track_layer_count(),
         waypoint_layer_count: s.waypoint_layer_count(),
         tracks,
-    })
+    }
 }
 
 // ── Track GeoJSON ─────────────────────────────────────────────────────────────
@@ -359,7 +370,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
 /// A segment with fewer than two points cannot be drawn as a line and is
 /// skipped; a track left with no parts is omitted rather than emitted with an
 /// empty geometry.
-fn build_tracks_geojson(layers: &[crate::domain::TrackLayer]) -> serde_json::Value {
+pub fn build_tracks_geojson(layers: &[crate::domain::TrackLayer]) -> serde_json::Value {
     let mut features = Vec::new();
 
     for layer in layers {
@@ -1563,30 +1574,33 @@ pub fn get_track_detail(
         .find(|t| t.id() == tid)
         .ok_or_else(|| format!("track {track_id} not found in layer {layer_id}"))?;
 
-    let segments = track
-        .segments()
-        .iter()
-        .map(|seg| SegmentDetailDto {
-            id: seg.id().value(),
-            points: seg
-                .points()
-                .iter()
-                .map(|pt| PointDetailDto {
-                    id: pt.id().value(),
-                    lat: pt.latitude(),
-                    lon: pt.longitude(),
-                    elevation: pt.elevation().map(|e| e as f32),
-                    timestamp: pt.timestamp().map(|ts| ts.to_rfc3339()),
-                })
-                .collect(),
-        })
-        .collect();
+    Ok(track_detail_dto(track))
+}
 
-    Ok(TrackDetailDto {
+/// Map one track to the detail shape the Inspector renders.
+pub fn track_detail_dto(track: &crate::domain::Track) -> TrackDetailDto {
+    TrackDetailDto {
         id: track.id().value(),
         name: track.name().to_owned(),
-        segments,
-    })
+        segments: track
+            .segments()
+            .iter()
+            .map(|seg| SegmentDetailDto {
+                id: seg.id().value(),
+                points: seg
+                    .points()
+                    .iter()
+                    .map(|pt| PointDetailDto {
+                        id: pt.id().value(),
+                        lat: pt.latitude(),
+                        lon: pt.longitude(),
+                        elevation: pt.elevation().map(|e| e as f32),
+                        timestamp: pt.timestamp().map(|ts| ts.to_rfc3339()),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
 }
 
 #[derive(serde::Serialize, specta::Type)]
@@ -1612,8 +1626,12 @@ pub fn get_waypoints(state: State<SharedState>, layer_id: u64) -> Result<Vec<Way
         .find(|l| l.id() == lid)
         .ok_or_else(|| format!("waypoint layer {layer_id} not found"))?;
 
-    let waypoints = layer
-        .waypoints()
+    Ok(waypoint_dtos(layer.waypoints()))
+}
+
+/// Map waypoints to the shape the Waypoints tab renders.
+pub fn waypoint_dtos(waypoints: &[crate::domain::Waypoint]) -> Vec<WaypointDto> {
+    waypoints
         .iter()
         .map(|w| WaypointDto {
             id: w.id().value(),
@@ -1623,9 +1641,7 @@ pub fn get_waypoints(state: State<SharedState>, layer_id: u64) -> Result<Vec<Way
             symbol: w.symbol().map(str::to_owned),
             visible: w.visible(),
         })
-        .collect();
-
-    Ok(waypoints)
+        .collect()
 }
 
 #[derive(serde::Serialize, specta::Type)]

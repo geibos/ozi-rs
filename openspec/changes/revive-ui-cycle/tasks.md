@@ -31,10 +31,10 @@
 
 ## 2. Fixtures from the Rust core (slice 1.1, one session)
 
-- [ ] 2.1 Commit a sample project under `example_data/fixtures/` (`.ozp` derived from the Lavrovo project with tracks and waypoints, plus the local bundle's metadata files; no tile payloads beyond a handful of PNG tiles)
-- [ ] 2.2 Rust: add `dump_fixtures` (binary or `#[test]` behind a feature) that loads the sample through the application layer and writes `app_state.json`, `tracks_geojson.json`, `track_detail_<id>.json`, `waypoints.json`, `projects_chunk.json` to `src/test/fixtures/`, deterministically ordered
-- [ ] 2.3 `justfile`: add `just fixtures`; document in `docs/testing-strategy.md`
-- [ ] 2.4 Frontend test `fixtures-conformance.test.ts`: parse every fixture against the specta types (runtime schema derived from `bindings.ts` or hand-written zod mirrors generated once) and fail on drift
+- [x] 2.1 The sample project is built in code (`src-tauri/src/fixtures.rs`) rather than committed as an `.ozp`: it needs no tile payloads, it is diffable, and the states a screen has to handle are asserted rather than hoped for
+- [x] 2.2 Rust: `write_fixtures` behind `#[cfg(test)]` writes `app-state.json`, `tracks-geojson.json`, `track-detail.json` and `waypoints.json` through the same mappers the commands use
+- [x] 2.3 `justfile`: `just fixtures`
+- [x] 2.4 Frontend `fixtures.test.ts`: the fixtures are typed against the generated bindings and asserted to carry the states a screen must handle; `fixtures_are_up_to_date` fails the Rust suite when a DTO change has not been regenerated
 - [ ] 2.5 `just ci` green, PR merged, `docs/STATE.md` updated
 
 ## 3. Browser stand (slice 1.2, one session)

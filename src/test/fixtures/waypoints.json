@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "lat": 59.95243,
+    "lon": 31.59681,
+    "name": "ШТАБ",
+    "symbol": "flag",
+    "visible": true
+  },
+  {
+    "id": 2,
+    "lat": 59.951938,
+    "lon": 31.596359,
+    "name": "ЗАБРОС",
+    "symbol": null,
+    "visible": true
+  },
+  {
+    "id": 3,
+    "lat": 59.94683,
+    "lon": 31.6915,
+    "name": "Проход у полю",
+    "symbol": "camp",
+    "visible": false
+  }
+]

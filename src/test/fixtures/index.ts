@@ -1,0 +1,34 @@
+/**
+ * The wire snapshots the Rust core writes, typed against the generated
+ * bindings.
+ *
+ * Hand-written mocks drift: the Tracks tab kept filtering for a geometry type
+ * the backend had stopped emitting and every test still passed. These come
+ * from the same mappers the commands use (`src-tauri/src/fixtures.rs`), and
+ * `cargo test fixtures_are_up_to_date` fails when a DTO change has not been
+ * regenerated here with `just fixtures`.
+ */
+import appStateJson from "./app-state.json";
+import tracksGeojsonJson from "./tracks-geojson.json";
+import trackDetailJson from "./track-detail.json";
+import waypointsJson from "./waypoints.json";
+
+import type { AppStateDto, TrackDetailDto, WaypointDto } from "$lib/bindings";
+
+/** A project shaped like one search: two tracks, one of them hidden. */
+export const appStateFixture = appStateJson as AppStateDto;
+
+/** The same project's tracks, as the map layer receives them. */
+export const tracksGeojsonFixture =
+  tracksGeojsonJson as unknown as GeoJSON.FeatureCollection;
+
+/** The two-segment track, as the inspector receives it. */
+export const trackDetailFixture = trackDetailJson as unknown as TrackDetailDto;
+
+/** The project's waypoints, as the Waypoints tab receives them. */
+export const waypointsFixture = waypointsJson as unknown as WaypointDto[];
+
+/** Ids the fixtures use, so tests do not hard-code them twice. */
+export const FIXTURE_TRACK_LAYER_ID = 1n;
+export const FIXTURE_WAYPOINT_LAYER_ID = 1n;
+export const FIXTURE_DETAILED_TRACK_ID = 1n;
