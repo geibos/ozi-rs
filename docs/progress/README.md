@@ -10,6 +10,49 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — every toast speaks Russian
+
+Third time. The library rows' tooltips were English inside a Russian window;
+the bundle progress arrived as an English sentence from the backend; the folder
+import's summary did too. Each was found by looking at one screen, and each fix
+was a sweep of that screen.
+
+This project's own rule says the third fix is a test over the shape. Written as
+one — a toast's message must come from the dictionary — it found **sixteen
+more** on its first run, in places nobody had looked: rename a waypoint, hide a
+track, export a GPX, export a PLT, change the line width, delete a track,
+simplify, load a track's points, reveal a map in the file manager. Every one of
+them is the sentence a crew reads at the moment something went wrong, which is
+the worst possible moment to be handed a language they do not read.
+
+`no-untranslated-labels` had not caught them because it watches `aria-label`,
+`title` and `placeholder`. A toast is none of those — the same lesson as the
+symbol picker's label table: a guard on one shape says nothing about another.
+
+Two things the guard had to get right to be worth having:
+
+- **The description is left alone.** `description: String(error)` is the
+  backend's own words about a failure. That is evidence, and translating it
+  would hide what actually broke.
+- **Comments are not code.** `api.ts` explains this very rule in a comment that
+  quotes `toast.error("Failed to …")`. A guard that flagged its own
+  documentation would teach people to work around it.
+
+And a message assembled entirely from translations passes, by the same narrow
+rule `no-untranslated-labels` uses: a Latin letter typed in, interpolations
+stripped first.
+
+Checked on the stand: «Переместить на карте» now says «Нажмите на карту, чтобы
+перенести точку» with «Точку можно и перетащить на карте» beneath it.
+
+| | |
+|---|---|
+| Change | `openspec/changes/every-toast-speaks-russian/` |
+| Automated gates | `just ci` green (334 Rust, 499 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the import speaks Russian
 
 Importing a folder is how a day's recordings arrive — the field archive is a

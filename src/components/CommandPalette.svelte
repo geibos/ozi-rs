@@ -572,9 +572,12 @@
                       packageName: r.mapName,
                       localPath: r.mapPath,
                     });
-                    toast.message(`Recent — ${r.mapName}`, {
-                      description: $i18n("palette.recentNeedsProject"),
-                    });
+                    toast.message(
+                      $i18n("palette.recentMap").replace("{name}", r.mapName),
+                      {
+                        description: $i18n("palette.recentNeedsProject"),
+                      },
+                    );
                   }
                 }}
               >

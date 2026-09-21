@@ -399,7 +399,7 @@
       drawingModeActive.set(true);
     } catch (err) {
       console.error("Failed to start track drawing mode", err);
-      toast.error("Failed to start track drawing mode", {
+      toast.error($i18n("tracksTab.drawStartFailed"), {
         description: String(err),
       });
     }
@@ -409,7 +409,9 @@
     try {
       await deleteTrack(t.layerId, t.trackId);
     } catch (err) {
-      toast.error("Failed to delete track", { description: String(err) });
+      toast.error($i18n("tracksTab.deleteFailed"), {
+        description: String(err),
+      });
     }
   }
 
@@ -448,7 +450,7 @@
         simplifyState.update((cur) => ({ ...cur, preview }));
       } catch (err) {
         console.error("Failed to compute simplified preview", err);
-        toast.error("Failed to compute simplified preview", {
+        toast.error($i18n("tracksTab.simplifyPreviewFailed"), {
           description: String(err),
         });
       }
@@ -462,7 +464,9 @@
       await simplifyTrack(s.layerId, s.trackId, s.tolerance);
       closeSimplify();
     } catch (err) {
-      toast.error("Failed to simplify track", { description: String(err) });
+      toast.error($i18n("tracksTab.simplifyFailed"), {
+        description: String(err),
+      });
     }
   }
 </script>

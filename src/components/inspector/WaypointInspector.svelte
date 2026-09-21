@@ -84,7 +84,9 @@
       await renameWaypoint(layerId, BigInt(wp.id), trimmed);
       nameDirty = false;
     } catch (error) {
-      toast.error("Failed to rename waypoint", { description: String(error) });
+      toast.error($t("inspector.waypointRenameFailed"), {
+        description: String(error),
+      });
       nameDraft = wp.name;
       nameDirty = false;
     }
@@ -113,7 +115,7 @@
     try {
       await toggleWaypointVisible(layerId, BigInt(wp.id));
     } catch (error) {
-      toast.error("Failed to toggle visibility", {
+      toast.error($t("inspector.waypointVisibilityFailed"), {
         description: String(error),
       });
     }
@@ -127,7 +129,9 @@
       await deleteWaypoint(layerId, BigInt(wp.id));
       selectedWaypointId.set(null);
     } catch (error) {
-      toast.error("Failed to delete waypoint", { description: String(error) });
+      toast.error($t("inspector.waypointDeleteFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -159,9 +163,8 @@
   }
 
   function handleMoveOnMap() {
-    toast.message("Click on the map to move this waypoint", {
-      description:
-        "Drag-to-move on the map is wired by the existing waypoint layer.",
+    toast.message($t("inspector.moveOnMapHint"), {
+      description: $t("inspector.moveOnMapHintDetail"),
     });
   }
   const swatchHex = $derived(waypointColorHex(waypoint?.color));

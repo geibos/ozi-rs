@@ -130,7 +130,7 @@
     try {
       await toggleTrackVisible(sel.layerId, sel.trackId);
     } catch (error) {
-      toast.error("Failed to toggle visibility", {
+      toast.error($t("trackInspector.visibilityFailed"), {
         description: String(error),
       });
     }
@@ -149,7 +149,9 @@
       } as Parameters<typeof open>[0]);
       if (path) await exportGpx(sel.layerId, path as string);
     } catch (error) {
-      toast.error("Failed to export GPX", { description: String(error) });
+      toast.error($t("trackInspector.exportGpxFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -166,7 +168,9 @@
       } as Parameters<typeof open>[0]);
       if (path) await exportTrackPlt(sel.layerId, sel.trackId, path as string);
     } catch (error) {
-      toast.error("Failed to export PLT", { description: String(error) });
+      toast.error($t("trackInspector.exportPltFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -178,7 +182,9 @@
     try {
       await setTrackLineWidth(sel.layerId, sel.trackId, width);
     } catch (error) {
-      toast.error("Failed to set line width", { description: String(error) });
+      toast.error($t("trackInspector.lineWidthFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -318,7 +324,9 @@
       await deleteTrack(sel.layerId, sel.trackId);
       selectedTrack.set(null);
     } catch (error) {
-      toast.error("Failed to delete track", { description: String(error) });
+      toast.error($t("trackInspector.deleteFailed"), {
+        description: String(error),
+      });
     }
   }
 </script>

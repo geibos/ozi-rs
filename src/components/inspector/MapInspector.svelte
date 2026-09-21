@@ -54,7 +54,7 @@
     try {
       await revealBundle();
     } catch (error) {
-      toast.error("Failed to reveal in file manager", {
+      toast.error($t("mapInspector.revealFailed"), {
         description: String(error),
       });
     }

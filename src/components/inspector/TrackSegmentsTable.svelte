@@ -69,7 +69,7 @@
       activeTrackLayerId.set(layerId);
     } catch (e) {
       console.error("Failed to load track details", e);
-      toast.error("Failed to load track details", { description: String(e) });
+      toast.error($t("points.detailFailed"), { description: String(e) });
       trackDetail = null;
     }
   }

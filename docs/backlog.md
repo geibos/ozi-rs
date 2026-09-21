@@ -130,11 +130,14 @@ decision.
   baseline, so nothing catches it. Before writing a delta, read the
   capability's existing requirements; before archiving a batch, read them
   against each other.
-- **Three guards now watch for a defect class rather than an instance**: a
-  literal label in a component, English assembled into one, and a `catch` that
-  logs and tells nobody. Each found something on its first run that the sweep
-  which prompted it had missed. When a defect turns up twice, the third fix is
-  a test over the shape, not another sweep.
+- **Five guards now watch for a defect class rather than an instance**: a
+  literal label in a component, English assembled into one, a `catch` that logs
+  and tells nobody, an annotated `$state(null)`, and a toast message typed in
+  rather than looked up. Each found something on its first run that the sweep
+  which prompted it had missed — the last one found sixteen. When a defect
+  turns up twice, the third fix is a test over the shape, not another sweep.
+  And each guard covers one shape only: `no-untranslated-labels` watches
+  attributes, so it said nothing about toasts for months.
 
 - **An async reload that writes to shared state needs `createLatestRun`.**
   Found five times: the bundle preview, both library tabs, and the map's
