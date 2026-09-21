@@ -5,9 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **start before the bundle finishes** (2026-09-21) — a map
-whose file has landed is openable while the rest downloads, which turned out to
-work already and only needed saying; after the first screen speaking Russian,
+Last merged slice: **handing the day over** (2026-09-21) — every track in the
+project exports to one GPX, the shape FTP upload will need; after a map being
+openable while the rest of its bundle downloads, which turned out to work
+already and only needed saying, and after the first screen speaking Russian,
 including the catalogue line that used to be the backend's own English status,
 and after the units and instants pass
 on the Track Inspector, and after the stand itself, which opens the real screens on fixtures in
@@ -27,7 +28,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 290 Rust tests and 339 frontend tests;
+rustfmt, clippy, type-checks, 292 Rust tests and 339 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

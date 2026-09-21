@@ -185,6 +185,14 @@ export async function exportGpx(layerId: bigint, path: string): Promise<void> {
   await unwrap("export_gpx", commands.exportGpx(toIdNumber(layerId), path));
 }
 
+/**
+ * Export every track in the project to one GPX file. Returns how many were
+ * written; an empty project rejects rather than writing an empty document.
+ */
+export async function exportAllTracksGpx(path: string): Promise<number> {
+  return unwrap("export_all_tracks_gpx", commands.exportAllTracksGpx(path));
+}
+
 export async function getTrackExportDefaultPath(
   trackName: string,
   extension: "gpx" | "plt",

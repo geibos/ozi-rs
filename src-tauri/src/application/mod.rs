@@ -1361,6 +1361,44 @@ impl AppState {
         }
     }
 
+    /// Export every track in the project to one GPX file.
+    ///
+    /// A folder import makes one layer per file, so "today's tracks" is
+    /// twenty-odd layers. Handing them over one dialog at a time is the same
+    /// shape as hiding twenty-five tracks by hand.
+    ///
+    /// Returns the number of tracks written; an empty project is an error
+    /// rather than a silently empty file.
+    pub fn export_all_tracks_gpx(&mut self, path: std::path::PathBuf) -> Result<usize, String> {
+        let tracks: Vec<crate::domain::Track> = self
+            .project
+            .track_layers()
+            .iter()
+            .flat_map(|layer| layer.tracks().iter().cloned())
+            .collect();
+
+        if tracks.is_empty() {
+            let message = "No tracks to export".to_owned();
+            self.update_status(DiagnosticLevel::Error, message.clone());
+            return Err(message);
+        }
+
+        match crate::infrastructure::export::export_tracks_to_gpx_file(&tracks, &path) {
+            Ok(()) => {
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Exported {} tracks to {}", tracks.len(), path.display()),
+                );
+                Ok(tracks.len())
+            }
+            Err(e) => {
+                let message = format!("Export failed: {e}");
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                Err(message)
+            }
+        }
+    }
+
     /// Export all waypoints of the given layer to a GPX file.
     ///
     /// The waypoints capability has always required this and the XML builder
@@ -2147,6 +2185,56 @@ mod tests {
             state.export_waypoints_default_path(LayerId::new(9999), "gpx"),
             None,
             "no suggestion for a layer that is not there"
+        );
+    }
+
+    /// A folder import makes one layer per navigator file, so handing the
+    /// day's work to the штаб meant one export dialog per layer.
+    #[test]
+    fn every_track_in_the_project_exports_to_one_file() {
+        let dir = temp_session_dir("export-all-tracks");
+        let mut state = AppState::new();
+        let first = LayerId::new(1);
+        state
+            .apply_create_empty_track(first, "20260708_Veter2".to_owned())
+            .expect("track");
+        state
+            .apply_create_empty_track(first, "20260709-ЛИСА15".to_owned())
+            .expect("track");
+        // A second layer, the shape an import leaves behind.
+        state
+            .project
+            .add_track_layer(crate::domain::TrackLayer::new(
+                LayerId::new(2),
+                "20260709_Veter3.gpx",
+            ));
+        state
+            .apply_create_empty_track(LayerId::new(2), "20260709-ЛИСА16".to_owned())
+            .expect("track");
+
+        let path = dir.join("tracks.gpx");
+        let written = state.export_all_tracks_gpx(path.clone()).expect("export");
+
+        assert_eq!(written, 3, "every track, across every layer");
+        let xml = std::fs::read_to_string(&path).expect("read gpx");
+        assert_eq!(xml.matches("<trk>").count(), 3);
+        assert!(xml.contains("20260709-ЛИСА15"), "Cyrillic names survive");
+        assert!(
+            xml.contains("20260709-ЛИСА16"),
+            "including the second layer"
+        );
+    }
+
+    #[test]
+    fn exporting_an_empty_project_is_an_error_not_an_empty_file() {
+        let dir = temp_session_dir("export-all-empty");
+        let mut state = AppState::new();
+        let path = dir.join("tracks.gpx");
+
+        assert!(state.export_all_tracks_gpx(path.clone()).is_err());
+        assert!(
+            !path.exists(),
+            "an empty export SHALL NOT leave a file that looks like a day's work"
         );
     }
 

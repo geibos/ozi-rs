@@ -82,6 +82,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::import_plt,
         commands::import_tracks_directory,
         commands::export_gpx,
+        commands::export_all_tracks_gpx,
         commands::get_track_export_default_path,
         commands::undo,
         commands::redo,

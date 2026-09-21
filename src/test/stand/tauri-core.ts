@@ -71,6 +71,7 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "load_projects",
   "preview_project",
   "export_gpx",
+  "export_all_tracks_gpx",
   "export_track_plt",
   "export_gpx_waypoints",
   "export_wpt_waypoints",

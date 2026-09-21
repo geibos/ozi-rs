@@ -142,6 +142,17 @@ async exportGpx(layerId: number, path: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Export every track in the project to one GPX file, returning the count.
+ */
+async exportAllTracksGpx(path: string) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_all_tracks_gpx", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getTrackExportDefaultPath(trackName: string, extension: string) : Promise<Result<string | null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_track_export_default_path", { trackName, extension }) };

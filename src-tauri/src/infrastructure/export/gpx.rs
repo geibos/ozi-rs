@@ -9,6 +9,15 @@ pub fn export_layer_to_gpx_file(layer: &TrackLayer, path: &Path) -> Result<(), i
     std::fs::write(path, xml)
 }
 
+/// Export every given track to one `.gpx` file on disk.
+///
+/// Importing a folder of navigators makes one layer per file, so handing the
+/// day's work to the штаб meant one export dialog per layer — the same
+/// twenty-six-clicks shape the visibility toggles had.
+pub fn export_tracks_to_gpx_file(tracks: &[Track], path: &Path) -> Result<(), io::Error> {
+    std::fs::write(path, build_gpx_xml(tracks))
+}
+
 /// Build GPX XML for the given tracks, including Garmin color extensions.
 pub fn build_gpx_xml(tracks: &[Track]) -> String {
     let mut out = String::new();

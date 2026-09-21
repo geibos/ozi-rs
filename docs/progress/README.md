@@ -10,6 +10,26 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — handing the day over
+
+A folder import makes one track layer per navigator file, so a day of searching
+is twenty-odd layers. Handing that to the штаб meant opening the export dialog
+once per layer — the same twenty-six-clicks shape the visibility toggles had
+before the bulk controls.
+
+One action now writes every track in the project into a single GPX and says how
+many it wrote. An empty project is refused: a file that looks like a day's work
+and contains nothing is worse than an error.
+
+This is also the shape FTP upload will need — "the day's tracks" as one thing.
+
+| | |
+|---|---|
+| After | [the tracks rail](2026-09-21-hand-it-over/after-tracks-rail.png) — with the layer selector finally reading "Треки" |
+| Automated gates | `just ci` green (292 Rust, 339 frontend) |
+
+---
+
 ## 2026-09-21 — start before the bundle finishes
 
 The owner's July note said a bundle could not be opened while the rest still

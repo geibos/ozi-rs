@@ -891,6 +891,19 @@ pub fn export_gpx(
     Ok(())
 }
 
+/// Export every track in the project to one GPX file, returning the count.
+#[tauri::command]
+#[specta::specta]
+pub fn export_all_tracks_gpx(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<u32, String> {
+    let written = lock_app_state(state.inner())?.export_all_tracks_gpx(PathBuf::from(path))?;
+    let _ = app.emit("state-changed", ());
+    Ok(written as u32)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_track_export_default_path(

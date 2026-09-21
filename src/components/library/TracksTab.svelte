@@ -42,6 +42,7 @@
   import {
     createEmptyTrack,
     deleteTrack,
+    exportAllTracksGpx,
     exportGpx,
     exportTrackPlt,
     getSimplifiedPreview,
@@ -63,6 +64,7 @@
   import { toast } from "svelte-sonner";
   import UploadIcon from "@lucide/svelte/icons/upload";
   import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
+  import DownloadIcon from "@lucide/svelte/icons/download";
   import LocateIcon from "@lucide/svelte/icons/locate";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import PencilIcon from "@lucide/svelte/icons/pencil";
@@ -315,6 +317,36 @@
     }
   }
 
+  /**
+   * Hand the day's work over in one file.
+   *
+   * A folder import makes one layer per navigator, so exporting "today's
+   * tracks" was one dialog per layer — the same twenty-six-clicks shape the
+   * visibility toggles had.
+   */
+  async function handleExportAll() {
+    try {
+      const defaultPath = await getTrackExportDefaultPath(
+        $appState?.project_name ?? "tracks",
+        "gpx",
+      );
+      const path = await open({
+        save: true,
+        defaultPath: defaultPath ?? "tracks.gpx",
+        filters: [{ name: "GPX", extensions: ["gpx"] }],
+      } as Parameters<typeof open>[0]);
+      if (!path) return;
+      const count = await exportAllTracksGpx(path as string);
+      toast.success(
+        $i18n("tracksTab.exportAllDone").replace("{count}", String(count)),
+      );
+    } catch (err) {
+      toast.error($i18n("tracksTab.exportAllFailed"), {
+        description: String(err),
+      });
+    }
+  }
+
   async function handleCreateTrackToggle() {
     // Toggle drawing mode. On exit we ask MapView to finish via the
     // existing `drawingFinishRequested` signal it already listens to,
@@ -513,6 +545,23 @@
           <span class="truncate">{$i18n("tracksTab.importFolder")}</span>
         </Button>
       </div>
+
+      {#if tracks.length > 0}
+        <div class="mt-1.5 flex">
+          <Button
+            variant="outline"
+            size="xs"
+            class="min-w-0 flex-1 justify-center gap-1.5"
+            disabled={$drawingModeActive}
+            title={$i18n("tracksTab.exportAllTitle")}
+            onclick={handleExportAll}
+            data-testid="library-export-all-tracks"
+          >
+            <DownloadIcon class="size-3.5" strokeWidth={1.5} />
+            <span class="truncate">{$i18n("tracksTab.exportAll")}</span>
+          </Button>
+        </div>
+      {/if}
     {/if}
 
     {#if tracks.length > 0}
