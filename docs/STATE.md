@@ -17,7 +17,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 282 Rust tests and 315 frontend tests;
+rustfmt, clippy, type-checks, 283 Rust tests and 317 frontend tests;
 `just smoke` passes;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -41,13 +41,11 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **The prominent button still fetches everything.** "Открыть бандл
-   (скачать)" downloads the whole project directory recursively, not the map
-   the operator picked, and has no total to show. Per-map sizes are on screen
-   now; the bundle button needs either a total or a narrower job.
-2. **The loader Sheet hides the download it started** (overlay `z-50` over a
-   `z-40` panel), and the toaster lands in the same corner.
-3. **Slice 1.1 — fixtures from the Rust core** (`revive-ui-cycle` section 2),
+1. **The bundle download still fetches everything.** It now says what that
+   weighs, but it is still the whole directory — print maps and Android
+   packages included. The owner's July note asks for a type filter; that is
+   the next step, and it needs their call on what to skip by default.
+2. **Slice 1.1 — fixtures from the Rust core** (`revive-ui-cycle` section 2),
    the first step of giving agents eyes that do not need the GUI.
 
 The rest of the bundle-flow survey is under "Bundle flow" in `docs/backlog.md`.

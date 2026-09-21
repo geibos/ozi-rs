@@ -88,3 +88,51 @@ describe("the progress panel belongs to the running download", () => {
     expect(get(activeDownloadId)).toBeNull();
   });
 });
+
+describe("bundle progress keeps what the next phase does not restate", () => {
+  const phase = (over: Record<string, unknown>) =>
+    ({
+      download_id: "d1",
+      message: "",
+      phase: "downloading",
+      ...over,
+    }) as never;
+
+  it("keeps the byte totals through extracting and indexing", async () => {
+    const { applyBundleProgress, bundleProgress } =
+      await import("../lib/stores");
+    bundleProgress.set(null);
+
+    applyBundleProgress(
+      phase({
+        total: 17,
+        completed: 14,
+        downloaded_bytes: 900,
+        total_bytes: 1000,
+      }),
+    );
+    // Extracting reports a message and nothing else — which is exactly when
+    // the operator looks at the panel.
+    applyBundleProgress(phase({ phase: "extracting", message: "Extracting" }));
+
+    expect(get(bundleProgress)).toMatchObject({
+      phase: "extracting",
+      total: 17,
+      downloaded_bytes: 900,
+      total_bytes: 1000,
+    });
+  });
+
+  it("does not carry one download's totals into the next", async () => {
+    const { applyBundleProgress, bundleProgress } =
+      await import("../lib/stores");
+    bundleProgress.set(null);
+
+    applyBundleProgress(phase({ total_bytes: 1000, downloaded_bytes: 900 }));
+    applyBundleProgress(
+      phase({ download_id: "d2", phase: "scanning", message: "Scanning" }),
+    );
+
+    expect(get(bundleProgress)?.total_bytes).toBeUndefined();
+  });
+});

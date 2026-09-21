@@ -7,8 +7,8 @@
   import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
   import {
     appendProjectsChunk,
+    applyBundleProgress,
     appState,
-    bundleProgress,
     commandPaletteOpen,
     currentDownload,
     finishDownload,
@@ -71,7 +71,7 @@
           currentDownload.set(event.payload);
         }),
         listen<BundleProgressPayload>("bundle-progress", (event) => {
-          bundleProgress.set(event.payload);
+          applyBundleProgress(event.payload);
         }),
         listen<LizaProjectSummaryDto[]>("projects-chunk", (event) =>
           appendProjectsChunk(event.payload),

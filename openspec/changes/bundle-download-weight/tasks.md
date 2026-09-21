@@ -11,4 +11,4 @@
 ## 3. Verification
 
 - [x] 3.1 `just ci` green
-- [ ] 3.2 Seen on screen
+- [x] 3.2 Seen on screen (panel over the loader; the byte line is covered by tests, see the gallery note)

@@ -341,6 +341,29 @@ export function resetBundleDownloadState(downloadId: string | null) {
 export const bundleProgress = writable<BundleProgressPayload | null>(null);
 
 /**
+ * Apply a `bundle-progress` event, keeping what the new phase does not restate.
+ *
+ * Only the downloading phase reports byte totals; extracting and indexing
+ * report a message and nothing else. Overwriting wholesale therefore blanked
+ * "43 MiB of 120 MiB" the moment the last file landed, which is exactly when
+ * the operator looks at it. A total that has not changed is still true.
+ */
+export function applyBundleProgress(payload: BundleProgressPayload): void {
+  bundleProgress.update((previous) => {
+    if (previous === null || previous.download_id !== payload.download_id) {
+      return payload;
+    }
+    return {
+      ...payload,
+      completed: payload.completed ?? previous.completed,
+      total: payload.total ?? previous.total,
+      downloaded_bytes: payload.downloaded_bytes ?? previous.downloaded_bytes,
+      total_bytes: payload.total_bytes ?? previous.total_bytes,
+    };
+  });
+}
+
+/**
  * Last per-file download-progress payload, used by the bundle-loader
  * status bar to render the "N / M — package_name" current-file label
  * and the indeterminate progress bar fallback. Layout-level writer,

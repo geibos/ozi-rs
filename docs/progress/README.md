@@ -10,6 +10,32 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — what the bundle download weighs
+
+One button fetches the project's whole directory tree — every subdirectory,
+including print maps and Android packages this app cannot open — and the panel
+counted files ("3 of 47") while saying nothing about bytes.
+
+The scan already reads every directory listing to build the file list, and
+those listings state each file's size, so the total was there to be had. It is
+summed over what is actually about to be fetched (files already on disk are
+skipped, so a resumed download does not re-announce the whole bundle) and the
+workers' fetched bytes accumulate into the progress.
+
+Two panel defects went with it: it sat at `z-40` under the loader sheet's
+`z-50` overlay, so opening the loader to queue the next map hid the download it
+had just started; and only the downloading phase reports byte totals, so the
+figure blanked the moment extraction began — which is exactly when an operator
+looks at it. The store keeps what the next phase does not restate.
+
+| | |
+|---|---|
+| Seen on screen | the panel, per-file rows and sizes, over the loader |
+| Not seen on screen | the aggregate byte line — on this link a bundle lands in a couple of seconds and the panel is gone before a screenshot catches it. Covered by tests: the scan announces the total, and the store keeps it through extraction. |
+| Automated gates | `just ci` green (283 Rust, 317 frontend) |
+
+---
+
 ## 2026-09-21 — how big is this download?
 
 Opening a map commits to a download, and nothing said how big it was. In a
