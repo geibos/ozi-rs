@@ -10,6 +10,36 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — an old project still opens
+
+Yesterday's waypoint colour turned up a class rather than an instance. The
+whole `.ozp` format rests on `#[serde(default)]` being in the right places: a
+field added to any persisted struct without one turns **every project a crew
+has ever saved** into a load error, and the only place that shows up is a load.
+Nothing in the build says a word.
+
+That is not a nicety. The format has no version field and no migration path —
+tracked as CJ-8 and still open — so "the older file still loads" is the entire
+compatibility story.
+
+What existed guarded the project shell: a legacy file with no layers at all.
+Nothing guarded what is inside them. There is now one file carrying a track of
+one segment and two points and a waypoint, with only the fields that have
+always existed, and it asserts what absence is supposed to *mean* — a track
+with no style recorded is visible, a waypoint with no symbol has none.
+
+It passed on the first run, which is the finding: the format is genuinely
+tolerant, and nobody had checked. Now it stays that way. I removed one
+`#[serde(default)]` — from `Track.style` — and watched the test name the field
+it could no longer read.
+
+| | |
+|---|---|
+| Evidence | the guard, verified red by removing a default |
+| Automated gates | `just ci` green (316 Rust, 395 frontend) |
+
+---
+
 ## 2026-09-21 — whose mark is this
 
 The symbol says what a mark is; the colour says whose it is. Group A's marks

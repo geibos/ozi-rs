@@ -469,6 +469,76 @@ mod tests {
         assert_eq!(loaded.waypoint_layers()[0].name(), "Waypoints");
     }
 
+    /// The smallest project an early build could have written, with a track
+    /// and a waypoint in it.
+    ///
+    /// The whole format rests on `#[serde(default)]` in the right places: a
+    /// field added to any of these structs without one turns every project a
+    /// crew has ever saved into a load error, and the only place that shows up
+    /// is a load. The existing legacy test covers the project shell with no
+    /// layers; this covers what is inside them.
+    ///
+    /// If this fails after a field is added, the field wants a default — or,
+    /// if it truly cannot have one, the format wants a version and a migration,
+    /// which it does not have (tracked as CJ-8).
+    #[test]
+    fn a_project_from_an_early_build_still_loads_with_its_contents() {
+        let raw = r#"{
+            "id": 1,
+            "name": "Ранний поиск",
+            "map_layers": [],
+            "track_layers": [
+                {
+                    "id": 1,
+                    "name": "Tracks",
+                    "tracks": [
+                        {
+                            "id": 1,
+                            "name": "20260708_Ветер",
+                            "segments": [
+                                {
+                                    "id": 1,
+                                    "points": [
+                                        { "id": 1, "latitude": 59.95, "longitude": 31.59 },
+                                        { "id": 2, "latitude": 59.96, "longitude": 31.60 }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "waypoint_layers": [
+                {
+                    "id": 1,
+                    "name": "Waypoints",
+                    "waypoints": [
+                        { "id": 1, "name": "ШТАБ", "latitude": 59.95, "longitude": 31.59 }
+                    ]
+                }
+            ]
+        }"#;
+
+        let path = temp_path("ozp");
+        write_raw_ozp(&path, raw);
+
+        let loaded = load_project(&path).expect("a project from an early build still loads");
+
+        let track = &loaded.track_layers()[0].tracks()[0];
+        assert_eq!(track.name(), "20260708_Ветер");
+        assert_eq!(track.segments()[0].points().len(), 2);
+        assert!(
+            track.style().visible,
+            "a track with no style recorded is visible, which is what its absence meant"
+        );
+
+        let waypoint = &loaded.waypoint_layers()[0].waypoints()[0];
+        assert_eq!(waypoint.name(), "ШТАБ");
+        assert_eq!(waypoint.symbol(), None);
+        assert_eq!(waypoint.color(), None);
+        assert!(waypoint.visible());
+    }
+
     #[test]
     fn load_ozp_with_existing_layers_does_not_append_defaults() {
         // A project with one track layer and two waypoint layers (none of

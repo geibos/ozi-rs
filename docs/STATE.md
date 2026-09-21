@@ -5,8 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **whose mark is this** (2026-09-21) — a waypoint can carry
-a colour of its own, undoably, and the map draws it; after yesterday's project
+Last merged slice: **an old project still opens** (2026-09-22) — the `.ozp`
+format's tolerance of older files is now a test rather than an assumption;
+after whose mark is this, where a waypoint gained
+a colour of its own, undoably, drawn by the map and the list alike, and after yesterday's project
 being one key away, where the
 palette offers the projects most recently opened or saved, and after the project
 file becoming `.ozp`, where both dialogs
@@ -87,7 +89,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 315 Rust tests and 395 frontend tests;
+rustfmt, clippy, type-checks, 316 Rust tests and 395 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
