@@ -12,9 +12,13 @@ import { toast } from "svelte-sonner";
 import { redo, saveProject, undo } from "$lib/api";
 import { t } from "$lib/i18n";
 import { projectPath } from "$lib/stores";
+import { PROJECT_SAVE_EXTENSION } from "$lib/project-file";
 
-/** Same filter the palette's "Open project…" dialog uses. */
-const PROJECT_FILE_FILTER = { name: "OziRS project", extensions: ["json"] };
+/** See `project-file.ts`: the format is `.ozp`, and both dialogs say so. */
+const PROJECT_FILE_FILTER = {
+  name: "OziRS project",
+  extensions: [PROJECT_SAVE_EXTENSION],
+};
 
 /**
  * Save without a dialog when the project already has a path on disk

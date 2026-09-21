@@ -5,9 +5,11 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a waypoint looks like what it is** (2026-09-21) — the
+Last merged slice: **the project file is `.ozp`** (2026-09-21) — both dialogs
+filtered on `json`, which made an `.ozp` project invisible in the open dialog;
+after a waypoint looking like what it is, where the
 symbol a crew picks is drawn on the map marker, not only in the lists and the
-exports; after what survives the trip, where a track and a
+exports, and after what survives the trip, where a track and a
 waypoint exported to GPX and read back are pinned as the same track and
 waypoint, which is the ground the planned FTP upload stands on, and after one flaky file not being the bundle, where
 a
@@ -81,7 +83,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 313 Rust tests and 379 frontend tests;
+rustfmt, clippy, type-checks, 313 Rust tests and 382 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the

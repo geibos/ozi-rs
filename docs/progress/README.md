@@ -10,6 +10,42 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the project file is `.ozp`
+
+Went looking for the declared-but-absent "recent `.ozp`" and found something
+before it. The recents in the palette are recent *maps*, not projects — so the
+item is genuinely absent — but on the way there, both project dialogs turned
+out to filter on `json`.
+
+The format is `.ozp`: `AGENTS.md` says so, `docs/project-map.md` says so, and
+`project-persistence` requires a save "to a user-chosen `.ozp` file". So what a
+crew saved was not the format the documentation names, and — the part that
+costs them something — **an `.ozp` was invisible in the open dialog.** A filter
+hides what it does not match. A project from an older build, from a colleague,
+from a USB stick was simply not there to select.
+
+The divergence was known: the capability's own Purpose carried a reality note
+about it. Owner decision 1 says the code is fixed where the owner wants the
+behaviour, and the requirement is unambiguous.
+
+There were two dialogs and no shared value, which is how they came to disagree
+with the documentation and agree with each other. One module now. Open still
+accepts `json`, because everything this app has saved until today carries it,
+and a filter that hid those would lose a crew their work far more surely than
+the wrong extension ever did.
+
+A CJ-7 test had `extensions: ["json"]` written into it as the contract. It was
+pinning the defect. What it pins now is that the filter comes from the shared
+module; the value is covered behaviourally beside the dialog.
+
+| | |
+|---|---|
+| Evidence | tests on what Save offers, what Open accepts, and that a cancelled dialog saves nothing |
+| Automated gates | `just ci` green (313 Rust, 382 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — the last of the findings
 
 Two lines left on the code-findings list, both now answered rather than

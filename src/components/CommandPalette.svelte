@@ -62,6 +62,7 @@
     save as saveDialog,
   } from "@tauri-apps/plugin-dialog";
   import { appendRecentFile, getRecentFiles } from "$lib/recentFiles";
+  import { PROJECT_OPEN_EXTENSIONS } from "$lib/project-file";
   import { toast } from "svelte-sonner";
   import { paletteProjects } from "$lib/palette-projects";
   import type { WaypointData } from "$lib/types";
@@ -187,7 +188,11 @@
     try {
       const path = await openDialog({
         filters: [
-          { name: $i18n("palette.projectFileType"), extensions: ["json"] },
+          {
+            name: $i18n("palette.projectFileType"),
+            // `.ozp` first, `json` still accepted — see `project-file.ts`.
+            extensions: PROJECT_OPEN_EXTENSIONS,
+          },
         ],
       } as Parameters<typeof openDialog>[0]);
       if (path) await loadProjectFile(path as string);

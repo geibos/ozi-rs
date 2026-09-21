@@ -156,10 +156,16 @@ describe("CJ-7 shared project actions (src/lib/actions/project.ts)", () => {
     expect(actionsSource).toContain('"toast.redoFailed"');
   });
 
-  it("exposes saveAs with the palette's project-file dialog filter", () => {
+  /**
+   * This used to pin `extensions: ["json"]`, which was the defect rather than
+   * the contract: the format is `.ozp` and a filter on `json` hid every `.ozp`
+   * in the open dialog. Both dialogs read the extension from one module now,
+   * which is what is worth pinning — the value itself is covered behaviourally
+   * in `project-file-extension.test.ts`.
+   */
+  it("exposes saveAs, taking its dialog filter from the project-file module", () => {
     expect(actionsSource).toContain("export async function saveAs");
-    expect(actionsSource).toContain(
-      '{ name: "OziRS project", extensions: ["json"] }',
-    );
+    expect(actionsSource).toContain("PROJECT_SAVE_EXTENSION");
+    expect(actionsSource).not.toContain('extensions: ["json"]');
   });
 });
