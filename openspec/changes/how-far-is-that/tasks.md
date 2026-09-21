@@ -25,12 +25,19 @@
 - [x] 4.4 One tool at a time, each discarding what it held — with tests
 - [x] 4.5 Walked on the stand: "Клик — центр", then "Клик — радиус", then "52 м"
 
-## 5. Not in this slice
+## 5. Projection
 
-- [ ] 5.1 Projection, the last of the three on-map tools ADR-0020 declares
-- [ ] 5.2 The tape's and the ring's rendered pixels are unverified. MapLibre does not set `preserveDrawingBuffer`, so reading the canvas back gives an empty buffer — the zero I got means nothing either way, and is recorded rather than reported as a pass
+- [x] 5.1 Click an origin, type a bearing and a distance, place the waypoint there
+- [x] 5.2 The result previewed on the map before it is committed
+- [x] 5.3 "Place" disabled until there is a distance to place at
+- [x] 5.4 All three tools mutually exclusive, with tests
+- [x] 5.5 The `Waypoint N` default name translated — it was English in a Russian window
+- [x] 5.6 Walked on the stand: hint, then the fields, then 240° and 1200 m placing "Точка 4" at the computed coordinates
 
-## 6. Gates
+## 6. Not in this slice
+- [ ] 6.1 The tools' rendered pixels are unverified. MapLibre does not set `preserveDrawingBuffer`, so reading the canvas back gives an empty buffer — the zero I got means nothing either way, and is recorded rather than reported as a pass
 
-- [x] 6.1 `just ci` green
-- [ ] 6.2 `just smoke` green (blocked: the Mac2 driver host crashes at session creation — see `docs/STATE.md`)
+## 7. Gates
+
+- [x] 7.1 `just ci` green
+- [ ] 7.2 `just smoke` green (blocked: the Mac2 driver host crashes at session creation — see `docs/STATE.md`)

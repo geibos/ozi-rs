@@ -10,7 +10,7 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
-## 2026-09-22 — how far is that, and what is within five hundred metres
+## 2026-09-22 — the three on-map tools
 
 ADR-0020 puts distance measurement in the MVP and it had never been built. It
 is the measurement a search crew takes constantly — how far is that from the
@@ -79,13 +79,29 @@ one on turns the other off and discards what it held — a stale point left
 behind would be measured into the next measurement, which is the kind of wrong
 number nobody questions.
 
+And the third, which completes what `product-scope` asks for: **placing a
+waypoint by bearing and distance**. Unlike the other two it is not click-driven,
+because "from the task point, 240° and 1.2 kilometres" is dictated over a radio,
+not pointed at. Click the origin, type the two numbers, and the point lands
+there — previewed on the map first, because a bearing heard over a radio is easy
+to mishear and seeing it is how that gets caught. "Place" stays disabled until
+there is a distance to place at.
+
+All three take the map's clicks, so only one listens at a time, and switching
+discards what the previous one held.
+
+Found beside it: the default name for a waypoint placed by clicking was
+`Waypoint N`. English, in the app's own Russian window, on a path I had walked
+past twice.
+
 | | |
 |---|---|
 | Evidence | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", clicks on the canvas make it "101 м" and then "146 м", Esc takes it away |
 | Evidence | the ring on the stand: "Клик — центр", then "Клик — радиус", then "52 м" |
+| Evidence | the projection on the stand: the hint, then the fields, then 240° and 1200 m placing "Точка 4" at the computed coordinates |
 | Evidence | tests on the distance, the formatting, the tape's GeoJSON and what counts as an editable target |
 | Not verified | the tape's rendered pixels — see above |
-| Automated gates | `just ci` green (318 Rust, 421 frontend) |
+| Automated gates | `just ci` green (318 Rust, 423 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

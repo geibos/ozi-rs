@@ -65,3 +65,23 @@ tools SHALL discard what the previous one held.
 
 - **WHEN** the operator turns on one on-map tool while another is active
 - **THEN** the other is off and what it held is discarded
+
+### Requirement: A waypoint can be placed by bearing and distance
+
+The operator SHALL be able to place a waypoint by choosing a point on the map
+and entering a bearing and a distance from it. A position given over a radio
+arrives as an azimuth and a range, not as somewhere to point at.
+
+Where the waypoint will land SHALL be shown on the map before it is placed, so
+that a misheard bearing is caught before it becomes a mark, and the placement
+SHALL NOT be offered until there is a distance to place at.
+
+#### Scenario: A position given over the radio
+
+- **WHEN** the operator chooses a point, enters a bearing and a distance, and confirms
+- **THEN** a waypoint is placed at that bearing and distance from the chosen point
+
+#### Scenario: Before confirming
+
+- **WHEN** a bearing and a distance have been entered
+- **THEN** the resulting position is shown on the map before the waypoint exists

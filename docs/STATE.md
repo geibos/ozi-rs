@@ -5,8 +5,9 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **how far is that** (2026-09-22) — distance measurement and
-a geodesic radius ring on the map, from the command palette; after an old project still opening, where
+Last merged slice: **the three on-map tools** (2026-09-22) — distance, a
+geodesic radius ring and placing a waypoint by bearing and distance, all from
+the command palette; after an old project still opening, where
 the `.ozp`
 format's tolerance of older files became a test rather than an assumption,
 and after whose mark is this, where a waypoint gained
@@ -91,7 +92,7 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 318 Rust tests and 421 frontend tests;
+rustfmt, clippy, type-checks, 318 Rust tests and 423 frontend tests;
 `just smoke` cannot run on this machine right now — see "Known broken";
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
@@ -151,8 +152,10 @@ re-ordered rather than followed blindly.
    not attempted while the E2E gate is down: the map is the product, and the
    stand stubs its tiles, so a major upgrade would ship verified only by type
    checks and a browser.
-6. **Field tools declared in scope and absent**: projection. Distance and the
-   radius ring were built on 2026-09-22. The home is the command palette, which
+6. ~~Field tools declared in scope and absent.~~ All three — distance, radius
+   ring, projection — were built on 2026-09-22 and live in the command palette.
+   Their rendered pixels are unverified; see the change's task 6.1 for why the
+   obvious check does not work. The home is the command palette, which
    `product-scope` names as a place a workspace action may live — the mode
    chips stay inert scaffolding per `ui-shell`, and that is not the obstacle it
    looked like.

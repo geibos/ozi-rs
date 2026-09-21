@@ -4,10 +4,13 @@ import { get } from "svelte/store";
 import {
   measuredPoints,
   measuringActive,
+  projectionActive,
+  projectionOrigin,
   ringActive,
   ringCentre,
   ringRadiusKm,
   setMeasuring,
+  setProjection,
   setRing,
 } from "../lib/stores";
 
@@ -21,6 +24,7 @@ import {
 beforeEach(() => {
   setMeasuring(false);
   setRing(false);
+  setProjection(false);
 });
 
 describe("the two on-map tools", () => {
@@ -65,5 +69,36 @@ describe("the two on-map tools", () => {
     ringCentre.set({ lat: 1, lon: 1 });
     setRing(false);
     expect(get(ringCentre)).toBeNull();
+  });
+});
+
+describe("the third tool joins the same rule", () => {
+  it("is switched off by either of the others", () => {
+    setProjection(true);
+    expect(get(projectionActive)).toBe(true);
+
+    setMeasuring(true);
+    expect(get(projectionActive)).toBe(false);
+
+    setProjection(true);
+    setRing(true);
+    expect(get(projectionActive)).toBe(false);
+  });
+
+  it("switches both of the others off, and forgets its origin", () => {
+    setMeasuring(true);
+    measuredPoints.set([{ lat: 1, lon: 1 }]);
+    setRing(true);
+    ringCentre.set({ lat: 2, lon: 2 });
+
+    setProjection(true);
+    expect(get(measuringActive)).toBe(false);
+    expect(get(measuredPoints)).toEqual([]);
+    expect(get(ringActive)).toBe(false);
+    expect(get(ringCentre)).toBeNull();
+
+    projectionOrigin.set({ lat: 3, lon: 3 });
+    setProjection(false);
+    expect(get(projectionOrigin)).toBeNull();
   });
 });

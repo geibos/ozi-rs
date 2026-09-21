@@ -41,6 +41,8 @@
     setMeasuring,
     ringActive,
     setRing,
+    projectionActive,
+    setProjection,
     currentProject,
     projects,
     selectedMapInfo,
@@ -533,6 +535,19 @@
               >{$ringActive
                 ? $i18n("palette.ringStop")
                 : $i18n("palette.ring")}</span
+            >
+          </Command.Item>
+          <Command.Item
+            value="tool:projection"
+            onSelect={() => {
+              setProjection(!$projectionActive);
+              close();
+            }}
+          >
+            <span class="flex-1"
+              >{$projectionActive
+                ? $i18n("palette.projectionStop")
+                : $i18n("palette.projection")}</span
             >
           </Command.Item>
           <Command.Item value="setting:gps" onSelect={handleGpsSetting}>

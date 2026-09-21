@@ -26,6 +26,11 @@
     ringCentre,
     ringRadiusKm,
     setRing,
+    projectionActive,
+    projectionOrigin,
+    projectionBearing,
+    projectionDistanceM,
+    setProjection,
     drawingTrackLayerId,
     drawingTrackId,
     drawingPointCount,
@@ -60,6 +65,7 @@
   import { reportEditFailure } from "$lib/edit-failure";
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
   import {
+    destinationPoint,
     distanceKm,
     formatMeasuredDistance,
     pathLengthKm,
@@ -154,6 +160,10 @@
       if ($ringActive) {
         e.preventDefault();
         setRing(false);
+      }
+      if ($projectionActive) {
+        e.preventDefault();
+        setProjection(false);
       }
     }
 
@@ -437,9 +447,55 @@
     const radius = $ringRadiusKm;
     if (!map || !mapLoaded) return;
     const ring = centre === null ? [] : ringAround(centre, radius);
-    updateMeasureLayer(map, points, ring);
+    const projected = projectionPreview;
+    updateMeasureLayer(
+      map,
+      projected === null ? points : [projected.from, projected.to],
+      ring,
+    );
     raiseMeasureLayer(map);
   });
+
+  /**
+   * Where the projected waypoint would land, shown before it is committed.
+   *
+   * A bearing dictated over a radio is easy to mishear; seeing the point on
+   * the map before placing it is how that gets caught.
+   */
+  const projectionPreview = $derived.by(() => {
+    const from = $projectionOrigin;
+    if (from === null || $projectionDistanceM <= 0) return null;
+    return {
+      from,
+      to: destinationPoint(
+        from,
+        $projectionBearing,
+        $projectionDistanceM / 1000,
+      ),
+    };
+  });
+
+  async function placeProjectedWaypoint() {
+    const preview = projectionPreview;
+    const layerId = $activeWaypointLayerId;
+    if (preview === null || layerId === null) return;
+    try {
+      const existing = await getWaypoints(layerId);
+      await addWaypoint(
+        layerId,
+        preview.to.lat,
+        preview.to.lon,
+        $i18n("map.newWaypointName").replace(
+          "{n}",
+          String(existing.length + 1),
+        ),
+      );
+      await refreshWaypointMarkers();
+      setProjection(false);
+    } catch (error) {
+      reportEditFailure("map.projectionFailed", error);
+    }
+  }
 
   /** See `createLatestRun`: an overtaken refresh must not draw its markers. */
   const waypointMarkerRuns = createLatestRun();
@@ -602,7 +658,12 @@
     try {
       const currentWaypoints = await getWaypoints(layerId);
       const nextIndex = currentWaypoints.length + 1;
-      await addWaypoint(layerId, lat, lng, `Waypoint ${nextIndex}`);
+      await addWaypoint(
+        layerId,
+        lat,
+        lng,
+        $i18n("map.newWaypointName").replace("{n}", String(nextIndex)),
+      );
       await refreshWaypointMarkers();
     } catch (error) {
       reportEditFailure("map.addWaypointFailed", error);
@@ -859,6 +920,10 @@
           ...points,
           { lat: e.lngLat.lat, lon: e.lngLat.lng },
         ]);
+        return;
+      }
+      if ($projectionActive) {
+        projectionOrigin.set({ lat: e.lngLat.lat, lon: e.lngLat.lng });
         return;
       }
       if ($ringActive) {
@@ -1370,6 +1435,55 @@
           ? $i18n("map.ringCentreHint")
           : $i18n("map.ringRadiusHint")}</span
       >
+    </div>
+  {/if}
+
+  {#if $projectionActive}
+    <div
+      class="bg-card border-border absolute top-2 left-1/2 z-10 flex -translate-x-1/2 items-end gap-2 rounded-md border px-2 py-1.5 text-xs shadow-lg"
+      data-testid="projection-panel"
+    >
+      {#if $projectionOrigin === null}
+        <span class="text-muted-foreground py-1"
+          >{$i18n("map.projectionOriginHint")}</span
+        >
+      {:else}
+        <label class="flex flex-col gap-0.5">
+          <span class="text-muted-foreground text-[10px]"
+            >{$i18n("map.projectionBearing")}</span
+          >
+          <input
+            class="border-border h-7 w-16 rounded-sm border bg-transparent px-1 text-right tabular-nums"
+            type="number"
+            min="0"
+            max="360"
+            step="1"
+            data-testid="projection-bearing"
+            bind:value={$projectionBearing}
+          />
+        </label>
+        <label class="flex flex-col gap-0.5">
+          <span class="text-muted-foreground text-[10px]"
+            >{$i18n("map.projectionDistance")}</span
+          >
+          <input
+            class="border-border h-7 w-20 rounded-sm border bg-transparent px-1 text-right tabular-nums"
+            type="number"
+            min="0"
+            step="10"
+            data-testid="projection-distance"
+            bind:value={$projectionDistanceM}
+          />
+        </label>
+        <button
+          class="bg-primary text-primary-foreground h-7 rounded-sm px-2 disabled:opacity-50"
+          disabled={projectionPreview === null}
+          onclick={() => void placeProjectedWaypoint()}
+          data-testid="projection-place"
+        >
+          {$i18n("map.projectionPlace")}
+        </button>
+      {/if}
     </div>
   {/if}
 

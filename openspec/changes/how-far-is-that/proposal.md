@@ -52,6 +52,24 @@ The two tools take the same click, so they cannot both be listening. Turning
 one on turns the other off and discards what it held — a stale point left
 behind would be measured into the next measurement.
 
+## Projection, completing the three
+
+`product-scope` asks for "placing a waypoint by projection (azimuth plus
+distance) from a selected point" — and unlike the other two, it is not
+click-driven. "From the task point, 240° and 1.2 kilometres" is dictated over a
+radio, not pointed at.
+
+So: click the origin, type the bearing and the distance, and the point is
+placed where they land. The result is previewed on the map before it is
+committed, because a bearing heard over a radio is easy to mishear and seeing
+the point is how that gets caught.
+
+All three tools take the map's clicks, so only one listens at a time and
+switching discards what the previous one held.
+
+Found beside it: the default name for a waypoint placed by clicking was
+`Waypoint N` — English, in the app's own Russian window.
+
 ## Impact
 
 - Affected specs: `product-scope`

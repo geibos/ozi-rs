@@ -84,8 +84,9 @@ describe("MapView non-destructive waypoint rendering", () => {
     // The placement handler still resolves $activeWaypointLayerId and calls
     // addWaypoint with that id, so new waypoints land in layer A only.
     expect(mapViewSource).toContain("async function handleMapClickForWaypoint");
+    // The default name is a dictionary lookup now, so the call spans lines.
     expect(mapViewSource).toMatch(
-      /handleMapClickForWaypoint[\s\S]+?const layerId = \$activeWaypointLayerId!?;[\s\S]+?await addWaypoint\(layerId,/,
+      /handleMapClickForWaypoint[\s\S]+?const layerId = \$activeWaypointLayerId!?;[\s\S]+?await addWaypoint\(\s*layerId,/,
     );
   });
 

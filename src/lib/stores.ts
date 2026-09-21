@@ -462,7 +462,10 @@ export const ringRadiusKm = writable(0);
 export function setMeasuring(active: boolean): void {
   measuredPoints.set([]);
   measuringActive.set(active);
-  if (active) setRingOff();
+  if (active) {
+    setRingOff();
+    setProjectionOff();
+  }
 }
 
 export function setRing(active: boolean): void {
@@ -472,7 +475,38 @@ export function setRing(active: boolean): void {
   if (active) {
     measuredPoints.set([]);
     measuringActive.set(false);
+    setProjectionOff();
   }
+}
+
+/**
+ * Placing a waypoint by projection: a point, an azimuth and a distance.
+ *
+ * The third on-map tool `product-scope` declares, and the one that is not
+ * click-driven — "from the task point, 240° and 1.2 km" is dictated over a
+ * radio, not pointed at. So it takes an origin by click and the rest by
+ * typing, and shows where the result will land before it is committed.
+ */
+export const projectionActive = writable(false);
+export const projectionOrigin = writable<{ lat: number; lon: number } | null>(
+  null,
+);
+export const projectionBearing = writable(0);
+export const projectionDistanceM = writable(0);
+
+export function setProjection(active: boolean): void {
+  projectionOrigin.set(null);
+  projectionActive.set(active);
+  if (active) {
+    measuredPoints.set([]);
+    measuringActive.set(false);
+    setRingOff();
+  }
+}
+
+function setProjectionOff(): void {
+  projectionOrigin.set(null);
+  projectionActive.set(false);
 }
 
 function setRingOff(): void {
