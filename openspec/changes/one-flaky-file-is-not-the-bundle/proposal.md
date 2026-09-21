@@ -28,6 +28,19 @@ how a crew ends up without a map.
   206; then what is on disk is worthless and the file starts again, which is
   the only safe reading of that answer.
 
+## Two rules this touches
+
+`codify-architecture-decisions`, which is written but not archived, codifies
+the behaviour this changes: "a network error or cancellation mid-stream SHALL
+remove the `.part` file", with a scenario asserting no `.part` remains. That
+was an accurate record of the code when it was written. It is amended there
+rather than left to contradict this, because archiving both in sequence would
+otherwise leave the baseline saying two things.
+
+The baseline `lizaalert-integration` requirement is untouched: it says the
+bundles root SHALL NOT be left "in a partially-extracted unusable state", and a
+`.part` is not a map — nothing lists it, nothing opens it.
+
 ## Impact
 
 - Affected specs: `map-bundles`

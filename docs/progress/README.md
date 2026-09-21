@@ -10,6 +10,46 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — reading the specs I had been writing against
+
+Yesterday's slice caught one of my own changes contradicting a baseline
+requirement instead of modifying it. One is a slip; twenty-six unarchived
+changes made by the same hand is a reason to look. So I read the baselines for
+every capability this session has touched, against every requirement it
+declares.
+
+Three more contradictions, all of them mine:
+
+- **The catalogue cache.** `Catalog cache merges refresh deltas without
+  dropping known entries` says the cache "SHALL accumulate the union of entries
+  the frontend has ever observed" and is "a superset of any single refresh",
+  with a scenario spelling out that five missing entries are not removed. The
+  pruning slice does exactly the opposite. Modified now, and it says why the
+  old rule was right when written: a complete refresh could not then be told
+  from an interrupted one.
+- **Track statistics.** `System computes and surfaces per-track statistics`
+  says the row shows distance and point count in every case; a one-point track
+  now shows the count alone. Modified, with the reason — those tracks had no
+  row at all until the list stopped coming from the map's geometry.
+- **The partial file.** `codify-architecture-decisions`, written but not
+  archived, codifies "a network error or cancellation mid-stream SHALL remove
+  the `.part` file", with a scenario asserting none remains. Resumable retries
+  keep it between attempts. Amended there rather than left to contradict, since
+  archiving both in sequence would leave the baseline saying two things.
+
+The pattern behind all four: writing a change against the code in front of me
+rather than against the requirement that already covered it. Nothing catches
+that — `openspec validate --strict` checks a change's shape, not whether it
+disagrees with the baseline — so it is in the backlog as something to read for,
+deliberately, before an archive.
+
+| | |
+|---|---|
+| Evidence | four deltas rewritten from ADDED to MODIFIED or amended in place; `openspec validate --changes --strict` green across 26 |
+| Automated gates | `just ci` green (307 Rust, 375 frontend) |
+
+---
+
 ## 2026-09-21 — one flaky file is not the bundle
 
 Slice 0.3 gave the transfers timeouts, so a stalled connection fails instead of

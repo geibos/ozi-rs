@@ -100,7 +100,10 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Archive the finished OpenSpec changes.** Eleven are implemented, gated and
+1. **Archive the finished OpenSpec changes.** Read the deltas against the
+   baseline first: four of this session's were written as ADDED where a
+   baseline requirement already said the opposite, and were corrected on
+   2026-09-21. `openspec validate --strict` does not check for that. Eleven are implemented, gated and
    waiting on the owner's review: archiving folds their requirements into the
    baseline specs, which is a step for a person, not for an agent.
    `one-preview-at-a-time` is the twelfth and is implemented too, but its

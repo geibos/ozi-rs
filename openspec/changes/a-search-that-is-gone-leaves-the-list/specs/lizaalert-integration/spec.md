@@ -34,3 +34,24 @@ This replaces the previous rule, under which an entry absent from a refresh was 
 
 - **WHEN** a refresh emits the cached catalogue before walking
 - **THEN** those rows alone do not count as evidence that a project still exists
+
+### Requirement: Catalog cache merges refresh deltas without dropping known entries
+
+The local catalog cache SHALL hold what the last complete refresh listed, together with entries seen since that no refresh has contradicted. A refresh that was stopped SHALL NOT remove anything from the cache, because it read only a prefix of the listing. A refresh that walked the whole listing SHALL remove the entries it did not reference.
+
+This replaces the previous rule, under which the cache accumulated the union of everything ever observed and was therefore a superset of any single refresh. That rule kept a crew's list intact across an interrupted refresh, which was the right trade when a complete refresh could not be distinguished from an interrupted one. It also meant that a search taken down upstream was never removed: it stayed listed, stayed cached, and failed when opened, with no way to clear it short of deleting the cache by hand.
+
+#### Scenario: A stopped refresh keeps the cached entries it did not reach
+
+- **WHEN** the operator has a cached catalogue of 200 entries AND stops a refresh after it has listed 195 of them
+- **THEN** the cache still contains 200 entries and all 200 stay listed
+
+#### Scenario: A complete refresh drops what it did not list
+
+- **WHEN** the operator has a cached catalogue of 200 entries AND a refresh walks the whole listing and returns 195 of them
+- **THEN** the five entries the listing no longer carries are removed from the list and from the cache
+
+#### Scenario: New entries appear after refresh
+
+- **WHEN** a refresh returns three previously-unseen entries among its chunks
+- **THEN** those three entries are appended to the working list AND included in the next cache write

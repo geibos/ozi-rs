@@ -34,6 +34,14 @@ decision.
 
 ## Engineering
 
+- **A new requirement may already exist, saying the opposite.** Four deltas
+  this session were written as ADDED against a baseline requirement that
+  already covered the ground with a different rule — the catalogue merge, the
+  catalogue cache, the track statistics, the `.part` file. `openspec validate
+  --strict` checks a change's shape, not whether it disagrees with the
+  baseline, so nothing catches it. Before writing a delta, read the
+  capability's existing requirements; before archiving a batch, read them
+  against each other.
 - **Three guards now watch for a defect class rather than an instance**: a
   literal label in a component, English assembled into one, and a `catch` that
   logs and tells nobody. Each found something on its first run that the sweep
