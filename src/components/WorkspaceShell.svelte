@@ -93,7 +93,7 @@
 </script>
 
 <div class="shell" class:has-inspector={$inspectorOpen}>
-  <aside class="rail library" aria-label="Library">
+  <aside class="rail library" aria-label={$t("shell.library")}>
     {#if libraryRail}
       {@render libraryRail()}
     {:else}
@@ -193,7 +193,7 @@
       </div>
     </div>
 
-    <main class="canvas" aria-label="Map canvas">
+    <main class="canvas" aria-label={$t("shell.mapCanvas")}>
       {#if canvas}
         {@render canvas()}
       {/if}
@@ -246,7 +246,7 @@
   <aside
     class="rail inspector"
     class:collapsed={!$inspectorOpen}
-    aria-label="Inspector"
+    aria-label={$t("shell.inspector")}
   >
     {#if inspectorRail}
       {@render inspectorRail()}

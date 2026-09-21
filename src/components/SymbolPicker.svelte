@@ -1,5 +1,6 @@
 <script lang="ts">
   import { buttonVariants } from "$lib/components/ui/button";
+  import { t } from "$lib/i18n";
   import * as Popover from "$lib/components/ui/popover";
   import * as Tooltip from "$lib/components/ui/tooltip";
 
@@ -54,7 +55,7 @@
             size: "icon",
           })}
           onclick={() => handleSelect(null)}
-          aria-label="None (default)"
+          aria-label={$t("symbol.none")}
         >
           <span class="text-base leading-none">📍</span>
         </Tooltip.Trigger>

@@ -661,14 +661,14 @@
               <Popover.Trigger
                 class="border-border size-4 shrink-0 rounded-full border p-0"
                 style="background-color: {t.color}"
-                aria-label="Track color"
+                aria-label={$i18n("row.trackColor")}
               ></Popover.Trigger>
               <Popover.Content class="w-auto p-2">
                 <input
                   class="border-border h-8 w-12 rounded-sm border bg-transparent p-0"
                   type="color"
                   value={colorToHex(t.color)}
-                  aria-label="Track color"
+                  aria-label={$i18n("row.trackColor")}
                   onchange={(e) => handleColorChange(t, e)}
                 />
               </Popover.Content>

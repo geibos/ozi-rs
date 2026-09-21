@@ -1,5 +1,6 @@
 <script lang="ts">
   import XIcon from "@lucide/svelte/icons/x";
+  import { t } from "$lib/i18n";
   import { Card } from "$lib/components/ui/card";
   import { ScrollArea } from "$lib/components/ui/scroll-area";
   import { Button } from "$lib/components/ui/button";
@@ -36,7 +37,7 @@
         variant="ghost"
         size="icon-xs"
         onclick={() => consoleOpen.set(false)}
-        aria-label="Close console"
+        aria-label={$t("shell.closeConsole")}
       >
         <XIcon />
       </Button>

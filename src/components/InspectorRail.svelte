@@ -19,6 +19,7 @@
    * variable). That keeps the MapView container aware of the right inset.
    */
   import PinIcon from "@lucide/svelte/icons/pin";
+  import { t } from "$lib/i18n";
   import PinOffIcon from "@lucide/svelte/icons/pin-off";
   import {
     inspectorOpen,
@@ -69,7 +70,7 @@
       type="button"
       class="edge-handle"
       onclick={togglePin}
-      aria-label="Pin inspector open"
+      aria-label={$t("shell.pinInspector")}
       title="Pin inspector open"
     >
       <span class="edge-handle-pin">

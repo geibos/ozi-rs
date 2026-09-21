@@ -10,6 +10,40 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-21 — the rows speak Russian
+
+Walked the workspace on the stand, mostly to see the one-point track from the
+last slice actually get a row. It does — "точка отсечки", third in the list,
+with the two the map draws. The stand is the only channel of evidence open
+while the Mac2 driver is down, and it answered the question the Rust tests
+could only answer in principle.
+
+It also showed what I had walked past: the library rows, the ones a crew
+touches most, were English inside a Russian window. The eye button's tooltip
+read "Hide". Its accessible name read "Hide 20260708_Veter2". The row menu was
+"Actions", the swatch "Track color", the rail "Library". The Waypoints tab was
+passing a translated label in; the Tracks and Maps tabs fell through to the
+English default written into the component.
+
+The tooltip is visible text. The rest is what a screen reader says — and on
+this project it is also what the customer-journey smoke matches on, because
+WKWebView publishes a control's `aria-label` rather than its inner text.
+
+One thing the dictionary could not do literally: Russian declines the object of
+"скрыть", and a name substituted raw stays nominative, so the honest
+translation of `Hide {name}` would have read "Скрыть точка отсечки". It is
+`Скрыть: {name}` — the colon sidesteps the case for any name, including the
+ones that are dates and call signs rather than words.
+
+| | |
+|---|---|
+| Evidence | walked on the stand: "Скрыть: точка отсечки", "Цвет трека", "Действия", "Библиотека" |
+| Evidence | tests on the labels in both languages and on the declension |
+| Automated gates | `just ci` green (300 Rust, 358 frontend) |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+
+---
+
 ## 2026-09-21 — one rule, written once
 
 Having found the overlapping-reload bug three times, I went looking for the

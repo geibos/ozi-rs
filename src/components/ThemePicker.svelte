@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as Select from "$lib/components/ui/select";
+  import { t } from "$lib/i18n";
   import { catppuccinPackEnabled, selectedTheme } from "$lib/stores";
   import { applyTheme, type ThemeName } from "$lib/theme";
 
@@ -46,7 +47,7 @@
 
 <div class="theme-picker">
   <Select.Root type="single" bind:value={$selectedTheme}>
-    <Select.Trigger aria-label="Color theme" size="sm">
+    <Select.Trigger aria-label={$t("shell.colourTheme")} size="sm">
       {selectedLabel}
     </Select.Trigger>
     <Select.Content>

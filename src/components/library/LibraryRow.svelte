@@ -31,6 +31,7 @@
   import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Tooltip from "$lib/components/ui/tooltip";
+  import { t as i18n } from "$lib/i18n";
 
   let {
     name,
@@ -119,7 +120,7 @@
           class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm border-0 bg-transparent p-0"
           onclick={onToggleVisibility}
           aria-label={visibilityLabel ??
-            (visible ? `Hide ${name}` : `Show ${name}`)}
+            $i18n(visible ? "row.hide" : "row.show").replace("{name}", name)}
         >
           {#if visible}
             <EyeIcon class="size-3.5" />
@@ -128,7 +129,7 @@
           {/if}
         </Tooltip.Trigger>
         <Tooltip.Content>
-          {visible ? "Hide" : "Show"}
+          {$i18n(visible ? "row.hideShort" : "row.showShort")}
         </Tooltip.Content>
       </Tooltip.Root>
     </span>
@@ -200,7 +201,7 @@
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
           class="text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-sm border-0 bg-transparent p-0"
-          aria-label="Actions"
+          aria-label={$i18n("row.actions")}
         >
           <MoreHorizontalIcon class="size-3.5" />
         </DropdownMenu.Trigger>
