@@ -50,6 +50,7 @@
   import { t } from "../lib/i18n";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
+  import { filterProjects } from "$lib/project-list";
   import { appendRecentFile } from "../lib/recentFiles";
 
   let {
@@ -61,6 +62,10 @@
   let projectFilter = $state("");
   let debouncedProjectFilter = $state("");
   let selectedSlug = $state("");
+  // Offline this is the only list that means anything: the catalogue is
+  // thirteen thousand rows and a crew without a signal can open the handful
+  // that are already on disk.
+  let onlyCached = $state(false);
 
   $effect(() => {
     const value = projectFilter;
@@ -71,9 +76,7 @@
   });
 
   const filtered = $derived(
-    $projects.filter((p) =>
-      p.name.toLowerCase().includes(debouncedProjectFilter.toLowerCase()),
-    ),
+    filterProjects($projects, debouncedProjectFilter, onlyCached),
   );
 
   // ── Manual virtual list over `filtered` ─────────────────────────────
@@ -101,6 +104,7 @@
     // Reset the scroll window whenever the filtered set changes — a stale
     // offset past the new (shorter) list would render nothing.
     void debouncedProjectFilter;
+    void onlyCached;
     scrollTop = 0;
     if (listEl) listEl.scrollTop = 0;
   });
@@ -297,7 +301,21 @@
         placeholder={$t("loader.filterPlaceholder")}
         bind:value={projectFilter}
       />
-      <span class="filter-count">({$projects.length})</span>
+      <button
+        class="only-cached-btn"
+        class:on={onlyCached}
+        aria-pressed={onlyCached}
+        title={onlyCached ? $t("loader.onlyCachedOn") : $t("loader.onlyCached")}
+        onclick={() => (onlyCached = !onlyCached)}
+        data-testid="only-cached"
+      >
+        {$t("loader.onlyCached")}
+      </button>
+      <span class="filter-count" data-testid="project-count">
+        {$t("loader.filterCount")
+          .replace("{shown}", String(filtered.length))
+          .replace("{total}", String($projects.length))}
+      </span>
     </div>
 
     {#if $projectsLoading}
@@ -325,7 +343,15 @@
               style={`top: ${row.top}px`}
               onclick={() => handleSelectProject(row.project.slug)}
             >
-              {row.project.name}
+              <span class="row-name">{row.project.name}</span>
+              {#if row.project.cached}
+                <span
+                  class="row-cached"
+                  title={$t("loader.cachedProject")}
+                  data-testid="project-cached-badge"
+                  >{$t("loader.cachedBadge")}</span
+                >
+              {/if}
             </button>
           {/each}
         </div>
@@ -558,6 +584,45 @@
     padding: 0 12px;
     display: flex;
     align-items: center;
+  }
+
+  .row-name {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* "downloaded" marker: the one thing that distinguishes rows offline, so
+     it reads at a glance without competing with the name. */
+  .row-cached {
+    flex-shrink: 0;
+    margin-left: 8px;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .only-cached-btn {
+    flex-shrink: 0;
+    padding: 3px 7px;
+    font-size: 11px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 4px;
+    background: none;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+  }
+
+  .only-cached-btn.on {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--background));
   }
 
   .list-item:hover {

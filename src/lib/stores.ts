@@ -22,12 +22,29 @@ export { selectVisibleWaypointLayers };
  */
 const CATALOG_CACHE_KEY = "liza:projects:v1";
 
-function isValidCacheEntry(value: unknown): value is LizaProjectSummaryDto {
+function isValidCacheEntry(
+  value: unknown,
+): value is Partial<LizaProjectSummaryDto> {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.slug === "string" && typeof candidate.name === "string"
   );
+}
+
+/**
+ * A cache entry written before the `cached` flag existed has none, and a flag
+ * written yesterday may be stale anyway. Default it to false: the backend
+ * re-sends every row with a fresh flag as soon as the catalogue is read.
+ */
+function normalizeCacheEntry(
+  entry: Partial<LizaProjectSummaryDto>,
+): LizaProjectSummaryDto {
+  return {
+    slug: entry.slug as string,
+    name: entry.name as string,
+    cached: entry.cached === true,
+  };
 }
 
 /**
@@ -46,7 +63,7 @@ export function loadCatalogCache(): LizaProjectSummaryDto[] | null {
     if (!Array.isArray(payload.items)) return null;
     if (typeof payload.writtenAt !== "string") return null;
     if (!payload.items.every(isValidCacheEntry)) return null;
-    return payload.items;
+    return payload.items.map(normalizeCacheEntry);
   } catch {
     return null;
   }

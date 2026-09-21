@@ -483,7 +483,14 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | Partial
 export type LayerSummaryDto = { id: number; name: string }
 export type LizaMapPackageDto = { name: string; base_zoom: number; downloaded: boolean }
 export type LizaProjectDto = { name: string; center_lat: number; center_lon: number; maps: LizaMapPackageDto[] }
-export type LizaProjectSummaryDto = { slug: string; name: string }
+export type LizaProjectSummaryDto = { slug: string; name: string; 
+/**
+ * Whether this bundle is already on disk and openable offline.
+ * 
+ * Without it the catalogue is thirteen thousand identical rows and a
+ * crew with no signal cannot tell which of them they can still open.
+ */
+cached: boolean }
 export type PointDetailDto = { id: number; lat: number; lon: number; elevation: number | null; timestamp: string | null }
 export type SegmentDetailDto = { id: number; points: PointDetailDto[] }
 export type SimplifiedPreviewDto = { original_count: number; simplified_count: number; segments: SimplifiedSegmentDto[] }

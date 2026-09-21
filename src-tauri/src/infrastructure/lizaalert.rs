@@ -310,6 +310,26 @@ pub fn save_project_summaries_cache(
     fs::write(root.join(PROJECTS_CACHE_FILE_NAME), cache_text).map_err(|err| err.to_string())
 }
 
+/// The slugs of every bundle already on disk under `root`.
+///
+/// Computed once per catalogue read rather than asking per project: the
+/// catalogue is about thirteen thousand entries and the bundles root holds a
+/// handful of directories, so one `read_dir` answers for all of them.
+pub fn cached_project_slugs(root: &Path) -> std::collections::HashSet<String> {
+    let Ok(entries) = fs::read_dir(root) else {
+        return std::collections::HashSet::new();
+    };
+
+    entries
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .filter_map(|entry| {
+            let slug = entry.file_name().to_str()?.to_owned();
+            is_project_cached(&slug, root).then_some(slug)
+        })
+        .collect()
+}
+
 pub fn is_project_cached(project_slug: &str, root: &Path) -> bool {
     project_coordinates_path(root, project_slug).exists()
 }
@@ -2007,6 +2027,34 @@ mod tests {
             super::is_project_cached("2026-09-21_demo", &root),
             "a bundle with a differently numbered coordinates file is still cached"
         );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Offline, an undifferentiated list of thirteen thousand projects is a
+    /// guess. The loader needs to know which of them are already on disk.
+    #[test]
+    fn cached_project_slugs_lists_only_bundles_that_are_actually_there() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("ozi-rs-cached-slugs-{unique}"));
+        let complete = root.join("2026-09-21_complete");
+        let partial = root.join("2026-09-20_partial");
+        fs::create_dir_all(&complete).expect("create complete");
+        fs::create_dir_all(partial.join("8-Android&iOS")).expect("create partial");
+        fs::write(complete.join("2-Coordinates.txt"), "N 54.3 E 048.4").expect("write coords");
+        fs::write(root.join("stray.txt"), b"not a bundle").expect("write stray file");
+
+        let slugs = super::cached_project_slugs(&root);
+
+        assert!(slugs.contains("2026-09-21_complete"));
+        assert!(
+            !slugs.contains("2026-09-20_partial"),
+            "a directory without coordinates is not an openable bundle"
+        );
+        assert_eq!(slugs.len(), 1);
 
         let _ = fs::remove_dir_all(&root);
     }

@@ -10,9 +10,21 @@ import type { LizaProjectSummaryDto } from "../lib/types";
 
 const CACHE_KEY = "liza:projects:v1";
 
-const ALPHA: LizaProjectSummaryDto = { slug: "alpha", name: "Alpha" };
-const BRAVO: LizaProjectSummaryDto = { slug: "bravo", name: "Bravo" };
-const CHARLIE: LizaProjectSummaryDto = { slug: "charlie", name: "Charlie" };
+const ALPHA: LizaProjectSummaryDto = {
+  slug: "alpha",
+  name: "Alpha",
+  cached: false,
+};
+const BRAVO: LizaProjectSummaryDto = {
+  slug: "bravo",
+  name: "Bravo",
+  cached: false,
+};
+const CHARLIE: LizaProjectSummaryDto = {
+  slug: "charlie",
+  name: "Charlie",
+  cached: false,
+};
 
 beforeEach(() => {
   localStorage.clear();
@@ -92,7 +104,11 @@ describe("appendProjectsChunk upsert-by-slug (task 3.3)", () => {
 
   it("updates known slugs in place and appends only the new ones", () => {
     projectsStore.set([ALPHA, BRAVO]);
-    const updatedAlpha = { slug: "alpha", name: "Alpha (renamed)" };
+    const updatedAlpha = {
+      slug: "alpha",
+      name: "Alpha (renamed)",
+      cached: false,
+    };
     appendProjectsChunk([updatedAlpha, CHARLIE]);
     expect(get(projectsStore)).toEqual([updatedAlpha, BRAVO, CHARLIE]);
   });
@@ -184,5 +200,35 @@ describe("cache write debounced off projectsStore (task 4.3)", () => {
       BRAVO,
       CHARLIE,
     ]);
+  });
+});
+
+describe("cached flag on restored catalogue entries", () => {
+  it("treats an entry written before the flag existed as not downloaded", () => {
+    localStorage.setItem(
+      "liza:projects:v1",
+      JSON.stringify({
+        items: [{ slug: "alpha", name: "Alpha" }],
+        writtenAt: new Date().toISOString(),
+      }),
+    );
+
+    const restored = loadCatalogCache();
+
+    // Claiming a bundle is on disk when it is not sends a crew into the field
+    // expecting a map they do not have.
+    expect(restored).toEqual([{ slug: "alpha", name: "Alpha", cached: false }]);
+  });
+
+  it("keeps a stored true flag", () => {
+    localStorage.setItem(
+      "liza:projects:v1",
+      JSON.stringify({
+        items: [{ slug: "alpha", name: "Alpha", cached: true }],
+        writtenAt: new Date().toISOString(),
+      }),
+    );
+
+    expect(loadCatalogCache()?.[0].cached).toBe(true);
   });
 });

@@ -114,6 +114,11 @@ pub struct TrackSummaryDto {
 pub struct LizaProjectSummaryDto {
     pub slug: String,
     pub name: String,
+    /// Whether this bundle is already on disk and openable offline.
+    ///
+    /// Without it the catalogue is thirteen thousand identical rows and a
+    /// crew with no signal cannot tell which of them they can still open.
+    pub cached: bool,
 }
 
 #[derive(serde::Serialize, specta::Type)]
@@ -169,12 +174,16 @@ fn to_track_summary_dto(layer_id: u64, track: &crate::domain::Track) -> TrackSum
     }
 }
 
-fn to_project_summary_dtos(projects: &[LizaProjectSummary]) -> Vec<LizaProjectSummaryDto> {
+fn to_project_summary_dtos(
+    projects: &[LizaProjectSummary],
+    cached: &std::collections::HashSet<String>,
+) -> Vec<LizaProjectSummaryDto> {
     projects
         .iter()
         .map(|project| LizaProjectSummaryDto {
             slug: project.slug.clone(),
             name: project.name.clone(),
+            cached: cached.contains(&project.slug),
         })
         .collect()
 }
@@ -218,6 +227,7 @@ struct BundleFileReadyPayload {
 #[specta::specta]
 pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
     let s = lock_app_state(state.inner())?;
+    let cached_slugs = lizaalert::cached_project_slugs(s.bundles_root());
 
     let projects = s
         .lizaalert_projects()
@@ -225,6 +235,7 @@ pub fn get_app_state(state: State<SharedState>) -> Result<AppStateDto, String> {
         .map(|p| LizaProjectSummaryDto {
             slug: p.slug.clone(),
             name: p.name.clone(),
+            cached: cached_slugs.contains(&p.slug),
         })
         .collect();
 
@@ -400,6 +411,10 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
     let Some(bundles_root) = lock_app_state(state.inner())?.begin_load_projects() else {
         return Ok(());
     };
+    // One read of the bundles root answers "is it downloaded?" for every one
+    // of the catalogue's thousands of rows.
+    let cached_slugs = lizaalert::cached_project_slugs(&bundles_root);
+    let cached_slugs_for_chunks = cached_slugs.clone();
 
     if let Ok(cached_projects) = lizaalert::load_project_summaries_cache(&bundles_root)
         && !cached_projects.is_empty()
@@ -407,7 +422,10 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
         if let Ok(mut s) = lock_app_state(state.inner()) {
             s.apply_projects_chunk(cached_projects.clone());
         }
-        let _ = app.emit("projects-chunk", to_project_summary_dtos(&cached_projects));
+        let _ = app.emit(
+            "projects-chunk",
+            to_project_summary_dtos(&cached_projects, &cached_slugs),
+        );
     }
 
     let state_arc = Arc::clone(&state);
@@ -415,7 +433,7 @@ pub fn load_projects(state: State<SharedState>, app: AppHandle) -> Result<(), St
         let chunk_state = Arc::clone(&state_arc);
         let chunk_app = app.clone();
         let result = lizaalert::fetch_project_summaries_streaming(move |chunk| {
-            let chunk_payload = to_project_summary_dtos(&chunk);
+            let chunk_payload = to_project_summary_dtos(&chunk, &cached_slugs_for_chunks);
             if let Ok(mut s) = lock_app_state(&chunk_state) {
                 s.apply_projects_chunk(chunk);
             }
