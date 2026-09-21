@@ -29,11 +29,33 @@ after they asked it to stop. And a retry says so through the keyed progress
 channel, because a retry that looks like a stall is a stall to the person
 watching the bar.
 
+And then the part that matters on the transfer that actually needs a retry: it
+resumes. Starting the file again is no use when the connection drops near the
+end of a 185 MiB map — that costs the map twice, and on a link that keeps
+dropping it may never land at all. The second attempt asks for the rest with a
+`Range` request, so the partial file is kept between attempts and removed only
+once the file is given up on. A server that ignores the range answers 200
+instead of 206; then what is on disk is worthless and the file starts again,
+which is the only safe reading of that answer.
+
+That reverses a contract the old test spelled out — "a stalled transfer SHALL
+clean up its .part file". Deliberately, and the test says why now. Nothing
+treats a `.part` as a map, so keeping one does not make the bundles root look
+complete when it is not.
+
+Writing this up also caught a mistake in the slice before it: the catalogue
+pruning was written as an ADDED requirement while the baseline said the
+opposite — "entries absent from a refresh SHALL NOT be removed". It is a
+MODIFIED requirement now, and says why the old rule was right when it was
+written: there was no way then to tell a complete refresh from an interrupted
+one.
+
 | | |
 |---|---|
 | Evidence | a mock server that fails once and then serves: the file lands whole, after exactly one retry |
-| Evidence | a cancelled transfer is not retried |
-| Automated gates | `just ci` green (305 Rust, 375 frontend) |
+| Evidence | a raw server that sends half and hangs up: the second request carries `Range: bytes=512-`, the file is 1024 bytes, and the progress bar never goes backwards |
+| Evidence | a cancelled transfer is not retried; a file given up on leaves no `.part` |
+| Automated gates | `just ci` green (307 Rust, 375 frontend) |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---

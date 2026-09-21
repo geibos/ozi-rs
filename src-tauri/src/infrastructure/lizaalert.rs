@@ -1280,7 +1280,17 @@ where
             return Err(CANCEL_ERROR.to_owned());
         }
 
-        match download_to_path_async(client, url, path, cancel, &mut on_progress).await {
+        // What the last attempt already wrote. Starting over is no use on the
+        // transfer that actually needs a retry: a connection that drops near
+        // the end of a 185 MiB map costs that map twice, and on a link that
+        // drops it may never land at all.
+        let resume_from = tokio::fs::metadata(&partial_path(path))
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        match download_to_path_async(client, url, path, cancel, resume_from, &mut on_progress).await
+        {
             Ok(()) => return Ok(()),
             Err(error) if error == CANCEL_ERROR => return Err(error),
             Err(error) => {
@@ -1293,20 +1303,40 @@ where
             }
         }
     }
+    // Given up on: the leftovers would otherwise sit in the bundle folder, and
+    // a later attempt at a file that has since changed would resume into the
+    // wrong bytes.
+    let _ = tokio::fs::remove_file(partial_path(path)).await;
     Err(last_error)
 }
 
+/// Where a file is written while it is still arriving.
+fn partial_path(path: &Path) -> std::path::PathBuf {
+    path.with_extension("part")
+}
+
+/// Fetch `url` into `path`, continuing from `resume_from` bytes already
+/// written to the partial file when that is more than zero.
+///
+/// A server that ignores the range answers 200 rather than 206; then what is
+/// on disk is worthless and the file starts again, which is the old behaviour
+/// and the only safe reading of that answer.
 async fn download_to_path_async<F>(
     client: &reqwest::Client,
     url: &str,
     path: &Path,
     cancel: &CancelToken,
+    resume_from: u64,
     mut on_progress: F,
 ) -> Result<(), String>
 where
     F: FnMut(u64, Option<u64>),
 {
-    let send_fut = client.get(url).send();
+    let mut request = client.get(url);
+    if resume_from > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={resume_from}-"));
+    }
+    let send_fut = request.send();
     tokio::pin!(send_fut);
     let response = tokio::select! {
         biased;
@@ -1320,16 +1350,29 @@ where
             .map_err(|err| err.to_string())?;
     }
 
-    let tmp_path = path.with_extension("part");
-    let mut file = tokio::fs::File::create(&tmp_path)
-        .await
-        .map_err(|err| err.to_string())?;
-    let total_bytes = response.content_length();
-    let mut downloaded_bytes = 0u64;
+    let resumed = resume_from > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+    let already_on_disk = if resumed { resume_from } else { 0 };
+
+    let tmp_path = partial_path(path);
+    let mut file = if resumed {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .open(&tmp_path)
+            .await
+            .map_err(|err| err.to_string())?
+    } else {
+        tokio::fs::File::create(&tmp_path)
+            .await
+            .map_err(|err| err.to_string())?
+    };
+    // On a resume the body is the remainder, so the whole file is that plus
+    // what is already on disk — otherwise the bar would restart at nothing.
+    let total_bytes = response.content_length().map(|len| len + already_on_disk);
+    let mut downloaded_bytes = already_on_disk;
 
     // Always emit at least one progress event per file so a UI can render the
     // currently-downloading label even if the body is empty.
-    on_progress(0, total_bytes);
+    on_progress(already_on_disk, total_bytes);
 
     let mut stream = response.bytes_stream();
     use futures_util::StreamExt;
@@ -1345,20 +1388,20 @@ where
             n = stream.next() => n,
         };
         let Some(chunk) = next else { break };
-        // A stream or write error leaves a partial `.part` behind unless it is
-        // removed here. Cancellation already cleaned up; a stalled or broken
-        // transfer did not, and the leftovers accumulate in the bundle folder.
+        // A broken transfer keeps its `.part`: that is what the next attempt
+        // resumes from. `download_file_with_retries` removes it once it gives
+        // up, so the leftovers do not accumulate in the bundle folder.
         let chunk = match chunk {
             Ok(chunk) => chunk,
             Err(err) => {
+                let _ = file.sync_all().await;
                 drop(file);
-                let _ = tokio::fs::remove_file(&tmp_path).await;
                 return Err(err.to_string());
             }
         };
         if let Err(err) = file.write_all(&chunk).await {
+            let _ = file.sync_all().await;
             drop(file);
-            let _ = tokio::fs::remove_file(&tmp_path).await;
             return Err(err.to_string());
         }
         downloaded_bytes += chunk.len() as u64;
@@ -2720,6 +2763,7 @@ mod tests {
             &format!("http://{addr}/stalled.sqlitedb"),
             &path,
             &super::CancelToken::new(),
+            0,
             |_, _| {},
         )
         .await;
@@ -2732,9 +2776,14 @@ mod tests {
             !path.exists(),
             "a stalled transfer SHALL NOT leave a file at the final path"
         );
+        // The `.part` is deliberately kept: it is what the next attempt
+        // resumes from. `download_file_with_retries` removes it once it gives
+        // up on the file, which is the test below. Nothing treats a `.part` as
+        // a usable map, so keeping it does not make the bundles root look
+        // complete when it is not.
         assert!(
-            !path.with_extension("part").exists(),
-            "a stalled transfer SHALL clean up its .part file"
+            path.with_extension("part").exists(),
+            "a stalled transfer keeps what it wrote, for the retry to resume"
         );
     }
 
@@ -3040,6 +3089,116 @@ mod bundle_download_tests {
             1024,
             "and the file that landed is the whole file"
         );
+    }
+
+    /// Kept between attempts, removed once they are exhausted: otherwise the
+    /// leftovers accumulate in the bundle folder, and a later download of a
+    /// file that has changed upstream would resume into the wrong bytes.
+    #[tokio::test]
+    async fn giving_up_on_a_file_removes_what_it_had_written() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/gone.sqlitedb"))
+            .respond_with(ResponseTemplate::new(503))
+            .mount(&server)
+            .await;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("gone.sqlitedb");
+        tokio::fs::write(target.with_extension("part"), b"half a map")
+            .await
+            .expect("a leftover from an earlier attempt");
+
+        let result = super::download_file_with_retries(
+            &super::async_client(super::CONNECT_TIMEOUT, super::READ_TIMEOUT).expect("client"),
+            &format!("{}/gone.sqlitedb", server.uri()),
+            &target,
+            &CancelToken::new(),
+            |_, _| {},
+            |_| {},
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert!(
+            !target.with_extension("part").exists(),
+            "the partial file goes when the file is given up on"
+        );
+    }
+
+    /// A retry that starts the file again is no use on the transfer that
+    /// actually needs it: a connection that drops near the end of a 185 MiB
+    /// map costs that map twice, and on a link that drops it may never land.
+    /// The second attempt asks for the rest.
+    #[tokio::test]
+    async fn a_retry_asks_for_the_rest_rather_than_the_whole_file() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::mpsc;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let (tx, rx) = mpsc::channel::<String>();
+
+        std::thread::spawn(move || {
+            // First connection: promise 1024 bytes, send half, hang up.
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 2048];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let _ = tx.send(String::from_utf8_lossy(&buf[..n]).to_string());
+                let _ = stream.write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 1024\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n",
+                );
+                let _ = stream.write_all(&[1u8; 512]);
+            }
+            // Second connection: serve the rest, as asked.
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 2048];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let _ = tx.send(String::from_utf8_lossy(&buf[..n]).to_string());
+                let _ = stream.write_all(
+                    b"HTTP/1.1 206 Partial Content\r\nContent-Length: 512\r\nContent-Range: bytes 512-1023/1024\r\nConnection: close\r\n\r\n",
+                );
+                let _ = stream.write_all(&[2u8; 512]);
+            }
+        });
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("big.sqlitedb");
+        let mut highest = 0u64;
+
+        let result = super::download_file_with_retries(
+            &super::async_client(super::CONNECT_TIMEOUT, super::READ_TIMEOUT).expect("client"),
+            &format!("http://{addr}/big.sqlitedb"),
+            &path,
+            &CancelToken::new(),
+            |downloaded, _| {
+                assert!(
+                    downloaded >= highest,
+                    "the bar must not go backwards across a resume: {downloaded} after {highest}"
+                );
+                highest = downloaded;
+            },
+            |_| {},
+        )
+        .await;
+
+        assert!(result.is_ok(), "the resumed attempt completed: {result:?}");
+        let first = rx.recv().expect("first request");
+        let second = rx.recv().expect("second request");
+        assert!(
+            !first.contains("range:") && !first.contains("Range:"),
+            "the first attempt asks for the whole file"
+        );
+        assert!(
+            second.to_lowercase().contains("range: bytes=512-"),
+            "the second asks for the rest, not the whole file: {second}"
+        );
+
+        let written = tokio::fs::read(&path).await.expect("file");
+        assert_eq!(written.len(), 1024, "the file is whole");
+        assert_eq!(written[0], 1, "the first half is the first attempt's");
+        assert_eq!(written[1023], 2, "the second half is the resume's");
     }
 
     /// Cancelling is not a transport failure: retrying it would ignore the

@@ -19,6 +19,14 @@ how a crew ends up without a map.
   would ignore the operator and keep the link busy after they asked it to stop.
 - A retry says so, through the keyed progress channel, because a retry that
   looks like a stall is the same as a stall to the person watching the bar.
+- A retry resumes: it asks for the rest with a `Range` request rather than
+  starting the file again. Starting again is no use on the transfer that
+  actually needs a retry — a connection that drops near the end of a 185 MiB
+  map costs that map twice, and on a link that drops it may never land.
+- The partial file is therefore kept between attempts, and removed once the
+  file is given up on. A server that ignores the range answers 200 rather than
+  206; then what is on disk is worthless and the file starts again, which is
+  the only safe reading of that answer.
 
 ## Impact
 

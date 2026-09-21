@@ -26,6 +26,15 @@ snapshot left the stand with an empty project list. The core writes
 started, the walk's chunk, finished — so the stand exercises the pruning
 instead of hiding it.
 
+## A rule this replaces
+
+`lizaalert-integration` said the opposite, and said why: "Entries already
+present in the working list but absent from a refresh SHALL NOT be removed by
+that refresh." That was right when it was written — there was no way to tell a
+complete refresh from an interrupted one, and removing on an interrupted one
+would have emptied the list. There is a way now, so the delta here modifies
+that requirement rather than contradicting it.
+
 ## Impact
 
 - Affected specs: `lizaalert-integration`

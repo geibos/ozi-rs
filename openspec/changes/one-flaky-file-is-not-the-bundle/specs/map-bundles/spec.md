@@ -12,6 +12,12 @@ instruction, not a transport failure.
 
 A retry SHALL be reported, so that it is not mistaken for a stall.
 
+A retry SHALL continue from what the failed attempt already wrote rather than
+fetching the file again, unless the server does not honour the request for the
+remainder, in which case the file SHALL be fetched again from the start. What
+a failed attempt wrote SHALL be kept for the next one and SHALL be removed once
+the file is given up on.
+
 #### Scenario: A connection drops partway through a bundle
 
 - **WHEN** one file's transfer fails and the next attempt succeeds
@@ -21,6 +27,16 @@ A retry SHALL be reported, so that it is not mistaken for a stall.
 
 - **WHEN** a transfer ends because the download was cancelled
 - **THEN** it is not attempted again
+
+#### Scenario: A drop near the end of a large map
+
+- **WHEN** a transfer fails after most of a file has been written and the next attempt is made
+- **THEN** the remainder is requested and the file is completed without fetching what had already arrived
+
+#### Scenario: The file is given up on
+
+- **WHEN** every attempt at a file has failed
+- **THEN** nothing partial is left behind for it
 
 #### Scenario: Watching a retry
 

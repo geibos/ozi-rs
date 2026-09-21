@@ -5,6 +5,9 @@
 - [x] 1.3 A test that a cancelled transfer is not retried
 - [x] 1.4 The bundle download uses it
 - [x] 1.5 `ProgressText::RetryingFile` so the retry reaches the status bar, in both dictionaries
+- [x] 1.6 A retry resumes with a `Range` request instead of starting the file again, with a test on a server that serves half and then the rest
+- [x] 1.7 A broken transfer keeps its `.part`; giving up on the file removes it, with a test
+- [x] 1.8 A server that ignores the range answers 200, and the file starts again — the only safe reading of that answer
 
 ## 2. Gates
 
