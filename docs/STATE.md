@@ -5,7 +5,7 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **catalogue repair** (2026-09-21), after row density, dev signing and 0.2 visible fixes. `main` is pushed and
+Last merged slice: **track search** (2026-09-21), after catalogue repair, row density, dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
 rustfmt, clippy, type-checks, 248 Rust tests and 278 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
@@ -20,27 +20,31 @@ is written and validating but not yet archived.
 
 ## Next slice
 
-**Track layers.** Importing creates one layer per source file — the owner's
-project carries 28 of them, with the active layer left empty, so the rail can
-look empty while the map is full. Layer ids also collide because they are
-allocated as `len() + 1`. Decide how the rail should present multiple layers
-(group by layer, or follow the import), then fix the id allocation as part of
-the same slice.
+Working goal, set by the owner on 2026-09-21: ozi-rs has to be good enough to
+replace OziExplorer in the field, and working with tracks and bundles has to be
+fast, comfortable and good-looking. The queue below is ordered by how much of
+that it buys, and is meant to be re-read and re-ordered each session rather
+than followed blindly.
 
-After that, **0.3 — correctness fixes** (`revive-ui-cycle` tasks 1b.1 … 1b.8): persist the
-bundles root across restarts, make Esc discard an in-progress draw instead of
-undoing it onto the redo stack, allocate map layer ids as max+1, restore what
-`qa_observe` captures, add HTTP timeouts, surface export errors to the caller,
-drop the unused `lucide-svelte` dependency and stop classifying `.kml` archive
-entries as supported. Each one gets its test first.
+1. **Russian by default.** The audience is Russian-speaking; the interface is
+   still mostly English and the language switch is buried in the palette.
+   `WaypointsTab` has no localized string at all. This is the single biggest
+   comfort win left.
+2. **Bulk visibility for tracks.** Show all / hide all, and show only the
+   selected one. With 26 tracks over one basemap, isolating one is currently 26
+   clicks.
+3. **Layer names from imports.** One layer per imported file, each named
+   `Imported tracks: /Users/.../20260708_Veter2.gpx`. The selector is a column
+   of paths; the file name alone would do.
+4. **Waypoints tab parity.** It has no search, no localization, and a different
+   row rhythm from the tracks tab.
+5. **Bundle flow.** Opening a project still means going through the cold-start
+   route; the maps list and the download popup have not been looked at since
+   the catalogue was repaired.
 
-Blocked before that, and blocking verification of everything after it: **task
-0.4**, restoring the screen grants (below).
-
-The catalogue works again: the site changed its listing markup in September,
-which silently emptied the project list and the per-project map list. Both are
-fixed and verified against the live site (13439 projects, maps listed for a
-freshly published project).
+Then the correctness slice 0.3 (`revive-ui-cycle` tasks 1b.1 … 1b.8): bundles
+root persistence, Esc discarding a draw, `qa_observe`, HTTP timeouts, export
+errors surfaced.
 
 ## Known broken
 
