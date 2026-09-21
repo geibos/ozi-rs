@@ -5,7 +5,7 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **track search** (2026-09-21), after catalogue repair, row density, dev signing and 0.2 visible fixes. `main` is pushed and
+Last merged slice: **Russian by default** (2026-09-21), after track search, catalogue repair, row density, dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
 rustfmt, clippy, type-checks, 248 Rust tests and 278 frontend tests;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
@@ -26,19 +26,15 @@ fast, comfortable and good-looking. The queue below is ordered by how much of
 that it buys, and is meant to be re-read and re-ordered each session rather
 than followed blindly.
 
-1. **Russian by default.** The audience is Russian-speaking; the interface is
-   still mostly English and the language switch is buried in the palette.
-   `WaypointsTab` has no localized string at all. This is the single biggest
-   comfort win left.
-2. **Bulk visibility for tracks.** Show all / hide all, and show only the
+1. **Bulk visibility for tracks.** Show all / hide all, and show only the
    selected one. With 26 tracks over one basemap, isolating one is currently 26
    clicks.
-3. **Layer names from imports.** One layer per imported file, each named
+2. **Layer names from imports.** One layer per imported file, each named
    `Imported tracks: /Users/.../20260708_Veter2.gpx`. The selector is a column
    of paths; the file name alone would do.
-4. **Waypoints tab parity.** It has no search, no localization, and a different
-   row rhythm from the tracks tab.
-5. **Bundle flow.** Opening a project still means going through the cold-start
+3. **Waypoints tab parity.** It is localized now but still has no search and a
+   different row rhythm from the tracks tab.
+4. **Bundle flow.** Opening a project still means going through the cold-start
    route; the maps list and the download popup have not been looked at since
    the catalogue was repaired.
 
@@ -63,3 +59,7 @@ errors surfaced.
   sort, crop and split/join as absent although they exist; the command
   reference is missing several commands. Listed in the
   `codify-architecture-decisions` design under "Findings", fixed by its task 2.6.
+
+Localization is done for the shell, the rails and the three library tabs. What
+is still English: the Track Inspector's field labels, the command palette's own
+entries, and the bundle loader. Those are the next translation pass.
