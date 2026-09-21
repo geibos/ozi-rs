@@ -83,6 +83,16 @@ pub fn load_project(path: &Path) -> Result<Project, PersistenceError> {
     // and only missing kinds get a default appended (in memory only —
     // the file on disk is not rewritten by load).
     project.ensure_default_layers();
+    // Older builds could write two layers sharing one id. Every operation
+    // addresses a layer by id, so the second of a colliding pair is
+    // unreachable — renames, imports and deletes silently land on the first.
+    // Repair on load (in memory; the file is rewritten only when the user
+    // saves) and report it so the change is not silent.
+    for (name, old_id, new_id) in project.deduplicate_layer_ids() {
+        tracing::warn!(
+            "layer {name:?} reused id {old_id}; renumbered to {new_id} so it can be addressed"
+        );
+    }
     Ok(project)
 }
 

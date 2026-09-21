@@ -1446,7 +1446,7 @@ impl AppState {
             return Ok(false);
         }
 
-        let layer_id = LayerId::new(self.project.map_layers().len() as u64 + 1);
+        let layer_id = super::application::import::next_layer_id(&self.project);
         let layer_name = format!("{} / {}", selection.project_name, selection.package_name);
         self.history.apply(
             &mut self.project,

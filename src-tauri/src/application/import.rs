@@ -196,7 +196,13 @@ fn apply_gpx_import(
     Ok(())
 }
 
-fn next_layer_id(project: &Project) -> LayerId {
+/// Allocate a layer id that no layer of any kind currently uses.
+///
+/// Ids are unique per project, not per layer kind, and callers assign them
+/// (ADR-0014: no central generator). Deriving one from a layer count breaks as
+/// soon as a layer is removed — the count drops and the next allocation hands
+/// out an id that is still in use.
+pub(crate) fn next_layer_id(project: &Project) -> LayerId {
     let max_map = project
         .map_layers()
         .iter()
@@ -398,5 +404,43 @@ mod zip_routing_tests {
         let report = import_gpx_file_into_project(&mut project, &mut history, &zip_path)
             .expect("zip routed to archive importer");
         assert_eq!(report.imported_tracks(), 1);
+    }
+}
+
+#[cfg(test)]
+mod layer_id_tests {
+    use super::next_layer_id;
+    use crate::domain::{LayerId, MapLayer, Project, TrackLayer, WaypointLayer};
+
+    #[test]
+    fn next_layer_id_clears_every_layer_kind() {
+        let mut project = Project::default();
+        project.add_track_layer(TrackLayer::new(LayerId::new(1), "Tracks"));
+        project.add_waypoint_layer(WaypointLayer::new(LayerId::new(7), "Waypoints"));
+        project.add_map_layer(MapLayer::new(LayerId::new(4), "Map"));
+
+        assert_eq!(next_layer_id(&project).value(), 8);
+    }
+
+    /// The failure this guards: allocating from a count reuses an id after a
+    /// removal, so two layers end up sharing one identifier.
+    #[test]
+    fn next_layer_id_does_not_reuse_an_id_after_a_removal() {
+        let mut project = Project::default();
+        project.add_map_layer(MapLayer::new(LayerId::new(1), "First"));
+        project.add_map_layer(MapLayer::new(LayerId::new(2), "Second"));
+        assert!(project.remove_map_layer(LayerId::new(1)));
+
+        let next = next_layer_id(&project);
+        assert_eq!(
+            project.map_layers().len(),
+            1,
+            "count-based allocation would say 2"
+        );
+        assert_eq!(next.value(), 3);
+        assert!(
+            project.map_layers().iter().all(|l| l.id() != next),
+            "allocated id must not already be in use"
+        );
     }
 }

@@ -153,6 +153,12 @@ pub struct MapLayer {
 }
 
 impl MapLayer {
+    /// Reassign this layer's identifier. Only `Project::deduplicate_layer_ids`
+    /// uses this, to repair a project file whose layers share an id.
+    pub(crate) fn set_id(&mut self, id: LayerId) {
+        self.id = id;
+    }
+
     pub fn new(id: LayerId, name: impl Into<String>) -> Self {
         Self::with_source_path(id, name, None::<PathBuf>)
     }
@@ -190,6 +196,12 @@ pub struct TrackLayer {
 }
 
 impl TrackLayer {
+    /// Reassign this layer's identifier. Only `Project::deduplicate_layer_ids`
+    /// uses this, to repair a project file whose layers share an id.
+    pub(crate) fn set_id(&mut self, id: LayerId) {
+        self.id = id;
+    }
+
     pub fn new(id: LayerId, name: impl Into<String>) -> Self {
         Self {
             id,
@@ -258,6 +270,12 @@ pub struct WaypointLayer {
 }
 
 impl WaypointLayer {
+    /// Reassign this layer's identifier. Only `Project::deduplicate_layer_ids`
+    /// uses this, to repair a project file whose layers share an id.
+    pub(crate) fn set_id(&mut self, id: LayerId) {
+        self.id = id;
+    }
+
     pub fn new(id: LayerId, name: impl Into<String>) -> Self {
         Self {
             id,
@@ -433,6 +451,48 @@ impl Project {
 
     pub fn waypoint_layers(&self) -> &[WaypointLayer] {
         &self.waypoint_layers
+    }
+
+    /// Give every layer an identifier that is unique among layers of its kind,
+    /// returning the layers that had to be renumbered as `(name, old, new)`.
+    ///
+    /// Layers are addressed by id within their own kind — a track layer and a
+    /// waypoint layer may both be id 1, and the default project relies on that.
+    /// Two layers of the *same* kind sharing an id is the problem: the second
+    /// is unreachable, so renames, imports and deletions all land on the first.
+    /// Older project files carry such duplicates, so a loaded project is
+    /// repaired rather than trusted. New ids continue past the highest in use
+    /// anywhere, matching how imports allocate them.
+    pub fn deduplicate_layer_ids(&mut self) -> Vec<(String, u64, u64)> {
+        let mut next: u64 = self
+            .map_layers
+            .iter()
+            .map(|l| l.id().value())
+            .chain(self.track_layers.iter().map(|l| l.id().value()))
+            .chain(self.waypoint_layers.iter().map(|l| l.id().value()))
+            .max()
+            .unwrap_or(0);
+
+        let mut renumbered = Vec::new();
+        macro_rules! repair_kind {
+            ($layers:expr) => {{
+                let mut seen: std::collections::HashSet<u64> = std::collections::HashSet::new();
+                for layer in $layers.iter_mut() {
+                    let old = layer.id().value();
+                    if seen.insert(old) {
+                        continue;
+                    }
+                    next += 1;
+                    layer.set_id(LayerId::new(next));
+                    seen.insert(next);
+                    renumbered.push((layer.name().to_owned(), old, next));
+                }
+            }};
+        }
+        repair_kind!(self.map_layers);
+        repair_kind!(self.track_layers);
+        repair_kind!(self.waypoint_layers);
+        renumbered
     }
 
     pub fn add_map_layer(&mut self, layer: MapLayer) {
@@ -805,6 +865,93 @@ impl Default for Project {
 
 #[cfg(test)]
 mod tests {
+    /// A project file written by an older build carries two track layers that
+    /// both claim id 1. Everything addresses a layer by id, so the second one
+    /// is unreachable: renames, imports and deletes all land on the first.
+    #[test]
+    fn deduplicate_layer_ids_renumbers_collisions_and_reports_them() {
+        let mut project = Project {
+            id: super::ProjectId::new(1),
+            name: "Test".to_owned(),
+            map_layers: vec![MapLayer::new(LayerId::new(2), "Map")],
+            track_layers: vec![
+                TrackLayer::new(LayerId::new(1), "Tracks"),
+                TrackLayer::new(LayerId::new(1), "Tracks"),
+            ],
+            waypoint_layers: vec![WaypointLayer::new(LayerId::new(1), "Waypoints")],
+        };
+
+        let renumbered = project.deduplicate_layer_ids();
+
+        let mut track_ids: Vec<u64> = project
+            .track_layers()
+            .iter()
+            .map(|l| l.id().value())
+            .collect();
+        let track_count = track_ids.len();
+        track_ids.sort_unstable();
+        track_ids.dedup();
+        assert_eq!(
+            track_ids.len(),
+            track_count,
+            "track layers must not share an id with each other"
+        );
+
+        assert_eq!(
+            renumbered.len(),
+            1,
+            "only the duplicate Tracks layer; a waypoint layer may share id 1 with a track layer"
+        );
+        assert_eq!(renumbered[0].1, 1);
+        assert!(renumbered[0].2 > 2);
+        assert_eq!(
+            project.waypoint_layers()[0].id().value(),
+            1,
+            "a waypoint layer keeps id 1 even though a track layer also uses it"
+        );
+    }
+
+    #[test]
+    fn deduplicate_layer_ids_leaves_a_healthy_project_untouched() {
+        let mut project = Project {
+            id: super::ProjectId::new(1),
+            name: "Test".to_owned(),
+            map_layers: vec![MapLayer::new(LayerId::new(3), "Map")],
+            track_layers: vec![TrackLayer::new(LayerId::new(1), "Tracks")],
+            waypoint_layers: vec![WaypointLayer::new(LayerId::new(2), "Waypoints")],
+        };
+
+        assert!(project.deduplicate_layer_ids().is_empty());
+        assert_eq!(project.track_layers()[0].id().value(), 1);
+        assert_eq!(project.waypoint_layers()[0].id().value(), 2);
+        assert_eq!(project.map_layers()[0].id().value(), 3);
+    }
+
+    /// Track contents must survive the repair — only the identifier changes.
+    #[test]
+    fn deduplicate_layer_ids_keeps_layer_contents() {
+        let mut first = TrackLayer::new(LayerId::new(1), "Tracks");
+        first.add_track(Track::new(TrackId::new(1), "kept"));
+        let mut second = TrackLayer::new(LayerId::new(1), "Imported");
+        second.add_track(Track::new(TrackId::new(2), "also kept"));
+        let mut project = Project {
+            id: super::ProjectId::new(1),
+            name: "Test".to_owned(),
+            map_layers: Vec::new(),
+            track_layers: vec![first, second],
+            waypoint_layers: Vec::new(),
+        };
+
+        project.deduplicate_layer_ids();
+
+        assert_eq!(project.track_layers()[0].tracks()[0].name(), "kept");
+        assert_eq!(project.track_layers()[1].tracks()[0].name(), "also kept");
+        assert_ne!(
+            project.track_layers()[0].id(),
+            project.track_layers()[1].id()
+        );
+    }
+
     use super::{LayerId, MapLayer, Project, ProjectLayerError, TrackLayer, WaypointLayer};
     use crate::domain::{
         Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId, Waypoint,
