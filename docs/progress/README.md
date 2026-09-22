@@ -10,6 +10,42 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the stand cannot lie about shape
+
+The stand's README has always said that a command with no answer throws loudly,
+"because a screen that renders because a mock quietly returned `undefined` is
+the failure this whole exercise exists to stop". A mock that answers with the
+*wrong shape* is that same failure wearing a hat, and it happened twice in two
+days: `export_all_tracks_gpx` answered "accepted" where the caller reads two
+counts, and `get_simplified_preview` answered `{points, removed}` where the DTO
+is `{original_count, simplified_count, segments}` — which threw inside
+`MapView`.
+
+Both were found by opening a screen. That is a method with a hole in it, so the
+answers are typed against the generated bindings now: each command's answer,
+unwrapped from the generated `Result`, keyed by the wire's snake_case name. The
+tile commands are the one stated exception — their binding says `number[]` and
+the transport hands the app an `ArrayBuffer`, as the real IPC does.
+
+Proved it bites: putting `{points, removed}` back fails `just check` with
+"missing the following properties from type 'SimplifiedPreviewDto'". A guard
+that has not been seen to fail is a guess.
+
+It found four more answers that were merely loose, including yesterday's own:
+the rows an import adds were `Record<string, unknown>` and are now
+`TrackSummaryDto`, so the next field the DTO grows will be a compile error
+rather than a blank column. The previewed project was being rebuilt as a slug
+in an otherwise empty object, which the app would have read as a project with
+no maps.
+
+| | |
+|---|---|
+| Change | `openspec/changes/the-stand-cannot-lie-about-shape/` |
+| Automated gates | `just ci` green (334 Rust, 500 frontend) |
+| Customer-journey smoke | not applicable — no product code changed |
+
+---
+
 ## 2026-09-22 — the menu speaks Russian
 
 The guard written yesterday reads `aria-label`, `title` and `placeholder`. The

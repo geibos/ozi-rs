@@ -5,7 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **the menu speaks Russian** (2026-09-22) — nothing read the
+Last merged slice: **the stand cannot lie about shape** (2026-09-22) — two
+stand answers in two days had shapes the app does not expect, so the answers
+are typed against the generated bindings and the drift is a compile error;
+after the menu speaks Russian, where nothing read the
 words between the tags, so every track row's actions menu was English, its
 `Delete` included, along with the simplify dialog; after every toast speaks
 Russian, where the third
@@ -170,7 +173,7 @@ re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the fifty-one OpenSpec changes.** Folding their requirements
+1. **Archive the fifty-two OpenSpec changes.** Folding their requirements
    into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on

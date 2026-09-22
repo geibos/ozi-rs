@@ -14,6 +14,12 @@
  * producing.
  */
 import { standEmit } from "./tauri-event";
+import type {
+  AppStateDto,
+  commands,
+  JsonValue,
+  TrackSummaryDto,
+} from "$lib/bindings";
 import { playBundleDownload, playMapDownload } from "./download-script";
 import {
   appStateFixture,
@@ -139,7 +145,7 @@ function requestedState(): "cold" | "workspace" {
  * an operator is checking. These rows are appended to the fixture's, and a
  * reload clears them, as a fresh launch would.
  */
-const importedTracks: Array<Record<string, unknown>> = [];
+const importedTracks: TrackSummaryDto[] = [];
 let importedLayerId = 10;
 
 function importOneLayer(label: string, trackCount: number): string {
@@ -163,20 +169,67 @@ function importOneLayer(label: string, trackCount: number): string {
 
 let previewedSlug: string | null = null;
 
-function previewedAppState(): unknown {
+function previewedAppState(): AppStateDto {
   const base = requestedState() === "cold" ? coldStartFixture : appStateFixture;
-  if (previewedSlug === null) return base;
-  const state = base as { current_project?: { slug: string } | null };
-  if (!state.current_project) return base;
+  const project = base.current_project;
+  if (previewedSlug === null || !project) return base;
+  // The whole project, with its slug moved: the loader matches on the slug, so
+  // a partial object here would have been a project with nothing in it.
   return {
     ...base,
-    current_project: { ...state.current_project, slug: previewedSlug },
+    current_project: { ...project, slug: previewedSlug },
   };
 }
 
-const HANDLERS: Record<string, (args: Args) => unknown> = {
+/**
+ * A command name as the wire uses it, from the camelCase the bindings use.
+ *
+ * `getTracksGeojson` → `get_tracks_geojson`.
+ */
+type SnakeCase<S extends string> = S extends `${infer Head}${infer Tail}`
+  ? Head extends Uppercase<Head>
+    ? Head extends Lowercase<Head>
+      ? `${Head}${SnakeCase<Tail>}`
+      : `_${Lowercase<Head>}${SnakeCase<Tail>}`
+    : `${Head}${SnakeCase<Tail>}`
+  : S;
+
+/** What a command answers with, unwrapped from the generated `Result`. */
+type Answer<K extends keyof typeof commands> = Extract<
+  Awaited<ReturnType<(typeof commands)[K]>>,
+  { status: "ok" }
+>["data"];
+
+/**
+ * The stand's answers, typed against the generated bindings.
+ *
+ * Two stubs have had the wrong shape: `export_all_tracks_gpx` answered nothing
+ * where the caller reads two counts, and `get_simplified_preview` answered
+ * `{points, removed}` where the DTO is `{original_count, simplified_count,
+ * segments}` — which threw inside `MapView`. The README says a command with no
+ * answer throws loudly because a mock returning `undefined` is the failure
+ * this exercise exists to stop; a mock returning the wrong shape is that same
+ * failure, and only the compiler catches it every time.
+ *
+ * The raw-byte tile commands are the exception: their binding says `number[]`
+ * and the transport hands the app an `ArrayBuffer`, which is what the real
+ * IPC does.
+ */
+type StandAnswers = {
+  [K in keyof typeof commands as SnakeCase<K & string>]?: (
+    args: Args,
+  ) => Answer<K>;
+} & {
+  get_sqlite_tile: (args: Args) => ArrayBuffer;
+  get_ozi_tile: (args: Args) => ArrayBuffer;
+};
+
+const HANDLERS: StandAnswers = {
   get_app_state: () => previewedAppState(),
-  get_tracks_geojson: () => tracksGeojsonFixture,
+  // The binding says `JsonValue` because the Rust side answers with dynamic
+  // JSON; the fixture is a typed FeatureCollection, which is the stricter of
+  // the two and what every reader here wants.
+  get_tracks_geojson: () => tracksGeojsonFixture as unknown as JsonValue,
   // The rows the Tracks tab reads — its own fixture, not the map's features.
   // Deriving them from the geometry would have made the stand inherit the very
   // omission this listing exists to undo.
@@ -184,7 +237,7 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
       ? trackDetailFixture
-      : { id: args?.trackId ?? 0, name: "", segments: [] },
+      : { id: Number(args?.trackId ?? 0), name: "", segments: [] },
   get_waypoints: (args) =>
     args?.layerId === FIXTURE_WAYPOINT_LAYER ? waypointsFixture : [],
   get_track_export_default_path: () => null,
@@ -316,7 +369,9 @@ export async function invoke<T>(command: string, args?: Args): Promise<T> {
     queueMicrotask(() => standEmit("state-changed", undefined));
   }
 
-  const handler = HANDLERS[command];
+  const handler = (
+    HANDLERS as Record<string, ((args: Args) => unknown) | undefined>
+  )[command];
   if (handler) return handler(args) as T;
   if (ACCEPTED_WITHOUT_DATA.has(command)) return null as T;
 

@@ -103,15 +103,11 @@ decision.
   when a download starts; permanent dead space on the first screen is the
   worse half of that trade.
 
-- **The stand's answers are not typed against the bindings.** Two stubs have
-  now had the wrong shape: `export_all_tracks_gpx` returned nothing where the
-  caller reads two counts, and `get_simplified_preview` returned
-  `{points, removed}` where the DTO is `{original_count, simplified_count,
-  segments}` — the second threw inside `MapView`. The stand's own README says a
-  command with no answer throws loudly because a mock returning `undefined` is
-  the failure it exists to stop; a mock returning the wrong shape is the same
-  failure. The handler table could be typed from `commands` in `bindings.ts`,
-  which needs a snake_case-to-camelCase mapping at the type level.
+- ~~The stand's answers are not typed against the bindings.~~ Done on
+  2026-09-22 in `the-stand-cannot-lie-about-shape`, after two wrong shapes in
+  two days. The handler table is typed from `commands` in `bindings.ts`, keyed
+  by the wire's snake_case name; the tile commands' `ArrayBuffer` is the one
+  stated exception. It found four loose answers on the way in.
 
 - **A grid child can grow its own column.** `.canvas-column` had
   `grid-template-rows` and no `grid-template-columns`, so the implicit column

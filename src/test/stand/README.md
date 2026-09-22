@@ -39,7 +39,9 @@ needs the smoke gate.
 `src/test/stand/tauri-core.ts` holds the command table. A command with no
 answer throws, with the command name and where to add it — a screen that
 renders because a mock quietly returned `undefined` is the failure this whole
-exercise exists to stop. Dialogs answer "cancelled" (the branch a screen must
+exercise exists to stop. The answers are typed against the generated bindings,
+so an answer of the wrong *shape* fails `just check` rather than the screen —
+that had happened twice before the types went in. Dialogs answer "cancelled" (the branch a screen must
 handle anyway) unless a session asks otherwise —
 `standAnswerDialogsWith("/tmp/day.gpx")` from `tauri-dialog.ts` makes the
 pickers answer that path, which is the only way to look at import, export,
