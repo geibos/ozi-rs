@@ -1,13 +1,41 @@
+import type maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap } from "maplibre-gl";
 
 const TRACKS_SOURCE = "tracks";
 const TRACKS_LAYER = "tracks-lines";
 const TRACKS_LAYER_LABELS = "tracks-labels";
+/** The casing drawn under the selected track. */
+export const TRACKS_LAYER_SELECTED = "tracks-line-selected";
+
+/** A filter that matches no feature: nothing is selected. */
+const MATCH_NOTHING: maplibregl.FilterSpecification = [
+  "==",
+  ["get", "track_id"],
+  -1,
+];
 
 export function initTracksLayer(map: MapLibreMap) {
   map.addSource(TRACKS_SOURCE, {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },
+  });
+
+  // Under the coloured line, not over it: the selected track has to stand out
+  // from the other eleven while keeping the colour that says whose it is. A
+  // day of recordings carries no names on the map — on-map labels need SDF
+  // glyphs nobody has bundled — so this is how a row in the list and a route
+  // on the map are connected.
+  map.addLayer({
+    id: TRACKS_LAYER_SELECTED,
+    type: "line",
+    source: TRACKS_SOURCE,
+    filter: MATCH_NOTHING,
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: {
+      "line-color": "#ffffff",
+      "line-opacity": 0.85,
+      "line-width": ["+", ["get", "line_width"], 6],
+    },
   });
 
   // The track LINE is the primary visualization and must always render.
@@ -69,4 +97,30 @@ export function updateTracksLayer(
   if (source) {
     source.setData(geojson);
   }
+}
+
+/**
+ * Put the casing under one track, or under none.
+ *
+ * The filter is swapped rather than the layer removed: its place in the stack
+ * — below the coloured line — is what keeps the colour true, and re-adding a
+ * layer puts it back on top.
+ */
+export function highlightTrack(
+  map: MapLibreMap,
+  selected: { layerId: bigint; trackId: bigint } | null,
+): void {
+  // A style reload can leave the map without the layer for a moment, and a
+  // selection arriving then must not throw at the operator.
+  if (!map.getLayer?.(TRACKS_LAYER_SELECTED)) return;
+  map.setFilter(
+    TRACKS_LAYER_SELECTED,
+    selected === null
+      ? MATCH_NOTHING
+      : ([
+          "all",
+          ["==", ["get", "layer_id"], Number(selected.layerId)],
+          ["==", ["get", "track_id"], Number(selected.trackId)],
+        ] as maplibregl.FilterSpecification),
+  );
 }

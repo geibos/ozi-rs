@@ -146,10 +146,16 @@ decision.
   baseline, so nothing catches it. Before writing a delta, read the
   capability's existing requirements; before archiving a batch, read them
   against each other.
-- **Five guards now watch for a defect class rather than an instance**: a
+- **An `$effect` that returns before reading its dependencies is dead.** Svelte
+  5 subscribes an effect to what it actually reads, so `if (!map) return;`
+  ahead of a `$store` read leaves the first run subscribed to nothing. It cost
+  a feature that looked written and was not, and four more effects in `MapView`
+  had the shape and worked only because they are declared after `onMount`.
+  Guarded by `effect-reads-before-guarding`; a `$state` local counts as a read.
+- **Six guards now watch for a defect class rather than an instance**: a
   literal label in a component, English assembled into one, a `catch` that logs
-  and tells nobody, an annotated `$state(null)`, and a toast message typed in
-  rather than looked up. Each found something on its first run that the sweep
+  and tells nobody, an annotated `$state(null)`, a toast message typed in
+  rather than looked up, and an effect that gives up before it subscribes. Each found something on its first run that the sweep
   which prompted it had missed — the last one found sixteen. When a defect
   turns up twice, the third fix is a test over the shape, not another sweep.
   And each guard covers one shape only: `no-untranslated-labels` watches

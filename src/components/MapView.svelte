@@ -85,6 +85,8 @@
     raiseMeasureLayer,
   } from "$lib/maplibre/measure-layer";
   import {
+    TRACKS_LAYER_SELECTED,
+    highlightTrack,
     initTracksLayer,
     updateTracksLayer,
   } from "../lib/maplibre/tracks-layer";
@@ -260,10 +262,25 @@
   // map image. Safe to call repeatedly; missing layers are skipped.
   function raiseTrackLayers() {
     if (!map) return;
-    for (const id of ["tracks-lines", "tracks-labels"]) {
+    // The selected track's casing first, so it ends up under the coloured
+    // line it belongs to rather than over the other tracks.
+    for (const id of [TRACKS_LAYER_SELECTED, "tracks-lines", "tracks-labels"]) {
       if (map.getLayer(id)) map.moveLayer(id);
     }
   }
+
+  // Which route is ЛИСА15, among twelve colours and no names on the map: the
+  // selected row's track gets a casing. Cheap, and it needs no glyphs.
+  $effect(() => {
+    // The selection is read first, on purpose. An effect is subscribed to what
+    // it actually reads, so a guard that exits before the read leaves it
+    // subscribed to nothing and it never runs again — which is what this
+    // effect did until it was turned around. `effect-reads-before-guarding`
+    // now fails on the shape.
+    const selected = $selectedTrack;
+    if (!map) return;
+    highlightTrack(map, selected);
+  });
 
   function openContextMenu(event: MouseEvent, target: PointMenuTarget) {
     event.preventDefault();
@@ -1153,9 +1170,11 @@
   });
 
   $effect(() => {
+    const drawing = $drawingModeActive;
+    const editing = $editModeActive;
     if (!map) return;
-    if ($drawingModeActive) {
-      if ($editModeActive) {
+    if (drawing) {
+      if (editing) {
         editModeActive.set(false);
       }
       if ($addWaypointMode) {
@@ -1187,23 +1206,25 @@
   });
 
   $effect(() => {
+    const drawing = $drawingModeActive;
+    const adding = $addWaypointMode;
+    const editing = $editModeActive;
     if (!map) return;
     const canvas = map.getCanvas();
-    if ($drawingModeActive) {
+    if (drawing) {
       canvas.style.cursor = "crosshair";
-    } else if ($addWaypointMode) {
+    } else if (adding) {
       canvas.style.cursor = "crosshair";
-    } else if (!$editModeActive) {
+    } else if (!editing) {
       canvas.style.cursor = "";
     }
   });
 
   $effect(() => {
-    if (!map) return;
-
     const active = $drawingModeActive;
     void $drawingTrackLayerId;
     void $drawingTrackId;
+    if (!map) return;
 
     if (active) {
       map.dragPan.disable();
@@ -1231,9 +1252,8 @@
   });
 
   $effect(() => {
-    if (!map) return;
-
     const state = $simplifyState;
+    if (!map) return;
 
     function updateSimplifyPreview() {
       if (!map) return;

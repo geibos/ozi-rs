@@ -10,6 +10,55 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — which line is ЛИСА15
+
+A day's recordings draw in twelve colours now, and the map carries no names —
+on-map labels need SDF glyphs nobody has bundled, which is a repository-size
+decision the owner has not been asked for. So the question "which line is
+ЛИСА15" was answered by reading a colour off the list and hunting for it among
+eleven others.
+
+Selecting a row answers it with no assets at all: the chosen track gets a white
+casing under its own line, so it stands out while keeping the colour that says
+whose it is. Stepping down the list lights each route in turn.
+
+Then the interesting part. It did not work, and the reason is a Svelte 5 trap
+worth writing down:
+
+```
+$effect(() => {
+  if (!map) return;          // first run: the map does not exist yet
+  highlightTrack(map, $selectedTrack);
+});
+```
+
+An effect is subscribed to what it *actually reads*. That first run returns
+before reaching `$selectedTrack`, so the effect ends up subscribed to nothing
+and never runs again. The row lit up; the map did not. Reading the selection
+before the guard fixes it.
+
+Four more effects in `MapView` had the same shape and are working only because
+they are declared after `onMount`, so their first run finds a map. That is not
+a property to rely on, so they are turned around too and a guard fails on the
+shape — comments stripped first, because the comment explaining this rule
+quotes `if (!map) return`, and the guard flagged the fix it had asked for. That
+is the second time in one day I have had to teach a guard not to read its own
+documentation.
+
+One process note, since it cost real work: to check the guard bites I broke the
+code deliberately and then undid it with `git checkout <file>`, which reverted
+the file to HEAD and threw away everything else I had written in it that
+iteration. A copy in the scratchpad next time.
+
+| | |
+|---|---|
+| After | [the selected route, cased](2026-09-22-highlight/after-selected-route.png) |
+| Change | `openspec/changes/which-line-is-lisa15/` |
+| Automated gates | `just ci` green (338 Rust, 508 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — a day on the map
 
 The palette I handed to imported tracks was designed by reasoning: avoid greens
