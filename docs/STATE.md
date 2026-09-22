@@ -179,67 +179,85 @@ Working goal, set by the owner on 2026-09-21: ozi-rs has to be good enough to
 replace OziExplorer in the field, and working with tracks and bundles has to be
 fast, comfortable and good-looking.
 
-Rewritten on 2026-09-21 after a long session, because the previous queue had
-been overtaken. It is ordered by what it buys, and is meant to be re-read and
-re-ordered rather than followed blindly.
+Rewritten on 2026-09-22 at the end of a long autonomous run, because the
+previous queue had been overtaken by the work done since. Ordered by what it
+buys; meant to be re-read and re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the fifty-six OpenSpec changes.** Folding their requirements
-   into the baseline is a step for a person. Read the deltas against the
-   baseline first: four of this session's were written as ADDED where a
-   baseline requirement already said the opposite, and were corrected on
-   2026-09-21 — `openspec validate --strict` checks a change's shape, not
-   whether it disagrees with the baseline.
+1. **Archive the fifty-six OpenSpec changes.** Folding their requirements into
+   the baseline is a step for a person, and fifty-six is a lot of reading, so
+   it is worth doing in batches by capability rather than in one sitting. Read
+   the deltas against the baseline first: four were once written as ADDED where
+   a baseline requirement already said the opposite — `openspec validate
+   --strict` checks a change's shape, not whether it disagrees with the
+   baseline.
 2. **Decisions the code is waiting on**, each with its reasoning in
-   `docs/backlog.md`: the stop threshold for moving time; whether OZI rasters
-   should key their no-data black to transparent, and per map or globally; the
-   catalogue's row and badge sizes; where the theme picker goes, since
-   `ui-shell` requires one and `ThemePicker.svelte` is imported by nothing;
-   and whether a WPT name should carry `&#NNNN;` or `?` for a character
-   cp1251 cannot hold — that one needs someone with OziExplorer in front of
-   them.
+   `docs/backlog.md`:
+   - the stop threshold for moving time, and the same question for ascent and
+     descent — one decision covers both;
+   - whether OZI rasters should key their no-data black to transparent, and per
+     map or globally;
+   - the catalogue's row and badge sizes;
+   - where the theme picker goes, since `ui-shell` requires one and
+     `ThemePicker.svelte` is imported by nothing;
+   - whether a WPT name should carry `&#NNNN;` or `?` for a character cp1251
+     cannot hold — needs someone with OziExplorer in front of them;
+   - **is there such a thing as a new project?** Nothing creates an empty one,
+     so a crew finishing one search and starting another keeps adding to the
+     same project. Whether that is wrong depends on whether a project is a
+     search or a machine's working set;
+   - **bundled map glyphs**, which is the price of putting track names on the
+     map: SDF PBFs for Cyrillic and Latin, checked in as binary assets, with a
+     licence that allows it. A repository-size decision as much as a code one,
+     and with a day's routes now drawn in twelve colours it is the largest
+     remaining readability gap.
 3. **FTP**, when the owner is ready: credentials from a settings form into the
    macOS keychain, an FTP listing adapter behind the interface the HTTP one
-   implements, and a source preference. Track upload stands on the GPX round
-   trip, which is pinned as of 2026-09-21.
+   implements, and a source preference. Track upload stands on the GPX and PLT
+   round trips, both pinned, and on the day's export, which now carries the
+   waypoints with the tracks.
 
 ### Blocked on this machine
 
-4. **`just smoke`.** The Mac2 driver host dies at session creation; every
-   piece works when run by hand and only fails when Appium spawns it. What has
-   been ruled out, and by which command, is under "Known broken". Forty-five
-   changes carry an unchecked "smoke green" task waiting on it.
+4. **`just smoke`.** The Mac2 driver host dies at session creation; every piece
+   works when run by hand and only fails when Appium spawns it. What has been
+   ruled out, and by which command, is under "Known broken". Forty-five changes
+   carry an unchecked "smoke green" task waiting on it, and nothing merged
+   since 2026-09-21 has been seen running in the packaged application.
 
 ### An agent can still do these
 
 5. **MapLibre 4 → 6**, which clears the waived critical advisory. Deliberately
-   not attempted while the E2E gate is down: the map is the product, and the
-   stand stubs its tiles, so a major upgrade would ship verified only by type
-   checks and a browser. Checked 2026-09-22: vulnerable `<=6.4.0`, fixed in
-   6.10.0 only, no 5.x backport, so there is no smaller step. The waiver's
-   premise — that nothing here reaches the vulnerable sink — is enforced by
-   `src/test/maplibre-waiver.test.ts` rather than by remembering to look.
-6. ~~Field tools declared in scope and absent.~~ All three — distance, radius
-   ring, projection — were built on 2026-09-22 and live in the command palette.
-   Their rendered pixels are unverified; see the change's task 6.1 for why the
-   obvious check does not work. The home is the command palette, which
-   `product-scope` names as a place a workspace action may live — the mode
-   chips stay inert scaffolding per `ui-shell`, and that is not the obstacle it
-   looked like.
-7. ~~The remaining ADR-0020 items.~~ All of them landed: recent `.ozp` and
-   waypoint colour on 2026-09-21; the three on-map tools, open-by-URL,
-   trimming a track at a point and the per-point walkthrough on 2026-09-22.
-   Trimming is crop-by-selection in two halves, each useful alone.
+   not attempted while the E2E gate is down: the map is the product, the stand
+   stubs its tiles, and a major upgrade would ship verified only by type checks
+   and a browser. Vulnerable `<=6.4.0`, fixed in 6.10.0 only, no 5.x backport,
+   so there is no smaller step. The waiver's premise is enforced by
+   `src/test/maplibre-waiver.test.ts`.
+6. **`get_ozi_tile` is dead IPC surface** — registered, generated into the
+   bindings, called by nothing; the map renders OZF2 through the `ozi://`
+   protocol. Removing it costs a binding and a registry line.
+7. **The legacy element defaults in `app.css`** are now all inside
+   `@layer base`, so none of them overrides a component. Deleting them outright
+   still needs a pass over the raw `<input>`/`<button>` sites that lean on
+   them; the stand makes that cheap.
 8. **Upkeep**: point the stand at whatever the next slice touches. Every screen
-   of the field cycle has been walked on it at least once.
+   of the field cycle has been walked on it, and its answers are typed against
+   the generated bindings, so a stub that drifts from a DTO is a compile error.
 
 ### Where the rest is
 
-`docs/backlog.md` holds the bundle-flow survey, the engineering items and the
-rules this session learned the hard way — the generation stamp for overlapping
-reloads, not deriving a list from map geometry, and reading a capability's
-existing requirements before writing a delta against it.
+`docs/backlog.md` holds the bundle-flow survey, the engineering items, and the
+rules learned the hard way — the generation stamp for overlapping reloads, not
+deriving a list from map geometry, reading a capability's existing requirements
+before writing a delta, a grid child that can grow its own column, and an
+`$effect` that returns before reading its dependencies.
+
+Six guards now watch defect *classes* rather than instances: a literal label, a
+computed English label, a `catch` that tells nobody, an annotated
+`$state(null)`, a typed-in toast message, and an effect that gives up before it
+subscribes. Each found something on its first run that the sweep which prompted
+it had missed; the toast one found sixteen.
 
 ## Known broken
 
