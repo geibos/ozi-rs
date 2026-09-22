@@ -108,10 +108,7 @@
       {:else}
         <div class="empty-state">
           <p class="empty-title">{$t("inspector.nothingSelected")}</p>
-          <p class="empty-hint">
-            Pick a Track, Waypoint, or Map from the Library to inspect its
-            properties.
-          </p>
+          <p class="empty-hint">{$t("inspector.nothingSelectedHint")}</p>
         </div>
       {/if}
     </div>

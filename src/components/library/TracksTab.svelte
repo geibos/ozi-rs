@@ -759,10 +759,15 @@
                 class="hover:bg-accent hover:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm border-0 bg-transparent px-2 py-1.5 text-xs select-none"
                 onclick={(e: Event) => e.stopPropagation()}
               >
-                Set line width
+                {$i18n("tracksTab.setLineWidth")}
               </Popover.Trigger>
               <Popover.Content class="w-44">
-                <Label class="text-xs">Line width: {t.lineWidth}px</Label>
+                <Label class="text-xs">
+                  {$i18n("tracksTab.lineWidthValue").replace(
+                    "{width}",
+                    String(t.lineWidth),
+                  )}
+                </Label>
                 <Slider
                   type="single"
                   min={1}
@@ -779,14 +784,14 @@
                 openSimplify(t);
               }}
             >
-              Simplify…
+              {$i18n("tracksTab.simplify")}
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item
               variant="destructive"
               onSelect={() => handleDelete(t)}
             >
-              Delete
+              {$i18n("tracksTab.delete")}
             </DropdownMenu.Item>
           {/snippet}
         </LibraryRow>
@@ -796,9 +801,14 @@
             class="bg-card text-card-foreground border-border mx-2 mt-1 mb-2 flex flex-col gap-2 rounded-md border p-2"
             data-testid="simplify-popover"
           >
-            <div class="text-xs font-semibold">Simplify Track</div>
+            <div class="text-xs font-semibold">
+              {$i18n("tracksTab.simplifyTitle")}
+            </div>
             <Label class="text-xs">
-              Tolerance: {$simplifyState.tolerance}m
+              {$i18n("tracksTab.tolerance").replace(
+                "{tolerance}",
+                String($simplifyState.tolerance),
+              )}
             </Label>
             <Slider
               type="single"
@@ -826,11 +836,11 @@
               <div
                 class="bg-muted text-muted-foreground rounded p-2 text-[11px] leading-snug"
               >
-                Original:
+                {$i18n("tracksTab.simplifyOriginal")}
                 <strong class="text-foreground">
                   {$simplifyState.preview.original_count}
                 </strong>
-                → Simplified:
+                {$i18n("tracksTab.simplifyResult")}
                 <strong class="text-foreground">
                   {$simplifyState.preview.simplified_count}
                 </strong>
@@ -838,7 +848,7 @@
             {/if}
             <div class="flex justify-end gap-2">
               <Button variant="outline" size="xs" onclick={closeSimplify}>
-                Cancel
+                {$i18n("tracksTab.cancel")}
               </Button>
               <Button
                 size="xs"
@@ -846,7 +856,7 @@
                   $simplifyState.preview.simplified_count === 0}
                 onclick={commitSimplify}
               >
-                Confirm
+                {$i18n("tracksTab.confirmSimplify")}
               </Button>
             </div>
           </div>

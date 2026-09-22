@@ -10,6 +10,45 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — the menu speaks Russian
+
+The guard written yesterday reads `aria-label`, `title` and `placeholder`. The
+one written an hour ago reads a notification's message. Neither reads the words
+*between* the tags — and that is where the actions menu on every track row was
+living, in English, including its destructive `Delete`, along with the whole
+simplify dialog and two empty states.
+
+Same lesson twice in two days: a guard on one shape says nothing about another.
+The symbol picker's label table escaped the attribute guard in exactly this
+way. So the third guard reads text nodes, with `<style>`, comments and `{…}`
+expressions blanked out first — it says nothing about how text is built, only
+that it is not typed in.
+
+Thirteen strings moved. `CRS` and `fps` stayed, allowed by name with the
+reason: a projection row's heading and the F3 overlay's unit, written the same
+in both languages.
+
+One wording decision: the map's drawing badge said `{n} point/points`. Russian
+needs three plural forms for a count and the interface has no rule for
+choosing, so it counts in `тчк`, as the tracks list already does. The
+requirement says that outright — a count is worded so that it needs no plural.
+
+The stand got in the way and then helped. Its `get_simplified_preview`
+answered `{points, removed}` while the DTO is `{original_count,
+simplified_count, segments}`, so opening the dialog threw
+`Cannot read properties of undefined (reading 'map')` inside `MapView` and
+showed two empty numbers. A stub with the wrong shape is the same failure as a
+stub that returns `undefined`, wearing a hat. Fixed, and the dialog now reads
+«Было: 5 → станет: 3».
+
+| | |
+|---|---|
+| Change | `openspec/changes/the-menu-speaks-russian/` |
+| Automated gates | `just ci` green (334 Rust, 500 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — every toast speaks Russian
 
 Third time. The library rows' tooltips were English inside a Russian window;

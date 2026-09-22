@@ -190,7 +190,28 @@ const HANDLERS: Record<string, (args: Args) => unknown> = {
   get_track_export_default_path: () => null,
   get_wpt_export_default_path: () => null,
   get_waypoints_export_default_path: () => null,
-  get_simplified_preview: () => ({ points: [], removed: 0 }),
+  // The real shape, not an invented one. This answered `{points, removed}`
+  // while `SimplifiedPreviewDto` is `{original_count, simplified_count,
+  // segments}`, so opening the simplify dialog threw
+  // `Cannot read properties of undefined (reading 'map')` inside MapView and
+  // the dialog showed two empty numbers. A stub with the wrong shape is the
+  // same failure as a stub that returns `undefined`, wearing a hat.
+  get_simplified_preview: () => {
+    const segments = trackDetailFixture.segments.map((segment) => {
+      const kept = segment.points.filter((_, index) => index % 2 === 0);
+      return {
+        id: segment.id,
+        original_count: segment.points.length,
+        simplified_count: kept.length,
+        kept_points: kept,
+      };
+    });
+    return {
+      original_count: segments.reduce((n, s) => n + s.original_count, 0),
+      simplified_count: segments.reduce((n, s) => n + s.simplified_count, 0),
+      segments,
+    };
+  },
   // The stand has no tile store. A transparent 1×1 PNG stands in, so the map
   // shows the basemap instead of a wall of error toasts — cartographic
   // fidelity is out of scope here and says so in the README.

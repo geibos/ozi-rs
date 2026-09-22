@@ -24,6 +24,11 @@ const ALLOWED = new Set([
   // A mode group that is inert by construction; the label says so to a
   // reviewer, and the group is disabled and read by nobody.
   "Mode (inert placeholder)",
+  // Units and standard abbreviations, which are written the same in both
+  // languages. "CRS" heads the projection row of a map's properties; "fps"
+  // belongs to the F3 developer overlay.
+  "CRS",
+  "fps",
 ]);
 
 function svelteFiles(dir: string): string[] {
@@ -56,6 +61,33 @@ describe("no user-facing label is typed in", () => {
     expect(
       offenders,
       "translate these, or add them to ALLOWED with a reason",
+    ).toEqual([]);
+  });
+
+  /**
+   * Both rules above read attributes. Nothing read the words *between* the
+   * tags — which is where the actions menu on every track row lived, in
+   * English, including its destructive `Delete`, along with the simplify
+   * dialog and two empty states. Sixteen toasts had just been found the same
+   * way; a guard on one shape says nothing about another.
+   */
+  it("has no English written between the tags", () => {
+    const offenders: string[] = [];
+
+    for (const root of ROOTS) {
+      for (const file of svelteFiles(root)) {
+        for (const node of textNodes(markupOf(readFileSync(file, "utf-8")))) {
+          // Three letters in a row: enough for a word, short of `px` or `⌘K`.
+          if (!/[A-Za-z]{3,}/.test(node.text)) continue;
+          if (ALLOWED.has(node.text)) continue;
+          offenders.push(`${file}:${node.line} ${node.text.slice(0, 60)}`);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `These are read by a crew and are typed in:\n${offenders.join("\n")}`,
     ).toEqual([]);
   });
 
@@ -123,6 +155,37 @@ function withoutDictionaryCalls(expression: string): string {
       }
     }
     i = j + 1;
+  }
+  return out;
+}
+
+/**
+ * The markup of a component: what is between `</script>` and `<style>`.
+ *
+ * Comments and `{…}` expressions are blanked rather than removed, so line
+ * numbers still mean something, and `<style>` never enters — a CSS comment
+ * full of English is not a label.
+ */
+function markupOf(source: string): string {
+  const start = source.lastIndexOf("</script>");
+  const end = source.lastIndexOf("<style>");
+  const markup = source.slice(
+    start >= 0 ? start + "</script>".length : 0,
+    end > start ? end : undefined,
+  );
+  return markup
+    .replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, " "))
+    .replace(/\{(?:[^{}]|\{[^{}]*\})*\}/g, (e) => e.replace(/[^\n]/g, " "));
+}
+
+/** The text a crew would read, node by node. */
+function textNodes(markup: string): Array<{ text: string; line: number }> {
+  const out: Array<{ text: string; line: number }> = [];
+  for (const match of markup.matchAll(/>([^<>]+)</g)) {
+    const text = match[1].replace(/\s+/g, " ").trim();
+    if (text) {
+      out.push({ text, line: markup.slice(0, match.index).split("\n").length });
+    }
   }
   return out;
 }

@@ -1501,8 +1501,12 @@
     <div
       class="bg-primary/20 border-primary text-primary pointer-events-none absolute top-2 left-2 z-10 rounded-md border px-2 py-1 text-xs"
     >
-      Drawing track · {$drawingPointCount}
-      {$drawingPointCount === 1 ? "point" : "points"}
+      <!-- Abbreviated, as the tracks list is: a Russian count needs three
+           plural forms and "тчк" needs none. -->
+      {get(i18n)("map.drawingTrack").replace(
+        "{count}",
+        String($drawingPointCount),
+      )}
     </div>
   {/if}
 </div>

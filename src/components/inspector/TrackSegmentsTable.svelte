@@ -261,7 +261,7 @@
 
   {#if !$selectedTrack}
     <div class="text-muted-foreground p-3 text-center text-xs">
-      Select a track to see points
+      {$t("points.selectTrack")}
     </div>
   {:else if !trackDetail}
     <div class="text-muted-foreground p-3 text-center text-xs">
