@@ -10,6 +10,33 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — a bar with nothing to say
+
+The launch screen's status bar was a fixed 80px of four rows, three of them
+empty whenever nothing is downloading — which is whenever the application has
+just been launched. One of the empty rows was an outlined progress track with
+no fill, which reads as a broken widget, not as a reserved space.
+
+The reservation was deliberate: it stops the bar jumping when a download
+starts. But the jump it avoids happens once, at the moment the operator asked
+for a download, and the price was permanent dead space on the first screen a
+crew sees. A height transition buys the same calm for nothing.
+
+Measured on the stand across the whole life of a download: 32px idle; 80px the
+moment one starts, with the progress row already reserved so the bar does not
+resize twice in a second; 80px with «Скачано 2 из 4 файлов · 2/4 · 4.8 МиБ /
+19.1 МиБ» while it runs; 32px again when it ends.
+
+| | |
+|---|---|
+| Before | [eighty pixels, three rows empty](2026-09-22-status-bar/before-eighty-pixels.png) |
+| After | [one line](2026-09-22-status-bar/after-one-line.png) |
+| Change | `openspec/changes/a-bar-with-nothing-to-say/` |
+| Automated gates | `just ci` green (334 Rust, 500 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — the stand cannot lie about shape
 
 The stand's README has always said that a command with no answer throws loudly,

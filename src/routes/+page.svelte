@@ -30,6 +30,11 @@
 
   let transientStatus = $state<string | null>(null);
 
+  /** Whether there is a download for the bar to report on. */
+  const downloadOnScreen = $derived(
+    $activeDownloadId !== null || $bundleProgress !== null || $bundleBusy,
+  );
+
   $effect(() => {
     const s = $appState;
     if (!s) return;
@@ -121,7 +126,17 @@
 <div class="root">
   <BundleLoader />
 
-  <div class="status-bar" class:busy={$busy}>
+  <!--
+    The bar is one line until there is a download to report.
+
+    It used to reserve all four rows always — 80px of the launch screen, three
+    of them empty, including an outlined progress track that reads as a broken
+    widget. Reserving the space avoids a jump when a download starts; paying
+    for that with permanent dead space on the first screen a crew sees is the
+    worse half of the trade, and a height transition makes the growth read as
+    the panel opening rather than as a jump.
+  -->
+  <div class="status-bar" class:busy={$busy} class:reporting={downloadOnScreen}>
     <div class="status-line-slot">
       {#if $busy || transientStatus}
         <span class="spinner"></span>
@@ -147,7 +162,9 @@
         <div class="bundle-track">
           <div class="bundle-fill" style={`width: ${bundlePercent}%`}></div>
         </div>
-      {:else}
+      {:else if downloadOnScreen}
+        <!-- A download with nothing to report yet keeps its row, so the bar
+             does not resize again a moment later. -->
         <div class="bundle-track bundle-track-placeholder"></div>
       {/if}
     </div>
@@ -190,7 +207,9 @@
 
   .status-bar {
     flex-shrink: 0;
-    height: var(--bundle-status-bar-height);
+    /* One line by default; the other three rows arrive with a download. */
+    height: 32px;
+    transition: height 0.18s ease;
     display: grid;
     /* minmax(0, …): a bare 1fr track's min-size is `auto`, so a long
        nowrap status line ("Imported …") used to push the grid wider than
@@ -201,7 +220,7 @@
       "current-file  actions"
       "progress      actions"
       "meta          actions";
-    grid-template-rows: 20px 16px 12px 16px;
+    grid-template-rows: 20px 0 0 0;
     column-gap: 8px;
     padding: 6px 10px;
     font-size: 11px;
@@ -209,6 +228,11 @@
     background: hsl(var(--card));
     border-top: 1px solid hsl(var(--secondary));
     overflow: hidden;
+  }
+
+  .status-bar.reporting {
+    height: var(--bundle-status-bar-height);
+    grid-template-rows: 20px 16px 12px 16px;
   }
 
   .status-line-slot {

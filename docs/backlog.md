@@ -97,11 +97,10 @@ decision.
   another keeps adding to the same project, and the session restore brings it
   back on relaunch. Whether that is wrong depends on whether a "project" is a
   search or a machine's working set — an owner question, not a code one.
-- **The launch screen's status bar reserves 80px for a download that is not
-  running.** Four grid rows, three of them empty, including an outlined
-  progress track that reads as a broken widget. The reservation avoids a jump
-  when a download starts; permanent dead space on the first screen is the
-  worse half of that trade.
+- ~~The launch screen's status bar reserves 80px for a download that is not
+  running.~~ Done on 2026-09-22 in `a-bar-with-nothing-to-say`: one line until
+  there is something to report, four rows while a download runs, with a height
+  transition so the growth reads as opening rather than as a jump.
 
 - ~~The stand's answers are not typed against the bindings.~~ Done on
   2026-09-22 in `the-stand-cannot-lie-about-shape`, after two wrong shapes in
