@@ -10,6 +10,185 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — verification, and fifty-five changes archived
+
+![the map-ready announcement](2026-09-22-verification/map-ready-announcement.png)
+
+Fifty-seven OpenSpec changes had piled up unarchived, which had stopped being a
+bookkeeping problem: `openspec validate --strict` checks a change's shape, not
+whether it agrees with the baseline, so the baseline could — and did — say the
+opposite of both the code and an agreed change. Fifty-five are archived now.
+
+**Forty-three were waiting on one thing.** Each carried an unchecked
+"`just smoke` green (blocked: the Mac2 driver …)". The gate runs again, so the
+box is ticked with the date and the note that the bundle was built the same
+hour. It is worth being plain about what that gate covers: CJ-4's editing
+spine, and nothing else.
+
+**Four were closed by looking.** These had been recorded honestly as
+unverified, and the honest thing was to go and verify them rather than leave
+them open forever.
+
+- `how-far-is-that` said the three on-map tools' rendered pixels were unknown,
+  because reading the canvas back gives an empty buffer without
+  `preserveDrawingBuffer` — "the zero I got means nothing either way". A page
+  screenshot is a compositor capture, not a canvas readback, so it shows what
+  is actually there. All three, on the stand: the measured line through three
+  clicked points reading «398 м», the radius ring about its centre reading
+  «165 м», and a waypoint placed 250 m at 45°.
+- `open-before-the-bundle-finishes` needed a real bundle download to see its
+  announcement. The stand replays the event sequence the backend emits, and
+  4.3 s into it the screen says «2026-07-08_Lavrovo_Topo_EEKO_z16.sqlitedb
+  готова / Можно открывать — остальное докачается само.» while the 185 MiB
+  satellite layer is still pending. That proves the screen given those events;
+  that the backend emits them when a file lands is the change's Rust test.
+- `a-refused-edit-says-so` and `one-rule-for-overlapping-reloads` each carried
+  a note that `MapView` cannot be mounted by vitest, so their call sites were
+  uncovered. One is now pinned by a wiring guard — every one of the map's
+  three overlapping-reload sites takes its token before the asynchronous
+  boundary and checks it before writing, read by index so reordering fails.
+  The other was seen failing correctly on screen, which is the next paragraph.
+
+### Two things the verification found on its own
+
+**The same `endsWith` defect, on the frontend.** The review had found it in
+Rust: a landed bundle file matched its map package by whether the whole path
+ends with the package name, so `bigmap.ozf2` claimed `map.ozf2`.
+`src/lib/ready-maps.ts` does the same job for the "map is ready" announcement
+and had the same bug — missed because the review read only the Rust. It
+compares the last path component now, with the collision as a test.
+
+**The stand could not walk one of its own features.** Placing a waypoint by
+bearing ended in a failure toast every time, because the stand had no answer
+for `add_waypoint`. It failed loudly, which is the stand working exactly as
+designed — and that failure is also the clearest evidence yet for
+`a-refused-edit-says-so`: the refusal reached the operator in Russian, carrying
+the backend's own message, on one of the ten call sites that no test drives.
+The answer is in the stand now, and the tool works end to end.
+
+### And one in the specs
+
+`codify-architecture-decisions` codified the partial-download naming as
+"extension is replaced by `.part` (`b.ozf2` → `b.part`)" — the precise
+data-loss defect fixed hours earlier the same day. Had it been archived
+unread, the baseline would carry the bug as a requirement. Corrected before
+the batch ran. This is the case the backlog warned about, and no gate catches
+it: `--strict` reads shape, not meaning.
+
+Two changes are left. `codify-architecture-decisions` waits on the owner
+reading 63 requirements; `revive-ui-cycle` is the ongoing rebuild.
+
+---
+
+## 2026-09-22 — what the review found
+
+No screenshots: nothing here changes what a screen looks like. What changed is
+what the application does when something goes wrong, which is the part no
+screenshot has ever shown.
+
+An external reviewer (`gpt-6-astra`, three slices, reports in
+`docs/reviews/2026-09-22/`) read the two-day autonomous run and the project as
+a whole. It could not run anything — no browser, no desktop — so every finding
+is static, and each report says so. Sixteen survived a reading of the code.
+Each fix here was written test-first, and several of the tests were checked
+red against the old behaviour before the fix went in.
+
+**The one that mattered.** Partial downloads were named with
+`Path::with_extension("part")`, which _replaces_ an extension rather than
+appending to it. A bundle holding `sheet.map` and `sheet.ozf2` — the normal
+shape of an OZI map — therefore wrote both partial files to `sheet.part`. Two
+files of one bundle download in parallel, so they interleaved their bytes into
+one file and both landed corrupt. Four tests covered partial paths. All four
+computed `with_extension("part")` themselves and compared it to what the code
+produced, so all four passed on a wrong answer. They assert against
+`partial_path` now, which is the only reason the two new cases could be
+written at all.
+
+**Things that quietly lied to the operator.**
+
+- A failed read of a layer's marks returned an empty array, which the marker
+  reconciler could not tell from "this layer has no marks" — so a read failure
+  removed the ШТАБ from the map and said nothing. It is `null` now, meaning
+  unknown, and an unknown layer keeps what it has.
+- "Показать всё" collected its marks by walking the MapLibre markers that
+  happened to be on the map. Those are placed by an asynchronous reconciler, so
+  a click that landed before it finished framed the tracks and left the marks
+  off-screen — on the one action whose whole job is to show everything. It
+  frames the layer data now (`focusPositions`, with its own tests).
+- A finished catalogue walk wrote "Loaded 412 projects" over the only line
+  saying how far a running download had got. The walk has the diagnostics log;
+  the status bar belongs to what the crew is waiting on.
+- A file that finished downloading matched its map package with
+  `package_name.ends_with(&map.file_name)`, so `bigmap.ozf2` marked `map.ozf2`
+  available and the crew opened a layer they had not downloaded.
+- Applying the active map set `appliedMapPath` _before_ awaiting the OZI
+  metadata. A read that failed therefore counted as applied and blocked every
+  retry of that map for the rest of the session, and a map switched during the
+  read raced two applies over the same source. It takes a run token now, and
+  the path is recorded only once the read has succeeded.
+
+**Things that took the operator's history.**
+
+- `apply_or_merge` cleared the redo stack before applying, so a command the
+  backend refused destroyed redo the operator still had: the edit did not
+  happen and the history changed anyway.
+- Coalescing merged on one question — do these two commands touch the same
+  entity. The frontend sends one command per completed drag, so dragging a
+  point, letting go, looking at it and dragging it again was a _single_ undo
+  step, and Ctrl+Z went back past a correction already accepted. Merging is
+  scoped to a gesture now; `apply` never merges, and a caller has to say that
+  two commands are one action.
+
+**Two broken promises.** CJ-2 promises a cold launch in a field camp makes zero
+network requests. The map added an OpenStreetMap raster source unconditionally
+and the launch sequence always started the catalogue walk. Offline both merely
+fail — slowly, and on a phone hotspot they spend the crew's data on a basemap
+nobody can see under the local raster. Neither runs now when the machine
+reports no link at all (`mayReachNetwork`, deliberately one-sided: only a
+definite `false` stops anything). Everything the operator asks for — the
+refresh button, a download — runs regardless, because they can see the link
+better than `navigator` can.
+
+**And a correction to our own security paperwork.** The MapLibre waiver said
+the advisory was "fixed in 6.10.0 only". The advisory covers `<=6.4.0`, so
+6.4.1 is the first release without it; `npm audit` names 6.10.0 because that is
+the latest fix, not the earliest. It also called 4.7.x "pinned" when
+`package.json` asks for `^4` and the pin is in the lockfile. The conclusion
+survives — no 4.x or 5.x carries the fix — but a waiver that states its facts
+wrongly is not a waiver anyone should trust. The guard enforcing its premise
+also missed `attribution`, which is what the advisory is actually about; it
+covers it now, verified by putting a computed attribution in and watching it
+fail.
+
+**Four of the sixteen were ours**, introduced by the run the review was asked
+to check: the GPX colour pass colouring tracks outside `<trk>`, a
+`decodeURIComponent` outside its `try`, the catalogue's written-at timestamp,
+and the plural in the drawing toggle.
+
+### The smoke gate, and what it cost
+
+`just smoke` ran again for the first time since the owner granted the
+Accessibility permission. It took three attempts, and the first two failed on
+_wording_:
+
+1. The drawing toggle's label had been reworded earlier in the run to fix the
+   Russian plural ("Завершить трек (1 точек)" reads as a bug). The smoke waits
+   on that label literally. 33 seconds of polling to find out.
+2. Then the map canvas selector — the one label in the file never made
+   bilingual, while its own header comment explains that everything else is.
+   The app opens in Russian, so all three map clicks missed.
+
+Both are the same defect: a Rust test file and a translation dictionary are a
+contract with nothing holding them together.
+`src/test/smoke-label-contract.test.ts` is that contract, checked in a second
+instead of after a build and a launch, in both languages, and verified red by
+putting the old wording back.
+
+The third run passed, end to end: 352 Rust tests, 527 frontend tests, and the
+packaged application drawing three points and cancelling them over real IPC.
+
+---
+
 ## 2026-09-22 — which line is ЛИСА15
 
 A day's recordings draw in twelve colours now, and the map carries no names —
@@ -32,7 +211,7 @@ $effect(() => {
 });
 ```
 
-An effect is subscribed to what it *actually reads*. That first run returns
+An effect is subscribed to what it _actually reads_. That first run returns
 before reaching `$selectedTrack`, so the effect ends up subscribed to nothing
 and never runs again. The row lit up; the map did not. Reading the selection
 before the guard fixes it.
@@ -50,12 +229,12 @@ code deliberately and then undid it with `git checkout <file>`, which reverted
 the file to HEAD and threw away everything else I had written in it that
 iteration. A copy in the scratchpad next time.
 
-| | |
-|---|---|
-| After | [the selected route, cased](2026-09-22-highlight/after-selected-route.png) |
-| Change | `openspec/changes/which-line-is-lisa15/` |
-| Automated gates | `just ci` green (338 Rust, 508 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                            |
+| ---------------------- | -------------------------------------------------------------------------- |
+| After                  | [the selected route, cased](2026-09-22-highlight/after-selected-route.png) |
+| Change                 | `openspec/changes/which-line-is-lisa15/`                                   |
+| Automated gates        | `just ci` green (338 Rust, 508 frontend)                                   |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                 |
 
 ---
 
@@ -85,12 +264,12 @@ layer only when the style has glyphs, and the basemap here is raster, so its
 own labels are baked into the tiles. That is the offline-glyphs item, and the
 backlog now carries what it would cost rather than just its name.
 
-| | |
-|---|---|
-| Looked at | [twelve routes over the basemap](2026-09-22-day-on-map/twelve-routes.png) |
-| Change | `openspec/changes/a-day-on-the-map/` |
-| Automated gates | `just ci` green (338 Rust, 500 frontend) |
-| Customer-journey smoke | not applicable — no product code changed |
+|                        |                                                                           |
+| ---------------------- | ------------------------------------------------------------------------- |
+| Looked at              | [twelve routes over the basemap](2026-09-22-day-on-map/twelve-routes.png) |
+| Change                 | `openspec/changes/a-day-on-the-map/`                                      |
+| Automated gates        | `just ci` green (338 Rust, 500 frontend)                                  |
+| Customer-journey smoke | not applicable — no product code changed                                  |
 
 ---
 
@@ -125,13 +304,13 @@ Two decisions worth stating:
 The stand got the same palette, because a stand that drew them all one colour
 would hide exactly the thing the palette exists to show.
 
-| | |
-|---|---|
-| Before | [a column of identical dots](2026-09-22-track-colours/before-one-colour.png) |
-| After | [a colour each](2026-09-22-track-colours/after-a-colour-each.png) |
-| Change | `openspec/changes/a-colour-for-every-crew/` |
-| Automated gates | `just ci` green (338 Rust, 500 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| Before                 | [a column of identical dots](2026-09-22-track-colours/before-one-colour.png) |
+| After                  | [a colour each](2026-09-22-track-colours/after-a-colour-each.png)            |
+| Change                 | `openspec/changes/a-colour-for-every-crew/`                                  |
+| Automated gates        | `just ci` green (338 Rust, 500 frontend)                                     |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                   |
 
 ---
 
@@ -152,13 +331,13 @@ moment one starts, with the progress row already reserved so the bar does not
 resize twice in a second; 80px with «Скачано 2 из 4 файлов · 2/4 · 4.8 МиБ /
 19.1 МиБ» while it runs; 32px again when it ends.
 
-| | |
-|---|---|
-| Before | [eighty pixels, three rows empty](2026-09-22-status-bar/before-eighty-pixels.png) |
-| After | [one line](2026-09-22-status-bar/after-one-line.png) |
-| Change | `openspec/changes/a-bar-with-nothing-to-say/` |
-| Automated gates | `just ci` green (334 Rust, 500 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| Before                 | [eighty pixels, three rows empty](2026-09-22-status-bar/before-eighty-pixels.png) |
+| After                  | [one line](2026-09-22-status-bar/after-one-line.png)                              |
+| Change                 | `openspec/changes/a-bar-with-nothing-to-say/`                                     |
+| Automated gates        | `just ci` green (334 Rust, 500 frontend)                                          |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                        |
 
 ---
 
@@ -167,7 +346,7 @@ resize twice in a second; 80px with «Скачано 2 из 4 файлов · 2/
 The stand's README has always said that a command with no answer throws loudly,
 "because a screen that renders because a mock quietly returned `undefined` is
 the failure this whole exercise exists to stop". A mock that answers with the
-*wrong shape* is that same failure wearing a hat, and it happened twice in two
+_wrong shape_ is that same failure wearing a hat, and it happened twice in two
 days: `export_all_tracks_gpx` answered "accepted" where the caller reads two
 counts, and `get_simplified_preview` answered `{points, removed}` where the DTO
 is `{original_count, simplified_count, segments}` — which threw inside
@@ -190,11 +369,11 @@ rather than a blank column. The previewed project was being rebuilt as a slug
 in an otherwise empty object, which the app would have read as a project with
 no maps.
 
-| | |
-|---|---|
-| Change | `openspec/changes/the-stand-cannot-lie-about-shape/` |
-| Automated gates | `just ci` green (334 Rust, 500 frontend) |
-| Customer-journey smoke | not applicable — no product code changed |
+|                        |                                                      |
+| ---------------------- | ---------------------------------------------------- |
+| Change                 | `openspec/changes/the-stand-cannot-lie-about-shape/` |
+| Automated gates        | `just ci` green (334 Rust, 500 frontend)             |
+| Customer-journey smoke | not applicable — no product code changed             |
 
 ---
 
@@ -202,7 +381,7 @@ no maps.
 
 The guard written yesterday reads `aria-label`, `title` and `placeholder`. The
 one written an hour ago reads a notification's message. Neither reads the words
-*between* the tags — and that is where the actions menu on every track row was
+_between_ the tags — and that is where the actions menu on every track row was
 living, in English, including its destructive `Delete`, along with the whole
 simplify dialog and two empty states.
 
@@ -229,10 +408,10 @@ showed two empty numbers. A stub with the wrong shape is the same failure as a
 stub that returns `undefined`, wearing a hat. Fixed, and the dialog now reads
 «Было: 5 → станет: 3».
 
-| | |
-|---|---|
-| Change | `openspec/changes/the-menu-speaks-russian/` |
-| Automated gates | `just ci` green (334 Rust, 500 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/the-menu-speaks-russian/`                |
+| Automated gates        | `just ci` green (334 Rust, 500 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -272,10 +451,10 @@ stripped first.
 Checked on the stand: «Переместить на карте» now says «Нажмите на карту, чтобы
 перенести точку» with «Точку можно и перетащить на карте» beneath it.
 
-| | |
-|---|---|
-| Change | `openspec/changes/every-toast-speaks-russian/` |
-| Automated gates | `just ci` green (334 Rust, 499 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/every-toast-speaks-russian/`             |
+| Automated gates        | `just ci` green (334 Rust, 499 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -312,10 +491,10 @@ Measured on the stand in the caveat branch, which is the one worth seeing. The
 clean branch builds the same summary string and differs only in which toast it
 calls.
 
-| | |
-|---|---|
-| Change | `openspec/changes/the-import-speaks-russian/` |
-| Automated gates | `just ci` green (334 Rust, 494 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/the-import-speaks-russian/`              |
+| Automated gates        | `just ci` green (334 Rust, 494 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -352,11 +531,11 @@ is exactly the shape of gap that hid the lost GPX colour. It passes as written
 feet, a timestamp and the absence of one, colour and width. The behaviour was
 already right; what was missing was saying so.
 
-| | |
-|---|---|
-| Changes | `openspec/changes/the-days-marks-go-with-it/`, `openspec/changes/plt-comes-back-the-same/` |
-| Automated gates | `just ci` green (332 Rust, 493 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| Changes                | `openspec/changes/the-days-marks-go-with-it/`, `openspec/changes/plt-comes-back-the-same/` |
+| Automated gates        | `just ci` green (332 Rust, 493 frontend)                                                   |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                                 |
 
 ---
 
@@ -390,18 +569,18 @@ Three decisions that are not obvious from the diff:
   between the two costs the colour, never the import.
 
 And one property worth being honest about rather than quiet: GPX names its
-colours, so what survives is the *nearest* name. A custom shade comes back as
+colours, so what survives is the _nearest_ name. A custom shade comes back as
 the nearest GPX colour, and there is a test saying so.
 
 `xml-rs` moves from a transitive dependency to a direct one — one line in the
 lockfile, nothing downloaded, `cargo audit` unchanged at its twelve
 pre-existing allowed warnings.
 
-| | |
-|---|---|
-| Change | `openspec/changes/the-colour-comes-back/` |
-| Automated gates | `just ci` green (329 Rust, 493 frontend), `cargo audit` unchanged |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                   |
+| ---------------------- | ----------------------------------------------------------------- |
+| Change                 | `openspec/changes/the-colour-comes-back/`                         |
+| Automated gates        | `just ci` green (329 Rust, 493 frontend), `cargo audit` unchanged |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode        |
 
 ---
 
@@ -431,12 +610,12 @@ Also the smaller half of a backlog item: this is what a decision to stop
 walking the catalogue at every launch would have to stand on. Nobody can be
 asked to trust a list whose age is invisible.
 
-| | |
-|---|---|
-| After | [the list's date beside the count](2026-09-22-list-age/after-list-age.png) |
-| Change | `openspec/changes/how-old-is-this-list/` |
-| Automated gates | `just ci` green (324 Rust, 493 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                            |
+| ---------------------- | -------------------------------------------------------------------------- |
+| After                  | [the list's date beside the count](2026-09-22-list-age/after-list-age.png) |
+| Change                 | `openspec/changes/how-old-is-this-list/`                                   |
+| Automated gates        | `just ci` green (324 Rust, 493 frontend)                                   |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                 |
 
 ---
 
@@ -463,20 +642,20 @@ because both hung off the same `!busy`.
 
 Driven on the stand through both flags:
 
-| State | Refresh | Download |
-|---|---|---|
-| Walking the catalogue | disabled | offered |
-| Downloading a bundle | free | disabled, "открывается другой бандл" |
-| Idle | free | offered |
+| State                 | Refresh  | Download                             |
+| --------------------- | -------- | ------------------------------------ |
+| Walking the catalogue | disabled | offered                              |
+| Downloading a bundle  | free     | disabled, "открывается другой бандл" |
+| Idle                  | free     | offered                              |
 
 That last cell is why looking is worth it. The disabled button still read
 «Подождите — список проектов ещё грузится» — the old reason, now the only one
 it cannot mean. The tests were green; the screen was wrong.
 
-| | |
-|---|---|
-| Change | `openspec/changes/one-wait-does-not-block-the-other/` |
-| Automated gates | `just ci` green (324 Rust, 488 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/one-wait-does-not-block-the-other/`      |
+| Automated gates        | `just ci` green (324 Rust, 488 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -507,13 +686,13 @@ catalogue already had a better word for itself, and the Maps tab now says
 Third surface, so the dialog, the remembering, the framing and the dropping of
 a stale path moved into one `openProjectFile` action rather than a third copy.
 
-| | |
-|---|---|
-| Before | [no way back to a project](2026-09-22-first-screen/before-no-way-back.png) |
-| After | [the recents where they are needed](2026-09-22-first-screen/after-recent-projects.png) |
-| Change | `openspec/changes/yesterdays-work-on-the-first-screen/` |
-| Automated gates | `just ci` green (320 Rust, 488 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| Before                 | [no way back to a project](2026-09-22-first-screen/before-no-way-back.png)             |
+| After                  | [the recents where they are needed](2026-09-22-first-screen/after-recent-projects.png) |
+| Change                 | `openspec/changes/yesterdays-work-on-the-first-screen/`                                |
+| Automated gates        | `just ci` green (320 Rust, 488 frontend)                                               |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                             |
 
 ---
 
@@ -546,12 +725,12 @@ a building.
 Measured on the stand: the scale bar went 50 m → 500 m and both track segments
 and the waypoint markers came on screen.
 
-| | |
-|---|---|
-| After | [framed on the data](2026-09-22-framing/after-framed-on-the-data.png) |
-| Change | `openspec/changes/open-a-project-and-see-it/` |
-| Automated gates | `just ci` green (320 Rust, 483 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                       |
+| ---------------------- | --------------------------------------------------------------------- |
+| After                  | [framed on the data](2026-09-22-framing/after-framed-on-the-data.png) |
+| Change                 | `openspec/changes/open-a-project-and-see-it/`                         |
+| Automated gates        | `just ci` green (320 Rust, 483 frontend)                              |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode            |
 
 ---
 
@@ -582,19 +761,19 @@ threshold that fixes that is a decision about the data rather than about the
 chart. It is in the backlog next to the moving-time threshold, which is the
 same question asked about time.
 
-| | |
-|---|---|
-| After | [the card with a profile](2026-09-22-elevation/after-elevation-card.png) |
-| Change | `openspec/changes/what-the-ground-does/` |
-| Automated gates | `just ci` green (320 Rust, 471 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                          |
+| ---------------------- | ------------------------------------------------------------------------ |
+| After                  | [the card with a profile](2026-09-22-elevation/after-elevation-card.png) |
+| Change                 | `openspec/changes/what-the-ground-does/`                                 |
+| Automated gates        | `just ci` green (320 Rust, 471 frontend)                                 |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode               |
 
 ---
 
 ## 2026-09-22 — the button that was not there
 
 Selecting a track opens the inspector. Opening the inspector put Save, Undo,
-Redo and the ⌘K trigger underneath it — not crowded, *unreachable*. At 1024×640
+Redo and the ⌘K trigger underneath it — not crowded, _unreachable_. At 1024×640
 with a track selected, `document.elementFromPoint` at the centre of each of
 those four returned `HEADER.rail-header`. A click on Save went to the inspector.
 
@@ -618,13 +797,13 @@ the window.
 
 Measured on the stand with a track selected:
 
-| Window | Bar | Overflow past the column | Unreachable actions |
-|---|---|---|---|
-| 880 | 240px | 0px | none |
-| 1024 | 384px | 0px | none |
-| 1280 | 640px | 0px | none |
-| 1300 | 660px | 0px | none |
-| 1440 | 800px | 0px | none |
+| Window | Bar   | Overflow past the column | Unreachable actions |
+| ------ | ----- | ------------------------ | ------------------- |
+| 880    | 240px | 0px                      | none                |
+| 1024   | 384px | 0px                      | none                |
+| 1280   | 640px | 0px                      | none                |
+| 1300   | 660px | 0px                      | none                |
+| 1440   | 800px | 0px                      | none                |
 
 One thing I nearly left in: the first version also hid the "Сохранено" readout
 on a narrow bar, and that rule silently did nothing — `.dirty-indicator`
@@ -632,13 +811,13 @@ declares its own `display` later in the same stylesheet, at equal specificity.
 A rule that does not apply is worse than no rule, so it is gone; the readout
 ellipsizes on its own, and "is my work saved" earns its 57 pixels.
 
-| | |
-|---|---|
-| Before | [inspector over the toolbar](2026-09-22-toolbar/before-inspector-covers-toolbar.png) |
-| After | [the bar inside its column](2026-09-22-toolbar/after-toolbar-fits.png) |
-| Change | `openspec/changes/the-toolbar-stays-clickable/` |
-| Automated gates | `just ci` green (320 Rust, 462 frontend) |
-| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+|                        |                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| Before                 | [inspector over the toolbar](2026-09-22-toolbar/before-inspector-covers-toolbar.png) |
+| After                  | [the bar inside its column](2026-09-22-toolbar/after-toolbar-fits.png)               |
+| Change                 | `openspec/changes/the-toolbar-stays-clickable/`                                      |
+| Automated gates        | `just ci` green (320 Rust, 462 frontend)                                             |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode                           |
 
 ---
 
@@ -671,10 +850,10 @@ panel never appeared — both had sampled after the script had already finished,
 which is worth writing down: a one-shot check of a transient panel proves
 nothing about whether it was there.
 
-| | |
-|---|---|
-| Change | `openspec/changes/one-way-to-start-a-map/` |
-| Automated gates | `just ci` green (320 Rust, 458 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/one-way-to-start-a-map/`                 |
+| Automated gates        | `just ci` green (320 Rust, 458 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -701,22 +880,22 @@ per debounced keystroke.
 
 Checked on the stand against the fixtures the Rust core writes:
 
-| Typed | Listed | Count |
-|---|---|---|
+| Typed      | Listed                | Count  |
+| ---------- | --------------------- | ------ |
 | `Шувалово` | 2026 09 20 Schuvalovo | 1 из 3 |
-| `Лаврово` | 2026 07 08 Lavrovo | 1 из 3 |
-| `Мурманск` | — | 0 из 3 |
-| `Sagra` | 2026 07 14 Sagra | 1 из 3 |
+| `Лаврово`  | 2026 07 08 Lavrovo    | 1 из 3 |
+| `Мурманск` | —                     | 0 из 3 |
+| `Sagra`    | 2026 07 14 Sagra      | 1 из 3 |
 
 The palette had it too. Its project search is the second way into the catalogue
 and matched just as literally, so the two ways in would have disagreed about
 what the catalogue contains. Same helper, same answer, and it still stops at a
 screenful rather than filtering thirteen thousand rows into `cmdk`.
 
-| | |
-|---|---|
-| Change | `openspec/changes/search-in-the-crews-language/` |
-| Automated gates | `just ci` green (320 Rust, 454 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/search-in-the-crews-language/`           |
+| Automated gates        | `just ci` green (320 Rust, 454 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -732,7 +911,7 @@ the toast wins every time. Hidden: the panel's title, its Cancel button, and the
 files/bytes counters.
 
 The pairing is not a coincidence. A toast during a bundle download is almost
-always *about* the download — a file that failed its retries, a preview that
+always _about_ the download — a file that failed its retries, a preview that
 could not be read. So the operator learns one file failed and simultaneously
 loses sight of how far the rest got, which is the number that decides whether
 to keep waiting on a tethered phone.
@@ -748,14 +927,14 @@ returns to 0 and the toast drops back to its usual 534..608.
 
 One thing the tests would not have caught and the measurement did: a panel
 measured mid-mount can report a height of a few px, which would have put a toast
-*closer* to the edge than normal. The offset is clamped to sonner's own edge
+_closer_ to the edge than normal. The offset is clamped to sonner's own edge
 offset, and the test for that failed before the clamp existed.
 
-| | |
-|---|---|
-| Change | `openspec/changes/progress-stays-readable/` |
-| Measured | on the stand, before and after, geometry above |
-| Automated gates | `just ci` green (320 Rust, 439 frontend) |
+|                        |                                                            |
+| ---------------------- | ---------------------------------------------------------- |
+| Change                 | `openspec/changes/progress-stays-readable/`                |
+| Measured               | on the stand, before and after, geometry above             |
+| Automated gates        | `just ci` green (320 Rust, 439 frontend)                   |
 | Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
 
 ---
@@ -789,10 +968,10 @@ safety and the route really is two majors. The waiver in
 `scripts/npm-audit-gate.mjs` now carries that, dated, with the command that
 produced it.
 
-| | |
-|---|---|
-| Evidence | the premise re-checked against the code; the guard, verified red |
-| Evidence | `npm audit --json`: `range <=6.4.0`, `fixAvailable 6.10.0`, `isSemVerMajor` |
+|                 |                                                                                 |
+| --------------- | ------------------------------------------------------------------------------- |
+| Evidence        | the premise re-checked against the code; the guard, verified red                |
+| Evidence        | `npm audit --json`: `range <=6.4.0`, `fixAvailable 6.10.0`, `isSemVerMajor`     |
 | Automated gates | `just ci` green (320 Rust, 431 frontend); the audit gate passes with one waiver |
 
 ---
@@ -827,12 +1006,12 @@ scoped to `$state(null)`: an array narrows to `never[]`, which is assignable to
 anything and harmless, and a guard that flagged those would be one somebody
 turns off.
 
-| | |
-|---|---|
-| Evidence | walked on the stand — nothing selected, then "1 из 5", "3 из 5", back to "2 из 5", crossing the segment boundary |
-| Evidence | the guard, verified red by putting one declaration back |
-| Automated gates | `just ci` green (320 Rust, 430 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Evidence               | walked on the stand — nothing selected, then "1 из 5", "3 из 5", back to "2 из 5", crossing the segment boundary |
+| Evidence               | the guard, verified red by putting one declaration back                                                          |
+| Automated gates        | `just ci` green (320 Rust, 430 frontend)                                                                         |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                     |
 
 ---
 
@@ -844,7 +1023,7 @@ time exist, and neither is the gesture a crew actually has.
 The commonest edit to a recording is that the first twenty minutes of it are
 the drive to the start. Cropping by time does that — if they work out what time
 the walking began. Cropping by extent does it — if the drive happens to fall
-outside a rectangle they can draw. What they *have* is the point: they can see
+outside a rectangle they can draw. What they _have_ is the point: they can see
 where the track stops being a road and starts being a search, on the map and in
 the points table.
 
@@ -855,7 +1034,7 @@ checks.
 
 No new command in the core. `CropTrackPoints` already takes the exact points to
 remove and restores them to their places on undo; what was missing was a caller
-that knows *order*, which a per-point predicate cannot. The plumbing takes an
+that knows _order_, which a per-point predicate cannot. The plumbing takes an
 `FnMut` now and the rule walks the track flipping once it reaches the point.
 
 Two trims compose into a crop by selection — cut before the start, cut after
@@ -865,11 +1044,11 @@ useful alone.
 A trim at the first or last point removes nothing, says so, and records no undo
 step. An edit that changes nothing should not be something to undo.
 
-| | |
-|---|---|
-| Evidence | Rust tests: both directions, the point survives, one undo restores all five, and a trim at an end leaves the mutation count untouched |
-| Automated gates | `just ci` green (320 Rust, 429 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | Rust tests: both directions, the point survives, one undo restores all five, and a trim at an end leaves the mutation count untouched |
+| Automated gates        | `just ci` green (320 Rust, 429 frontend)                                                                                              |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                                          |
 
 ---
 
@@ -899,12 +1078,12 @@ created, for a project the catalogue has not walked yet. That says so and names
 the slug, because it is not an error and "nothing happened" would be the wrong
 thing to show.
 
-| | |
-|---|---|
-| Evidence | six tests on the parsing, including the lookalike host and the catalogue root |
-| Evidence | walked on the stand — a pasted link previews that slug and leaves "2026 09 20 Schuvalovo" in the box; an unlisted one shows the message and previews nothing |
-| Automated gates | `just ci` green (318 Rust, 429 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Evidence               | six tests on the parsing, including the lookalike host and the catalogue root                                                                                |
+| Evidence               | walked on the stand — a pasted link previews that slug and leaves "2026 09 20 Schuvalovo" in the box; an unlisted one shows the message and previews nothing |
+| Automated gates        | `just ci` green (318 Rust, 429 frontend)                                                                                                                     |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                                                                 |
 
 ---
 
@@ -915,7 +1094,7 @@ is the measurement a search crew takes constantly — how far is that from the
 task point, how wide is this clearing, how long is the leg we are about to walk
 — and without it they measure by eye or open another program.
 
-I had it filed as blocked on *where it goes*, because `ui-shell` requires the
+I had it filed as blocked on _where it goes_, because `ui-shell` requires the
 four mode chips above the canvas to stay inert scaffolding. That was a
 misreading of my own note: `product-scope` names the command palette as a place
 a workspace action may live, and it is where the other verbs already are. The
@@ -992,15 +1171,15 @@ Found beside it: the default name for a waypoint placed by clicking was
 `Waypoint N`. English, in the app's own Russian window, on a path I had walked
 past twice.
 
-| | |
-|---|---|
-| Evidence | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", clicks on the canvas make it "101 м" and then "146 м", Esc takes it away |
-| Evidence | the ring on the stand: "Клик — центр", then "Клик — радиус", then "52 м" |
-| Evidence | the projection on the stand: the hint, then the fields, then 240° and 1200 m placing "Точка 4" at the computed coordinates |
-| Evidence | tests on the distance, the formatting, the tape's GeoJSON and what counts as an editable target |
-| Not verified | the tape's rendered pixels — see above |
-| Automated gates | `just ci` green (318 Rust, 423 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | walked on the stand end to end — the palette turns it on, the readout reads "0 м · Клик — мерить · Esc — закончить", clicks on the canvas make it "101 м" and then "146 м", Esc takes it away |
+| Evidence               | the ring on the stand: "Клик — центр", then "Клик — радиус", then "52 м"                                                                                                                      |
+| Evidence               | the projection on the stand: the hint, then the fields, then 240° and 1200 m placing "Точка 4" at the computed coordinates                                                                    |
+| Evidence               | tests on the distance, the formatting, the tape's GeoJSON and what counts as an editable target                                                                                               |
+| Not verified           | the tape's rendered pixels — see above                                                                                                                                                        |
+| Automated gates        | `just ci` green (318 Rust, 423 frontend)                                                                                                                                                      |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                                                                                                  |
 
 ---
 
@@ -1019,7 +1198,7 @@ compatibility story.
 What existed guarded the project shell: a legacy file with no layers at all.
 Nothing guarded what is inside them. There is now one file carrying a track of
 one segment and two points and a waypoint, with only the fields that have
-always existed, and it asserts what absence is supposed to *mean* — a track
+always existed, and it asserts what absence is supposed to _mean_ — a track
 with no style recorded is visible, a waypoint with no symbol has none.
 
 It passed on the first run, which is the finding: the format is genuinely
@@ -1045,11 +1224,11 @@ that did make the guard fire.
 Two code comments and yesterday's write-up said the wrong thing and now say
 this.
 
-| | |
-|---|---|
-| Evidence | the guard, verified red by removing the default from `Track.style` — which is not an `Option` and so depends on it |
-| Evidence | the session guards, and the check that disproved my own claim |
-| Automated gates | `just ci` green (318 Rust, 395 frontend) |
+|                 |                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Evidence        | the guard, verified red by removing the default from `Track.style` — which is not an `Option` and so depends on it |
+| Evidence        | the session guards, and the check that disproved my own claim                                                      |
+| Automated gates | `just ci` green (318 Rust, 395 frontend)                                                                           |
 
 ---
 
@@ -1081,12 +1260,12 @@ type instead of narrowing to it. The declaration says so now.
 
 And beside the symbol handler, `toast.error("Failed to change symbol")` —
 English, in a file I had translated twice. The silent-failure guard let it
-through because it *does* toast; the label guard does not look inside `toast`
+through because it _does_ toast; the label guard does not look inside `toast`
 calls. Fourth miss, same shape as the others: a guard on syntax catches the
 careless version.
 
 A colour that does not survive being saved is a lie, and the round trip that
-would have caught it was over a *bare* waypoint — a round trip over defaults
+would have caught it was over a _bare_ waypoint — a round trip over defaults
 proves only that defaults survive. It carries a symbol, a colour and a
 visibility flag now.
 
@@ -1105,14 +1284,14 @@ are looking at on the map — knew nothing about it. The row's symbol button is 
 disc now, the same disc the marker draws, from the same conversion. Three
 surfaces, one function, so they cannot disagree.
 
-| | |
-|---|---|
-| Evidence | a Rust test over set, set again, undo, redo, and clearing back to the default |
-| Evidence | walked on the stand: 🏁 on `rgb(37, 99, 235)` in the row *and* on the marker, the others on the default in both |
-| Evidence | tests on the shared conversion, including alpha and a single-digit channel |
-| Evidence | the project round trip and an older `.ozp` — both red when the field is made `#[serde(skip)]` |
-| Automated gates | `just ci` green (315 Rust, 395 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Evidence               | a Rust test over set, set again, undo, redo, and clearing back to the default                                   |
+| Evidence               | walked on the stand: 🏁 on `rgb(37, 99, 235)` in the row _and_ on the marker, the others on the default in both |
+| Evidence               | tests on the shared conversion, including alpha and a single-digit channel                                      |
+| Evidence               | the project round trip and an older `.ozp` — both red when the field is made `#[serde(skip)]`                   |
+| Automated gates        | `just ci` green (315 Rust, 395 frontend)                                                                        |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                    |
 
 ---
 
@@ -1120,7 +1299,7 @@ surfaces, one function, so they cannot disagree.
 
 The item I went looking for last slice, built. Reopening yesterday's search
 meant finding the file in a dialog again; the palette's recents were recent
-*maps*, which answers a different question.
+_maps_, which answers a different question.
 
 A crew comes back to the same search for days, and the one they want is almost
 always the one they had open last. Cmd-K now offers the last eight, by file
@@ -1138,19 +1317,19 @@ Not merged with `recentFiles.ts`, and the module says why: the records differ,
 the shared part is forty lines of storage plumbing around a working feature
 with its own tests, and two is not yet a pattern.
 
-| | |
-|---|---|
-| Evidence | seven tests on the list, three on the save wiring including the failed save |
-| Evidence | walked on the stand: the palette shows "Недавние проекты" with the file name above its path |
-| Automated gates | `just ci` green (313 Rust, 392 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| Evidence               | seven tests on the list, three on the save wiring including the failed save                 |
+| Evidence               | walked on the stand: the palette shows "Недавние проекты" with the file name above its path |
+| Automated gates        | `just ci` green (313 Rust, 392 frontend)                                                    |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                |
 
 ---
 
 ## 2026-09-21 — the project file is `.ozp`
 
 Went looking for the declared-but-absent "recent `.ozp`" and found something
-before it. The recents in the palette are recent *maps*, not projects — so the
+before it. The recents in the palette are recent _maps_, not projects — so the
 item is genuinely absent — but on the way there, both project dialogs turned
 out to filter on `json`.
 
@@ -1175,11 +1354,11 @@ A CJ-7 test had `extensions: ["json"]` written into it as the contract. It was
 pinning the defect. What it pins now is that the filter comes from the shared
 module; the value is covered behaviourally beside the dialog.
 
-| | |
-|---|---|
-| Evidence | tests on what Save offers, what Open accepts, and that a cancelled dialog saves nothing |
-| Automated gates | `just ci` green (313 Rust, 382 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| Evidence               | tests on what Save offers, what Open accepts, and that a cancelled dialog saves nothing |
+| Automated gates        | `just ci` green (313 Rust, 382 frontend)                                                |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)            |
 
 ---
 
@@ -1207,10 +1386,10 @@ character came through intact, which is how the assumption was caught rather
 than recorded. It takes an emoji or a Latin-Extended character to reach the
 replacement path, and an emoji typed on a phone is the likelier one anyway.
 
-| | |
-|---|---|
-| Evidence | a waypoint named with an emoji: the file carries `&#128205;`, the Cyrillic around it untouched |
-| Automated gates | `just ci` green (313 Rust, 379 frontend) |
+|                 |                                                                                                |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Evidence        | a waypoint named with an emoji: the file carries `&#128205;`, the Cyrillic around it untouched |
+| Automated gates | `just ci` green (313 Rust, 379 frontend)                                                       |
 
 ---
 
@@ -1240,12 +1419,12 @@ attribute, they are looked up from data. That is the third case the guard has
 missed, which is roughly what a guard on a syntactic shape is worth — it
 catches the careless version, not every version.
 
-| | |
-|---|---|
-| Evidence | walked on the stand: the flagged waypoint draws 🏁, the one without a symbol 📍, both computed 22×22 |
-| Evidence | tests on the lookup, including the unknown-symbol fallback |
-| Automated gates | `just ci` green (312 Rust, 379 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| Evidence               | walked on the stand: the flagged waypoint draws 🏁, the one without a symbol 📍, both computed 22×22 |
+| Evidence               | tests on the lookup, including the unknown-symbol fallback                                           |
+| Automated gates        | `just ci` green (312 Rust, 379 frontend)                                                             |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                         |
 
 ---
 
@@ -1275,10 +1454,10 @@ extraction refuses such an entry and writes nothing, one that the inventory
 shown to the operator beforehand lists it rather than hiding it, so the listing
 and the refusal agree.
 
-| | |
-|---|---|
-| Evidence | a crafted archive with a `../escaped.gpx` entry: refused by name, nothing written beside the destination |
-| Automated gates | `just ci` green (312 Rust, 375 frontend) |
+|                 |                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| Evidence        | a crafted archive with a `../escaped.gpx` entry: refused by name, nothing written beside the destination |
+| Automated gates | `just ci` green (312 Rust, 375 frontend)                                                                 |
 
 ---
 
@@ -1321,10 +1500,10 @@ is imported nowhere.** The `ui-shell` spec has requirements about a theme
 selector and its persistence; the component is unreachable. I localized its
 labels yesterday, which was polish on dead code.
 
-| | |
-|---|---|
-| Evidence | each claim checked against the code before editing — five commands traced from `lib.rs` through `api.ts` to their callers, the import filter read, `Cargo.toml` read for `ozf2` and `tokio`, the keydown handler read |
-| Automated gates | `just ci` green (310 Rust, 375 frontend) |
+|                 |                                                                                                                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence        | each claim checked against the code before editing — five commands traced from `lib.rs` through `api.ts` to their callers, the import filter read, `Cargo.toml` read for `ozf2` and `tokio`, the keydown handler read |
+| Automated gates | `just ci` green (310 Rust, 375 frontend)                                                                                                                                                                              |
 
 ---
 
@@ -1367,11 +1546,11 @@ decimal places.
 So the interchange story is now known rather than assumed, in all four
 directions.
 
-| | |
-|---|---|
-| Evidence | round trips over a two-segment track and over two waypoints; the colour gap against a colour that is not the default |
-| Automated gates | `just ci` green (310 Rust, 375 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | round trips over a two-segment track and over two waypoints; the colour gap against a colour that is not the default |
+| Automated gates        | `just ci` green (310 Rust, 375 frontend)                                                                             |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                         |
 
 ---
 
@@ -1386,7 +1565,7 @@ declares.
 Three more contradictions, all of them mine:
 
 - **The catalogue cache.** `Catalog cache merges refresh deltas without
-  dropping known entries` says the cache "SHALL accumulate the union of entries
+dropping known entries` says the cache "SHALL accumulate the union of entries
   the frontend has ever observed" and is "a superset of any single refresh",
   with a scenario spelling out that five missing entries are not removed. The
   pruning slice does exactly the opposite. Modified now, and it says why the
@@ -1408,10 +1587,10 @@ that — `openspec validate --strict` checks a change's shape, not whether it
 disagrees with the baseline — so it is in the backlog as something to read for,
 deliberately, before an archive.
 
-| | |
-|---|---|
-| Evidence | four deltas rewritten from ADDED to MODIFIED or amended in place; `openspec validate --changes --strict` green across 26 |
-| Automated gates | `just ci` green (307 Rust, 375 frontend) |
+|                 |                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Evidence        | four deltas rewritten from ADDED to MODIFIED or amended in place; `openspec validate --changes --strict` green across 26 |
+| Automated gates | `just ci` green (307 Rust, 375 frontend)                                                                                 |
 
 ---
 
@@ -1455,13 +1634,13 @@ MODIFIED requirement now, and says why the old rule was right when it was
 written: there was no way then to tell a complete refresh from an interrupted
 one.
 
-| | |
-|---|---|
-| Evidence | a mock server that fails once and then serves: the file lands whole, after exactly one retry |
-| Evidence | a raw server that sends half and hangs up: the second request carries `Range: bytes=512-`, the file is 1024 bytes, and the progress bar never goes backwards |
-| Evidence | a cancelled transfer is not retried; a file given up on leaves no `.part` |
-| Automated gates | `just ci` green (307 Rust, 375 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Evidence               | a mock server that fails once and then serves: the file lands whole, after exactly one retry                                                                 |
+| Evidence               | a raw server that sends half and hangs up: the second request carries `Range: bytes=512-`, the file is 1024 bytes, and the progress bar never goes backwards |
+| Evidence               | a cancelled transfer is not retried; a file given up on leaves no `.part`                                                                                    |
+| Automated gates        | `just ci` green (307 Rust, 375 frontend)                                                                                                                     |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                                                                 |
 
 ---
 
@@ -1492,12 +1671,12 @@ aggregate afterwards so one bad file does not bury the summary.
 That is the third guard of this shape this session. They keep finding things
 the sweep that prompted them had already missed.
 
-| | |
-|---|---|
-| Evidence | tests on the reporter itself; the guard, verified red by putting one `console.error` back |
-| Not covered | the ten call sites — `MapView` and the inspectors need a MapLibre instance |
-| Automated gates | `just ci` green (303 Rust, 375 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| Evidence               | tests on the reporter itself; the guard, verified red by putting one `console.error` back |
+| Not covered            | the ten call sites — `MapView` and the inspectors need a MapLibre instance                |
+| Automated gates        | `just ci` green (303 Rust, 375 frontend)                                                  |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)              |
 
 ---
 
@@ -1512,7 +1691,7 @@ The whole difficulty is one fact: whether the walk ran to the end. A stopped
 walk read a prefix, and pruning on that would make "stop" mean "delete most of
 the list". So the walk's boundaries are emitted now, and between them the
 interface collects what the walk sent; on a complete walk it drops the rest.
-The cached chunk goes out *before* the window opens, deliberately — counting
+The cached chunk goes out _before_ the window opens, deliberately — counting
 yesterday's cache as proof that a search still exists would defeat the point,
 and there is a test for exactly that.
 
@@ -1523,12 +1702,12 @@ I had stopped the stand before making the change. The core writes
 started, the walk's chunk, finished — so it exercises the pruning rather than
 hiding it. Three rows, "3 из 3", not emptied by the complete walk.
 
-| | |
-|---|---|
-| Evidence | two Rust tests (complete walk replaces, stopped walk does not) and five on the store, including the chunk that arrives before the window |
-| Evidence | walked on the stand: the catalogue is back and survives a complete walk |
-| Automated gates | `just ci` green (303 Rust, 372 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | two Rust tests (complete walk replaces, stopped walk does not) and five on the store, including the chunk that arrives before the window |
+| Evidence               | walked on the stand: the catalogue is back and survives a complete walk                                                                  |
+| Automated gates        | `just ci` green (303 Rust, 372 frontend)                                                                                                 |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                                             |
 
 ---
 
@@ -1558,11 +1737,11 @@ generated, because specta generates from command signatures and the catalogue
 now travels only as an event payload. It is hand-written in `types.ts`, which
 `CLAUDE.md` already requires to be kept in step by hand.
 
-| | |
-|---|---|
-| Evidence | a Rust test that a 500-project catalogue does not reach the snapshot, and that it stays under 4 KiB |
-| Automated gates | `just ci` green (301 Rust, 367 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| Evidence               | a Rust test that a 500-project catalogue does not reach the snapshot, and that it stays under 4 KiB |
+| Automated gates        | `just ci` green (301 Rust, 367 frontend)                                                            |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                        |
 
 ---
 
@@ -1588,12 +1767,12 @@ It also needed a mark of its own: the keyboard position is not DOM focus, and
 it is not the selected row either. Three different things, three different
 looks.
 
-| | |
-|---|---|
-| Evidence | five behavioural tests: pointing, both ends, Enter, Enter before any row, walking in from the search box |
-| Evidence | walked on the stand — End reaches the last search, its outline computes to 3px, and Enter fires `preview_project` for that slug |
-| Automated gates | `just ci` green (300 Rust, 367 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | five behavioural tests: pointing, both ends, Enter, Enter before any row, walking in from the search box                        |
+| Evidence               | walked on the stand — End reaches the last search, its outline computes to 3px, and Enter fires `preview_project` for that slug |
+| Automated gates        | `just ci` green (300 Rust, 367 frontend)                                                                                        |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                                    |
 
 ---
 
@@ -1614,11 +1793,11 @@ says "Обновление списка… уже 5 300" now. A crew that came f
 not need the other twelve thousand — but they do need to know whether theirs
 has arrived.
 
-| | |
-|---|---|
-| Evidence | tests on the short track in both languages, and the older `0.0 km · 0m · 0 pts` expectation updated with its reason |
-| Automated gates | `just ci` green (300 Rust, 362 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | tests on the short track in both languages, and the older `0.0 km · 0m · 0 pts` expectation updated with its reason |
+| Automated gates        | `just ci` green (300 Rust, 362 frontend)                                                                            |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)                                        |
 
 ---
 
@@ -1648,12 +1827,12 @@ pinned/unpinned ternary. So the guard grew a second rule — strip the `$t(…)`
 calls, whose keys are Latin by design, and fail on English left in what
 remains. The rows read "Значок: flag" and "Значок по умолчанию" now.
 
-| | |
-|---|---|
-| Evidence | the guard test, red on its first run, naming both files it found |
-| Evidence | the second rule, verified red by putting `` `Symbol: ${symbol}` `` back |
-| Evidence | walked on the stand: "Значок: flag", "Значок по умолчанию", "Скрыть: ШТАБ" |
-| Automated gates | `just ci` green (300 Rust, 360 frontend) |
+|                        |                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| Evidence               | the guard test, red on its first run, naming both files it found             |
+| Evidence               | the second rule, verified red by putting `` `Symbol: ${symbol}` `` back      |
+| Evidence               | walked on the stand: "Значок: flag", "Значок по умолчанию", "Скрыть: ШТАБ"   |
+| Automated gates        | `just ci` green (300 Rust, 360 frontend)                                     |
 | Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
 
 ---
@@ -1683,12 +1862,12 @@ translation of `Hide {name}` would have read "Скрыть точка отсеч
 `Скрыть: {name}` — the colon sidesteps the case for any name, including the
 ones that are dates and call signs rather than words.
 
-| | |
-|---|---|
-| Evidence | walked on the stand: "Скрыть: точка отсечки", "Цвет трека", "Действия", "Библиотека" |
-| Evidence | tests on the labels in both languages and on the declension |
-| Automated gates | `just ci` green (300 Rust, 358 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`) |
+|                        |                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| Evidence               | walked on the stand: "Скрыть: точка отсечки", "Цвет трека", "Действия", "Библиотека" |
+| Evidence               | tests on the labels in both languages and on the declension                          |
+| Automated gates        | `just ci` green (300 Rust, 358 frontend)                                             |
+| Customer-journey smoke | not run — the Mac2 driver host crashes at session creation (`docs/STATE.md`)         |
 
 ---
 
@@ -1715,12 +1894,12 @@ Honest about the gap: the map's two guards have no test. `MapView` needs a
 MapLibre instance, and this slice did not build one. That is recorded in the
 change's tasks rather than left to be assumed.
 
-| | |
-|---|---|
-| Evidence | four tests on the rule itself; the two tabs' behavioural tests still green through the refactor |
-| Not covered | the map's two guards — stated, not implied |
-| Automated gates | `just ci` green (300 Rust, 356 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+|                        |                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| Evidence               | four tests on the rule itself; the two tabs' behavioural tests still green through the refactor |
+| Not covered            | the map's two guards — stated, not implied                                                      |
+| Automated gates        | `just ci` green (300 Rust, 356 frontend)                                                        |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`)        |
 
 ---
 
@@ -1743,11 +1922,11 @@ The test for that one is the kind worth keeping: each layer's answer resolves
 only once every layer has been asked, so the sequential version does not fail
 an assertion — it deadlocks, and the rows never appear.
 
-| | |
-|---|---|
-| Evidence | a held-open reload overtaken by a newer one, in both tabs; both red before the change |
-| Evidence | a parallel-fetch test that cannot pass sequentially |
-| Automated gates | `just ci` green (300 Rust, 352 frontend) |
+|                        |                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Evidence               | a held-open reload overtaken by a newer one, in both tabs; both red before the change    |
+| Evidence               | a parallel-fetch test that cannot pass sequentially                                      |
+| Automated gates        | `just ci` green (300 Rust, 352 frontend)                                                 |
 | Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
 
 ---
@@ -1779,11 +1958,11 @@ from the geometry fixture — so the core writes `tracks-list.json` beside it an
 the sample project gained a one-point track. Three rows against two features,
 and a test that holds the two fixtures against each other.
 
-| | |
-|---|---|
-| Evidence | Rust tests that the listing includes what the map omits and carries no coordinates; frontend tests on the row mapper and on the gap between the two fixtures |
-| Automated gates | `just ci` green (300 Rust, 349 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+|                        |                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Evidence               | Rust tests that the listing includes what the map omits and carries no coordinates; frontend tests on the row mapper and on the gap between the two fixtures |
+| Automated gates        | `just ci` green (300 Rust, 349 frontend)                                                                                                                     |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`)                                                                     |
 
 ---
 
@@ -1805,12 +1984,12 @@ one argument at a time means the second pass can substitute into what the first
 one inserted, and a bundle name is free text off a web listing. One pass now,
 with a test that a name shaped like a placeholder survives.
 
-| | |
-|---|---|
-| Evidence | a Rust test pinning key, arguments and English for the message shapes; four frontend tests covering both languages, the fallback, the placeholder-shaped name and a missing argument |
-| Stand | the played-out download carries keys, so it shows the translation rather than the fallback |
-| Automated gates | `just ci` green (298 Rust, 349 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+|                        |                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Evidence               | a Rust test pinning key, arguments and English for the message shapes; four frontend tests covering both languages, the fallback, the placeholder-shaped name and a missing argument |
+| Stand                  | the played-out download carries keys, so it shows the translation rather than the fallback                                                                                           |
+| Automated gates        | `just ci` green (298 Rust, 349 frontend)                                                                                                                                             |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`)                                                                                             |
 
 ---
 
@@ -1830,15 +2009,15 @@ that is enough. There is a stop beside the refreshing hint now.
 The part worth being careful about is the cache. A stopped walk holds the first
 few pages; writing those over the cached catalogue would leave a crew offline
 tomorrow with the newest few dozen searches and nothing to say the rest ever
-existed. It does not write. And the status says the refresh was *stopped* at
+existed. It does not write. And the status says the refresh was _stopped_ at
 412 projects rather than that 412 were loaded — different facts.
 
-| | |
-|---|---|
-| Evidence | a two-page test server, cancelled from inside the first page's callback: the second page is never requested, what was read stays, and the walk reports itself stopped |
-| Evidence | a behavioural test: the stop appears only while refreshing, and reaches the backend |
-| Automated gates | `just ci` green (297 Rust, 345 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+|                        |                                                                                                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | a two-page test server, cancelled from inside the first page's callback: the second page is never requested, what was read stays, and the walk reports itself stopped |
+| Evidence               | a behavioural test: the stop appears only while refreshing, and reaches the backend                                                                                   |
+| Automated gates        | `just ci` green (297 Rust, 345 frontend)                                                                                                                              |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`)                                                                              |
 
 ---
 
@@ -1861,17 +2040,17 @@ which is the only reason to trust it. Mounting the loader at all needed
 `$app/navigation` and `$app/paths` stubs; they are there now for the next
 component that navigates.
 
-| | |
-|---|---|
-| Evidence | a behavioural test across an unmount, red before the change |
-| Automated gates | `just ci` green (296 Rust, 343 frontend) |
+|                        |                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Evidence               | a behavioural test across an unmount, red before the change                              |
+| Automated gates        | `just ci` green (296 Rust, 343 frontend)                                                 |
 | Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
 
 ---
 
 ## 2026-09-21 — one preview at a time
 
-No screenshot in this one, and that is the point: the defect was in *when*
+No screenshot in this one, and that is the point: the defect was in _when_
 things happened, not in how they looked. Scrolling a thirteen-thousand-entry
 catalogue, a crew clicks several projects in a row — that is how you find the
 right search. Each click previews a bundle in a thread of its own, and nothing
@@ -1882,7 +2061,7 @@ same way, naming a search nobody had asked about any more.
 
 Two more faults sat on the same path. A preview deliberately does not take the
 busy flag — a click during the catalogue walk must not be swallowed — but it
-*cleared* the flag on the way out, releasing something it never held; a preview
+_cleared_ the flag on the way out, releasing something it never held; a preview
 landing mid-download let a second download start. And the loader decided the
 list had arrived by comparing display names, which are not identity, while a
 fifteen-second timer cleared the spinner outright with the request still in
@@ -1892,12 +2071,12 @@ The newest preview is now the only one that may land, by slug. The timer says
 the wait is running long rather than ending it; what bounds the request is the
 HTTP read timeout added in slice 0.3, which reports a real failure.
 
-| | |
-|---|---|
-| Evidence | three tests that fail on the old code: the abandoned preview lands and wins, its failure is reported, and it clears the busy flag |
-| Stand | `preview_project` moves the previewed slug now, so the round trip closes instead of spinning forever |
-| Automated gates | `just ci` green (296 Rust, 341 frontend) |
-| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`) |
+|                        |                                                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Evidence               | three tests that fail on the old code: the abandoned preview lands and wins, its failure is reported, and it clears the busy flag |
+| Stand                  | `preview_project` moves the previewed slug now, so the round trip closes instead of spinning forever                              |
+| Automated gates        | `just ci` green (296 Rust, 341 frontend)                                                                                          |
+| Customer-journey smoke | not run — the Mac2 driver cannot initialise UI testing on this machine (`docs/STATE.md`)                                          |
 
 ---
 
@@ -1916,11 +2095,11 @@ The failed download turned out to behave already: the error reaches a toast
 carrying the backend's own message, the panel closes rather than hanging, and
 the map that did land stays openable. Verified rather than assumed.
 
-| | |
-|---|---|
-| Offline | [the saved list, marked](2026-09-21-when-it-fails/offline-catalogue.png) |
-| Failed download | [the toast](2026-09-21-when-it-fails/failed-download.png) |
-| Automated gates | `just ci` green (293 Rust, 340 frontend) |
+|                 |                                                                          |
+| --------------- | ------------------------------------------------------------------------ |
+| Offline         | [the saved list, marked](2026-09-21-when-it-fails/offline-catalogue.png) |
+| Failed download | [the toast](2026-09-21-when-it-fails/failed-download.png)                |
+| Automated gates | `just ci` green (293 Rust, 340 frontend)                                 |
 
 ---
 
@@ -1946,10 +2125,10 @@ count walks 0/3 → 3/3, the per-file bars arrive one by one, the ready-map
 announcement fires when the topo layer lands, and the panel closes when the
 download finishes.
 
-| | |
-|---|---|
+|                       |                                                               |
+| --------------------- | ------------------------------------------------------------- |
 | The panel, mid-flight | [captured](2026-09-21-download-in-flight/panel-in-flight.png) |
-| Automated gates | `just ci` green (293 Rust, 340 frontend) |
+| Automated gates       | `just ci` green (293 Rust, 340 frontend)                      |
 
 `window.__stand.calls` now exposes the IPC transcript, which is how "the button
 does nothing" became "the command never fired" without guessing.
@@ -1965,10 +2144,10 @@ starts a download — 185 MiB for the satellite layer on this bundle.
 
 It carries a marker now, and the tooltip names the size.
 
-| | |
-|---|---|
-| After | [the maps rows](2026-09-21-not-downloaded-marker/after-maps-rows.png) |
-| Automated gates | `just ci` green (293 Rust, 339 frontend) |
+|                 |                                                                       |
+| --------------- | --------------------------------------------------------------------- |
+| After           | [the maps rows](2026-09-21-not-downloaded-marker/after-maps-rows.png) |
+| Automated gates | `just ci` green (293 Rust, 339 frontend)                              |
 
 The rest of the pass found nothing: the workspace, the tracks and waypoints
 rails and the inspector all hold together at 1024×640.
@@ -1994,11 +2173,11 @@ moment the rail ran short of room that card — and only it — collapsed, hidin
 the points behind the next card. It does not shrink now; its own cap and the
 rail's scroll do the work.
 
-| | |
-|---|---|
-| Before | [a row menu](2026-09-21-padding-restored/before-menu.png) |
-| After | [the same menu](2026-09-21-padding-restored/after-menu.png), [the inspector](2026-09-21-padding-restored/after-inspector.png) |
-| Automated gates | `just ci` green (293 Rust, 339 frontend) |
+|                 |                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Before          | [a row menu](2026-09-21-padding-restored/before-menu.png)                                                                     |
+| After           | [the same menu](2026-09-21-padding-restored/after-menu.png), [the inspector](2026-09-21-padding-restored/after-inspector.png) |
+| Automated gates | `just ci` green (293 Rust, 339 frontend)                                                                                      |
 
 Both were found in about ten minutes on the stand. Neither would have been
 visible in a test, and both had been shipping for months.
@@ -2017,11 +2196,11 @@ so the app does not decide. The loader shows what the bundle holds, with the
 sizes the listing states, everything checked. Clearing an entry leaves it on
 the server; clearing nothing fetches the whole bundle exactly as before.
 
-| | |
-|---|---|
-| After | [the loader](2026-09-21-choose-what-to-download/after-contents.png) |
-| Automated gates | `just ci` green (293 Rust, 339 frontend) |
-| Test | a named entry is left on the server while everything else, including folders below the top level, still arrives |
+|                 |                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------- |
+| After           | [the loader](2026-09-21-choose-what-to-download/after-contents.png)                                             |
+| Automated gates | `just ci` green (293 Rust, 339 frontend)                                                                        |
+| Test            | a named entry is left on the server while everything else, including folders below the top level, still arrives |
 
 ---
 
@@ -2038,10 +2217,10 @@ and contains nothing is worse than an error.
 
 This is also the shape FTP upload will need — "the day's tracks" as one thing.
 
-| | |
-|---|---|
-| After | [the tracks rail](2026-09-21-hand-it-over/after-tracks-rail.png) — with the layer selector finally reading "Треки" |
-| Automated gates | `just ci` green (292 Rust, 339 frontend) |
+|                 |                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| After           | [the tracks rail](2026-09-21-hand-it-over/after-tracks-rail.png) — with the layer selector finally reading "Треки" |
+| Automated gates | `just ci` green (292 Rust, 339 frontend)                                                                           |
 
 ---
 
@@ -2058,9 +2237,9 @@ and waited for the whole thing. The first map of a download that becomes
 openable is announced once, with the invitation to start on it while the rest
 continues.
 
-| | |
-|---|---|
-| Automated gates | `just ci` green (290 Rust, 339 frontend) |
+|                    |                                                                           |
+| ------------------ | ------------------------------------------------------------------------- |
+| Automated gates    | `just ci` green (290 Rust, 339 frontend)                                  |
 | Not seen on screen | needs a real bundle download in flight; the owner's next one will show it |
 
 ---
@@ -2083,11 +2262,11 @@ and they live in the saved file, so they are translated for display rather than
 renamed: a project written today still opens in an older build, and an English
 build still shows what it stored.
 
-| | |
-|---|---|
-| Before | [the first screen](2026-09-21-first-screen/before-cold-start.png) |
-| After | [the first screen](2026-09-21-first-screen/after-cold-start.png) |
-| Automated gates | `just ci` green (289 Rust, 336 frontend) |
+|                 |                                                                   |
+| --------------- | ----------------------------------------------------------------- |
+| Before          | [the first screen](2026-09-21-first-screen/before-cold-start.png) |
+| After           | [the first screen](2026-09-21-first-screen/after-cold-start.png)  |
+| Automated gates | `just ci` green (289 Rust, 336 frontend)                          |
 
 The stand also learned to emit `state-changed` after the commands whose real
 implementations do. Without it the "refreshing…" hint sat there forever and the
@@ -2107,11 +2286,11 @@ string under every point in the list.
 Units follow the interface language now, and an instant is formatted for a
 person — `08.07.2026, 12:00`, in the operator's own clock.
 
-| | |
-|---|---|
-| Before | [the inspector](2026-09-21-readable-numbers/before-inspector.png) |
-| After | [the inspector](2026-09-21-readable-numbers/after-inspector.png) |
-| Automated gates | `just ci` green (289 Rust, 334 frontend) |
+|                 |                                                                   |
+| --------------- | ----------------------------------------------------------------- |
+| Before          | [the inspector](2026-09-21-readable-numbers/before-inspector.png) |
+| After           | [the inspector](2026-09-21-readable-numbers/after-inspector.png)  |
+| Automated gates | `just ci` green (289 Rust, 334 frontend)                          |
 
 The stand needed two fixes of its own in the process, both of the same class it
 exists to catch. Its `get_waypoints` ignored the layer id and answered every
@@ -2144,11 +2323,11 @@ a screen that renders because a mock quietly answered nothing is the failure
 this whole exercise exists to stop. The first run made the case for itself by
 catching an unanswered `get_ozi_metadata` behind a red toast.
 
-| | |
-|---|---|
-| Maps tab | [on fixtures](2026-09-21-stand/stand-maps.png) — sizes, cached badges, the active local map |
-| Tracks tab | [on fixtures](2026-09-21-stand/stand-tracks.png) — a hidden track dimmed, the name-format warning, stats sublines |
-| Automated gates | `just ci` green (289 Rust, 330 frontend) |
+|                 |                                                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Maps tab        | [on fixtures](2026-09-21-stand/stand-maps.png) — sizes, cached badges, the active local map                       |
+| Tracks tab      | [on fixtures](2026-09-21-stand/stand-tracks.png) — a hidden track dimmed, the name-format warning, stats sublines |
+| Automated gates | `just ci` green (289 Rust, 330 frontend)                                                                          |
 
 What it does not prove is in `src/test/stand/README.md`: nothing about the Rust
 side, the IPC boundary, tiles or the packaged app. ADR-0024 stands — the smoke
@@ -2177,10 +2356,10 @@ everything addresses a layer by id, and saving then loading silently renumbered
 it. It showed up as three lines of duplicated JSON the moment the first fixture
 was written.
 
-| | |
-|---|---|
-| Automated gates | `just ci` green (289 Rust, 325 frontend) |
-| What this buys | a screen can be rendered against real backend data without a backend — the first half of giving agents eyes that do not need the GUI |
+|                 |                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Automated gates | `just ci` green (289 Rust, 325 frontend)                                                                                             |
+| What this buys  | a screen can be rendered against real backend data without a backend — the first half of giving agents eyes that do not need the GUI |
 
 ---
 
@@ -2197,11 +2376,11 @@ Both surfaces now offer both formats — the row menu in the Waypoints tab and
 the Waypoint Inspector — the suggested file name follows the chosen format,
 and a failed export reaches a toast instead of only the status line.
 
-| | |
-|---|---|
-| Automated gates | `just ci` green (286 Rust, 317 frontend) |
-| Tests | a GPX written from a real waypoint carries its position, its Cyrillic name and its symbol; both failure paths return an error; the suggested name follows the format |
-| Not seen on screen | the menu items. Two attempts: the row dropdown holds focus and swallowed the following clicks, so the run stopped per `CLAUDE.md` rather than fighting it. |
+|                    |                                                                                                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Automated gates    | `just ci` green (286 Rust, 317 frontend)                                                                                                                             |
+| Tests              | a GPX written from a real waypoint carries its position, its Cyrillic name and its symbol; both failure paths return an error; the suggested name follows the format |
+| Not seen on screen | the menu items. Two attempts: the row dropdown holds focus and swallowed the following clicks, so the run stopped per `CLAUDE.md` rather than fighting it.           |
 
 ---
 
@@ -2223,11 +2402,11 @@ had just started; and only the downloading phase reports byte totals, so the
 figure blanked the moment extraction began — which is exactly when an operator
 looks at it. The store keeps what the next phase does not restate.
 
-| | |
-|---|---|
-| Seen on screen | the panel, per-file rows and sizes, over the loader |
+|                    |                                                                                                                                                                                                                               |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Seen on screen     | the panel, per-file rows and sizes, over the loader                                                                                                                                                                           |
 | Not seen on screen | the aggregate byte line — on this link a bundle lands in a couple of seconds and the panel is gone before a screenshot catches it. Covered by tests: the scan announces the total, and the store keeps it through extraction. |
-| Automated gates | `just ci` green (283 Rust, 317 frontend) |
+| Automated gates    | `just ci` green (283 Rust, 317 frontend)                                                                                                                                                                                      |
 
 ---
 
@@ -2247,10 +2426,10 @@ disagreeing about MB versus MiB. One shared function now, in the app's
 language, and the status bar's last English strings ("Downloading", "Cancel")
 are translated.
 
-| | |
-|---|---|
-| After | [sizes on every map](2026-09-21-download-size/after-map-sizes.png) |
-| Automated gates | `just ci` green (282 Rust, 315 frontend) |
+|                 |                                                                    |
+| --------------- | ------------------------------------------------------------------ |
+| After           | [sizes on every map](2026-09-21-download-size/after-map-sizes.png) |
+| Automated gates | `just ci` green (282 Rust, 315 frontend)                           |
 
 The size went on its own line after the first attempt put it beside the name
 and the column — about 240px — cut it off.
@@ -2278,11 +2457,11 @@ and hands its id to the same progress panel a whole-bundle download uses. Both
 paths announce when they stop, which is also where a failed download finally
 gets reported instead of just making the panel disappear.
 
-| | |
-|---|---|
-| Before | [the catalogue, undifferentiated](2026-09-21-downloaded-bundles/before-catalogue.png) |
-| After | [23 of 13440, each marked](2026-09-21-downloaded-bundles/after-downloaded-only.png) |
-| Automated gates | `just ci` green (277 Rust, 311 frontend) |
+|                 |                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Before          | [the catalogue, undifferentiated](2026-09-21-downloaded-bundles/before-catalogue.png) |
+| After           | [23 of 13440, each marked](2026-09-21-downloaded-bundles/after-downloaded-only.png)   |
+| Automated gates | `just ci` green (277 Rust, 311 frontend)                                              |
 
 Found on screen and fixed in the same slice: the filter input was `width: 100%`
 and `flex-shrink: 0`, so the new toggle and the count were pushed out of the
@@ -2321,10 +2500,10 @@ the palette treated the workspace as a cold start and offered nothing but
 Settings — save, undo, redo and the track search were all hidden with 26 tracks
 on screen. It keys on the active map now.
 
-| | |
-|---|---|
-| After | [command palette](2026-09-21-bundle-flow/after-palette.png), [maps tab in Russian](2026-09-21-bundle-flow/after-maps-tab.png) |
-| Automated gates | `just ci` green (276 Rust, 303 frontend) |
+|                 |                                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| After           | [command palette](2026-09-21-bundle-flow/after-palette.png), [maps tab in Russian](2026-09-21-bundle-flow/after-maps-tab.png) |
+| Automated gates | `just ci` green (276 Rust, 303 frontend)                                                                                      |
 
 Also translated in this pass: the Maps tab, the command palette, and all four
 inspectors. What stays English is the backend's own status and progress text,
@@ -2351,10 +2530,10 @@ DOM — five of them fail if the filter is removed. The tab's older tests read i
 source text, which is the class of test that let the Tracks tab go empty
 unnoticed.
 
-| | |
-|---|---|
-| After | [the tab in use](2026-09-21-waypoints-parity/after-waypoints-tab.png) |
-| Automated gates | `just ci` green (269 Rust, 295 frontend) |
+|                 |                                                                       |
+| --------------- | --------------------------------------------------------------------- |
+| After           | [the tab in use](2026-09-21-waypoints-parity/after-waypoints-tab.png) |
+| Automated gates | `just ci` green (269 Rust, 295 frontend)                              |
 
 Confirmed on screen: the search field, the show-all / hide-all pair, and every
 row carrying its coordinates, a locate button and an actions menu.
@@ -2380,11 +2559,11 @@ style mutation, so none of this touches the undo stack.
 Import-created layers are named after the source file instead of its full path,
 which makes the layer selector readable.
 
-| | |
-|---|---|
-| Controls | [header](2026-09-21-bulk-visibility/after-controls.png) |
-| Hide all | [one click, empty map](2026-09-21-bulk-visibility/after-hide-all.png) |
-| Automated gates | `just ci` green (263 Rust, 286 frontend) |
+|                 |                                                                       |
+| --------------- | --------------------------------------------------------------------- |
+| Controls        | [header](2026-09-21-bulk-visibility/after-controls.png)               |
+| Hide all        | [one click, empty map](2026-09-21-bulk-visibility/after-hide-all.png) |
+| Automated gates | `just ci` green (263 Rust, 286 frontend)                              |
 
 ---
 
@@ -2400,10 +2579,10 @@ The chrome that stayed English is translated: the rail tabs, the mode chips,
 the palette button, the cached badge, and the whole Waypoints tab, which had no
 translated string at all.
 
-| | |
-|---|---|
-| After | [workspace in Russian](2026-09-21-russian-default/after-russian.png) |
-| Automated gates | `just ci` green (259 Rust, 286 frontend) |
+|                 |                                                                      |
+| --------------- | -------------------------------------------------------------------- |
+| After           | [workspace in Russian](2026-09-21-russian-default/after-russian.png) |
+| Automated gates | `just ci` green (259 Rust, 286 frontend)                             |
 
 ---
 
@@ -2419,10 +2598,10 @@ total" counter. Matching is a case-insensitive substring in either alphabet,
 because operators search by call sign as often as by date. Typing `лиса1`
 narrows 26 tracks to 8.
 
-| | |
-|---|---|
-| After | [search in use](2026-09-21-track-search/after-search.png) |
-| Automated gates | `just ci` green (259 Rust, 286 frontend) |
+|                 |                                                           |
+| --------------- | --------------------------------------------------------- |
+| After           | [search in use](2026-09-21-track-search/after-search.png) |
+| Automated gates | `just ci` green (259 Rust, 286 frontend)                  |
 
 ---
 
@@ -2440,11 +2619,11 @@ macOS, so the Documents-access prompt returned on each build and blocked the
 window from opening — verified fixed: a rebuild now launches straight into the
 workspace with no prompt.
 
-| | |
-|---|---|
-| Before | [rows](2026-09-21-row-density/before-rows.png) |
-| After | [rows](2026-09-21-row-density/after-rows.png) |
-| Automated gates | `just ci` green (248 Rust, 281 frontend) |
+|                 |                                                |
+| --------------- | ---------------------------------------------- |
+| Before          | [rows](2026-09-21-row-density/before-rows.png) |
+| After           | [rows](2026-09-21-row-density/after-rows.png)  |
+| Automated gates | `just ci` green (248 Rust, 281 frontend)       |
 
 ---
 
@@ -2466,12 +2645,12 @@ Four defects the owner saw the first time the built app was opened.
 
 Evidence: [`2026-09-20-visible-fixes/`](2026-09-20-visible-fixes/)
 
-| | |
-|---|---|
-| Before | [maps tab](2026-09-20-visible-fixes/before-maps-tab.png), [tracks tab](2026-09-20-visible-fixes/before-tracks-tab.png) |
-| After | [maps tab](2026-09-20-visible-fixes/after-maps-tab.png), [tracks tab](2026-09-20-visible-fixes/after-tracks-tab.png), [row detail](2026-09-20-visible-fixes/after-tracks-rows-detail.png) |
-| Automated gates | `just ci` green (248 Rust, 281 frontend), `cargo audit` clean, npm audit gate clean, GitHub Actions green |
-| Customer-journey smoke | still owed |
+|                        |                                                                                                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Before                 | [maps tab](2026-09-20-visible-fixes/before-maps-tab.png), [tracks tab](2026-09-20-visible-fixes/before-tracks-tab.png)                                                                    |
+| After                  | [maps tab](2026-09-20-visible-fixes/after-maps-tab.png), [tracks tab](2026-09-20-visible-fixes/after-tracks-tab.png), [row detail](2026-09-20-visible-fixes/after-tracks-rows-detail.png) |
+| Automated gates        | `just ci` green (248 Rust, 281 frontend), `cargo audit` clean, npm audit gate clean, GitHub Actions green                                                                                 |
+| Customer-journey smoke | still owed                                                                                                                                                                                |
 
 Confirmed on screen (2026-09-21): no straight lines across the map; every row
 carries its visibility eye, a round colour swatch, a locate button and the

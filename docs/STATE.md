@@ -5,7 +5,31 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **which line is ЛИСА15** (2026-09-22) — twelve coloured
+Fifty-five changes were archived on 2026-09-22 and their requirements are in
+the baseline. Two are left: `codify-architecture-decisions`, which needs the
+owner's review before its 63 requirements merge, and `revive-ui-cycle`, which
+is the ongoing rebuild of the development cycle. What unblocked the batch was
+the smoke gate coming back — forty-three of the changes were waiting on nothing
+else — and four more were closed by verifying on screen what had been recorded
+as unverified: the three on-map measuring tools' rendered pixels, and the
+"this map is ready" announcement during a bundle download. Evidence in
+`docs/progress/2026-09-22-verification/`.
+
+Last merged slice: **what the review found** (2026-09-22) — an external
+reviewer read the two-day run and the project as a whole
+(`docs/reviews/2026-09-22/`), and sixteen of its findings survived a reading of
+the code. The first was a data loss: partial downloads were named with
+`with_extension("part")`, which replaces the extension instead of appending, so
+`sheet.map` and `sheet.ozf2` of one bundle wrote to the same file — and the
+four tests covering it recomputed the same wrong name, so they passed. The rest
+were things that quietly lied (a failed read of a layer's marks erased its
+markers; a finished catalogue walk wrote over a running download's status line;
+a bundle file matched its map by `ends_with`), things that took the operator's
+history (a refused command cleared redo; two drags of one point merged into one
+undo step), and two broken promises (CJ-2 says a field launch makes no network
+requests, and the app asked for OSM tiles and walked the catalogue on every
+start). Four of the sixteen were introduced by the run under review. After
+**which line is ЛИСА15** (2026-09-22) — twelve coloured
 routes and no names on the map, so the selected track now carries a casing;
 finding that it did not work uncovered a Svelte 5 trap in five effects; after a
 day on the map, where the stand showed an
@@ -157,8 +181,11 @@ Waypoints tab parity,
 track triage, Russian by default, track search, catalogue repair, row density,
 dev signing and 0.2 visible fixes. `main` is pushed and
 `origin/main` is level with it. Automated gates are green: `just ci` runs
-rustfmt, clippy, type-checks, 320 Rust tests and 431 frontend tests;
-`just smoke` cannot run on this machine right now — see "Known broken";
+rustfmt, clippy, type-checks, 352 Rust tests and 527 frontend tests;
+**`just smoke` is green again** (2026-09-22, 19.3s, against a bundle built the
+same hour) — the owner granted the Accessibility permission the Mac2 driver had
+been timing out on, and the first two runs then failed on labels rather than
+behaviour, which is now guarded by `src/test/smoke-label-contract.test.ts`;
 `cargo audit` is clean; the npm audit gate passes with one documented waiver.
 GitHub Actions is green on `main` as of c08e05d — all seven jobs, including the
 Windows NSIS bundle and the smoke builds on all three platforms.
@@ -185,13 +212,21 @@ buys; meant to be re-read and re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the fifty-six OpenSpec changes.** Folding their requirements into
-   the baseline is a step for a person, and fifty-six is a lot of reading, so
-   it is worth doing in batches by capability rather than in one sitting. Read
-   the deltas against the baseline first: four were once written as ADDED where
-   a baseline requirement already said the opposite — `openspec validate
-   --strict` checks a change's shape, not whether it disagrees with the
-   baseline.
+1. **Review and archive `codify-architecture-decisions`.** Fifty-five of the
+   fifty-seven changes were archived on 2026-09-22; this one is left because
+   its task 3.1 is the owner reading the proposal, the coverage table, the
+   three new capabilities and their Purpose texts before 63 requirements enter
+   the baseline. Its task 2.3 — walking each of those 63 against its cited
+   evidence — is unfinished, and an agent can do it.
+
+   The batch confirmed why that reading matters. The four "ADDED against a
+   baseline that says the opposite" cases the backlog warned about had been
+   fixed to MODIFIED except one, and it was in this change: it codified
+   `.part` naming as replacing the extension, which is the exact data-loss
+   defect fixed the same day. The wording is corrected now, but
+   `openspec validate --strict` never saw it — it checks a change's shape, not
+   whether it disagrees with the baseline or with the code.
+
 2. **Decisions the code is waiting on**, each with its reasoning in
    `docs/backlog.md`:
    - the stop threshold for moving time, and the same question for ascent and
@@ -218,22 +253,26 @@ buys; meant to be re-read and re-ordered rather than followed blindly.
    round trips, both pinned, and on the day's export, which now carries the
    waypoints with the tracks.
 
-### Blocked on this machine
-
-4. **`just smoke`.** The Mac2 driver host dies at session creation; every piece
-   works when run by hand and only fails when Appium spawns it. What has been
-   ruled out, and by which command, is under "Known broken". Forty-five changes
-   carry an unchecked "smoke green" task waiting on it, and nothing merged
-   since 2026-09-21 has been seen running in the packaged application.
-
 ### An agent can still do these
 
-5. **MapLibre 4 → 6**, which clears the waived critical advisory. Deliberately
-   not attempted while the E2E gate is down: the map is the product, the stand
-   stubs its tiles, and a major upgrade would ship verified only by type checks
-   and a browser. Vulnerable `<=6.4.0`, fixed in 6.10.0 only, no 5.x backport,
-   so there is no smaller step. The waiver's premise is enforced by
-   `src/test/maplibre-waiver.test.ts`.
+4. **Walk the forty-five changes carrying an unchecked "smoke green" task.**
+   The gate runs again, so the box can be ticked — but ticking it honestly
+   means running the journey each change touched, not the one core journey.
+   `smoke_core_workflow` covers CJ-4's editing spine and nothing else; the
+   import, the bundle download, the export and the session restore have no
+   packaged-app coverage at all. That gap is the reason two of today's three
+   smoke runs failed on wording: nothing else was exercising those labels.
+
+5. **MapLibre 4 → 6**, which clears the waived critical advisory. The gate is
+   back, so the reason to defer it is now only its size: the map is the
+   product, MapLibre 5 and 6 change the style spec and the marker API, and the
+   stand stubs its tiles. The advisory covers `<=6.4.0`, so 6.4.1 is the first
+   release without it — `npm audit` names 6.10.0 because that is the latest,
+   not the earliest fix — and there is no 4.x or 5.x backport either way.
+   `package.json` asks for `^4`; `package-lock.json` resolves 4.7.1. The
+   waiver's premise is enforced by `src/test/maplibre-waiver.test.ts`, which
+   since 2026-09-22 also covers `attribution`, the sink the advisory is
+   actually about.
 6. **`get_ozi_tile` is dead IPC surface** — registered, generated into the
    bindings, called by nothing; the map renders OZF2 through the `ozi://`
    protocol. Removing it costs a binding and a registry line.
@@ -253,11 +292,16 @@ deriving a list from map geometry, reading a capability's existing requirements
 before writing a delta, a grid child that can grow its own column, and an
 `$effect` that returns before reading its dependencies.
 
-Six guards now watch defect *classes* rather than instances: a literal label, a
-computed English label, a `catch` that tells nobody, an annotated
-`$state(null)`, a typed-in toast message, and an effect that gives up before it
-subscribes. Each found something on its first run that the sweep which prompted
-it had missed; the toast one found sixteen.
+Eight guards now watch defect _classes_ rather than instances: a literal label,
+a computed English label, a `catch` that tells nobody, an annotated
+`$state(null)`, a typed-in toast message, an effect that gives up before it
+subscribes, and — since 2026-09-22 — the labels the customer-journey smoke
+matches on, held against the dictionaries, and the map's three
+overlapping-reload sites, each pinned to take its run token before the
+asynchronous boundary and check it before writing. Each found something on its first
+run that the sweep which prompted it had missed; the toast one found sixteen,
+and the smoke-label one was written after the same break happened twice in an
+afternoon.
 
 ## Known broken
 
@@ -267,33 +311,49 @@ it had missed; the toast one found sixteen.
   the visible text at that. WKWebView publishes a control's `aria-label`, not
   the text inside it, so the matchers read the label now and accept either
   language.
-- **The Mac2 driver cannot enable automation mode** (2026-09-22; the cause is
-  now known and the fix is the owner's). `just smoke` fails at session
+- ~~**The Mac2 driver cannot enable automation mode.**~~ Cleared on
+  2026-09-22: the owner granted the Accessibility permission and `just smoke`
+  passed. The diagnosis below is kept because the failure mode will come back
+  on a new machine or after an OS update, and because the grant is the answer.
+
+  Two further things the run taught, both now guarded:
+  - The gate matches labels literally, in both languages, and two of the three
+    runs failed on wording rather than behaviour — first because the drawing
+    toggle's label had been reworded for the Russian plural, then because the
+    map canvas selector was the one label never made bilingual, so every map
+    click missed while the app was in its default language.
+    `src/test/smoke-label-contract.test.ts` now holds the smoke's labels
+    against the dictionaries, in a second rather than after a build and a
+    launch.
+  - `tools/ozi-rs-mcp/tests/smoke_bundle_and_maps.rs` is not a second gate. Its
+    own `#[ignore]` says it: superseded, no UI interaction, launches by
+    bundleId, which hangs on an unregistered debug bundle.
+
+  The original diagnosis, for when it returns. `just smoke` failed at session
   creation with "'GET /status' cannot be proxied to Mac2 Driver server because
   its process is not running (probably crashed)". That is the symptom. The
   cause, visible for the first time because `appium:showServerLogs` is now on
   (`tools/ozi-rs-mcp/src/appium.rs`):
 
-      Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
-      Code=1000 "Timed out while enabling automation mode."
+        Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+        Code=1000 "Timed out while enabling automation mode."
 
   **What this means.** Enabling automation mode is macOS asking for the
   Accessibility grant that lets a test runner drive the interface. It times out
-  when the grant is missing for the *responsible* application — the one that
+  when the grant is missing for the _responsible_ application — the one that
   spawned the chain — or when the permission dialog appeared and nobody
   answered it. The grant attaches to the application that started `appium`, not
   to `appium` itself.
 
   That explains everything observed. Run by hand from a shell that already has
   the grant, every piece works: `xcodebuild build-for-testing
-  test-without-building` reports `** TEST BUILD SUCCEEDED **` and WebDriverAgent
+test-without-building` reports `** TEST BUILD SUCCEEDED **` and WebDriverAgent
   opens port 10100 in four seconds. Spawned by an `appium` that was started
   from a host without the grant, the same command times out here.
 
   **What to try, in order:**
-
   1. Start the Appium server from your own terminal — `! appium --address
-     127.0.0.1 --port 4723` — and run `just smoke` against it. If a permission
+127.0.0.1 --port 4723` — and run `just smoke` against it. If a permission
      dialog appears, answer it.
   2. If it does not appear, add your terminal application (and, if it is listed,
      `node`) under System Settings → Privacy & Security → **Accessibility**, and
@@ -306,7 +366,6 @@ it had missed; the toast one found sixteen.
   and the earlier `com.apple.LocalAuthentication` block, which was a different
   error and is cleared.
 
-  Forty-five changes carry an unchecked "smoke green" task waiting on this.
 - **An Appium click only lands when the app window is frontmost.** A Mac2
   session starts the app but does not raise it, and a click on a background
   window reports success while the event goes to whatever is on top. Run

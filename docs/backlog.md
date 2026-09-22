@@ -10,7 +10,7 @@ decision.
   service ("220 DB Based FTP ready") that would give a machine-readable listing
   instead of scraped HTML — which is exactly what broke in September when the
   site changed its markup. Anonymous login is refused (`530 Authentication
-  failed`), so it needs credentials. Owner decision (2026-09-21): credentials
+failed`), so it needs credentials. Owner decision (2026-09-21): credentials
   are entered by the user in application settings, never shipped in the build;
   the password belongs in the macOS keychain, not in a config file. Scope: a
   settings form (host, user, password), keychain storage, an FTP listing
@@ -38,6 +38,80 @@ decision.
   menu and the Waypoint Inspector offer GPX and WPT.
 
 ## Engineering
+
+### From the archiving and verification pass, 2026-09-22
+
+- **`MapView` is driven by no automated test.** It needs a MapLibre instance,
+  so vitest cannot mount it, and the stand has no test runner wired into
+  `just ci`. What exists is unit tests on the helpers (`edit-failure`,
+  `latest-run`, `map-bounds`), class guards over the source, and hand-driven
+  stand sessions. The gap was recorded as a permanently-open task in two
+  changes; it belongs here instead. Closing it means a browser test runner
+  against the stand — `revive-ui-cycle` task 4.1 already proposes Playwright
+  as a dev dependency for the screenshot matrix, and the same runner would
+  serve this.
+
+- **The stand answers only the commands somebody has needed.** `add_waypoint`
+  was missing until 2026-09-22, so placing a waypoint by bearing had never
+  been walked past its form. It fails loudly rather than silently, which is
+  the design working — but a feature nobody walks is a feature nobody sees.
+  Worth a sweep: which commands in the bindings have no stand answer, and
+  which screens does that make unreachable.
+
+- **`?state=cold` cannot preview a project.** `previewedAppState()` re-slugs
+  the fixture's `current_project`, and the cold fixture has none, so selecting
+  a search from the cold screen sits on "Загрузка списка карт…" forever. The
+  cold screen is the one a crew actually sees first.
+
+- **Seeded content promised and absent.** `revive-ui-cycle` task 5.3 asks for
+  `docs/backlog.md` seeded with, among others, the Meetily-inspired list; this
+  file has no Meetily entry. Either it is elsewhere or it was never written.
+
+### From the external review, 2026-09-22 — not yet acted on
+
+Sixteen of the reviewer's findings were confirmed by reading the code and
+fixed the same day (`openspec/changes/what-the-review-found`,
+`docs/progress/README.md`). What is below is the remainder: each is the
+reviewer's claim, checked only as far as the note says, and none is a verified
+defect unless it says so. Reports: `docs/reviews/2026-09-22/`.
+
+- **The baseline specs are stale, and `--strict` cannot see it.** Confirmed by
+  reading: `openspec/specs/track-import/spec.md` still requires GPX to import
+  "into the active track layer", while `application/import.rs` creates a layer
+  per source file. This is not a spec-versus-code argument — the correct
+  requirement is already written in
+  `openspec/changes/codify-architecture-decisions`, which removes the stale one
+  with its reason. It has simply never been archived. Fifty-seven unarchived
+  changes is the actual finding: `openspec validate --strict` checks a change's
+  shape, not whether it agrees with the baseline, so the baseline can say the
+  opposite of both the code and the agreed change and stay green. Archiving is
+  the owner's step and is already item 1 of "Blocked on the owner" in
+  `docs/STATE.md`.
+
+- **A spec freezes a temporary shell.** `openspec/specs/ui-shell/spec.md:403`
+  requires the non-working mode chips to stay, and the measuring tool's author
+  cites that requirement as the reason the action lives in the palette instead.
+  A requirement that preserves scaffolding is worse than no requirement.
+  Needs the owner to say whether the chips are the intended interface or a
+  placeholder; the answer removes either the requirement or the scaffolding.
+
+- **The shared mutex is held across save, import and export.** Not measured. A
+  slow disk or a large import delays every other call into `AppState`. The
+  reviewer's own advice is to measure on a real day's tracks first; splitting
+  services without moving the lock boundary changes nothing.
+
+- **Every state snapshot rebuilds all track summaries**, statistics included,
+  and a snapshot goes out on every state change. Frontend filtering reduces
+  redraws, not this. Same order: measure on a day's collection, then cache by
+  revision.
+
+- **CJ-7 is the least-supported journey.** Its criterion — do not lose an hour
+  of marking — is stronger than the implemented contract, which explicitly
+  excludes recovering unsaved edits (`project-persistence/spec.md:40`). The
+  atomic save protects the last saved version, not the work after it. Needs a
+  decision on recovery before it is worth designing.
+
+- **`get_ozi_tile` is dead IPC surface** — see `docs/STATE.md`.
 
 - **ADR-0020 asks for waypoint export to PLT, which cannot mean what it says.**
   PLT is OziExplorer's track format — a track header and track rows, no
@@ -75,7 +149,7 @@ decision.
 - ~~An annotated `let … = $state(null)` narrows to `null` in an inline
   `$derived`.~~ Hit a second time on 2026-09-22, in another file; a guard test
   now fails on the declaration. Scoped to `$state(null)` on purpose — an array
-  narrows to `never[]`, which is assignable and harmless. The original note:** TypeScript's flow analysis, not a broken type: before the first
+  narrows to `never[]`, which is assignable and harmless. The original note:\*\* TypeScript's flow analysis, not a broken type: before the first
   assignment the variable is `null`, so the non-null branch of any inline
   derived is `never` and every property read on it fails. Function bodies are
   deferred and never see it, which is why it looks arbitrary. Declare with
@@ -142,7 +216,7 @@ decision.
   this session were written as ADDED against a baseline requirement that
   already covered the ground with a different rule — the catalogue merge, the
   catalogue cache, the track statistics, the `.part` file. `openspec validate
-  --strict` checks a change's shape, not whether it disagrees with the
+--strict` checks a change's shape, not whether it disagrees with the
   baseline, so nothing catches it. Before writing a delta, read the
   capability's existing requirements; before archiving a batch, read them
   against each other.
@@ -241,7 +315,7 @@ and the palette slice; these were not.
   `progress-in-the-crews-language`: the bundle path sends a key and its
   arguments, both status surfaces translate the message and the phase, and the
   backend's English wording is the fallback. The folder import's summary was
-  the one that *was* being rendered, and it was converted on 2026-09-22 in
+  the one that _was_ being rendered, and it was converted on 2026-09-22 in
   `the-import-speaks-russian`. Still English: the `AppState` status line's own
   44 messages, which no surface currently renders — convert them the same way
   if one starts to. Worth a guard over the shape rather than a third sweep:
@@ -262,6 +336,7 @@ and the palette slice; these were not.
   `a-search-that-is-gone-leaves-the-list`: a complete walk replaces the list,
   a stopped one changes nothing, and the walk's boundaries are emitted so the
   interface knows which it was.
+
 - **Small targets.** 28px rows and 10px badges in the catalogue. The keyboard
   half of this is done on 2026-09-21 in `walk-the-catalogue-by-keyboard`: the
   list is a listbox with an `aria-activedescendant` position, walked with the
