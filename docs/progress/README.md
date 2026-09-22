@@ -10,6 +10,41 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — a day on the map
+
+The palette I handed to imported tracks was designed by reasoning: avoid greens
+and pale shades, because that is what a topographic basemap is made of. Nothing
+had looked at twelve of those colours drawn over that basemap — the stand
+served imported tracks to the list and not to the map, and the map is where a
+day of recordings is actually read.
+
+Why they were invisible is worth writing down: `MapView` redraws off a
+fingerprint taken from `AppStateDto.tracks`, and the stand's import added rows
+to `list_tracks` alone. The list and the map disagreed, which is a state the
+application never has, so the stand was describing something that cannot
+happen.
+
+With that fixed, the question the palette raises can be answered by looking.
+Twelve routes over the basemap: distinguishable from each other and from the
+ground. The two browns are the closest pair and sit far apart in the sequence;
+cyan crossing the river's blue hatching is the weakest and still reads at line
+width 3. The design holds — and now I have seen it rather than argued it.
+
+One thing the picture makes plain: twelve coloured lines carry no names. On-map
+track labels are switched off by design — `tracks-layer.ts` adds the label
+layer only when the style has glyphs, and the basemap here is raster, so its
+own labels are baked into the tiles. That is the offline-glyphs item, and the
+backlog now carries what it would cost rather than just its name.
+
+| | |
+|---|---|
+| Looked at | [twelve routes over the basemap](2026-09-22-day-on-map/twelve-routes.png) |
+| Change | `openspec/changes/a-day-on-the-map/` |
+| Automated gates | `just ci` green (338 Rust, 500 frontend) |
+| Customer-journey smoke | not applicable — no product code changed |
+
+---
+
 ## 2026-09-22 — a colour for every crew
 
 I filled the stand's tracks list with a day's worth of imports to see how it

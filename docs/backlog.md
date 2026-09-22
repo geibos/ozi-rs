@@ -108,6 +108,17 @@ decision.
   by the wire's snake_case name; the tile commands' `ArrayBuffer` is the one
   stated exception. It found four loose answers on the way in.
 
+- **On-map track labels wait on bundled glyphs, and now they are worth it.**
+  `tracks-layer.ts` adds its label layer only when the style has glyphs, which
+  a raster basemap does not: the basemap's own names are baked into the tiles.
+  With a day's twenty routes drawn in twenty colours, the missing half is which
+  colour is whose without going back to the list. The cost is real and is why
+  it has not been done: SDF glyph PBFs for at least Cyrillic and Latin ranges,
+  generated with fontnik or similar, checked into the repository as binary
+  assets, with a font whose licence allows it — and `style.glyphs` pointing at
+  them so it works with no network, which is the whole point. That is a repo-
+  size decision as much as a code one.
+
 - **A grid child can grow its own column.** `.canvas-column` had
   `grid-template-rows` and no `grid-template-columns`, so the implicit column
   was `auto` = max-content and the context bar widened it by 358px, under the

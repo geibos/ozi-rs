@@ -170,6 +170,24 @@ const STAND_TRACK_PALETTE = [
   "rgba(15,118,110,1.000)",
 ];
 
+/**
+ * A route for an imported track, so the map shows what the list says.
+ *
+ * Without geometry the imported rows appeared in the list and nowhere else,
+ * and the map is where a day of recordings is actually read — it is the only
+ * place that answers "are twelve colours actually distinguishable on a
+ * topographic basemap", which is a question a palette cannot be designed
+ * without.
+ */
+function importedGeometry(index: number): number[][] {
+  const north = 59.9524 + (index % 6) * 0.004;
+  const west = 31.596 + Math.floor(index / 6) * 0.03;
+  return Array.from({ length: 8 }, (_, step) => [
+    west + step * 0.006,
+    north + Math.sin((step + index) / 2) * 0.0025,
+  ]);
+}
+
 function importOneLayer(label: string, trackCount: number): string {
   importedLayerId += 1;
   for (let i = 0; i < trackCount; i += 1) {
@@ -196,7 +214,14 @@ function importOneLayer(label: string, trackCount: number): string {
 let previewedSlug: string | null = null;
 
 function previewedAppState(): AppStateDto {
-  const base = requestedState() === "cold" ? coldStartFixture : appStateFixture;
+  const fixture =
+    requestedState() === "cold" ? coldStartFixture : appStateFixture;
+  // The imported rows belong in the state too, not only in `list_tracks`:
+  // MapView redraws off a fingerprint taken from `AppStateDto.tracks`, so an
+  // import that left this alone appeared in the list and never on the map.
+  const base: AppStateDto = importedTracks.length
+    ? { ...fixture, tracks: [...fixture.tracks, ...importedTracks] }
+    : fixture;
   const project = base.current_project;
   if (previewedSlug === null || !project) return base;
   // The whole project, with its slug moved: the loader matches on the slug, so
@@ -255,7 +280,21 @@ const HANDLERS: StandAnswers = {
   // The binding says `JsonValue` because the Rust side answers with dynamic
   // JSON; the fixture is a typed FeatureCollection, which is the stricter of
   // the two and what every reader here wants.
-  get_tracks_geojson: () => tracksGeojsonFixture as unknown as JsonValue,
+  get_tracks_geojson: () =>
+    ({
+      ...tracksGeojsonFixture,
+      features: [
+        ...tracksGeojsonFixture.features,
+        ...importedTracks.map((track, index) => ({
+          type: "Feature",
+          geometry: {
+            type: "MultiLineString",
+            coordinates: [importedGeometry(index)],
+          },
+          properties: { ...track },
+        })),
+      ],
+    }) as unknown as JsonValue,
   // The rows the Tracks tab reads — its own fixture, not the map's features.
   // Deriving them from the geometry would have made the stand inherit the very
   // omission this listing exists to undo.

@@ -5,7 +5,10 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Last merged slice: **a colour for every crew** (2026-09-22) — a day's folder of
+Last merged slice: **a day on the map** (2026-09-22) — the stand showed an
+import in the list and not on the map, so the palette handed to imported tracks
+had never been seen over a basemap; it has now, and it holds; after a colour
+for every crew, where a day's folder of
 GPX carries no colour, so twenty crews' routes imported as twenty identical red
 lines, and each now takes its own from a palette; after a bar with nothing to
 say, where the launch
@@ -179,7 +182,7 @@ re-ordered rather than followed blindly.
 
 ### Blocked on the owner
 
-1. **Archive the fifty-four OpenSpec changes.** Folding their requirements
+1. **Archive the fifty-five OpenSpec changes.** Folding their requirements
    into the baseline is a step for a person. Read the deltas against the
    baseline first: four of this session's were written as ADDED where a
    baseline requirement already said the opposite, and were corrected on
