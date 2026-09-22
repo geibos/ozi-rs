@@ -23,6 +23,10 @@
     updateDownloadProgress,
   } from "../lib/stores";
   import { loadProjects } from "../lib/api";
+  import {
+    OFFLINE_CATALOGUE_REASON,
+    mayReachNetworkNow,
+  } from "../lib/network-reach";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
   import { isEditableTarget } from "$lib/editable-target";
   import { t } from "$lib/i18n";
@@ -147,6 +151,18 @@
       // cache-seeded catalog immediately, with only the small
       // "refreshing list…" hint while this runs.
       await appState.refresh();
+      // CJ-2: a cold launch in a field camp reaches for nothing. Without a
+      // link the walk only fails slowly, and the cached list the loader has
+      // already rendered is the whole truth available — which is exactly
+      // what a non-null `catalogueError` makes the interface say ("saved
+      // list from {when}"). The refresh button still works; the operator can
+      // see the link better than `navigator` can.
+      // External review, 2026-09-22.
+      if (!mayReachNetworkNow()) {
+        projectsLoading.set(false);
+        catalogueError.set(OFFLINE_CATALOGUE_REASON);
+        return;
+      }
       projectsLoading.set(true);
       catalogueError.set(null);
       loadProjects().catch((error) => {

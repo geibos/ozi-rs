@@ -595,7 +595,7 @@ where
     // (mirrors `download_to_path_async`) so an interrupted download never
     // leaves a truncated file at the canonical path — the cached-map listing
     // treats any file at that path as a fully downloaded map.
-    let tmp_path = selection.local_path.with_extension("part");
+    let tmp_path = partial_path(&selection.local_path);
     if let Err(err) = stream_response_to_file(&mut response, &tmp_path, cancel, &mut on_progress) {
         let _ = fs::remove_file(&tmp_path);
         return Err(err);
@@ -1311,8 +1311,18 @@ where
 }
 
 /// Where a file is written while it is still arriving.
+///
+/// The suffix is appended to the whole name, not substituted for the
+/// extension. `with_extension("part")` gave `sheet.map` and `sheet.ozf2` — a
+/// calibration file and its raster, which is exactly how an OziExplorer
+/// bundle is laid out — the same `sheet.part`, and the two are fetched
+/// concurrently. Two workers wrote to one file and the rename published
+/// whatever was left; the atomic rename never helped, because the damage
+/// happened before it.
 fn partial_path(path: &Path) -> std::path::PathBuf {
-    path.with_extension("part")
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".part");
+    path.with_file_name(name)
 }
 
 /// Fetch `url` into `path`, continuing from `resume_from` bytes already
@@ -2551,8 +2561,44 @@ mod tests {
             "interrupted download must not leave a truncated file at the final path"
         );
         assert!(
-            !local_path.with_extension("part").exists(),
+            !super::partial_path(&local_path).exists(),
             "interrupted download must clean up its .part file"
+        );
+    }
+
+    /// Два файла бандла не должны писаться в один временный путь.
+    ///
+    /// Комплект OziExplorer устроен так, что калибровочный `.map` лежит рядом
+    /// со своим растром `.ozf2` под тем же именем. `with_extension("part")`
+    /// превращал оба в один `sheet.part`, а файлы качаются параллельно: два
+    /// worker'а писали в один файл, и переименование публиковало то, что
+    /// осталось. Атомарность переименования тут ничего не значила, потому что
+    /// порча происходила до него.
+    #[test]
+    fn two_files_of_one_bundle_do_not_share_a_partial_path() {
+        use std::path::Path;
+        let a = super::partial_path(Path::new("/bundle/sheet.map"));
+        let b = super::partial_path(Path::new("/bundle/sheet.ozf2"));
+        assert_ne!(
+            a, b,
+            "`.map` и `.ozf2` одного листа получили один временный путь"
+        );
+    }
+
+    /// Расширение исходного файла должно сохраняться: по нему сканеры карт
+    /// отличают `.sqlitedb` от всего остального, а человек — понимает, что
+    /// именно не докачалось.
+    #[test]
+    fn a_partial_path_keeps_the_original_extension() {
+        use std::path::Path;
+        assert_eq!(
+            super::partial_path(Path::new("/bundle/topo_z16.sqlitedb")),
+            Path::new("/bundle/topo_z16.sqlitedb.part")
+        );
+        assert_eq!(
+            super::partial_path(Path::new("/bundle/coords")),
+            Path::new("/bundle/coords.part"),
+            "файл без расширения тоже должен получать суффикс"
         );
     }
 
@@ -2782,7 +2828,7 @@ mod tests {
         // a usable map, so keeping it does not make the bundles root look
         // complete when it is not.
         assert!(
-            path.with_extension("part").exists(),
+            super::partial_path(&path).exists(),
             "a stalled transfer keeps what it wrote, for the retry to resume"
         );
     }
@@ -3105,7 +3151,7 @@ mod bundle_download_tests {
 
         let dir = tempfile::tempdir().expect("tempdir");
         let target = dir.path().join("gone.sqlitedb");
-        tokio::fs::write(target.with_extension("part"), b"half a map")
+        tokio::fs::write(super::partial_path(&target), b"half a map")
             .await
             .expect("a leftover from an earlier attempt");
 
@@ -3121,7 +3167,7 @@ mod bundle_download_tests {
 
         assert!(result.is_err());
         assert!(
-            !target.with_extension("part").exists(),
+            !super::partial_path(&target).exists(),
             "the partial file goes when the file is given up on"
         );
     }

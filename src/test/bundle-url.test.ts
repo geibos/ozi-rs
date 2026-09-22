@@ -62,3 +62,27 @@ describe("the slug in a catalogue link", () => {
     expect(bundleSlugFromUrl("https://maps.lizaalert.ru/")).toBeNull();
   });
 });
+
+/**
+ * Внешнее ревью 22.09: `decodeURIComponent` стоял вне `try`, поэтому строка с
+ * оборванным процентом бросала `URIError` вместо того, чтобы вернуть `null`.
+ * Вся задача функции — сказать «это не ссылка каталога», а не упасть: её
+ * зовёт эффект на каждое изменение строки поиска.
+ */
+describe("кривое percent-encoding", () => {
+  it("не бросает, а отвечает null", () => {
+    expect(() =>
+      bundleSlugFromUrl("https://maps.lizaalert.ru/maps/%/"),
+    ).not.toThrow();
+    expect(bundleSlugFromUrl("https://maps.lizaalert.ru/maps/%/")).toBeNull();
+    expect(bundleSlugFromUrl("https://maps.lizaalert.ru/maps/%D0/")).toBeNull();
+  });
+
+  it("корректно закодированное имя по-прежнему разбирается", () => {
+    expect(
+      bundleSlugFromUrl(
+        "https://maps.lizaalert.ru/maps/2026-09-21_%D0%9B%D0%B0%D0%B2%D1%80%D0%BE%D0%B2%D0%BE/",
+      ),
+    ).toBe("2026-09-21_Лаврово");
+  });
+});

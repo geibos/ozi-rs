@@ -20,7 +20,7 @@ export { selectVisibleWaypointLayers };
  * `LizaProjectSummaryDto`) bump to `v2` while old cache values are
  * naturally garbage-collected by the next read attempt.
  */
-const CATALOG_CACHE_KEY = "liza:projects:v1";
+export const CATALOG_CACHE_KEY = "liza:projects:v1";
 
 function isValidCacheEntry(
   value: unknown,
@@ -74,10 +74,36 @@ export function loadCatalogCache(): LizaProjectSummaryDto[] | null {
  * timestamp. Best-effort: storage errors (e.g. `QuotaExceededError`,
  * unavailable storage) are swallowed and logged to the dev console only.
  */
-export function saveCatalogCache(items: LizaProjectSummaryDto[]): void {
+/**
+ * When the list on screen last came from the server.
+ *
+ * Not "when the cache was last written": the cache is rewritten 800 ms after
+ * any non-empty change to the list, and that includes the very first one,
+ * where the list was restored from the cache itself. Stamping the write time
+ * meant a launch with no network re-dated yesterday's list as today's — and
+ * the date exists precisely so a crew can tell those apart. External review,
+ * 2026-09-22.
+ */
+let lastRefreshedAt: string | null = null;
+
+/** A completed catalogue walk landed; the list on screen is from the server. */
+export function markCatalogueRefreshed(at: string = new Date().toISOString()) {
+  lastRefreshedAt = at;
+}
+
+export function saveCatalogCache(
+  items: LizaProjectSummaryDto[],
+  refreshedAt?: string,
+): void {
   try {
     if (typeof localStorage === "undefined") return;
-    const writtenAt = new Date().toISOString();
+    if (refreshedAt !== undefined) lastRefreshedAt = refreshedAt;
+    // A write with no refresh behind it keeps whatever date the cache had:
+    // the contents may have been merged, but nothing newer was fetched. Only
+    // a first-ever write, which by definition follows a walk, takes now.
+    const writtenAt =
+      lastRefreshedAt ?? loadCatalogWrittenAt() ?? new Date().toISOString();
+    lastRefreshedAt = writtenAt;
     const payload: CatalogCachePayload = { items, writtenAt };
     localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify(payload));
     catalogueWrittenAt.set(writtenAt);
@@ -108,11 +134,20 @@ export function loadCatalogWrittenAt(): string | null {
 
 function createAppStore() {
   const { subscribe, set } = writable<AppStateDto | null>(null);
+  // The same generation stamp `latest-run.ts` holds for component reloads,
+  // inlined here because the store is the shared state. Two refreshes
+  // overlapped freely and the slower one's answer replaced the newer state —
+  // and overlapping is the normal case, not a rare one: a bundle download
+  // emits `state-changed` once per file. External review, 2026-09-22.
+  let latest = 0;
 
   return {
     subscribe,
     async refresh() {
+      latest += 1;
+      const mine = latest;
       const state = await getAppState();
+      if (mine !== latest) return;
       set(state);
     },
   };
@@ -320,6 +355,9 @@ export function finishCatalogueRefresh(complete: boolean): void {
   const seen = walkedSlugs;
   walkedSlugs = null;
   if (!complete || seen === null) return;
+  // The list on screen is now the server's answer, so the date it carries may
+  // move. A stopped walk read only a prefix and does not earn a new date.
+  markCatalogueRefreshed();
   projectsStore.update((current) =>
     current.filter((project) => seen.has(project.slug)),
   );

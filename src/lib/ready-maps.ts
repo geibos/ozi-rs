@@ -10,14 +10,18 @@ import type { LizaMapPackageDto } from "./bindings";
  * file lands; nothing ever said so, so the crew waited for the whole bundle.
  *
  * `packageName` is the file's path relative to the bundle root
- * (`8-Android&iOS/..._z16.sqlitedb`), which is why this matches by suffix.
+ * (`8-Android&iOS/..._z16.sqlitedb`), so the two meet at the last component,
+ * compared whole. Comparing with `endsWith` over the entire path instead made
+ * `bigmap.ozf2` a match for `map.ozf2`, and the crew was told a map was ready
+ * that had not been downloaded. The Rust side had the same defect, found by
+ * external review on 2026-09-22; this copy was missed because the review read
+ * only the Rust.
  */
 export function readyMapName(
   packageName: string,
   maps: readonly LizaMapPackageDto[],
 ): string | null {
-  const match = maps.find(
-    (map) => map.name.length > 0 && packageName.endsWith(map.name),
-  );
+  const landed = packageName.split("/").pop() ?? packageName;
+  const match = maps.find((map) => map.name.length > 0 && landed === map.name);
   return match ? match.name : null;
 }

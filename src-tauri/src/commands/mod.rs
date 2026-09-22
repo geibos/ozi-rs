@@ -911,9 +911,10 @@ pub fn load_project_file(
     state: State<SharedState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    lock_app_state(state.inner())?.load_project_from(PathBuf::from(path));
+    let result = lock_app_state(state.inner())?.load_project_from(PathBuf::from(path));
+    // Emit either way: a failed open still produced a diagnostic entry.
     let _ = app.emit("state-changed", ());
-    Ok(())
+    result
 }
 
 // ── Import / export ───────────────────────────────────────────────────────────
@@ -1271,14 +1272,25 @@ pub fn show_only_track(
 
 /// Abandon a drawing in progress: reverse its commands without leaving them
 /// in the redo stack.
+///
+/// The track is named as well as counted. The undo stack is bounded, so a
+/// drawing longer than the stack has already lost the command that created
+/// the track, and counting alone left an empty one behind.
 #[tauri::command]
 #[specta::specta]
 pub fn cancel_drawing(
+    layer_id: u64,
+    track_id: u64,
     command_count: u32,
     state: State<SharedState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    lock_app_state(state.inner())?.cancel_drawing(command_count as usize);
+    use crate::domain::{LayerId, TrackId};
+    lock_app_state(state.inner())?.cancel_drawing_of(
+        LayerId::new(layer_id),
+        TrackId::new(track_id),
+        command_count as usize,
+    );
     let _ = app.emit("state-changed", ());
     Ok(())
 }

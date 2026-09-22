@@ -30,18 +30,21 @@ export function bundleSlugFromUrl(text: string): string | null {
     : `https://${trimmed}`;
 
   let url: URL;
+  let segments: string[];
   try {
     url = new URL(withScheme);
+    if (url.hostname.toLowerCase() !== CATALOGUE_HOST) return null;
+    // Decoding belongs inside the guard: a trailing or truncated percent —
+    // `…/maps/%/` — throws `URIError`, and this function's whole job is to
+    // answer "not a catalogue link" rather than to fail. An effect calls it
+    // on every keystroke in the search box.
+    segments = url.pathname
+      .split("/")
+      .map((s) => decodeURIComponent(s))
+      .filter((s) => s !== "");
   } catch {
     return null;
   }
-
-  if (url.hostname.toLowerCase() !== CATALOGUE_HOST) return null;
-
-  const segments = url.pathname
-    .split("/")
-    .map((s) => decodeURIComponent(s))
-    .filter((s) => s !== "");
   if (segments[0] !== "maps") return null;
 
   const slug = segments[1];

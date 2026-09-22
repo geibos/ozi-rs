@@ -238,16 +238,35 @@ fn parse_gpx_archive_entry(
 fn track_colours_in_document_order(bytes: &[u8]) -> Vec<Option<[u8; 4]>> {
     use xml::reader::{EventReader, XmlEvent};
 
+    /// The namespace a real `<trk>` lives in. An element of the same local
+    /// name from anybody else's namespace is not a track.
+    const GPX_NS: &str = "http://www.topografix.com/GPX/1/1";
+
     let mut colours: Vec<Option<[u8; 4]>> = Vec::new();
     let mut in_display_colour = false;
+    // Depth inside the current `<trk>`, or `None` between tracks. A colour
+    // found outside a track belongs to no track — it used to be written into
+    // the last slot even after `</trk>`, and `declared_flags` then locked that
+    // in as "the file said so", which the palette no longer corrects.
+    let mut track_depth: Option<usize> = None;
+
+    let is_track = |name: &xml::name::OwnedName| {
+        name.local_name == "trk" && name.namespace.as_deref().is_none_or(|ns| ns == GPX_NS)
+    };
 
     for event in EventReader::new(bytes) {
         match event {
-            Ok(XmlEvent::StartElement { name, .. }) => match name.local_name.as_str() {
-                "trk" => colours.push(None),
-                "DisplayColor" => in_display_colour = true,
-                _ => {}
-            },
+            Ok(XmlEvent::StartElement { name, .. }) => {
+                if let Some(depth) = track_depth.as_mut() {
+                    *depth += 1;
+                    if name.local_name == "DisplayColor" {
+                        in_display_colour = true;
+                    }
+                } else if is_track(&name) {
+                    colours.push(None);
+                    track_depth = Some(0);
+                }
+            }
             Ok(XmlEvent::Characters(text)) if in_display_colour => {
                 if let Some(slot) = colours.last_mut() {
                     *slot = super::super::export::gpx::garmin_color_to_rgba(text.trim());
@@ -256,6 +275,13 @@ fn track_colours_in_document_order(bytes: &[u8]) -> Vec<Option<[u8; 4]>> {
             Ok(XmlEvent::EndElement { name }) => {
                 if name.local_name == "DisplayColor" {
                     in_display_colour = false;
+                }
+                if let Some(depth) = track_depth.as_mut() {
+                    if *depth == 0 {
+                        track_depth = None;
+                    } else {
+                        *depth -= 1;
+                    }
                 }
             }
             Err(_) => return Vec::new(),
@@ -398,6 +424,68 @@ mod tests {
             track_colours_in_document_order(xml.as_bytes()),
             vec![Some([0, 0, 255, 255]), None, Some([0, 255, 0, 255])]
         );
+    }
+
+    /// Внешнее ревью 22.09: проход считал по `local_name`, без проверки
+    /// вложенности и namespace. Любой `<x:trk>` внутри чужого `extensions`
+    /// добавлял слот и сдвигал всё сопоставление с `gpx.tracks`.
+    #[test]
+    fn a_trk_inside_an_extension_is_not_a_track() {
+        let xml = r#"<?xml version="1.0"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3"
+  xmlns:other="http://example.invalid/ns">
+  <trk><name>real</name>
+    <extensions><other:route><other:trk>не трек</other:trk></other:route></extensions>
+    <extensions><gpxx:TrackExtension>
+      <gpxx:DisplayColor>Blue</gpxx:DisplayColor>
+    </gpxx:TrackExtension></extensions>
+    <trkseg><trkpt lat="59.9" lon="31.5"/></trkseg>
+  </trk>
+</gpx>"#;
+        assert_eq!(
+            track_colours_in_document_order(xml.as_bytes()),
+            vec![Some([0, 0, 255, 255])],
+            "чужой <other:trk> не должен создавать слот"
+        );
+    }
+
+    /// И обратное: `DisplayColor` за пределами трека не должен перекрашивать
+    /// последний. Раньше он писал в последний слот даже после `</trk>`, а
+    /// `declared_flags` закреплял это как «цвет объявлен явно», так что
+    /// палитра уже не исправляла.
+    #[test]
+    fn a_display_colour_outside_a_track_colours_nothing() {
+        let xml = r#"<?xml version="1.0"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+  <trk><name>plain</name>
+    <trkseg><trkpt lat="59.9" lon="31.5"/></trkseg>
+  </trk>
+  <extensions><gpxx:TrackExtension>
+    <gpxx:DisplayColor>Blue</gpxx:DisplayColor>
+  </gpxx:TrackExtension></extensions>
+</gpx>"#;
+        assert_eq!(
+            track_colours_in_document_order(xml.as_bytes()),
+            vec![None],
+            "цвет вне трека не принадлежит последнему треку"
+        );
+    }
+
+    /// Namespace трека — тот же, что у самого GPX. Элемент с тем же локальным
+    /// именем из чужого пространства треком не является.
+    #[test]
+    fn only_the_gpx_namespace_declares_a_track() {
+        let xml = r#"<?xml version="1.0"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:foreign="http://example.invalid/ns">
+  <foreign:trk><foreign:name>чужое</foreign:name></foreign:trk>
+  <trk><name>real</name>
+    <trkseg><trkpt lat="59.9" lon="31.5"/></trkseg>
+  </trk>
+</gpx>"#;
+        assert_eq!(track_colours_in_document_order(xml.as_bytes()).len(), 1);
     }
 
     #[test]

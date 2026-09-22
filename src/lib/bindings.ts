@@ -231,10 +231,14 @@ async setTrackColor(layerId: number, trackId: number, color: [number, number, nu
 /**
  * Abandon a drawing in progress: reverse its commands without leaving them
  * in the redo stack.
+ * 
+ * The track is named as well as counted. The undo stack is bounded, so a
+ * drawing longer than the stack has already lost the command that created
+ * the track, and counting alone left an empty one behind.
  */
-async cancelDrawing(commandCount: number) : Promise<Result<null, string>> {
+async cancelDrawing(layerId: number, trackId: number, commandCount: number) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("cancel_drawing", { commandCount }) };
+    return { status: "ok", data: await TAURI_INVOKE("cancel_drawing", { layerId, trackId, commandCount }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

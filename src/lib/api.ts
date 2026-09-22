@@ -366,9 +366,24 @@ export async function showOnlyWaypoint(
  * Abandon a drawing in progress: reverse its commands without leaving them in
  * the redo stack. `commandCount` is the number of commands the draw produced,
  * including the one that created the track.
+ *
+ * The track is named as well, because the count alone is not enough: the undo
+ * stack is bounded, and a drawing longer than the stack has already lost the
+ * command that created the track.
  */
-export async function cancelDrawing(commandCount: number): Promise<void> {
-  await unwrap("cancel_drawing", commands.cancelDrawing(commandCount));
+export async function cancelDrawing(
+  layerId: bigint,
+  trackId: bigint,
+  commandCount: number,
+): Promise<void> {
+  await unwrap(
+    "cancel_drawing",
+    commands.cancelDrawing(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      commandCount,
+    ),
+  );
 }
 
 export async function revealBundle(): Promise<void> {

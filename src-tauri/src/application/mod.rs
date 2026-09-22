@@ -439,7 +439,16 @@ impl AppState {
                 } else {
                     format!("Loaded {count} projects")
                 };
-                self.update_status(DiagnosticLevel::Info, status);
+                // The launch-time walk finishes minutes after the operator
+                // started a download, and used to write its count over the one
+                // line that says how far that download has got. The walk has
+                // the diagnostics log; the status bar belongs to the thing the
+                // crew is waiting on. External review, 2026-09-22.
+                if self.lizaalert.downloading.is_empty() {
+                    self.update_status(DiagnosticLevel::Info, status);
+                } else {
+                    self.push_diagnostic(DiagnosticLevel::Info, status);
+                }
             }
             Err(error) => {
                 self.update_status(DiagnosticLevel::Error, error);
@@ -568,11 +577,14 @@ impl AppState {
             local_path: local_path.to_path_buf(),
         });
         if let Some(project) = self.lizaalert.selected_project.as_mut() {
-            // Match by file_name suffix; bundle packages store the local
-            // file name as `file_name`, while `package_name` here is a path
-            // relative to the bundle root.
+            // `package_name` is a path relative to the bundle root, a package's
+            // `file_name` is the bare name, so the two meet at the last
+            // component. Comparing with `ends_with` on the whole string instead
+            // made `bigmap.ozf2` a match for `map.ozf2`, and the crew opened a
+            // layer they had not downloaded. External review, 2026-09-22.
+            let landed_name = package_name.rsplit('/').next().unwrap_or(package_name);
             for map in project.maps.iter_mut() {
-                if package_name.ends_with(&map.file_name) {
+                if landed_name == map.file_name {
                     map.local_path = Some(local_path.to_path_buf());
                 }
             }
@@ -806,7 +818,15 @@ impl AppState {
         }
     }
 
-    pub fn load_project_from(&mut self, path: PathBuf) {
+    /// Open a project file.
+    ///
+    /// Returns the failure to the caller. It used to swallow it into the
+    /// diagnostics and return `()`, so the command answered `Ok(())` for a
+    /// file it had not opened: the interface then remembered the path in the
+    /// recents and framed the map on a project that was never loaded. Saving
+    /// already returned its errors; this is the other half of that pair.
+    /// External review, 2026-09-22.
+    pub fn load_project_from(&mut self, path: PathBuf) -> Result<(), String> {
         match persistence::load_project(&path) {
             Ok(project) => {
                 let display = path.display().to_string();
@@ -817,9 +837,12 @@ impl AppState {
                 self.lizaalert.active_map = None;
                 self.update_status(DiagnosticLevel::Info, format!("Opened: {display}"));
                 self.persist_session_snapshot();
+                Ok(())
             }
             Err(error) => {
-                self.update_status(DiagnosticLevel::Error, format!("Open failed: {error}"));
+                let message = format!("Open failed: {error}");
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                Err(message)
             }
         }
     }
@@ -991,8 +1014,29 @@ impl AppState {
     /// left the abandoned track in the redo stack — a later redo brought it
     /// back — and kept the project marked as changed. Discarding reverses the
     /// same commands without recording them.
-    pub fn cancel_drawing(&mut self, command_count: usize) -> usize {
-        self.history.discard_last(command_count, &mut self.project)
+    /// Abandon a drawing in progress, naming the track it created.
+    ///
+    /// Counting commands is not enough: the undo stack is bounded at
+    /// `MAX_STACK_DEPTH` and drops its oldest entries, so a drawing longer
+    /// than the stack has already lost the command that created the track.
+    /// Discarding "the last N" then reversed only the surviving inserts and
+    /// left an empty track behind — rubbish a crew could not remove with
+    /// undo, because undo no longer knew about it. External review,
+    /// 2026-09-22.
+    ///
+    /// The sweep is deliberate rather than another command: the drawing never
+    /// happened, so there is nothing to put in the redo stack.
+    pub fn cancel_drawing_of(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        command_count: usize,
+    ) -> usize {
+        let discarded = self.history.discard_last(command_count, &mut self.project);
+        if let Ok(layer) = self.project.track_layer_mut(layer_id.value()) {
+            let _ = layer.remove_track(track_id);
+        }
+        discarded
     }
 
     pub fn rename_track(&mut self, layer_id: LayerId, track_id: TrackId, new_name: String) {
@@ -1011,7 +1055,11 @@ impl AppState {
         );
     }
 
-    /// Move a track point (uses apply_or_merge for drag coalescing).
+    /// Move a track point.
+    ///
+    /// `None` for the gesture: the frontend sends one command per completed
+    /// drag, so each drop is its own undo step. Passing a gesture id is how a
+    /// continuous drag — a command per pointer move — would collapse into one.
     pub fn apply_move_track_point(
         &mut self,
         layer_id: LayerId,
@@ -1036,7 +1084,7 @@ impl AppState {
             layer_id, track_id, segment_id, point_id, lat, lon, old_lat, old_lon,
         );
         self.history
-            .apply_or_merge(cmd, &mut self.project)
+            .apply_or_merge(cmd, None, &mut self.project)
             .map_err(|e| match e {
                 commands::CommandError::ProjectLayer(pe) => pe,
             })
@@ -2133,7 +2181,7 @@ mod tests {
             .apply_create_empty_track(fresh_layer, "X".into())
             .expect("create");
         assert!(fresh.project_dirty());
-        fresh.load_project_from(save_path);
+        fresh.load_project_from(save_path).expect("load");
         assert!(!fresh.project_dirty(), "loaded project starts clean");
     }
     use crate::infrastructure::persistence::{PersistedActiveMap, PersistedAppSession};
@@ -2552,6 +2600,92 @@ mod tests {
         );
     }
 
+    /// Длинное рисование должно отменяться целиком.
+    ///
+    /// Внешнее ревью 22.09: отмена считала число команд, а стек ограничен
+    /// сотней записей и вытесняет старое. После сотни точек команда создания
+    /// трека уже вытеснена — `discard_last` снимала только оставшиеся
+    /// вставки, и пустой трек оставался в проекте. Крыло, которое передумало
+    /// рисовать длинный маршрут, получало мусор без способа его убрать
+    /// отменой.
+    #[test]
+    fn cancelling_a_long_drawing_leaves_no_scratch_track() {
+        let mut state = AppState::new();
+        let layer = LayerId::new(1);
+        state
+            .apply_create_empty_track(layer, "рисую".to_owned())
+            .expect("create");
+        let track = state
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer)
+            .expect("layer")
+            .tracks()
+            .last()
+            .expect("track")
+            .id();
+
+        // Больше, чем глубина стека: самые ранние команды вытесняются.
+        let segment = state
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer)
+            .expect("layer")
+            .tracks()
+            .last()
+            .expect("track")
+            .segments()
+            .first()
+            .expect("segment")
+            .id();
+        for i in 0..150usize {
+            state
+                .apply_insert_track_point(layer, track, segment, i, 59.9 + i as f64 * 1e-5, 31.5)
+                .expect("point");
+        }
+
+        state.cancel_drawing_of(layer, track, 151);
+
+        let tracks_left = state
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer)
+            .expect("layer")
+            .tracks()
+            .len();
+        assert_eq!(
+            tracks_left, 0,
+            "отменённое рисование не должно оставлять трек в проекте"
+        );
+    }
+
+    /// Неудачное открытие должно доехать до вызывающего.
+    ///
+    /// Раньше `load_project_from` возвращала `()`, ошибка уходила в
+    /// диагностику, а команда отвечала `Ok(())`. Интерфейс на это записывал
+    /// путь в недавние и кадрировал карту по проекту, который не открылся.
+    #[test]
+    fn opening_a_file_that_is_not_a_project_reports_the_failure() {
+        let dir = temp_session_dir("open-failure");
+        let path = dir.join("broken.ozp");
+        std::fs::write(&path, b"not json at all").expect("write");
+
+        let mut state = AppState::new();
+        let before = state.project_name().to_owned();
+
+        let result = state.load_project_from(path);
+
+        assert!(result.is_err(), "отказ должен вернуться вызывающему");
+        assert_eq!(
+            state.project_name(),
+            before,
+            "неудачное открытие не должно менять текущий проект"
+        );
+    }
+
     /// A fresh project must have exactly one layer of each kind. It used to
     /// have two of each, both claiming id 1 — the selector showed "Tracks"
     /// twice and the second was unreachable.
@@ -2611,7 +2745,7 @@ mod tests {
             .len();
         assert_eq!(drawn, 1, "the drawing is on the project");
 
-        let discarded = state.cancel_drawing(3);
+        let discarded = state.cancel_drawing_of(layer_id, track_id, 3);
         assert_eq!(discarded, 3);
 
         assert_eq!(
@@ -2844,6 +2978,99 @@ mod tests {
             }
             _ => panic!("a map already on disk SHALL open without a download"),
         }
+    }
+
+    /// `bigmap.ozf2` ends with `map.ozf2`. Matching the ready file against a
+    /// package's name with `ends_with` therefore handed the wrong map a
+    /// `local_path`, and the crew opened a layer they had not downloaded.
+    /// External review, 2026-09-22.
+    #[test]
+    fn a_ready_file_lands_on_the_map_whose_name_it_actually_is() {
+        let mut state = AppState::new();
+        let mut project = sample_project_with_remote_map();
+        project.maps[0].file_name = "map.ozf2".to_owned();
+        project.maps.push(LizaMapPackage {
+            name: "big".to_owned(),
+            file_name: "bigmap.ozf2".to_owned(),
+            url: "https://example.invalid/bigmap.ozf2".to_owned(),
+            base_zoom: 12,
+            local_path: None,
+            size_bytes: None,
+        });
+        state.lizaalert.selected_project = Some(project);
+
+        let landed = std::path::PathBuf::from("/tmp/bundle/bigmap.ozf2");
+        state.note_bundle_file_ready("8-Android&iOS/bigmap.ozf2", &landed);
+
+        let maps = &state.lizaalert.selected_project.as_ref().unwrap().maps;
+        assert_eq!(
+            maps[0].local_path, None,
+            "`map.ozf2` SHALL NOT be marked ready by a file called `bigmap.ozf2`"
+        );
+        assert_eq!(maps[1].local_path, Some(landed));
+    }
+
+    /// A file directly in the bundle root, with no directory in front of it,
+    /// still belongs to its package.
+    #[test]
+    fn a_ready_file_at_the_bundle_root_still_finds_its_map() {
+        let mut state = AppState::new();
+        let mut project = sample_project_with_remote_map();
+        project.maps[0].file_name = "map.ozf2".to_owned();
+        state.lizaalert.selected_project = Some(project);
+
+        let landed = std::path::PathBuf::from("/tmp/bundle/map.ozf2");
+        state.note_bundle_file_ready("map.ozf2", &landed);
+
+        let maps = &state.lizaalert.selected_project.as_ref().unwrap().maps;
+        assert_eq!(maps[0].local_path, Some(landed));
+    }
+
+    /// The launch-time walk finishes minutes after the operator started a
+    /// download. It used to write "Loaded 412 projects" over the only line
+    /// that says how far the download has got. The walk has the diagnostics
+    /// log; the status bar belongs to the thing the crew is waiting on.
+    /// External review, 2026-09-22.
+    #[test]
+    fn a_finished_walk_does_not_write_over_a_running_download() {
+        let mut state = AppState::new();
+        state.lizaalert.downloading.insert("demo-map".to_owned());
+        state.apply_progress("Downloading demo-map: 40%".to_owned());
+
+        state.apply_projects_loaded(Ok(lizaalert::CatalogueWalk {
+            projects: Vec::new(),
+            pages: 1,
+            cancelled: false,
+        }));
+
+        assert_eq!(
+            state.lizaalert.status, "Downloading demo-map: 40%",
+            "the status bar SHALL keep reporting the download the crew is waiting on"
+        );
+        assert!(
+            state
+                .lizaalert
+                .diagnostics
+                .iter()
+                .any(|entry| entry.message.contains("0 projects")),
+            "the walk's result SHALL still reach the diagnostics log"
+        );
+        assert!(
+            !state.lizaalert.listing_busy,
+            "the walk SHALL still release its flag"
+        );
+    }
+
+    /// With nothing downloading, the walk owns the line as before.
+    #[test]
+    fn a_finished_walk_reports_itself_when_nothing_is_downloading() {
+        let mut state = AppState::new();
+        state.apply_projects_loaded(Ok(lizaalert::CatalogueWalk {
+            projects: Vec::new(),
+            pages: 1,
+            cancelled: false,
+        }));
+        assert!(state.lizaalert.status.contains("0 projects"));
     }
 
     /// An export that failed used to answer `Ok(())`, so the caller showed the

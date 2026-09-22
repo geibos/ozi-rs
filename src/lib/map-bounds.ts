@@ -93,3 +93,42 @@ export function toLngLatBounds(
 export function centreOf(bounds: Bounds): [number, number] {
   return [(bounds.west + bounds.east) / 2, (bounds.south + bounds.north) / 2];
 }
+
+/**
+ * A waypoint layer as the camera sees it: either the marks that were read
+ * from it, or `null` when the read failed and the layer's contents are
+ * unknown.
+ */
+export interface FocusWaypointLayer {
+  layerId: string;
+  waypoints: { lon: number; lat: number; visible?: boolean | null }[] | null;
+}
+
+/**
+ * Everything "показать всё" should fit on screen.
+ *
+ * Tracks come from the GeoJSON the backend built; marks come from the layer
+ * data, not from the markers that happen to be on the map. Those markers are
+ * put there by an asynchronous reconciler, so reading them meant a click that
+ * landed before the reconciler finished framed the tracks and left the marks
+ * off-camera. A layer whose read failed is the one case where the drawn
+ * markers are still the best answer available, so `drawnFor` supplies them.
+ */
+export function focusPositions(
+  features: GeometryLike[],
+  layers: FocusWaypointLayer[],
+  drawnFor: (layerId: string) => LatLon[],
+): LatLon[] {
+  const points = geojsonPositions(features);
+  for (const { layerId, waypoints } of layers) {
+    if (waypoints === null) {
+      points.push(...drawnFor(layerId));
+      continue;
+    }
+    for (const wp of waypoints) {
+      if (wp.visible === false) continue;
+      points.push({ lon: wp.lon, lat: wp.lat });
+    }
+  }
+  return points;
+}

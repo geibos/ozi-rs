@@ -1323,7 +1323,27 @@ fn collect_simplify_removed(
 struct CommandDelta {
     forward: ProjectCommand,
     reverse: ProjectCommand,
+    /// The gesture this entry belongs to, when it belongs to one.
+    ///
+    /// Only entries of the same gesture coalesce. Before, merging asked one
+    /// question — do these two commands touch the same entity — so dragging a
+    /// point, letting go, looking at it and dragging it again produced a
+    /// single undo step, and Ctrl+Z went back past a correction the operator
+    /// had already accepted. A gesture is what the operator would call one
+    /// action, and only the caller knows where one ends.
+    /// External review, 2026-09-22.
+    gesture: Option<GestureId>,
 }
+
+/// Identifies one continuous operator action, so the commands it produces
+/// collapse into a single undo step.
+///
+/// Nothing merges today: every caller sends one command per gesture, so each
+/// carries `None` and each lands as its own entry. The type exists for the
+/// path that will send a command per pointer move while a drag is in flight —
+/// that is the case coalescing was written for, and the one where merging by
+/// entity alone would be right by accident.
+pub type GestureId = u64;
 
 #[derive(Debug, Clone, Default)]
 pub struct CommandStack {
@@ -1337,25 +1357,38 @@ pub struct CommandStack {
 }
 
 impl CommandStack {
+    /// Apply a command as its own undo step.
     pub fn apply(
         &mut self,
         project: &mut Project,
         command: &ProjectCommand,
     ) -> Result<(), CommandError> {
-        self.apply_or_merge(command.clone(), project)
+        self.apply_or_merge(command.clone(), None, project)
     }
 
+    /// Apply a command, merging it into the previous undo step when both
+    /// belong to the same gesture and touch the same entity.
+    ///
+    /// `gesture` of `None` never merges: an action the caller has not tied to
+    /// a gesture is an action of its own, and the operator gets one Ctrl+Z
+    /// for it. See [`GestureId`].
     pub fn apply_or_merge(
         &mut self,
         command: ProjectCommand,
+        gesture: Option<GestureId>,
         project: &mut Project,
     ) -> Result<(), CommandError> {
-        self.redo_history.clear();
-
+        // The redo stack is cleared only once the command has actually landed.
+        // Clearing first meant a refused operation destroyed the redo the
+        // operator still had — the edit did not happen, and the history
+        // changed anyway. External review, 2026-09-22.
         if let Some(last_delta) = self.undo_history.last_mut()
+            && gesture.is_some()
+            && last_delta.gesture == gesture
             && last_delta.forward.targets_same_entity(&command)
         {
             command.apply(project)?;
+            self.redo_history.clear();
             last_delta.forward = command;
             self.mutation_count += 1;
             return Ok(());
@@ -1363,10 +1396,12 @@ impl CommandStack {
 
         let reverse = command.reverse(project);
         command.apply(project)?;
+        self.redo_history.clear();
         self.mutation_count += 1;
         self.undo_history.push(CommandDelta {
             forward: command,
             reverse,
+            gesture,
         });
         if self.undo_history.len() > MAX_STACK_DEPTH {
             self.undo_history.remove(0);
@@ -1614,6 +1649,44 @@ mod cj4_tests {
 
 #[cfg(test)]
 mod tests {
+    /// Неуспешная команда не должна трогать историю.
+    ///
+    /// Внешнее ревью 22.09: `redo_history.clear()` стоял до `apply`, поэтому
+    /// отказ операции стирал возможность повтора, хотя правка не состоялась.
+    /// Крыло нажимает «удалить точку», получает отказ — и молча теряет всё,
+    /// что могло вернуть через «повторить».
+    #[test]
+    fn a_command_that_fails_leaves_redo_alone() {
+        use crate::domain::{LayerId, Project, TrackId};
+
+        let mut project = Project::default();
+        let layer = LayerId::new(1);
+        let mut history = CommandStack::default();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::create_empty_track(layer, TrackId::new(1), "трек".to_owned()),
+            )
+            .expect("create");
+        assert!(history.undo(&mut project), "undo");
+        assert!(history.can_redo(), "после отмены повтор доступен");
+
+        // Команда, которая обязана отказать: такого слоя нет.
+        let failed = history.apply(
+            &mut project,
+            &ProjectCommand::create_empty_track(
+                LayerId::new(999),
+                TrackId::new(2),
+                "нет".to_owned(),
+            ),
+        );
+        assert!(failed.is_err(), "команда должна отказать");
+        assert!(
+            history.can_redo(),
+            "отказ не должен уничтожать стек повтора"
+        );
+    }
+
     use super::{CommandError, CommandStack, ProjectCommand};
     use crate::domain::{
         LayerId, Project, ProjectLayerError, Track, TrackId, TrackLayer, TrackPoint, TrackPointId,
@@ -1789,6 +1862,109 @@ mod tests {
         assert_eq!(project.waypoint_layers()[1].waypoints()[0].latitude(), 54.1);
     }
 
+    /// Dragging a mark, letting go, looking at it and dragging it again is two
+    /// actions. Merging on "same entity" alone made it one undo step, so a
+    /// Ctrl+Z after the second drag went back past the first — a correction
+    /// the operator had already accepted. External review, 2026-09-22.
+    #[test]
+    fn two_drags_of_the_same_waypoint_are_two_undo_steps() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+        let before_moves = history.undo_history.len();
+
+        history
+            .apply_or_merge(
+                ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.0, 27.7),
+                Some(1),
+                &mut project,
+            )
+            .unwrap();
+        history
+            .apply_or_merge(
+                ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.2, 27.9),
+                Some(2),
+                &mut project,
+            )
+            .unwrap();
+
+        assert_eq!(
+            history.undo_history.len(),
+            before_moves + 2,
+            "a second gesture SHALL NOT fold into the first"
+        );
+
+        assert!(history.undo(&mut project));
+        let waypoint = &project.waypoint_layers()[1].waypoints()[0];
+        assert_eq!(
+            (waypoint.latitude(), waypoint.longitude()),
+            (54.0, 27.7),
+            "one undo SHALL take back one drag"
+        );
+    }
+
+    /// An action nobody tied to a gesture is an action of its own. `apply` —
+    /// which is every path but a drag — must never fold two of them together.
+    #[test]
+    fn commands_outside_a_gesture_never_merge() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(30);
+        let waypoint_id = WaypointId::new(4);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Waypoints"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(waypoint_id, "Camp", 53.9, 27.5667),
+                ),
+            )
+            .unwrap();
+        let before_moves = history.undo_history.len();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.0, 27.7),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.2, 27.9),
+            )
+            .unwrap();
+
+        assert_eq!(history.undo_history.len(), before_moves + 2);
+        assert!(history.undo(&mut project));
+        let waypoint = &project.waypoint_layers()[1].waypoints()[0];
+        assert_eq!((waypoint.latitude(), waypoint.longitude()), (54.0, 27.7));
+    }
+
     #[test]
     fn apply_or_merge_coalesces_sequential_waypoint_moves_into_single_undo_step() {
         let mut project = Project::untitled();
@@ -1815,12 +1991,14 @@ mod tests {
         history
             .apply_or_merge(
                 ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.0, 27.7),
+                Some(1),
                 &mut project,
             )
             .unwrap();
         history
             .apply_or_merge(
                 ProjectCommand::move_waypoint(layer_id, waypoint_id, 54.2, 27.9),
+                Some(1),
                 &mut project,
             )
             .unwrap();
@@ -1941,6 +2119,7 @@ mod tests {
                 ProjectCommand::move_track_point(
                     layer_id, track_id, segment_id, point_id, 54.0, 27.7, 53.9, 27.5667,
                 ),
+                Some(7),
                 &mut project,
             )
             .unwrap();
@@ -1950,6 +2129,7 @@ mod tests {
                 ProjectCommand::move_track_point(
                     layer_id, track_id, segment_id, point_id, 54.2, 27.9, 53.9, 27.5667,
                 ),
+                Some(7),
                 &mut project,
             )
             .unwrap();

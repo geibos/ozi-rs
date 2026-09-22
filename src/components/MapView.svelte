@@ -56,17 +56,23 @@
     getWaypoints,
     cancelDrawing,
   } from "../lib/api";
-  import type { PointDetail, SegmentDetail, TrackDetail } from "../lib/types";
+  import type {
+    OziMetadataDto,
+    PointDetail,
+    SegmentDetail,
+    TrackDetail,
+  } from "../lib/types";
   import { locale, t as i18n } from "../lib/i18n";
   import { toast } from "svelte-sonner";
   import { registerSqliteProtocol } from "../lib/maplibre/sqlite-protocol";
   import { registerOziProtocol } from "../lib/maplibre/ozi-protocol";
   import { createLatestRun } from "$lib/latest-run";
+  import { mayReachNetworkNow } from "$lib/network-reach";
   import { reportEditFailure } from "$lib/edit-failure";
   import {
     boundsOf,
     centreOf,
-    geojsonPositions,
+    focusPositions,
     isDegenerate,
     toLngLatBounds,
   } from "$lib/map-bounds";
@@ -209,6 +215,9 @@
 
   async function cancelDrawingMode() {
     if (!$drawingModeActive || $drawingTrackId === null) return;
+    const layerId = $drawingTrackLayerId;
+    const trackId = $drawingTrackId;
+    if (layerId === null) return;
     // +1 for the command that created the track itself.
     const commandCount = drawingCommandCount + 1;
 
@@ -221,7 +230,10 @@
       // One discard rather than a loop of undos: undoing left the abandoned
       // track in the redo stack, where a later redo brought it back, and kept
       // the project marked as changed although nothing had changed.
-      await cancelDrawing(commandCount);
+      // The track is named as well as counted: the undo stack is bounded, so
+      // a drawing longer than it has already lost its own creation command
+      // and the count alone would leave an empty track behind.
+      await cancelDrawing(layerId, trackId, commandCount);
     } catch (error) {
       reportEditFailure("map.cancelDrawingFailed", error);
     } finally {
@@ -370,6 +382,18 @@
   async function reloadEditableTrackPoints(layerId: bigint, trackId: bigint) {
     if (!map || !$editModeActive) return;
     const detail = await getTrackDetail(layerId, trackId);
+    // Re-check after the await: switching the mode off or selecting another
+    // track during the request used to be ignored, and the late answer drew
+    // editable markers for a track nobody was editing any more, with handlers
+    // still carrying the old ids. External review, 2026-09-22.
+    const selected = get(selectedTrack);
+    if (
+      !get(editModeActive) ||
+      selected?.layerId !== layerId ||
+      selected?.trackId !== trackId
+    ) {
+      return;
+    }
     renderEditableTrackPoints(layerId, trackId, detail);
     await refreshTrackGeometry();
   }
@@ -524,6 +548,12 @@
   /** See `createLatestRun`: an overtaken refresh must not draw its markers. */
   const waypointMarkerRuns = createLatestRun();
   const trackGeometryRuns = createLatestRun();
+  /**
+   * The active-map apply awaits the OZI metadata before it touches the map,
+   * so switching maps during that read left two applies removing and adding
+   * the same source. External review, 2026-09-22.
+   */
+  const activeMapRuns = createLatestRun();
 
   async function refreshWaypointMarkers() {
     if (!map) return;
@@ -553,8 +583,14 @@
         const layerId = BigInt(layer.id);
         try {
           return { layerId, waypoints: await getWaypoints(layerId) };
-        } catch {
-          return { layerId, waypoints: [] };
+        } catch (error) {
+          // An empty array here would be indistinguishable from "this layer
+          // has no marks", and the reconciler below would then remove the
+          // markers that are on the map — a read failure silently erasing the
+          // ШТАБ. `null` means "unknown", and an unknown layer keeps what it
+          // has. External review, 2026-09-22.
+          reportEditFailure("map.waypointsLoadFailed", error);
+          return { layerId, waypoints: null };
         }
       }),
     );
@@ -563,7 +599,15 @@
     // already moved past — a waypoint just added, gone again.
     if (!waypointMarkerRuns.isCurrent(run)) return;
 
+    // Layers whose marks could not be read: their markers stay as they are.
+    const unreadable = new Set(
+      perLayer
+        .filter((entry) => entry.waypoints === null)
+        .map((entry) => String(entry.layerId)),
+    );
+
     for (const { layerId, waypoints } of perLayer) {
+      if (waypoints === null) continue;
       const isActive = activeId !== null && layerId === activeId;
       for (const wp of waypoints.filter((w) => w.visible !== false)) {
         const key = waypointMarkerKey(layerId, wp.id);
@@ -586,6 +630,8 @@
     //    (draggable is wired at Marker construction; we can't toggle it
     //    in place without re-creating the marker).
     for (const [key, marker] of waypointMarkers) {
+      // `layerId:waypointId` — a marker of an unreadable layer is left alone.
+      if (unreadable.has(key.split(":")[0])) continue;
       const next = incoming.get(key);
       const applied = appliedWaypoints.get(key);
       if (!next || (applied && applied.isActive !== next.data.isActive)) {
@@ -893,15 +939,25 @@
       // isStyleLoaded()/once("load"), which silently dropped refreshes
       // forever when it ran after startup (tracks-never-render bug).
       mapLoaded = true;
-      map.addSource("osm", {
-        type: "raster",
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        maxzoom: 19,
-        attribution:
-          "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
-      });
-      map.addLayer({ id: "osm-tiles", type: "raster", source: "osm" });
+      // CJ-2 promises a field launch makes no network requests, and this
+      // source made one per visible tile — for a basemap that is covered by
+      // the local raster the moment a map is opened, and that offline only
+      // ever renders as grey anyway. A link found later in the session does
+      // not bring it back: re-inserting a layer underneath the active raster
+      // is how the "JPG накладывается поверх" bug happened, and the backdrop
+      // is not worth that risk. The next launch with a link has it.
+      // External review, 2026-09-22.
+      if (mayReachNetworkNow()) {
+        map.addSource("osm", {
+          type: "raster",
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          maxzoom: 19,
+          attribution:
+            "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+        });
+        map.addLayer({ id: "osm-tiles", type: "raster", source: "osm" });
+      }
 
       initTracksLayer(map);
       initMeasureLayer(map);
@@ -1009,6 +1065,24 @@
     if (!am) return;
 
     async function applyActiveMap() {
+      const run = activeMapRuns.begin();
+
+      let meta: OziMetadataDto | null = null;
+      if (am.kind === "ozi") {
+        // Read before touching the map: a metadata read that fails or is
+        // overtaken must leave the raster the crew is looking at alone.
+        try {
+          meta = await getOziMetadata(am.local_path);
+        } catch (error) {
+          reportEditFailure("map.activeMapFailed", error);
+          return;
+        }
+        if (!activeMapRuns.isCurrent(run)) return;
+      }
+
+      // Only now is the apply going to happen, so only now has this path
+      // been applied. Setting it before the await meant a read that failed
+      // blocked every retry of the same map for the rest of the session.
       appliedMapPath = am.local_path;
 
       // Remove old map source/layer
@@ -1023,8 +1097,7 @@
 
       let fitBoundsTarget: [number, number, number, number] | null = null;
 
-      if (am.kind === "ozi") {
-        const meta = await getOziMetadata(am.local_path);
+      if (meta) {
         const sourceSpec: maplibregl.RasterSourceSpecification = {
           type: "raster",
           tiles: [`ozi://${am.local_path}/{z}/{x}/{y}`],
@@ -1081,9 +1154,9 @@
     }
 
     if (!mapLoaded) {
-      map.once("load", applyActiveMap);
+      map.once("load", () => void applyActiveMap());
     } else {
-      applyActiveMap();
+      void applyActiveMap();
     }
   });
 
@@ -1371,14 +1444,41 @@
    */
   async function focusAllData() {
     try {
-      const geojson = await getTracksGeojson();
-      const points = geojsonPositions(
+      // The marks come from the layers, not from the markers that happen to
+      // be on the map: those are placed by an asynchronous reconciler, so a
+      // click that lands before it finishes used to frame the tracks and
+      // leave the ШТАБ off-camera. External review, 2026-09-22.
+      const layers = get(visibleWaypointLayers);
+      const [geojson, perLayer] = await Promise.all([
+        getTracksGeojson(),
+        Promise.all(
+          layers.map(async (layer) => {
+            const layerId = BigInt(layer.id);
+            try {
+              return {
+                layerId: String(layerId),
+                waypoints: await getWaypoints(layerId),
+              };
+            } catch (error) {
+              reportEditFailure("map.waypointsLoadFailed", error);
+              return { layerId: String(layerId), waypoints: null };
+            }
+          }),
+        ),
+      ]);
+      const points = focusPositions(
         geojson.features as { geometry?: { coordinates?: unknown } | null }[],
+        perLayer,
+        (layerId) => {
+          const drawn: { lon: number; lat: number }[] = [];
+          for (const [key, marker] of waypointMarkers) {
+            if (key.split(":")[0] !== layerId) continue;
+            const { lng, lat } = marker.getLngLat();
+            drawn.push({ lon: lng, lat });
+          }
+          return drawn;
+        },
       );
-      for (const marker of waypointMarkers.values()) {
-        const { lng, lat } = marker.getLngLat();
-        points.push({ lon: lng, lat });
-      }
       const bounds = boundsOf(points);
       if (!bounds) return;
       if (isDegenerate(bounds)) {

@@ -17,6 +17,31 @@ describe("readyMapName", () => {
     expect(readyMapName("2-Coordinates.txt", maps)).toBeNull();
   });
 
+  it("does not hand a landed file to a map whose name it merely ends with", () => {
+    // The Rust side had this same defect, found by external review on
+    // 2026-09-22: `bigmap.ozf2` ends with `map.ozf2`, so matching the whole
+    // path with `endsWith` announced a map the crew had not downloaded. The
+    // frontend copy was missed because the review read only the Rust.
+    const two = [
+      { name: "map.ozf2", base_zoom: 0, downloaded: false, size_bytes: null },
+      {
+        name: "bigmap.ozf2",
+        base_zoom: 0,
+        downloaded: false,
+        size_bytes: null,
+      },
+    ];
+    expect(readyMapName("8-Android&iOS/bigmap.ozf2", two)).toBe("bigmap.ozf2");
+    expect(readyMapName("8-Android&iOS/map.ozf2", two)).toBe("map.ozf2");
+  });
+
+  it("recognises a map that landed in the bundle root", () => {
+    const one = [
+      { name: "map.ozf2", base_zoom: 0, downloaded: false, size_bytes: null },
+    ];
+    expect(readyMapName("map.ozf2", one)).toBe("map.ozf2");
+  });
+
   it("does not match everything when a map name is empty", () => {
     expect(
       readyMapName("anything", [

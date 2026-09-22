@@ -38,7 +38,9 @@ const projectActionsSource = readFileSync(
  */
 describe("framing the data on the map", () => {
   it("a file import asks for the frame when at least one track arrived", () => {
-    expect(tracksTabSource).toContain("if (imported > 0) requestAllDataFocus()");
+    expect(tracksTabSource).toContain(
+      "if (imported > 0) requestAllDataFocus()",
+    );
   });
 
   it("a folder import asks for it once the backend summary resolves", () => {
@@ -63,9 +65,15 @@ describe("framing the data on the map", () => {
     expect(mapViewSource).toContain('request.kind === "all-data"');
     expect(mapViewSource).toContain("focusAllData");
     expect(mapViewSource).toContain("map.fitBounds(toLngLatBounds(bounds)");
-    // The waypoint positions come from the markers already on the map.
+    // The waypoint positions come from the layers, not from the markers that
+    // happen to be drawn: those are placed by an asynchronous reconciler, so
+    // reading them framed whatever had rendered so far. What `focusPositions`
+    // does with the two sources is covered in `focus-positions.test.ts`.
     expect(mapViewSource).toMatch(
-      /for \(const marker of waypointMarkers\.values\(\)\)[\s\S]{0,160}points\.push/,
+      /focusPositions\([\s\S]{0,200}geojson\.features/,
+    );
+    expect(mapViewSource).toMatch(
+      /getWaypoints\(layerId\)[\s\S]{0,400}focusPositions/,
     );
   });
 

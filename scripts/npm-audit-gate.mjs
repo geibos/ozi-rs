@@ -37,12 +37,14 @@ const ALLOWED = [
       "or customAttribution anywhere in src/ — a waiver whose premise is only " +
       "a promise decays the first time someone writes the call without " +
       "reading this file. " +
-      "Fix availability, checked 2026-09-22 with `npm audit --json`: " +
-      "vulnerable <=6.4.0, fixed in 6.10.0 only. There is no 5.x backport, " +
-      "so the pinned 4.7.x cannot be patched into safety and the only route " +
-      "is a two-major upgrade, which needs its own slice with visual " +
-      "verification — deliberately not attempted while the customer-journey " +
-      "smoke gate is down (see docs/STATE.md).",
+      "Fix availability, checked 2026-09-22 with `npm audit --json`: the " +
+      "advisory covers <=6.4.0, so the first version without it is 6.4.1; " +
+      "`fixAvailable` names 6.10.0 because that is the latest, not because " +
+      "it is the earliest fix. Either way there is no 4.x or 5.x backport. " +
+      "package.json asks for `^4` and package-lock.json resolves it to " +
+      "4.7.1, and no 4.x release carries the fix, so the only route out is " +
+      "a two-major upgrade — its own slice, with visual verification, " +
+      "because MapLibre 5 and 6 change the style spec and the marker API.",
     recheck:
       "When the MapLibre 6 upgrade slice lands. The code-side premise no " +
       "longer needs a human recheck: the test above fails instead.",
@@ -71,7 +73,12 @@ for (const entry of Object.values(report.vulnerabilities ?? {})) {
     if (typeof via !== "object" || !via.url) continue;
     const id = via.url.split("/").pop();
     if (!FAIL_LEVELS.has(via.severity)) continue;
-    found.set(id, { id, severity: via.severity, package: via.name, title: via.title });
+    found.set(id, {
+      id,
+      severity: via.severity,
+      package: via.name,
+      title: via.title,
+    });
   }
 }
 
@@ -81,10 +88,14 @@ const waived = [...found.values()].filter((a) => allowedIds.has(a.id));
 const stale = ALLOWED.filter((a) => !found.has(a.id));
 
 for (const a of waived) {
-  console.log(`waived  ${a.severity.padEnd(8)} ${a.package} ${a.id} — ${a.title}`);
+  console.log(
+    `waived  ${a.severity.padEnd(8)} ${a.package} ${a.id} — ${a.title}`,
+  );
 }
 for (const a of blocking) {
-  console.error(`BLOCKING ${a.severity.padEnd(8)} ${a.package} ${a.id} — ${a.title}`);
+  console.error(
+    `BLOCKING ${a.severity.padEnd(8)} ${a.package} ${a.id} — ${a.title}`,
+  );
 }
 for (const a of stale) {
   console.error(
