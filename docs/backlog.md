@@ -41,6 +41,23 @@ failed`), so it needs credentials. Owner decision (2026-09-21): credentials
 
 ### From the archiving and verification pass, 2026-09-22
 
+- **The local `openspec` was ten minor versions behind CI's.** CI installs
+  `@fission-ai/openspec@1.13.1` (`.github/workflows/ci.yml`); this machine had
+  1.3.1, which lacks the check that a MODIFIED block must carry forward the
+  scenarios the baseline still has — a MODIFIED requirement replaces the whole
+  block, so anything left out is dropped. Fifty-five changes were archived
+  under the older validator before that was noticed.
+
+  The damage was two scenarios, both from
+  `a-search-that-is-gone-leaves-the-list`, and both deliberately superseded:
+  the requirement text that replaced them says so in as many words and covers
+  both branches with new scenarios, so nothing was lost in meaning. A diff of
+  every `#### Scenario:` heading in the baseline before and after the batch
+  found no others, and no requirement was lost at all.
+
+  Worth pinning the version the way `rust-toolchain.toml` pins rustc, so a
+  machine cannot archive under a validator weaker than the gate's.
+
 - **`MapView` is driven by no automated test.** It needs a MapLibre instance,
   so vitest cannot mount it, and the stand has no test runner wired into
   `just ci`. What exists is unit tests on the helpers (`edit-failure`,
