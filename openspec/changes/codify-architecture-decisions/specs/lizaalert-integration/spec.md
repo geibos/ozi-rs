@@ -30,7 +30,7 @@ All HTTP traffic to `maps.lizaalert.ru` SHALL go through `reqwest` built with `d
 
 The system SHALL surface download or extraction failures as user-facing errors and SHALL NOT panic. Failure handling SHALL be atomic per file and per archive, not per bundle:
 
-- a file being downloaded SHALL be written to a sibling temporary file whose extension is replaced by `.part` (`10-Tracks/b.ozf2` → `10-Tracks/b.part`) and renamed to its canonical path only after it is fully written and fsynced, so a file present at its canonical path is always complete; a cancellation mid-stream SHALL remove the `.part` file; a network error SHALL keep it, because the next attempt resumes from it with a range request, and it SHALL be removed once the attempts at that file are exhausted (see `one-flaky-file-is-not-the-bundle`);
+- a file being downloaded SHALL be written to a sibling temporary file named by appending `.part` to the whole file name (`10-Tracks/b.ozf2` → `10-Tracks/b.ozf2.part`) and renamed to its canonical path only after it is fully written and fsynced, so a file present at its canonical path is always complete; a cancellation mid-stream SHALL remove the partial file; a network error SHALL keep it, because the next attempt resumes from it with a range request, and it SHALL be removed once the attempts at that file are exhausted (see `one-flaky-file-is-not-the-bundle`);
 - a cached OZI archive SHALL be extracted into a sibling staging directory and renamed into place only on success; a failed or interrupted extraction SHALL leave no destination directory, and the next open of the bundle SHALL retry the extraction;
 - files that finished before the failure SHALL remain on disk, and re-selecting the same project SHALL resume by fetching only the missing files;
 - one failing file SHALL NOT abort the other in-flight files of the same bundle; the first error is reported after the remaining workers finish, unless the user cancels.
@@ -40,7 +40,7 @@ When the remote listing is unreachable and the bundle is already cached (`<bundl
 #### Scenario: Network failure mid-download
 
 - **WHEN** a download is interrupted by a network error while `10-Tracks/b.ozf2` is in flight
-- **THEN** the system reports the failure to the user, `10-Tracks/b.ozf2` does not exist at its canonical path, files completed earlier remain on disk, and re-selecting the project fetches only the missing files. `10-Tracks/b.part` remains only while attempts at that file are still to come, and is gone once they are exhausted
+- **THEN** the system reports the failure to the user, `10-Tracks/b.ozf2` does not exist at its canonical path, files completed earlier remain on disk, and re-selecting the project fetches only the missing files. `10-Tracks/b.ozf2.part` remains only while attempts at that file are still to come, and is gone once they are exhausted
 
 #### Scenario: Interrupted archive extraction leaves no half-extracted directory
 

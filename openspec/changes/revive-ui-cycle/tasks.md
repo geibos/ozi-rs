@@ -4,7 +4,7 @@
 - [x] 0.2 Push `main` to `origin` (68 commits behind); confirm `git log origin/main..main` is empty and GitHub Actions runs green on the pushed head
 - [x] 0.3 Switch `.mcp.json` to `cargo run --quiet -p ozi-rs-mcp --` (mirror `opencode.json`); document in `docs/native-qa-mcp.md` that the prebuilt binary is no longer used
 - [ ] 0.4 Document the one-time Screen Recording grant for the terminal and MCP server in `docs/native-qa-mcp.md`; owner performs it
-- [ ] 0.5 Create `docs/STATE.md` (where we are / next slice / known broken) and link it from `AGENTS.md` and `CLAUDE.md` as the first thing to read and last thing to update
+- [x] 0.5 Create `docs/STATE.md` (where we are / next slice / known broken) and link it from `AGENTS.md` and `CLAUDE.md` as the first thing to read and last thing to update — done; verified 2026-09-22, the file exists and both documents point at it
 - [ ] 0.6 Add `.github/pull_request_template.md` with the five Definition-of-Done checkboxes
 - [ ] 0.7 Create branch `slice/0.2-visible-fixes` for the next group; from here on every slice is a branch + PR
 

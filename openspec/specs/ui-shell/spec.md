@@ -10,7 +10,6 @@ The application shell: the desktop window, frontend stack and routing, the UI ki
 - Legacy spec `docs/superpowers/specs/2026-05-17-shadcn-ui-kit-svelte-design.md` (2026-05-17, executed via archived `migrate-to-sveltekit`, `add-design-tokens-and-shadcn`, `2026-05-17-migrate-panels-to-shadcn`): stay on Svelte, adopt shadcn-svelte over bits-ui, SvelteKit + adapter-static, routes `/` and `/project`, felte + zod forms, track colours outside the theme, third-party credits, ESLint/Prettier/svelte-check baseline; rationale: meetily-grade polish without a framework migration. Codified as: "Frontend is bootstrapped via SvelteKit with adapter-static", "Top-level surfaces live at distinct routes `/` and `/project`", "UI primitives are sourced from the shadcn-svelte library", "All in-app panels render through shadcn-svelte primitives and Tailwind utility classes that consume semantic tokens", "Form panels use felte with zod resolvers", "Track and waypoint colours are isolated from the theme system", "Third-party dependencies are credited", "Icons come from Lucide via `@lucide/svelte`", "Toasts and tooltips are hosted once in the root layout" | D4/D5 (Catppuccin as the single colour source, HSL semantic layer derived from the flavour) superseded by the native token layer; the HSL-triplet contract survives inside the Catppuccin pack requirement; D8 tooling gates are codified in `ci-pipeline` ("Continuous integration pipeline on pull requests and main").
 - Legacy spec `docs/superpowers/specs/2026-05-17-meetily-inspired-future-work.md` (2026-05-17, backlog): not codified — backlog only. Its item A1 (command palette) later shipped as "A global Cmd-K command palette is available everywhere…"; remaining ideas are kept as a backlog list outside the specs.
 - Owner decision (2026-09-19): theme requirements stand although `ThemePicker.svelte` is currently unmounted; the picker returns with the toolbar/palette migration (`revive-ui-cycle` follow-up `migrate-toolbar-and-palette`).
-
 ## Requirements
 ### Requirement: System provides a Catppuccin theme selector with five options
 
@@ -1089,4 +1088,120 @@ Activating the trigger (click, Enter, Space) SHALL open the command palette dial
 
 - **WHEN** the user clicks the Cmd-K trigger (or presses Enter / Space while it is focused)
 - **THEN** the command palette dialog opens AND focus moves into the dialog's internal `Command.Input` AND typing characters there filters the palette results
+
+### Requirement: Accessible names and tooltips are localized
+
+Every control's tooltip and accessible name SHALL come from the interface's
+dictionaries, not from a literal in a component, including the library rows'
+visibility toggle, row menu and colour swatch, and the shell's landmark
+regions. An accessible name is what a screen reader speaks and what the
+platform's automation reads, so leaving it in one language is leaving the
+application in that language.
+
+A name substituted into a label SHALL NOT be required to take a grammatical
+case the interface cannot give it.
+
+#### Scenario: A row read in a Russian window
+
+- **WHEN** the interface is Russian and a track row is read out or inspected
+- **THEN** its visibility control, its menu and its colour swatch are named in Russian
+
+#### Scenario: A track name inside a label
+
+- **WHEN** a track's name appears inside a control's label in Russian
+- **THEN** the label reads correctly without declining the name
+
+### Requirement: No user-facing string is written into a component
+
+Every user-facing string SHALL come from the interface's dictionaries rather
+than being written as a literal in a component, and this SHALL be enforced by a
+test over the components rather than by review, because the strings that slip
+through are the ones nobody sees while writing them.
+
+An exception SHALL be recorded in the test with its reason rather than left
+implicit.
+
+#### Scenario: A label added in one language
+
+- **WHEN** a component is given an `aria-label`, `title` or `placeholder` written as a literal
+- **THEN** the test suite fails and names the file and the value
+
+#### Scenario: A label assembled in an expression
+
+- **WHEN** a component builds such a label from English text in an expression rather than from a dictionary lookup
+- **THEN** the test suite fails and names the file and the text
+
+#### Scenario: Editing a track on the map in Russian
+
+- **WHEN** the point context menu is opened while the interface is Russian
+- **THEN** its entries are in Russian
+
+### Requirement: The workspace actions stay reachable at every width
+
+The workspace context bar SHALL remain within the canvas column at every window
+width and in every combination of open rails, and its actions — undo, redo,
+save and the command-palette trigger — SHALL remain clickable. When the bar is
+too narrow for everything it holds, the inert mode placeholders SHALL be
+dropped first and the labels on the actions second; no action SHALL be moved
+out of reach, clipped or covered.
+
+#### Scenario: A track is selected on a laptop screen
+
+- **WHEN** the operator selects a track, which opens the inspector, on a window narrow enough that the bar cannot hold both the mode placeholders and the actions
+- **THEN** the placeholders are gone and all four actions are on screen and receive their own clicks
+
+#### Scenario: The bar is narrower still
+
+- **WHEN** the bar has room for the actions but not for their labels
+- **THEN** the labels are dropped and the controls stay, rather than the controls overflowing
+
+#### Scenario: A wide window
+
+- **WHEN** the bar has room for everything
+- **THEN** the mode placeholders and the labels are both shown
+
+### Requirement: A notification's message comes from the dictionary
+
+Every notification shown to the operator SHALL take its message from the
+interface dictionary rather than from a string written into a component or
+built by the backend. The detail beside it MAY be raw — a backend error's own
+words are evidence, and translating them would hide what failed.
+
+This SHALL be enforced by a test over the source rather than by review, since
+the same defect has reached the screen three times.
+
+#### Scenario: An ordinary edit fails
+
+- **WHEN** renaming a waypoint, hiding a track, exporting, simplifying or deleting fails
+- **THEN** the message is in the interface language, and the failure's own text appears as the detail
+
+#### Scenario: A message typed into a component
+
+- **WHEN** a notification is raised with a message written as a literal string
+- **THEN** the build fails, naming the file and line
+
+### Requirement: Text shown between the tags comes from the dictionary
+
+A component SHALL take the words it renders as its own content — a menu item,
+a button, a heading, an empty state — from the interface dictionary rather than
+from the markup, and a test over the source SHALL enforce it. Units and standard abbreviations written identically in both languages
+MAY be exempt, by name and with a stated reason.
+
+A count SHALL be worded so that it needs no plural form, since Russian requires
+three and the interface has no rule for choosing between them.
+
+#### Scenario: The actions menu on a track row
+
+- **WHEN** the operator opens a track's actions menu
+- **THEN** every item, including the destructive one, is in the interface language
+
+#### Scenario: A word typed into the markup
+
+- **WHEN** a component renders a word of its own rather than a dictionary lookup
+- **THEN** the build fails, naming the file and line
+
+#### Scenario: A counted badge
+
+- **WHEN** a badge shows how many points a drawing has
+- **THEN** it is worded without a noun that would need to agree with the number
 

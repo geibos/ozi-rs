@@ -9,7 +9,6 @@ Covers how track data enters a project from files: the single Import dialog (GPX
 - Change `bootstrap-current-state`: first behaviour-level requirements; its "into the active track layer" wording never matched `application/import.rs`, which creates `Imported tracks: <path>` and `Imported waypoints: <path>` layers — replaced in `codify-architecture-decisions`.
 - Change `fix-plt-import-encoding-detection` (2026-05-17): PLT bytes decode via BOM → strict UTF-8 → `chardetng` → Windows-1251 fallback; rationale: field PLT files from Russian Windows are cp1251, newer ones UTF-8 or UTF-16. Codified as: PLT import accepts Windows-1251 encoded text. GPX import has no such chain; it relies on the XML encoding declaration.
 - CJ-3 (`docs/customer-journeys.md`) and the July 2026 import work: one Import dialog with a combined GPX/PLT/ZIP filter, `.zip` routed through the GPX import command, and a recursive "Import folder…" for per-date subfolders that reports per-file failures instead of aborting; rationale: volunteers bring a folder or a ZIP from several navigators, and the twin GPX/PLT buttons were indistinguishable. Codified as: Single import dialog accepts GPX, PLT and ZIP files; Recursive folder import of GPX and PLT files.
-
 ## Requirements
 ### Requirement: System imports GPX files into the active track layer
 
@@ -87,4 +86,68 @@ The system SHALL convert import errors (unreadable file, malformed XML, unknown 
 
 - **WHEN** the user attempts to import a file that fails GPX parsing
 - **THEN** the application reports an import error and the project state is unchanged
+
+### Requirement: Import-created layers are named after the source file
+
+A layer created by importing a file SHALL be named after that file rather than
+its full path, so the layer selector shows the part that distinguishes one
+import from another.
+
+#### Scenario: Importing a folder of GPX files
+
+- **WHEN** `/Users/owner/Downloads/10-Tracks/20260709/20260708_Veter2.gpx` is imported
+- **THEN** the created track layer is named `20260708_Veter2.gpx`
+
+#### Scenario: Two files of the same name from different folders
+
+- **WHEN** two imported files share a file name
+- **THEN** both layers carry that name and remain distinguishable by their identifiers, which stay unique
+
+### Requirement: A folder import reports in the operator's language
+
+Importing a folder of recordings SHALL report what it did as counts — files
+read, tracks imported, waypoints imported — and the interface SHALL put those
+into words, rather than the backend sending a sentence to be displayed. Files
+that could not be read SHALL be named, by file name rather than by path. A
+folder in which some files were read and others were not SHALL be reported as a
+success carrying a caveat, not as a failure.
+
+#### Scenario: A day's archive imports
+
+- **WHEN** the operator imports a folder and every file is read
+- **THEN** the result is stated in the interface language, naming how many tracks and waypoints came from how many files
+
+#### Scenario: One navigator's file is unreadable
+
+- **WHEN** a folder imports with one file unread
+- **THEN** the rest is reported as imported, and the unread file is named alongside rather than replacing the result
+
+### Requirement: Imported tracks are told apart by colour
+
+An imported track that does not declare a colour SHALL be given one from a
+fixed palette, chosen by the track's position among the project's tracks, so
+that the tracks of one day's import are drawn in different colours. An imported
+track that does declare a colour SHALL keep it.
+
+Whether a colour was declared SHALL be reported by the code that reads the
+file, not inferred from the value: a file may declare the same colour the
+application uses by default.
+
+The palette SHALL hold at least eight distinct colours and SHALL avoid those a
+topographic basemap is made of.
+
+#### Scenario: A day's folder of recordings
+
+- **WHEN** a folder of GPX files that carry no colour is imported
+- **THEN** each track is drawn in a different colour
+
+#### Scenario: A file that names its colour
+
+- **WHEN** an imported track declares a colour, through the GPX extension or a PLT colour field
+- **THEN** it keeps that colour, including when it is the same as the application's default
+
+#### Scenario: The same day twice
+
+- **WHEN** the same folder is imported into a fresh project on two occasions
+- **THEN** the tracks come out in the same colours both times
 

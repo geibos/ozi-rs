@@ -9,7 +9,6 @@ Define the `justfile` as the single entry point for developer and agent workflow
 - change `fix-dev-release-rebuild` (archived 2026-05-26, implemented): `just run-release` must be a no-op when no input changed while `just build` / `just release` keep going through `npm run tauri build`; rationale: the build-and-launch loop was rebuilding the whole app on every run, and bypassing the Tauri CLI on the bundled path would break parity with the CI smoke build. Codified as: `just run-release` SHALL be a no-op when inputs are unchanged, Canonical bundled build path SHALL remain `npm run tauri build`.
 - ADR-0024 (2026-04-28, accepted; narrowed by ADR-0025 in `revive-ui-cycle`) together with the M1 `just smoke` gate (AGENTS.md "E2E gate"): the end-to-end gate for app-touching changes is an Appium Mac2 smoke run from `tools/ozi-rs-mcp/tests/`, invoked as `just smoke`, and it stays out of `just ci` because it seizes the screen; rationale: Playwright cannot exercise Tauri IPC, protocols or window lifecycle, and GUI-seizing runs must be batched, not run per check. Codified as: (revive-ui-cycle) Stand, fixtures and screenshot recipes are available through `just` — `just smoke [<N>]` runs the per-CJ smokes and `just ci` SHALL NOT include Appium smoke.
 - `docs/native-qa-mcp.md` §"Registering with an MCP client" and `opencode.json` (2026-05, implemented for opencode only): the MCP server is started through `cargo run` so a stale prebuilt binary can never serve a session; rationale: `.mcp.json` still points at `target/release/ozi-rs-mcp`, and that binary (built 2026-05-26) served sessions for months after the July fixes. Codified as: (revive-ui-cycle, agent-workflow) The native QA MCP server is always built from source.
-
 ## Requirements
 ### Requirement: `just run-release` SHALL be a no-op when inputs are unchanged
 
@@ -67,4 +66,33 @@ The optimization MAY be applied only to `just run-release` (and, at the implemen
 
 - **WHEN** the user runs `just build`
 - **THEN** the recipe SHALL invoke `npm run tauri build -- --debug` AND SHALL NOT short-circuit any step
+
+### Requirement: The stand answers in the shapes the bindings declare
+
+The browser stand SHALL type each command's answer against the generated
+bindings, so that an answer whose shape the application does not expect fails
+the type check rather than the screen. Any command whose answer deliberately
+differs SHALL be listed as an exception with its reason.
+
+#### Scenario: A stub drifts from its DTO
+
+- **WHEN** a stand answer is written with fields the command's DTO does not declare
+- **THEN** the type check fails, naming the command and the missing fields
+
+#### Scenario: A deliberate difference
+
+- **WHEN** an answer differs from its binding on purpose, as the tile commands do
+- **THEN** it is declared as an exception rather than widening every answer's type
+
+### Requirement: The stand draws what an import produced
+
+An import played on the stand SHALL reach every surface the real one reaches,
+the map included, so that a decision about how tracks look can be checked
+rather than reasoned about. A stand whose import changes one surface and not
+another describes a state the application never has.
+
+#### Scenario: A day's folder is imported on the stand
+
+- **WHEN** a folder import is played
+- **THEN** the new tracks appear in the list and are drawn on the map, in the colours the list shows
 

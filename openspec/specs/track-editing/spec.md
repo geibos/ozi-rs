@@ -11,7 +11,6 @@ Editing the geometry and structure of tracks that already exist in a project: mo
 - CJ-4 slice 1.2, commit c60dc6e (2026-07-15, landed; `docs/customer-journeys.md`): `ReorderTrackPoints` (per-segment stable sort, untimed points first, no-op when already sorted) and `CropTrackPoints` (extent or time range, untimed points always kept, all-points crop rejected, removed count reported), split/join UI in the Inspector segments table, track selection by clicking its line; rationale: cleaning a 5000-point track must take minutes and every step must be reversible. Codified as: User can sort a track's points by time as one undoable step; User can crop a track to the map extent or a time range.
 - Drawing mode (as implemented in `src/components/MapView.svelte:129-160, 623-650`): the track is created by `CreateEmptyTrack` when the mode starts, each click is an `InsertTrackPoint` command, and Esc cancels by undoing all of them; no ADR records this. Codified as: User can create new tracks by drawing on the map (modified to describe the command-per-click model; the earlier wording "no project change is committed" did not match the code).
 - Owner decision (2026-09-19): cancelling a draw with Esc discards the draw commands without a redo entry and restores the dirty flag; the previous undo-based cancel (commands left on the redo stack, project marked dirty) is replaced. Codified as the modified "User can create new tracks by drawing on the map"; implemented in `revive-ui-cycle` slice 0.3.
-
 ## Requirements
 ### Requirement: User can move a track point by dragging on the map
 
@@ -85,4 +84,63 @@ The system SHALL provide a simplification action with a configurable tolerance s
 
 - **WHEN** the user opens the simplify panel, adjusts tolerance, and cancels
 - **THEN** the original track geometry is preserved and no undo step is added
+
+### Requirement: A track can be trimmed at one of its points
+
+The operator SHALL be able to remove everything in a track before a chosen
+point, or everything after it, choosing the point in the points table. This is
+the commonest edit to a recording — the first part of it is the drive to the
+start — and the point is what the operator has, where a time or an extent is
+something they would have to work out.
+
+The chosen point SHALL be kept in either direction: it is where the walk begins
+or ends.
+
+A trim SHALL be a single undoable step that restores every removed point to its
+place. A trim that removes nothing SHALL say so and SHALL NOT record a step.
+
+#### Scenario: Cutting the drive to the start
+
+- **WHEN** the operator trims everything before the point where the walking began
+- **THEN** the earlier points are gone, that point remains, and one undo restores them all
+
+#### Scenario: Trimming at an end
+
+- **WHEN** the operator trims before the first point of a track
+- **THEN** nothing is removed, they are told, and there is no step to undo
+
+### Requirement: Bringing everything into view frames the data
+
+Framing the camera on everything the project holds SHALL use the tracks and the
+marks as stored, not the markers that have been drawn on the map so far, so
+that the result does not depend on how much of an asynchronous redraw has
+finished. A layer whose marks could not be read SHALL fall back to what is
+drawn for it.
+
+#### Scenario: Asking for everything right after opening a project
+
+- **WHEN** the operator asks to see everything before the markers have finished being drawn
+- **THEN** the camera frames the marks as well as the tracks
+
+### Requirement: A refused edit tells the operator
+
+An edit that the system declines SHALL be reported to the operator, carrying
+the reason the backend gave, rather than only being written to a developer
+console which is not present in a release build. This covers moving, deleting
+and inserting a track point, placing a point while drawing, cancelling a draw,
+and bringing the tracks into view.
+
+Where the refused edit has already been shown on the map, the map SHALL be
+brought back into agreement with the stored data rather than continuing to
+show the edit that did not happen.
+
+#### Scenario: A track point dragged to somewhere the system refuses
+
+- **WHEN** a track point is dragged and the move is declined
+- **THEN** the operator is told, with the reason, and the point is shown at its stored position
+
+#### Scenario: Drawing a point that cannot be placed
+
+- **WHEN** placing a point while drawing is declined
+- **THEN** the operator is told, with the reason
 

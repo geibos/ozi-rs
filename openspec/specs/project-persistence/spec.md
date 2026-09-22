@@ -112,3 +112,129 @@ Errors from the registration step SHALL be reported via `update_status` with `Di
 - **WHEN** session restore validates the selection and the layer-registration step fails (e.g. tile-source registration returns an error)
 - **THEN** the error is reported via `update_status` with `DiagnosticLevel::Error` AND `self.lizaalert.active_map` is reset to `None` AND the workspace falls back to the cold-start bundle loader
 
+### Requirement: The save and open dialogs offer the project format
+
+The dialog that saves a project SHALL offer the `.ozp` extension, and the
+dialog that opens one SHALL list `.ozp` files. A filter hides what it does not
+match, so a dialog filtering on anything else makes a project file unselectable
+however correctly it was written.
+
+The open dialog SHALL also accept the `json` extension, because projects saved
+by earlier builds of this application carry it and must stay openable.
+
+#### Scenario: Opening a project saved by another build
+
+- **WHEN** the operator opens a project file with the `.ozp` extension
+- **THEN** the open dialog lists it
+
+#### Scenario: Saving a project for the first time
+
+- **WHEN** the operator saves a never-saved project
+- **THEN** the dialog offers the `.ozp` extension
+
+### Requirement: Recently opened projects are offered for reopening
+
+The system SHALL remember the projects most recently opened or saved and offer
+them for reopening without a file dialog, because a crew returns to the same
+search for days and the one they want is almost always the one they had open
+last.
+
+A project SHALL be recorded when it is opened and when it is saved — a save is
+where a never-saved project first receives a path — and SHALL NOT be recorded
+when the save fails. The list SHALL be bounded and SHALL NOT list one project
+twice.
+
+A remembered path that no longer opens SHALL be removed from the list and the
+failure reported, rather than left to fail again. An unreadable list SHALL
+behave as an empty one rather than preventing the surface that offers it from
+opening.
+
+#### Scenario: Coming back to the same search
+
+- **WHEN** the operator opens the command palette after having saved a project
+- **THEN** that project is offered by name, and choosing it opens it without a file dialog
+
+#### Scenario: A project that has moved
+
+- **WHEN** a remembered project no longer opens
+- **THEN** the operator is told and the entry is removed from the list
+
+### Requirement: A project saved by an earlier build still opens
+
+A `.ozp` written by any earlier build of the application SHALL still load. The
+format carries no version field and has no migration path, so every field added
+to a persisted structure SHALL be readable from a file that lacks it — by being
+optional, or by carrying a default — and the absence of a field in an older file
+SHALL mean what it meant when the file was written.
+
+The application session file SHALL be held to the same rule. A session that
+cannot be read costs the restored project and the active map as well, and an
+unreadable session SHALL be distinguishable from an absent one, which is a
+first run.
+
+This SHALL be enforced by a test that loads a file carrying only the fields
+that have always existed, covering the project, its layers, tracks, segments,
+points and waypoints, rather than by review.
+
+#### Scenario: Opening a project from an early build
+
+- **WHEN** a project file is loaded that carries only a track with segments and points, and a waypoint, without any field added since
+- **THEN** it loads, the track is visible, and the waypoint has no symbol, no colour and is visible
+
+#### Scenario: A session from before a field was added
+
+- **WHEN** an application session file is read that lacks a field added since it was written
+- **THEN** it reads, and that field is absent rather than defaulted to a value the file never carried
+
+#### Scenario: A field added without a default
+
+- **WHEN** a persisted structure gains a field that older files cannot supply
+- **THEN** the test suite fails and names the field
+
+### Requirement: Opening a project puts its contents on screen
+
+Opening a project file SHALL frame the map on what that project contains,
+whether it was chosen from a dialog or from the recent-projects list. The frame
+SHALL cover waypoints as well as tracks, so that a project holding only
+waypoints is framed too. An extent too small to fit a camera to — a single
+point, or a few metres across — SHALL be centred at a readable zoom rather than
+fitted. A coordinate that is not a finite number SHALL be ignored rather than
+allowed to spoil the frame.
+
+#### Scenario: Reopening yesterday's search
+
+- **WHEN** the operator opens a saved project whose tracks lie outside the current view
+- **THEN** the map moves to show them, rather than leaving a view that looks like the project failed to load
+
+#### Scenario: A project of waypoints
+
+- **WHEN** the opened project holds waypoints and no track geometry
+- **THEN** the map is framed on the waypoints
+
+#### Scenario: A project holding one point
+
+- **WHEN** everything the project contains sits within a few metres
+- **THEN** the map is centred on it at a readable zoom, not at the maximum zoom
+
+### Requirement: A saved project is reachable without the command palette
+
+The screen the application opens on SHALL offer to open a saved project file,
+and SHALL list the most recently opened projects as direct choices. No control
+SHALL use the same words for opening a saved project and for opening the
+LizaAlert catalogue, since they are different things.
+
+#### Scenario: A crew arrives with yesterday's work
+
+- **WHEN** the application is launched and no project is open
+- **THEN** the first screen offers to open a saved project, and lists the recent ones, without the operator needing the command palette
+
+#### Scenario: A recent project has moved
+
+- **WHEN** an entry in that list no longer opens
+- **THEN** the failure is reported and the entry is dropped, rather than failing again the next time it is chosen
+
+#### Scenario: Opening from either surface
+
+- **WHEN** a project is opened from the first screen or from the command palette
+- **THEN** the same thing happens: it is loaded, remembered, and the map is framed on it
+

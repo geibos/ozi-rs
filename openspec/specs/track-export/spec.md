@@ -8,7 +8,6 @@ Covers writing tracks out of a project: whole-layer GPX export with the Garmin c
 - Change `bootstrap-current-state`: GPX layer export with `<gpxx:DisplayColor>`, single-track PLT export with COLORREF BGR colour and OLE dates, and the `<bundle>/10-Tracks/<track>.<ext>` default path; codified as the existing requirements of this spec.
 - Commits 0d17104 (2026-04-28) and f5f44bb (2026-07-14, M0 data-loss fixes): the PLT properties line was rewritten to the ten-field order OziExplorer and `import/plt.rs::parse_track_style` expect (visible, width, COLORREF, name, fixed tail) and the output switched from UTF-8 to Windows-1251 with CRLF, guarded by an export → import round-trip test; rationale: OziExplorer on Russian Windows showed mojibake and misread columns (CJ-6). Codified as: PLT export writes the OziExplorer 2.1 track layout; PLT export text is Windows-1251 with CRLF line endings.
 - ADR-0022 (2026-04-28, accepted): export taxonomy "GPX (tracks/waypoints), PLT (tracks), WPT (waypoints)"; only the taxonomy touches this capability — WPT itself is codified in `waypoints`. Not codified: a waypoint GPX export — `build_waypoint_gpx_xml` exists in `export/gpx.rs` but no command or UI calls it (`export_gpx` exports track layers only).
-
 ## Requirements
 ### Requirement: System exports the active track layer to GPX
 
@@ -64,4 +63,94 @@ The system SHALL, when an active bundle is known, pre-fill the GPX/PLT export fi
 
 - **WHEN** the user changes the export path to a directory outside the active bundle
 - **THEN** the system writes the export to the chosen location without warning
+
+### Requirement: Every track in the project exports in one step
+
+The system SHALL provide an action that writes every track in every track layer
+to a single user-chosen `.gpx` file, and SHALL report how many tracks it wrote.
+A project with no tracks SHALL be refused rather than producing an empty file.
+
+#### Scenario: Handing over a day of searching
+
+- **WHEN** a project holds tracks across several layers, one per imported navigator file
+- **THEN** one action writes all of them into one GPX, and the operator is told how many
+
+#### Scenario: Nothing to hand over
+
+- **WHEN** the project has no tracks
+- **THEN** the export is refused with a reason and no file is written
+
+### Requirement: A track exported to GPX and read back is the same track
+
+A track written to GPX and imported again SHALL carry the same name, the same
+division into segments, the same coordinates in the same order, the same point
+timestamps, including their absence where there were none, and the same colour.
+
+The segment boundary is part of this: a track whose sittings are joined on the
+way back claims a straight line between them that was never walked.
+
+The colour is carried as a GPX colour name, so what survives is the nearest
+name rather than the exact bytes. A track that declares no colour, or one whose
+declared name is not a GPX colour, SHALL keep the application's default rather
+than be given a guess. Colours SHALL be matched to tracks by their order in the
+document.
+
+#### Scenario: A two-sitting track goes out and comes back
+
+- **WHEN** a track of two segments, one of them timestamped, is exported to GPX and imported again
+- **THEN** its name, its two segments, every coordinate in order and every timestamp are as they were
+
+#### Scenario: A coloured track goes out and comes back
+
+- **WHEN** a track whose colour is one of the GPX colour names is exported and imported again
+- **THEN** it comes back that colour, not the default
+
+#### Scenario: A file where only some tracks declare a colour
+
+- **WHEN** a GPX holds a coloured track, then one with no colour, then another coloured one
+- **THEN** each coloured track gets its own colour and the middle one keeps the default
+
+#### Scenario: A colour name from another program
+
+- **WHEN** an imported track declares a colour name that is not a GPX colour
+- **THEN** the track keeps the default colour and the import succeeds
+
+### Requirement: A track exported to PLT and read back is the same track
+
+A track written to OziExplorer's PLT format and imported again SHALL carry the
+same name, the same division into sittings, the same coordinates, the same
+timestamps including their absence, the same colour and the same line width.
+Elevation SHALL survive the format's round to whole feet and no worse.
+
+The round trip SHALL be measured through the same colour packing the export
+command performs, since a comparison that bypasses the caller does not describe
+what a receiver gets.
+
+#### Scenario: A day's track goes to OziExplorer and back
+
+- **WHEN** a two-sitting track with a Cyrillic name, an elevation, one timestamped point and one without, a colour and a line width is exported to PLT and imported again
+- **THEN** every one of those is as it was, and the two sittings are still two
+
+### Requirement: A day is handed over as one file
+
+Exporting the day SHALL write every track and every waypoint in the project to
+a single GPX file, and SHALL report how many of each it wrote. A project
+holding waypoints and no tracks SHALL be exported, since a project of marks is
+a day's work too; only a project holding neither SHALL be refused, and a
+refusal SHALL leave no file behind.
+
+#### Scenario: A day of routes and marks
+
+- **WHEN** the operator exports the day from a project holding tracks and waypoints
+- **THEN** one file carries both, and the operator is told how many tracks and how many marks were written
+
+#### Scenario: A project of marks alone
+
+- **WHEN** the project holds waypoints and no tracks
+- **THEN** the export writes the marks rather than refusing
+
+#### Scenario: Nothing to hand over
+
+- **WHEN** the project holds neither tracks nor waypoints
+- **THEN** the export is refused and no file is written
 

@@ -26,6 +26,10 @@ The system SHALL store `color`, `line_width`, `opacity`, and `visible` per `Trac
 
 The system SHALL compute, for each track, total distance in kilometres, total duration when point timestamps are present, and total point count, and SHALL surface these in the track row UI.
 
+A track holding fewer than two points SHALL surface its point count alone. It has no length and no elapsed span, so a distance and a duration for it are not measurements of anything: the row read "0.0 км · 0мин · 1 тчк", two such numbers standing in front of the one that means something. A point count of one SHALL use the singular unit where the language has one.
+
+This last part is new because such tracks had no row at all until the track list stopped being derived from the map's geometry, which omits what it cannot draw.
+
 #### Scenario: Track with timestamps
 
 - **WHEN** a track has GPS timestamps on its points
@@ -45,6 +49,11 @@ The system SHALL compute, for each track, total distance in kilometres, total du
 
 - **WHEN** the user displays a track whose points have no timestamps
 - **THEN** the Tracks panel row shows distance and point count but omits the duration field
+
+#### Scenario: A track of a single point
+
+- **WHEN** the track list shows a track whose only segment holds one point
+- **THEN** its statistics read as a point count alone, without a distance or a duration
 
 ### Requirement: Track points panel exposes per-point attributes
 
@@ -87,4 +96,162 @@ The system SHALL accept any 8 leading digits followed by an underscore and a non
 
 - **WHEN** a track is named `20249999_Иванов`
 - **THEN** no warning is shown — the warning checks pattern only, not calendar validity
+
+### Requirement: Track visibility can be changed for all tracks at once
+
+The system SHALL provide commands to show every track and to hide every track in
+the project, each applied as one operation rather than per-track toggles. The
+Tracks tab SHALL expose both. Visibility remains a non-undoable style mutation,
+so a bulk change SHALL mark the project dirty without adding undo entries.
+
+#### Scenario: Hiding every track
+
+- **WHEN** a project holds twenty-six visible tracks across several layers and the operator chooses hide-all
+- **THEN** every track becomes hidden in a single state update, and the map redraws once
+
+#### Scenario: Showing every track again
+
+- **WHEN** some tracks are hidden and the operator chooses show-all
+- **THEN** every track in every layer becomes visible
+
+#### Scenario: Bulk visibility does not fill the undo stack
+
+- **WHEN** the operator hides all tracks and then presses undo
+- **THEN** the undo stack is unchanged by the bulk operation, consistent with per-track visibility toggles
+
+### Requirement: One track can be isolated from the rest
+
+The system SHALL provide an action that makes one track visible and hides every
+other track in the project in a single operation, reachable from that track's
+row.
+
+#### Scenario: Isolating a track for inspection
+
+- **WHEN** the operator picks "only this one" on the row for `20260709-ЛИСА15`
+- **THEN** that track is visible and every other track in every layer is hidden
+
+#### Scenario: Isolating a hidden track shows it
+
+- **WHEN** the chosen track is itself hidden at the time of the action
+- **THEN** it becomes visible while the others are hidden
+
+### Requirement: Every track in the project has a row
+
+The track list SHALL show one row for every track in the project, including a
+track the map cannot draw because it has fewer than two points in every
+segment. Such a track is part of the project and is exported with it, so it
+SHALL be selectable, renamable and deletable like any other.
+
+The list SHALL NOT be derived from the map's features, whose omissions are
+correct for drawing and wrong for a listing.
+
+#### Scenario: A track of a single point
+
+- **WHEN** the project contains a track whose only segment holds one point
+- **THEN** the track list shows a row for it, and the map draws nothing for it
+
+### Requirement: The track list is fetched without track geometry
+
+The data behind the track list SHALL carry only what a row shows. Track
+coordinates SHALL NOT be transferred in order to render the list, so that a
+project of many long recordings costs the list nothing beyond its rows.
+
+#### Scenario: A project of long recordings
+
+- **WHEN** the track list is loaded for a project whose tracks hold hundreds of thousands of points
+- **THEN** no track coordinates are transferred
+
+### Requirement: Only the newest track-list reload may be shown
+
+The track list SHALL show the result of the most recently started reload only,
+and SHALL discard an earlier reload's rows and an earlier reload's failure
+alike, so that the list never goes backwards. Reloads overlap because the list
+reloads on every application-state change.
+
+#### Scenario: A reload overtaken while a bundle downloads
+
+- **WHEN** a track-list reload is still running and a newer one completes first
+- **THEN** the rows shown are the newer reload's, and the older one changes nothing when it finishes
+
+### Requirement: A track's points can be stepped through
+
+The operator SHALL be able to step to the next and previous point of a track
+and SHALL be shown where in the recording they are. Reviewing a recording by
+clicking each row loses the operator's place whenever the list scrolls.
+
+Stepping SHALL move the map to the point, and SHALL follow the track's own
+order across its segments: a recording made in two sittings is one walk.
+
+Stepping SHALL stop at each end rather than wrapping, because a jump from the
+last point to the first reads as a fault.
+
+#### Scenario: Reviewing a two-sitting recording
+
+- **WHEN** the operator steps forward past the last point of the first segment
+- **THEN** the first point of the second segment is selected and the map moves to it
+
+#### Scenario: At the end
+
+- **WHEN** the last point of the track is selected
+- **THEN** stepping forward is not offered
+
+### Requirement: The inspector shows the track's elevation against distance
+
+The track inspector SHALL draw the recorded elevation of the selected track
+against distance travelled along it, and SHALL state the range in metres. A
+point carrying no elevation SHALL still count towards the distance, so a gap in
+the data does not move the samples around it. A track with fewer than two
+elevation readings SHALL be reported as carrying no elevation rather than
+drawn.
+
+#### Scenario: A recording with elevation
+
+- **WHEN** the operator selects a track whose points carry elevation
+- **THEN** the inspector draws the profile across the card and states the lowest and highest readings
+
+#### Scenario: A recording without elevation
+
+- **WHEN** the selected track carries no elevation, or only one reading
+- **THEN** the card says the recording carries no elevation, and no chart is drawn
+
+#### Scenario: A gap in the elevation data
+
+- **WHEN** a point between two readings carries no elevation
+- **THEN** the later reading keeps its distance from the track's start, rather than moving towards the earlier one
+
+### Requirement: The selected track is picked out on the map
+
+The map SHALL distinguish the selected track from the others without changing
+the colour that identifies it, so that a row in the list and a route on the map
+can be matched by eye while the map carries no names.
+
+Selecting nothing SHALL leave every track drawn as it was.
+
+#### Scenario: One route among a day's
+
+- **WHEN** a track is selected while a day's recordings are on the map
+- **THEN** that route is visibly marked out, and still drawn in its own colour
+
+#### Scenario: Stepping down the list
+
+- **WHEN** the operator moves from one track to the next
+- **THEN** the mark follows the selection, one route at a time
+
+#### Scenario: Nothing selected
+
+- **WHEN** no track is selected
+- **THEN** no route is marked
+
+### Requirement: Only the newest track-geometry fetch may be drawn
+
+The map SHALL draw the geometry of the most recently started fetch only, and
+SHALL discard an earlier fetch's result, so that the map does not fall behind
+the track list it is meant to match. Two changes in quick succession leave two
+fetches in flight.
+
+#### Scenario: Two track edits in quick succession
+
+- **WHEN** a second track-geometry fetch is started before the first answers
+- **AND** the first answers last
+- **THEN** the map draws the second fetch's geometry
 

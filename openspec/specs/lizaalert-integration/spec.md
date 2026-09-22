@@ -13,7 +13,11 @@ Covers the integration with `maps.lizaalert.ru`: streaming the project catalog a
 
 The system SHALL fetch the list of available projects from `maps.lizaalert.ru` and SHALL deliver results to the frontend in chunks via a `projects-chunk` event so the UI can render progressively.
 
-The frontend SHALL merge each incoming chunk into its working project list with upsert-by-slug semantics: an entry whose `slug` is already present SHALL replace the existing entry in place; an entry whose `slug` is new SHALL be appended at the end of the list. Entries already present in the working list but absent from a refresh SHALL NOT be removed by that refresh; they SHALL remain reachable from the bundle loader until the user explicitly clears the local catalog cache.
+The frontend SHALL merge each incoming chunk into its working project list with upsert-by-slug semantics: an entry whose `slug` is already present SHALL replace the existing entry in place; an entry whose `slug` is new SHALL be appended at the end of the list.
+
+An entry absent from a refresh SHALL be removed when, and only when, that refresh walked the whole listing. A refresh that was stopped read only a prefix of the catalogue and SHALL remove nothing. Rows sent from the cache before the walk began SHALL NOT count as evidence that a project still exists.
+
+This replaces the previous rule, under which an entry absent from a refresh was never removed and stayed reachable until the operator cleared the cache by hand. That rule was written when there was no way to tell a complete refresh from an interrupted one; there is now, so a search taken down upstream no longer stays in the list and in the cache for good, offered to a crew and failing when opened.
 
 #### Scenario: Streaming project list
 
@@ -25,10 +29,20 @@ The frontend SHALL merge each incoming chunk into its working project list with 
 - **WHEN** a `projects-chunk` payload contains an entry whose `slug` already exists in the working project list AND whose `name` differs from the cached value
 - **THEN** the existing entry's `name` is updated in place and its position in the list is preserved
 
-#### Scenario: Refresh that omits a known slug keeps the entry
+#### Scenario: A search is taken down between two refreshes
 
-- **WHEN** a complete refresh finishes (every `projects-chunk` event has been processed and no further chunk has arrived for the debounce window described in the Cache write Requirement) AND the working list contains a `slug` that was not referenced by any chunk in that refresh
-- **THEN** that `slug` remains in the working list and stays selectable in the bundle loader
+- **WHEN** a complete catalogue walk does not list a project the previous walk listed
+- **THEN** that project is no longer in the list or in the cache
+
+#### Scenario: The operator stops the refresh
+
+- **WHEN** a catalogue walk is stopped partway
+- **THEN** no project is removed from the list
+
+#### Scenario: The cached rows sent before the walk
+
+- **WHEN** a refresh emits the cached catalogue before walking
+- **THEN** those rows alone do not count as evidence that a project still exists
 
 ### Requirement: User can download a LizaAlert project bundle
 
@@ -100,6 +114,8 @@ The system SHALL hydrate the working catalog from this cache synchronously at fr
 
 The system SHALL swallow storage write failures (e.g. `QuotaExceededError`) silently and log them only to the developer console; the cache is best-effort and SHALL NOT block any user-facing flow.
 
+The system SHALL also show that timestamp to the operator beside the project list, and within the notice shown when a refresh has failed, so that a saved list can be told apart from a current one. It SHALL be shown as a calendar date and a clock time rather than an elapsed interval. A timestamp that cannot be read as a date SHALL be shown as nothing at all.
+
 #### Scenario: Cache survives across app restarts
 
 - **WHEN** the user successfully completes a project list refresh in session 1 AND restarts the application
@@ -120,14 +136,31 @@ The system SHALL swallow storage write failures (e.g. `QuotaExceededError`) sile
 - **WHEN** a cache write fails with `QuotaExceededError` or any other storage error
 - **THEN** the error is logged to the developer console only, the user sees no toast, and the in-memory catalog remains usable for the rest of the session
 
+#### Scenario: Reading a saved list offline
+
+- **WHEN** the refresh has failed and the operator is reading the cached list
+- **THEN** the notice names the date and time that list was written, so a search published since then can be recognised as missing rather than as non-existent
+
+#### Scenario: An unreadable timestamp
+
+- **WHEN** the stored timestamp cannot be parsed as a date
+- **THEN** nothing is shown in its place, rather than a placeholder that looks like a date
+
 ### Requirement: Catalog cache merges refresh deltas without dropping known entries
 
-The local catalog cache SHALL accumulate the union of entries the frontend has ever observed via `projects-chunk` events. A refresh that does not reference a previously-seen `slug` SHALL NOT remove that entry from the cache. The cache SHALL therefore be a superset of any single refresh's payload.
+The local catalog cache SHALL hold what the last complete refresh listed, together with entries seen since that no refresh has contradicted. A refresh that was stopped SHALL NOT remove anything from the cache, because it read only a prefix of the listing. A refresh that walked the whole listing SHALL remove the entries it did not reference.
 
-#### Scenario: Historical entries persist across refreshes
+This replaces the previous rule, under which the cache accumulated the union of everything ever observed and was therefore a superset of any single refresh. That rule kept a crew's list intact across an interrupted refresh, which was the right trade when a complete refresh could not be distinguished from an interrupted one. It also meant that a search taken down upstream was never removed: it stayed listed, stayed cached, and failed when opened, with no way to clear it short of deleting the cache by hand.
 
-- **WHEN** the user has a cached catalog containing 200 entries AND triggers a refresh that returns only 195 of those 200 entries
-- **THEN** after the refresh settles, the cache still contains 200 entries and the bundle loader still lists all 200; the five entries absent from the refresh are not removed
+#### Scenario: A stopped refresh keeps the cached entries it did not reach
+
+- **WHEN** the operator has a cached catalogue of 200 entries AND stops a refresh after it has listed 195 of them
+- **THEN** the cache still contains 200 entries and all 200 stay listed
+
+#### Scenario: A complete refresh drops what it did not list
+
+- **WHEN** the operator has a cached catalogue of 200 entries AND a refresh walks the whole listing and returns 195 of them
+- **THEN** the five entries the listing no longer carries are removed from the list and from the cache
 
 #### Scenario: New entries appear after refresh
 
@@ -161,4 +194,284 @@ Switching between the three states (`in-progress` → `cached` → neutral) SHAL
 
 - **WHEN** the user clicks a project row in the Library Maps tab (or its parent Projects pane) AND the project's bundle is selected via `load_project`
 - **THEN** no Sonner toast with `data-testid="ipc-error"` appears in a dev build (i.e. the IPC payload validates cleanly) AND the project becomes the current project
+
+### Requirement: The catalogue refresh can be stopped
+
+The catalogue refresh SHALL be stoppable by the operator while it runs, and the
+interface SHALL offer that control for as long as a refresh is in flight and
+not otherwise. The projects already read SHALL remain listed after a stop.
+
+Stopping SHALL release the busy flag exactly as completion does, so that a
+bundle download can start immediately afterwards.
+
+#### Scenario: A crew needs a bundle before the listing finishes
+
+- **WHEN** the operator stops the refresh while it is walking the listing
+- **THEN** the walk stops without requesting further pages, the projects already read stay in the list, and a bundle download can be started
+
+#### Scenario: No refresh is running
+
+- **WHEN** no catalogue refresh is in flight
+- **THEN** no stop control is offered
+
+### Requirement: A stopped refresh is not passed off as the whole catalogue
+
+A refresh that was stopped SHALL NOT replace the cached catalogue, because it
+read only its first pages. The system SHALL report a stopped refresh
+distinguishably from a completed one rather than reporting a count as if it
+were the total.
+
+#### Scenario: Stopping a refresh and reopening the application offline
+
+- **WHEN** a refresh is stopped partway and the application is later started without a network
+- **THEN** the catalogue shown is the last complete one, not the fragment the stopped refresh read
+
+#### Scenario: Reporting the outcome
+
+- **WHEN** a refresh is stopped partway
+- **THEN** the status says the refresh was stopped at that many projects, not that that many were loaded
+
+### Requirement: Bundle progress is reported in the interface's language
+
+Progress reported while a bundle is being opened SHALL reach the interface as a
+translation key with its arguments, not as a finished sentence, so that it can
+be shown in the language the interface is set to. The phase word shown beside
+it SHALL be translated on the same terms.
+
+The backend SHALL also send the English wording, and the interface SHALL show
+that wording when it has no translation for the key, so that an untranslated
+message degrades to English rather than to a key.
+
+#### Scenario: A download watched in a Russian window
+
+- **WHEN** a bundle download reports its progress and the interface is Russian
+- **THEN** the message and the phase beside it are in Russian
+
+#### Scenario: A message the interface does not know
+
+- **WHEN** progress arrives with a key the dictionaries do not define
+- **THEN** the backend's own wording is shown, and the key is not
+
+#### Scenario: A bundle name that looks like a placeholder
+
+- **WHEN** a message argument itself contains placeholder-shaped text
+- **THEN** it appears in the message unchanged
+
+### Requirement: The catalogue refresh says how far it has got
+
+While a catalogue refresh runs, the interface SHALL state how many projects are
+already listed, so that the decision to stop the refresh can be made on what is
+there rather than on elapsed time alone.
+
+#### Scenario: A crew watching the refresh
+
+- **WHEN** a catalogue refresh is running and projects have arrived
+- **THEN** the refreshing hint states how many are listed so far
+
+### Requirement: The project catalogue can be walked from the keyboard
+
+The project list SHALL be operable from the keyboard without a pointer: it
+SHALL expose itself as a listbox that takes focus and names the row the
+keyboard is on, SHALL move that position with the arrow keys, by a screenful
+with Page Up and Page Down and to either end with Home and End, and SHALL open
+the row it is on when Enter is pressed.
+
+The position SHALL be held against the full filtered list rather than against
+the rows currently rendered, because the list is virtualized and most rows do
+not exist in the document. It SHALL NOT move past either end, the list SHALL
+scroll to keep it visible, and it SHALL be marked distinctly from the selected
+row.
+
+Narrowing the list SHALL clear the position.
+
+#### Scenario: Finding a search without the pointer
+
+- **WHEN** the operator types part of a name, presses Down and presses Enter
+- **THEN** the first matching project is opened
+
+#### Scenario: Reaching the end of the catalogue
+
+- **WHEN** the operator presses End and then Down
+- **THEN** the position is on the last project and stays there
+
+#### Scenario: Narrowing the list after moving
+
+- **WHEN** the operator has moved the position and then changes the filter
+- **THEN** no row is pointed at until the keyboard is used again
+
+### Requirement: The application state snapshot does not carry the catalogue
+
+The application state snapshot SHALL NOT include the project catalogue. It is
+fetched on every state change — once per file during a bundle download — and
+the catalogue is thousands of rows, so carrying it there costs that payload on
+every such change.
+
+Building the snapshot SHALL NOT read the bundles directory, which was needed
+only to mark catalogue rows.
+
+The catalogue SHALL reach the interface as its own stream, and the interface
+SHALL seed itself from its persisted cache, so that a cold start renders the
+previous catalogue without waiting for either.
+
+#### Scenario: A bundle download in progress
+
+- **WHEN** a bundle download emits a state change for each file it finishes
+- **THEN** no part of the catalogue is transferred with those state changes
+
+#### Scenario: A cold start with a cached catalogue
+
+- **WHEN** the application starts with a previously cached catalogue
+- **THEN** the project list renders from the cache before any catalogue request completes
+
+### Requirement: A catalogue link opens the search it names
+
+A link to a project in the online catalogue SHALL open that project when the
+operator pastes it, without their having to find the search by name. A link is
+how a search reaches a crew, and its name is a transliteration they would
+otherwise have to retype exactly.
+
+Parsing SHALL tolerate what passing through a messenger does to a link — an
+absent scheme, a missing or extra trailing slash, appended query parameters, a
+percent-encoded name — and SHALL require the catalogue's own host, so that a
+lookalike address is not treated as one.
+
+Text that is not a catalogue link SHALL be treated as ordinary input rather
+than guessed at.
+
+A link naming a project the catalogue has not listed SHALL be reported as such,
+naming it, rather than silently doing nothing.
+
+#### Scenario: A link sent over a messenger
+
+- **WHEN** the operator pastes a catalogue link for a listed project
+- **THEN** that project is opened and identified by its name
+
+#### Scenario: A link for a search not in the list yet
+
+- **WHEN** the operator pastes a catalogue link naming a project the catalogue has not listed
+- **THEN** they are told, and the name in the link is shown
+
+#### Scenario: Ordinary text
+
+- **WHEN** the operator types something that is not a catalogue link
+- **THEN** no project is opened by it
+
+### Requirement: The catalogue filter accepts the crew's own language
+
+Every surface that searches the catalogue SHALL match a query written in
+Russian against project names written in latin transliteration. Because no single transliteration is in
+use, a Cyrillic letter SHALL match any of the latin spellings in common use for
+it, and SHALL also match itself, so an entry written in Cyrillic is still
+found. A query containing no Cyrillic SHALL behave exactly as before, matching
+the name or the slug as a literal substring. A space in the query SHALL match
+whichever separator the catalogue uses between words.
+
+#### Scenario: Typing the Russian name of the search
+
+- **WHEN** the catalogue holds a project named `2026 09 20 Schuvalovo` AND the operator types `Шувалово`
+- **THEN** that project is listed, and the match count reflects it
+
+#### Scenario: The same letter spelled two ways
+
+- **WHEN** the catalogue holds both `Shuvalovo` and `Schuvalovo` AND the operator types `Шувалово`
+- **THEN** both are listed
+
+#### Scenario: A query that matches nothing
+
+- **WHEN** the operator types a Russian name no project carries
+- **THEN** the list is empty and the count says so, rather than falling back to everything
+
+#### Scenario: A latin query is unchanged
+
+- **WHEN** the operator types `Sagra`
+- **THEN** the result is the same list the literal substring match produced before this change
+
+#### Scenario: The command palette answers the same as the loader
+
+- **WHEN** the same Russian query is typed into the command palette's project search and into the loader's filter
+- **THEN** both list the same projects, subject to the palette's own screenful limit
+
+### Requirement: A catalogue refresh does not block a bundle download
+
+A running catalogue refresh SHALL NOT prevent a bundle from being downloaded or
+opened from disk, and a running bundle operation SHALL NOT prevent the
+catalogue from being refreshed. Each SHALL still refuse a second instance of
+itself, and SHALL say which of the two is in the way. Completing one SHALL NOT
+clear the other's in-progress state.
+
+#### Scenario: Downloading during the launch-time refresh
+
+- **WHEN** the catalogue walk started at launch is still running AND the operator asks to open a bundle
+- **THEN** the download starts, rather than being refused until the walk ends or is stopped
+
+#### Scenario: Refreshing during a download
+
+- **WHEN** a bundle download is in flight AND the operator asks to refresh the catalogue
+- **THEN** the refresh starts
+
+#### Scenario: A second bundle
+
+- **WHEN** a bundle is already being downloaded or opened AND another is asked for
+- **THEN** it is refused, and the refusal names a bundle operation rather than the project list
+
+#### Scenario: The walk ends while a download runs
+
+- **WHEN** the catalogue walk finishes or is stopped while a download is in flight
+- **THEN** the download keeps its progress and its own in-progress state
+
+### Requirement: Two files of one bundle never share a partial path
+
+A partial download SHALL be written to a path formed by appending a suffix to
+the whole file name, so that two files of one bundle differing only in
+extension never write to the same partial file.
+
+#### Scenario: A bundle holding sheet.map and sheet.ozf2
+
+- **WHEN** both files of that bundle are downloading at once
+- **THEN** each writes to its own partial file and both land intact
+
+#### Scenario: A partial path keeps what the file is
+
+- **WHEN** a partial path is formed for `sheet.ozf2`
+- **THEN** the original extension is still part of the name
+
+### Requirement: A ready bundle file belongs to the map whose name it is
+
+A file reported ready inside a bundle SHALL be matched to a map package by the
+last component of its path, compared whole, rather than by whether the path
+ends with the package's file name.
+
+#### Scenario: A bundle holding map.ozf2 and bigmap.ozf2
+
+- **WHEN** `bigmap.ozf2` finishes downloading
+- **THEN** only `bigmap.ozf2` is marked available, and `map.ozf2` still needs downloading
+
+### Requirement: A finished catalogue walk does not take the status line from a download
+
+While a download is running, a catalogue walk that finishes SHALL report its
+result to the diagnostics log without replacing the status line.
+
+#### Scenario: The launch-time walk finishes mid-download
+
+- **WHEN** the catalogue walk completes while a bundle is downloading
+- **THEN** the status line still reports the download, and the walk's result is in the diagnostics log
+
+#### Scenario: Nothing is downloading
+
+- **WHEN** the catalogue walk completes with no download running
+- **THEN** the status line reports how many projects were loaded
+
+### Requirement: A cold launch with no link does not walk the catalogue
+
+When the machine reports that it has no network at all, the application SHALL
+NOT start the launch-time catalogue walk, and SHALL present the saved list as
+saved rather than as the result of a refresh that failed.
+
+The operator's own request to refresh SHALL run regardless: they can see the
+state of the link better than the machine reports it.
+
+#### Scenario: Launching in a field camp
+
+- **WHEN** the application starts and the machine reports no network
+- **THEN** no catalogue request is made and the catalogue is shown as the saved list with its age
 
