@@ -169,8 +169,12 @@ fn apply_gpx_import(
         )?;
         report.imported_track_layers += 1;
 
-        for track in import.tracks() {
-            history.apply(project, &ProjectCommand::add_track(layer_id, track.clone()))?;
+        for (index, track) in import.tracks().iter().enumerate() {
+            let mut track = track.clone();
+            if !import.declared_colour(index) {
+                track.style_mut().color = palette_colour(track_count(project));
+            }
+            history.apply(project, &ProjectCommand::add_track(layer_id, track))?;
             report.imported_tracks += 1;
         }
     }
@@ -194,6 +198,49 @@ fn apply_gpx_import(
     }
 
     Ok(())
+}
+
+/// Colours handed to imported tracks that do not say what colour they are.
+///
+/// Almost no GPX says: the colour is a Garmin extension, written by Garmin's
+/// own software and by little else, so a day's folder from phones and
+/// navigators used to import as twenty identical red lines. Telling the crews
+/// apart on the map is most of what a coordinator does with a day.
+///
+/// Chosen to stay apart from each other and from a topographic basemap, which
+/// is mostly green, grey and pale yellow: no greens, nothing pale, and the
+/// first few as far apart as the wheel allows, since most days need only the
+/// first few.
+pub const TRACK_PALETTE: [[u8; 4]; 12] = [
+    [220, 38, 38, 255],  // red
+    [37, 99, 235, 255],  // blue
+    [217, 119, 6, 255],  // amber
+    [147, 51, 234, 255], // violet
+    [8, 145, 178, 255],  // cyan
+    [219, 39, 119, 255], // pink
+    [120, 53, 15, 255],  // brown
+    [30, 64, 175, 255],  // deep blue
+    [190, 24, 93, 255],  // crimson
+    [126, 34, 206, 255], // purple
+    [161, 98, 7, 255],   // bronze
+    [15, 118, 110, 255], // teal
+];
+
+/// The colour for the `index`-th track a project holds.
+///
+/// Position in the project, not in the file, so a folder import continues the
+/// sequence across files and the same day imported twice looks the same twice.
+fn palette_colour(index: usize) -> [u8; 4] {
+    TRACK_PALETTE[index % TRACK_PALETTE.len()]
+}
+
+/// How many tracks the project already holds, across every layer.
+fn track_count(project: &Project) -> usize {
+    project
+        .track_layers()
+        .iter()
+        .map(|layer| layer.tracks().len())
+        .sum()
 }
 
 /// Name an import-created layer after the source file.
@@ -455,5 +502,131 @@ mod layer_id_tests {
             project.map_layers().iter().all(|l| l.id() != next),
             "allocated id must not already be in use"
         );
+    }
+}
+
+#[cfg(test)]
+mod track_colour_tests {
+    use super::{TRACK_PALETTE, import_tracks_directory_into_project};
+    use crate::application::CommandStack;
+    use crate::domain::Project;
+
+    /// A day's recordings arrive as a folder of GPX from phones and
+    /// navigators, and almost none of them carry a colour — the Garmin
+    /// extension is written by Garmin's own software and by little else. Every
+    /// one of them used to import as the domain's default red, so twenty
+    /// crews' routes drew one red smear on the map, and telling them apart is
+    /// most of what a coordinator does with a day.
+    ///
+    /// A track that says what colour it is keeps it. That half already worked;
+    /// this is the other half, and it is the common one.
+    #[test]
+    fn imported_tracks_without_a_colour_get_different_ones() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for (index, name) in ["lisa15", "veter2", "sokol7"].iter().enumerate() {
+            std::fs::write(
+                dir.path().join(format!("{name}.gpx")),
+                format!(
+                    r#"<?xml version="1.0"?><gpx version="1.1"><trk><name>{name}</name>
+<trkseg><trkpt lat="59.9{index}" lon="31.5{index}"/><trkpt lat="59.91" lon="31.51"/></trkseg>
+</trk></gpx>"#
+                ),
+            )
+            .expect("write");
+        }
+
+        let mut project = Project::default();
+        let mut history = CommandStack::default();
+        import_tracks_directory_into_project(&mut project, &mut history, dir.path())
+            .expect("import");
+
+        let colours: Vec<[u8; 4]> = project
+            .track_layers()
+            .iter()
+            .flat_map(|layer| layer.tracks().iter().map(|t| t.style().color))
+            .collect();
+        assert_eq!(colours.len(), 3);
+        let distinct: std::collections::HashSet<_> = colours.iter().collect();
+        assert_eq!(
+            distinct.len(),
+            3,
+            "three routes, three colours: {colours:?}"
+        );
+    }
+
+    #[test]
+    fn an_imported_track_that_declares_a_colour_keeps_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("blue.gpx"),
+            r#"<?xml version="1.0"?><gpx version="1.1" creator="ozi-rs"
+  xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+<trk><name>blue</name>
+<extensions><gpxx:TrackExtension>
+  <gpxx:DisplayColor>Blue</gpxx:DisplayColor>
+</gpxx:TrackExtension></extensions>
+<trkseg><trkpt lat="59.9" lon="31.5"/></trkseg></trk></gpx>"#,
+        )
+        .expect("write");
+
+        let mut project = Project::default();
+        let mut history = CommandStack::default();
+        let report = import_tracks_directory_into_project(&mut project, &mut history, dir.path())
+            .expect("import");
+        assert_eq!(
+            report.imported_tracks, 1,
+            "the file did not import at all: {:?}",
+            report.skipped
+        );
+
+        // Across the layers: a fresh project already has an empty one, and the
+        // import adds its own beside it.
+        let colours: Vec<[u8; 4]> = project
+            .track_layers()
+            .iter()
+            .flat_map(|layer| layer.tracks().iter().map(|t| t.style().color))
+            .collect();
+        assert_eq!(colours, vec![[0, 0, 255, 255]]);
+    }
+
+    /// The same folder imported into a fresh project twice gives the same
+    /// colours, so a coordinator's screenshot still matches the screen after a
+    /// reopen, and two machines looking at the same day agree.
+    #[test]
+    fn the_colours_are_the_same_every_time_the_same_day_is_imported() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for name in ["a", "b", "c", "d"] {
+            std::fs::write(
+                dir.path().join(format!("{name}.gpx")),
+                r#"<?xml version="1.0"?><gpx version="1.1"><trk><name>t</name>
+<trkseg><trkpt lat="59.9" lon="31.5"/></trkseg></trk></gpx>"#,
+            )
+            .expect("write");
+        }
+
+        let colours_of = || {
+            let mut project = Project::default();
+            let mut history = CommandStack::default();
+            import_tracks_directory_into_project(&mut project, &mut history, dir.path())
+                .expect("import");
+            project
+                .track_layers()
+                .iter()
+                .flat_map(|l| l.tracks().iter().map(|t| t.style().color))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(colours_of(), colours_of());
+    }
+
+    #[test]
+    fn the_palette_holds_distinct_colours() {
+        let distinct: std::collections::HashSet<_> = TRACK_PALETTE.iter().collect();
+        assert_eq!(
+            distinct.len(),
+            TRACK_PALETTE.len(),
+            "a repeated entry would hand two crews the same colour early"
+        );
+        assert!(TRACK_PALETTE.len() >= 8, "a day has more than a few crews");
     }
 }

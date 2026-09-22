@@ -148,6 +148,28 @@ function requestedState(): "cold" | "workspace" {
 const importedTracks: TrackSummaryDto[] = [];
 let importedLayerId = 10;
 
+/**
+ * The colours the backend hands to imported tracks that declare none — the
+ * same list and the same order as `TRACK_PALETTE` in
+ * `src-tauri/src/application/import.rs`. A day of recordings is twenty crews,
+ * and a stand that drew them all one colour would hide exactly the thing the
+ * palette exists to show.
+ */
+const STAND_TRACK_PALETTE = [
+  "rgba(220,38,38,1.000)",
+  "rgba(37,99,235,1.000)",
+  "rgba(217,119,6,1.000)",
+  "rgba(147,51,234,1.000)",
+  "rgba(8,145,178,1.000)",
+  "rgba(219,39,119,1.000)",
+  "rgba(120,53,15,1.000)",
+  "rgba(30,64,175,1.000)",
+  "rgba(190,24,93,1.000)",
+  "rgba(126,34,206,1.000)",
+  "rgba(161,98,7,1.000)",
+  "rgba(15,118,110,1.000)",
+];
+
 function importOneLayer(label: string, trackCount: number): string {
   importedLayerId += 1;
   for (let i = 0; i < trackCount; i += 1) {
@@ -155,7 +177,11 @@ function importOneLayer(label: string, trackCount: number): string {
       layer_id: importedLayerId,
       track_id: importedTracks.length + 100,
       name: `${label} ${i + 1}`,
-      color: "rgba(37,99,235,1.000)",
+      color:
+        STAND_TRACK_PALETTE[
+          (tracksListFixture.length + importedTracks.length) %
+            STAND_TRACK_PALETTE.length
+        ],
       line_width: 3.0,
       visible: true,
       point_count: 42,

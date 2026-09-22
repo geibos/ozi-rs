@@ -16,15 +16,34 @@ pub struct ArchivedGpxImport {
     source_path: String,
     tracks: Vec<Track>,
     waypoints: Vec<Waypoint>,
+    /// Whether each track said what colour it is, in the same order.
+    ///
+    /// Almost no GPX does: the extension is Garmin's, written by Garmin's own
+    /// software and by little else. The application gives the rest a colour of
+    /// their own, and it can only do that if it knows which ones asked for
+    /// none — "it is the default red" is a guess, since a file may declare
+    /// red.
+    declared_colours: Vec<bool>,
 }
 
 impl ArchivedGpxImport {
-    fn new(source_path: String, tracks: Vec<Track>, waypoints: Vec<Waypoint>) -> Self {
+    fn new(
+        source_path: String,
+        tracks: Vec<Track>,
+        waypoints: Vec<Waypoint>,
+        declared_colours: Vec<bool>,
+    ) -> Self {
         Self {
             source_path,
             tracks,
             waypoints,
+            declared_colours,
         }
+    }
+
+    /// Whether the track at `index` declared its own colour.
+    pub fn declared_colour(&self, index: usize) -> bool {
+        self.declared_colours.get(index).copied().unwrap_or(false)
     }
 
     pub fn source_path(&self) -> &str {
@@ -150,7 +169,8 @@ pub fn import_gpx_file(path: &Path) -> Result<ArchivedGpxImport, ArchivedGpxImpo
         .enumerate()
         .map(|(i, t)| convert_track(i, &file_stem, t))
         .collect();
-    apply_track_colours(&mut tracks, &track_colours_in_document_order(&bytes));
+    let colours = track_colours_in_document_order(&bytes);
+    apply_track_colours(&mut tracks, &colours);
     let waypoints = gpx
         .waypoints
         .into_iter()
@@ -158,7 +178,12 @@ pub fn import_gpx_file(path: &Path) -> Result<ArchivedGpxImport, ArchivedGpxImpo
         .map(|(i, w)| convert_waypoint(i, &file_stem, w))
         .collect();
 
-    Ok(ArchivedGpxImport::new(path_str, tracks, waypoints))
+    Ok(ArchivedGpxImport::new(
+        path_str,
+        tracks,
+        waypoints,
+        declared_flags(&colours),
+    ))
 }
 
 fn parse_gpx_archive_entry(
@@ -177,7 +202,8 @@ fn parse_gpx_archive_entry(
         .enumerate()
         .map(|(track_index, track)| convert_track(track_index, &file_stem, track))
         .collect();
-    apply_track_colours(&mut tracks, &track_colours_in_document_order(bytes));
+    let colours = track_colours_in_document_order(bytes);
+    apply_track_colours(&mut tracks, &colours);
     let waypoints = gpx
         .waypoints
         .into_iter()
@@ -185,7 +211,12 @@ fn parse_gpx_archive_entry(
         .map(|(waypoint_index, waypoint)| convert_waypoint(waypoint_index, &file_stem, waypoint))
         .collect();
 
-    Ok(ArchivedGpxImport::new(path.to_owned(), tracks, waypoints))
+    Ok(ArchivedGpxImport::new(
+        path.to_owned(),
+        tracks,
+        waypoints,
+        declared_flags(&colours),
+    ))
 }
 
 /// The colour each `<trk>` declares, in the order the tracks appear.
@@ -233,6 +264,11 @@ fn track_colours_in_document_order(bytes: &[u8]) -> Vec<Option<[u8; 4]>> {
     }
 
     colours
+}
+
+/// Which tracks declared a colour, by position.
+fn declared_flags(colours: &[Option<[u8; 4]>]) -> Vec<bool> {
+    colours.iter().map(Option::is_some).collect()
 }
 
 /// Apply the colours read by the second pass, by position.

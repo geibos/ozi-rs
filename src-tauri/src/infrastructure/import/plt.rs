@@ -15,6 +15,9 @@ const BOM_UTF16_BE: &[u8] = &[0xFE, 0xFF];
 pub struct PltImport {
     pub source_path: String,
     pub track: Track,
+    /// Whether the file's track-properties line carried a usable COLORREF.
+    /// OziExplorer always writes one; another program's PLT may not.
+    pub declared_colour: bool,
 }
 
 #[derive(Debug)]
@@ -149,7 +152,7 @@ pub fn import_plt_text(source_path: String, text: &str) -> Result<PltImport, Plt
 
     // Line 5 (index 4) = track properties; line 6 = point count or 0
     let properties_line = lines.get(4).ok_or(PltImportError::MissingTrackProperties)?;
-    let style = parse_track_style(properties_line);
+    let (style, declared_colour) = parse_track_style(properties_line);
 
     let track_name = parse_track_name(properties_line)
         .unwrap_or_else(|| source_path_stem(&source_path).to_owned());
@@ -194,16 +197,21 @@ pub fn import_plt_text(source_path: String, text: &str) -> Result<PltImport, Plt
     // If no segments were created the file had no valid points; add one empty segment
     // so callers can still distinguish "loaded but empty" from "not loaded".
 
-    Ok(PltImport { source_path, track })
+    Ok(PltImport {
+        source_path,
+        track,
+        declared_colour,
+    })
 }
 
 /// Parse the track style from the PLT properties line (line index 4).
 ///
 /// Format (comma-separated):
 /// `visible, line_width, colorref, name, skip_n, type, line_style, fill_color, closed, reserved`
-fn parse_track_style(line: &str) -> TrackStyle {
+fn parse_track_style(line: &str) -> (TrackStyle, bool) {
     let fields: Vec<&str> = line.split(',').map(str::trim).collect();
     let mut style = TrackStyle::default();
+    let mut declared_colour = false;
 
     // visible: 0 = shown, 1 = hidden (OziExplorer convention)
     if let Some(v) = fields.first().and_then(|s| s.parse::<u8>().ok()) {
@@ -218,9 +226,10 @@ fn parse_track_style(line: &str) -> TrackStyle {
     // color as Windows COLORREF (0x00BBGGRR)
     if let Some(colorref) = fields.get(2).and_then(|s| s.parse::<u32>().ok()) {
         style.color = colorref_to_rgba(colorref);
+        declared_colour = true;
     }
 
-    style
+    (style, declared_colour)
 }
 
 fn parse_track_name(line: &str) -> Option<String> {

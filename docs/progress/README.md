@@ -10,6 +10,47 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-09-22 — a colour for every crew
+
+I filled the stand's tracks list with a day's worth of imports to see how it
+looks at twenty rows, and the answer was a column of identical dots. That is
+not the stand's fault: a day's recordings come as GPX from phones and
+navigators, and almost none of them say what colour the track is —
+`gpxx:DisplayColor` is a Garmin extension written by Garmin's own software and
+by little else. Every one of them imported as the domain's default red.
+
+Which is the thing I described two slices ago as the reason to read the colour
+back out of a round trip: "three navigators' tracks on one map, all red, is one
+smear instead of three routes". That slice fixed the case where the file says a
+colour. This is the common case, where it says nothing.
+
+An imported track with no colour of its own now takes one from a palette, by
+its position among the project's tracks — so a folder import keeps counting
+across files, and the same day imported twice comes out the same twice. A crew
+can point at a screenshot from this morning and it still matches.
+
+Two decisions worth stating:
+
+- **"It is the default red" is not the test for "declared nothing."** A file
+  may genuinely declare red. The importers report what the file said, and the
+  application decides what to do about it. That cost a `Vec<bool>` on two
+  structs and is the difference between a rule and a guess.
+- **The palette avoids what the map is made of.** No greens, nothing pale, and
+  the most distant hues first, because most days need only the first few.
+
+The stand got the same palette, because a stand that drew them all one colour
+would hide exactly the thing the palette exists to show.
+
+| | |
+|---|---|
+| Before | [a column of identical dots](2026-09-22-track-colours/before-one-colour.png) |
+| After | [a colour each](2026-09-22-track-colours/after-a-colour-each.png) |
+| Change | `openspec/changes/a-colour-for-every-crew/` |
+| Automated gates | `just ci` green (338 Rust, 500 frontend) |
+| Customer-journey smoke | still owed — the Mac2 driver cannot enable automation mode |
+
+---
+
 ## 2026-09-22 — a bar with nothing to say
 
 The launch screen's status bar was a fixed 80px of four rows, three of them
