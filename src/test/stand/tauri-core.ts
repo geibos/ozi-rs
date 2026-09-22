@@ -19,6 +19,7 @@ import type {
   commands,
   JsonValue,
   TrackSummaryDto,
+  WaypointDto,
 } from "$lib/bindings";
 import { playBundleDownload, playMapDownload } from "./download-script";
 import {
@@ -213,6 +214,9 @@ function importOneLayer(label: string, trackCount: number): string {
 
 let previewedSlug: string | null = null;
 
+/** Waypoints this stand session has placed, appended to the fixture's. */
+const placedWaypoints: WaypointDto[] = [];
+
 function previewedAppState(): AppStateDto {
   const fixture =
     requestedState() === "cold" ? coldStartFixture : appStateFixture;
@@ -304,7 +308,27 @@ const HANDLERS: StandAnswers = {
       ? trackDetailFixture
       : { id: Number(args?.trackId ?? 0), name: "", segments: [] },
   get_waypoints: (args) =>
-    args?.layerId === FIXTURE_WAYPOINT_LAYER ? waypointsFixture : [],
+    args?.layerId === FIXTURE_WAYPOINT_LAYER
+      ? [...waypointsFixture, ...placedWaypoints]
+      : [],
+  // Placing a waypoint by bearing and distance was the one on-map tool that
+  // could not be walked here: the stand had no answer for `add_waypoint`, so
+  // the tool ended in the failure toast every time. It failed loudly, which is
+  // the stand working as designed, but it left the feature unlooked-at.
+  // Verification session, 2026-09-22.
+  add_waypoint: (args) => {
+    placedWaypoints.push({
+      id: 900 + placedWaypoints.length,
+      name: typeof args?.name === "string" ? args.name : "Точка",
+      lat: Number(args?.lat ?? 0),
+      lon: Number(args?.lon ?? 0),
+      symbol: null,
+      visible: true,
+      color: null,
+    });
+    standEmit("state-changed", undefined);
+    return null;
+  },
   get_track_export_default_path: () => null,
   get_wpt_export_default_path: () => null,
   get_waypoints_export_default_path: () => null,
