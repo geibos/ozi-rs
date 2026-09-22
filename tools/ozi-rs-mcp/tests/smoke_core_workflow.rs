@@ -73,6 +73,11 @@ fn kill_wedged_wda() {
 const TRACKS_TAB: [&str; 2] = ["Треки", "Tracks"];
 const WAYPOINTS_TAB: [&str; 2] = ["Точки", "Waypoints"];
 const DRAW_TRACK: [&str; 2] = ["Нарисовать трек", "Draw a track"];
+/// `shell.mapCanvas`. This one was left English-only when the rest of the
+/// file was made bilingual, so the three map clicks failed with "no such
+/// element" the first time the app under test happened to open in Russian —
+/// which is its default. Both spellings, like everything else here.
+const MAP_CANVAS: [&str; 2] = ["Холст карты", "Map canvas"];
 const SCRATCH_TRACK_NAME: &str = "New Track";
 
 fn contains_any(source: &str, needles: &[&str]) -> bool {
@@ -82,15 +87,21 @@ fn contains_any(source: &str, needles: &[&str]) -> bool {
 /// The drawing-mode toggle with its point count.
 ///
 /// WKWebView publishes the button's `aria-label` and not the text inside it,
-/// so this matches the label ("Завершить трек (N точек)"), not the visible
-/// "Готово (N)". Matching the visible text is what silently broke this smoke.
+/// so this matches the label, not the visible "Готово (N)". Matching the
+/// visible text is what silently broke this smoke once.
+///
+/// These strings are `tracksTab.finishTrack` in `src/lib/i18n.ts`, and a
+/// change to either side breaks the gate — as it did on 2026-09-22, when the
+/// label lost its "(N точек)" shape to get the Russian plural right and this
+/// file went on looking for the old one. `src/test/smoke-label-contract.test.ts`
+/// now fails first, and in seconds rather than after a build and a launch.
 fn shows_point_count(source: &str, count: usize) -> bool {
-    source.contains(&format!("Завершить трек ({count} точек)"))
-        || source.contains(&format!("Finish the track ({count} points)"))
+    source.contains(&format!("Завершить трек · точек: {count}"))
+        || source.contains(&format!("Finish the track · points: {count}"))
 }
 
 fn shows_any_point_count(source: &str) -> bool {
-    source.contains("Завершить трек (") || source.contains("Finish the track (")
+    source.contains("Завершить трек · точек:") || source.contains("Finish the track · points:")
 }
 
 fn poll_source_until<F: Fn(&str) -> bool>(
@@ -275,10 +286,17 @@ fn smoke_core_workflow_draw_track() {
 
     // 4. Three paced clicks on the map canvas = three insert_track_point IPC
     //    round-trips. The toggle label counts only points the backend accepted.
-    let map_selector = "//*[@title=\"Map canvas\" or @label=\"Map canvas\"]";
+    let map_selector = format!(
+        "//*[{}]",
+        MAP_CANVAS
+            .iter()
+            .map(|name| format!("@title=\"{name}\" or @label=\"{name}\""))
+            .collect::<Vec<_>>()
+            .join(" or "),
+    );
     for offset in [(-120, -70), (10, 10), (110, 80)] {
         let click =
-            appium_click_element_offsets_with_session_id(server, sid, map_selector, &[offset]);
+            appium_click_element_offsets_with_session_id(server, sid, &map_selector, &[offset]);
         assert!(click.ok, "map click at {offset:?} failed: {click:?}");
         thread::sleep(CLICK_PACING);
     }
