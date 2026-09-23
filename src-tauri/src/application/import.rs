@@ -13,6 +13,11 @@ use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArchiveImportReport {
+    /// Set when the file declared a datum that is not WGS 84.
+    ///
+    /// This application does not transform between datums; saying so is the
+    /// least it can do, and the map-open path has said so for months.
+    datum_warning: Option<String>,
     imported_entries: usize,
     imported_track_layers: usize,
     imported_waypoint_layers: usize,
@@ -28,6 +33,7 @@ impl ArchiveImportReport {
             imported_waypoint_layers: 0,
             imported_tracks: 0,
             imported_waypoints: 0,
+            datum_warning: None,
         }
     }
 
@@ -49,6 +55,10 @@ impl ArchiveImportReport {
 
     pub const fn imported_waypoints(&self) -> usize {
         self.imported_waypoints
+    }
+
+    pub fn datum_warning(&self) -> Option<&str> {
+        self.datum_warning.as_deref()
     }
 }
 
@@ -152,6 +162,7 @@ pub fn import_wpt_file_into_project(
 ) -> Result<ArchiveImportReport, WptImportError> {
     let import = crate::infrastructure::import::import_wpt_file(path)?;
     let mut report = ArchiveImportReport::new();
+    report.datum_warning = crate::application::datum_shift_warning(import.datum());
 
     let waypoints = import.waypoints().to_vec();
     if waypoints.is_empty() {

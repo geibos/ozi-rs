@@ -78,7 +78,7 @@ Delta inventory: 13 capability deltas, 63 requirements (54 ADDED, 9 MODIFIED, 2 
 | 0001 initial architecture | ADDED `architecture`: layering, thin command handlers; edit rule covered by `undo-redo` | application↔infrastructure share data types both ways (lizaalert.rs:1-3, application/mod.rs:12-16); codified as-is |
 | 0002 bundle/project separation | covered (map-bundles, project-persistence); ADDED default bundles root | eframe storage for active-map ref superseded by `PersistedAppSession` |
 | 0003 egui stack | superseded by 0016 | history only |
-| 0004 JSON `.ozp` | covered; ADDED pretty-printed stable shape; ADDED atomic writes (July 2026) | `version` field not implemented (CJ-8) |
+| 0004 JSON `.ozp` | covered; ADDED pretty-printed stable shape; ADDED atomic writes (July 2026) | `version` field implemented 2026-09-23 (`a-file-says-who-wrote-it`): a saved file carries `format_version`, a file without one is the oldest format, a newer one is refused |
 | 0005 snapshot undo | superseded by 0017 | `CommandStack` holds `Vec<CommandDelta>` (commands.rs:1289-1296) |
 | 0006 ozf2 sibling crate | ADDED decode-through-adapter | crate is crates.io `ozf2 = "0.1"`, not a path sibling; docs/architecture.md stale |
 | 0007 zip import boundary | ADDED zip→GPX entries, per-file layers; architecture history only | only `.gpx` consumed from archives (import/gpx.rs:104-110); zip-slip guard only on bundle staging (archive.rs:174-178 via lizaalert.rs:1297) |
@@ -88,7 +88,7 @@ Delta inventory: 13 capability deltas, 63 requirements (54 ADDED, 9 MODIFIED, 2 
 | 0011 no async runtime | stale; reality ADDED "Long-running work runs off the IPC thread and reports via events" | 52 sync commands; std::thread + tauri::async_runtime + tokio (commands/mod.rs:394-481; lizaalert.rs:15-16, 501-556); docs/conventions.md stale |
 | 0012 sqlite sync + LRU 512 | MODIFIED sqlite protocol (zoom inversion, not row inversion); ADDED empty response for missing tiles | fresh `rusqlite::Connection` per request, no cache (tiles.rs:65) |
 | 0013 style in domain | ADDED | domain/track.rs:46-63 |
-| 0014 u64 newtypes | ADDED | six newtypes, caller-assigned max+1; map LayerId uses `len()+1` (application/mod.rs:1449) — possible collision after deletion |
+| 0014 u64 newtypes | ADDED | six newtypes, caller-assigned max+1. The `len()+1` collision this note reported is gone: `import::next_layer_id` takes max+1 across map, track and waypoint layers. Re-checked 2026-09-23, when layer deletion first made a collision reachable |
 | 0015 edition 2024 | ADDED; pin covered by ci-pipeline | rust-toolchain.toml 1.95.0 |
 | 0016 Tauri/MapLibre/Svelte | covered (ui-shell stack); ADDED raw-byte tile IPC, OZF2 metadata command, generated bindings, MapLibre sole engine | manual `types.ts` mirroring and floating windows superseded |
 | 0017 delta undo | covered; MODIFIED inverse/forward semantics and coalescing (code coalesces MoveTrackPoint, MoveWaypoint, RenameTrack) | commands.rs:1204-1382 |

@@ -6,9 +6,15 @@ When writing OziExplorer files, a comma inside a text field SHALL be replaced
 with a space rather than written as the `chr(209)` escape the format reserves.
 
 The escape is a byte, and these files are Windows-1251, where that byte is
-`С`. Writing it would put a comma inside every name the original reads back
-that happens to contain that letter — which, in Russian, is most of them. One
-character of a name is the price of not corrupting the rest.
+`С`. Reading it as a comma would put one inside «СТАРТ», which settles the
+import side.
+
+The export side rests on one thing that has not been checked: whether the
+original substitutes that byte when reading a cp1251 file regardless of who
+wrote it. If it does, a name with a `С` in it is mangled whatever this
+application writes, and not escaping only avoids adding a second way to be
+wrong. A round trip through a Russian OziExplorer would settle it; nobody has
+run one.
 
 #### Scenario: A track named with a comma
 

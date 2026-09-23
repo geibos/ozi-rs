@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { declutter, labelAnchor, positionsOf } from "../lib/track-labels";
+import { declutter, labelAnchor, segmentsOf } from "../lib/track-labels";
 import type { LatLon } from "../lib/geo";
 
 /**
@@ -59,10 +59,12 @@ describe("declutter", () => {
     name,
     color: "rgba(220,38,38,1)",
     selected,
-    positions: Array.from({ length: points }, (_, i) => ({
-      lat: 59.95,
-      lon: lon + i * 0.001,
-    })),
+    segments: [
+      Array.from({ length: points }, (_, i) => ({
+        lat: 59.95,
+        lon: lon + i * 0.001,
+      })),
+    ],
   });
 
   /** A projection where one degree of longitude is 1000 px. */
@@ -110,15 +112,112 @@ describe("declutter", () => {
 
   it("says nothing about a track the backend could not draw", () => {
     const placed = declutter(
-      [{ key: "1:9", name: "пусто", color: "#fff", positions: [] }],
+      [{ key: "1:9", name: "пусто", color: "#fff", segments: [] }],
       project,
     );
     expect(placed).toEqual([]);
   });
 });
 
-describe("positionsOf", () => {
-  it("walks a multi-segment track in the order it was walked", () => {
+/**
+ * Three defects an outside reviewer found on 2026-09-23, each pinned here
+ * before it was fixed. All three were mine, and the first was visible in the
+ * screenshot I took to prove the feature worked — the name sat in the gap
+ * between two drawn segments and I read it as "the middle of the track".
+ */
+describe("what the reviewer found", () => {
+  const project = (at: LatLon) => ({ x: at.lon * 1000, y: at.lat * 1000 });
+
+  it("puts the name on the line, not in the gap between two segments", () => {
+    // A track split at a break: the crew walked one stretch, stopped
+    // recording, and walked another a kilometre away. Half the *flattened*
+    // length falls in the gap, where there is nothing to label.
+    const placed = declutter(
+      [
+        {
+          key: "1:1",
+          name: "ЛИСА15",
+          color: "#f00",
+          segments: [
+            [
+              { lat: 60, lon: 30 },
+              { lat: 60, lon: 30.01 },
+            ],
+            [
+              { lat: 60, lon: 31 },
+              { lat: 60, lon: 31.01 },
+            ],
+          ],
+        },
+      ],
+      project,
+    );
+    expect(placed).toHaveLength(1);
+    const lon = placed[0].at.lon;
+    const onASegment =
+      (lon >= 30 && lon <= 30.01) || (lon >= 31 && lon <= 31.01);
+    expect(onASegment, `label landed at ${lon}, which is on no segment`).toBe(
+      true,
+    );
+  });
+
+  it("ranks by how far the crew walked, not by how often the GPS logged", () => {
+    // A navigator logging once a second at a rest stop beats a long route
+    // logged once a minute, if the count is what decides.
+    const restStop = {
+      key: "1:1",
+      name: "привал",
+      color: "#f00",
+      segments: [
+        Array.from({ length: 1000 }, (_, i) => ({
+          lat: 60,
+          lon: 30 + i * 0.0000001,
+        })),
+      ],
+    };
+    const longRoute = {
+      key: "1:2",
+      name: "длинный",
+      color: "#00f",
+      segments: [
+        [
+          { lat: 60, lon: 30.0001 },
+          { lat: 60, lon: 30.05 },
+        ],
+      ],
+    };
+    const placed = declutter([restStop, longRoute], project, 100000);
+    expect(placed).toHaveLength(1);
+    expect(placed[0].name).toBe("длинный");
+  });
+
+  it("keeps two long names from overlapping, not just their centres", () => {
+    // Centres 60 px apart clears a 48 px centre-to-centre test and still
+    // overlaps, because the text is far wider than the gap.
+    const wide = (key: string, name: string, lon: number) => ({
+      key,
+      name,
+      color: "#f00",
+      segments: [
+        [
+          { lat: 60, lon },
+          { lat: 60, lon: lon + 0.00001 },
+        ],
+      ],
+    });
+    const placed = declutter(
+      [
+        wide("1:1", "20260708_Ветер2_первая_группа", 30),
+        wide("1:2", "20260708_Ветер3_вторая_группа", 30.06),
+      ],
+      project,
+    );
+    expect(placed).toHaveLength(1);
+  });
+});
+
+describe("segmentsOf", () => {
+  it("keeps a multi-segment track's parts apart", () => {
     const geometry = {
       type: "MultiLineString",
       coordinates: [
@@ -132,11 +231,33 @@ describe("positionsOf", () => {
         ],
       ],
     };
-    expect(positionsOf(geometry)).toEqual([
-      { lon: 31.6, lat: 59.95 },
-      { lon: 31.61, lat: 59.951 },
-      { lon: 31.62, lat: 59.952 },
-      { lon: 31.63, lat: 59.953 },
+    // Two parts, not one list: the gap between them is not a leg of the walk.
+    expect(segmentsOf(geometry)).toEqual([
+      [
+        { lon: 31.6, lat: 59.95 },
+        { lon: 31.61, lat: 59.951 },
+      ],
+      [
+        { lon: 31.62, lat: 59.952 },
+        { lon: 31.63, lat: 59.953 },
+      ],
+    ]);
+  });
+
+  it("reads a single-part line as one segment", () => {
+    expect(
+      segmentsOf({
+        type: "LineString",
+        coordinates: [
+          [31.6, 59.95],
+          [31.61, 59.951],
+        ],
+      }),
+    ).toEqual([
+      [
+        { lon: 31.6, lat: 59.95 },
+        { lon: 31.61, lat: 59.951 },
+      ],
     ]);
   });
 });

@@ -793,20 +793,26 @@ impl ProjectCommand {
                 project.add_waypoint_layer(layer.clone());
                 Ok(())
             }
+            // A rename of a layer that is not there is an error, not a
+            // success. Answering `Ok` let the command stack clear the redo
+            // history and count a mutation for something that did not happen —
+            // the same shape as the refused-command defect the September
+            // review found, reached from a different direction. Found by an
+            // outside reviewer, 2026-09-23.
             Self::RenameTrackLayer {
                 layer_id, new_name, ..
             } => {
-                if let Ok(layer) = project.track_layer_mut(layer_id.value()) {
-                    layer.set_name(new_name.clone());
-                }
+                project
+                    .track_layer_mut(layer_id.value())?
+                    .set_name(new_name.clone());
                 Ok(())
             }
             Self::RenameWaypointLayer {
                 layer_id, new_name, ..
             } => {
-                if let Ok(layer) = project.waypoint_layer_mut(layer_id.value()) {
-                    layer.set_name(new_name.clone());
-                }
+                project
+                    .waypoint_layer_mut(layer_id.value())?
+                    .set_name(new_name.clone());
                 Ok(())
             }
             Self::RemoveTrack { layer_id, track } => {
@@ -1996,6 +2002,41 @@ mod tests {
         );
         assert_eq!(back.name(), "Day three");
         assert_eq!(back.tracks()[1].name(), "ЛИСА1");
+    }
+
+    /// A rename aimed at a layer that is not there used to answer `Ok`: the
+    /// stack then cleared the redo history and counted a mutation for
+    /// something that never happened. Found by an outside reviewer,
+    /// 2026-09-23.
+    #[test]
+    fn renaming_a_layer_that_is_not_there_is_an_error_and_costs_no_redo() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(77);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Day one"),
+            )
+            .unwrap();
+        assert!(history.undo(&mut project));
+        assert!(history.can_redo());
+
+        let refused = history.apply(
+            &mut project,
+            &ProjectCommand::RenameTrackLayer {
+                layer_id: LayerId::new(9999),
+                old_name: "nothing".to_owned(),
+                new_name: "something".to_owned(),
+            },
+        );
+
+        assert!(refused.is_err(), "a rename of a missing layer SHALL fail");
+        assert!(
+            history.can_redo(),
+            "a refused rename SHALL NOT take the redo the operator still had"
+        );
     }
 
     /// The import names a layer after the path it came from

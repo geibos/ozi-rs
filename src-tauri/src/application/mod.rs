@@ -901,7 +901,16 @@ impl AppState {
         &mut self,
         path: std::path::PathBuf,
     ) -> Result<ArchiveImportReport, crate::infrastructure::import::WptImportError> {
-        import::import_wpt_file_into_project(&mut self.project, &mut self.history, &path)
+        let report =
+            import::import_wpt_file_into_project(&mut self.project, &mut self.history, &path)?;
+        // A file from another headquarters may be in another datum. We do not
+        // transform between them — that is a non-goal — but taking the
+        // coordinates without a word puts the marks 100–150 m from where they
+        // were meant, and nobody finds out until the crew is standing there.
+        if let Some(warning) = report.datum_warning() {
+            self.push_diagnostic(DiagnosticLevel::Warning, warning.to_owned());
+        }
+        Ok(report)
     }
 
     pub fn apply_set_waypoint_color(
@@ -2171,7 +2180,7 @@ fn default_bundles_root() -> PathBuf {
 
 /// Returns a user-facing warning when `datum_name` is not in the WGS-84
 /// family ("WGS 84", "WGS84", "WGS-84" in any case), `None` otherwise.
-fn datum_shift_warning(datum_name: &str) -> Option<String> {
+pub(crate) fn datum_shift_warning(datum_name: &str) -> Option<String> {
     let normalized: String = datum_name
         .chars()
         .filter(|c| !c.is_whitespace() && *c != '-')
@@ -3671,8 +3680,9 @@ mod tests {
             .map(|entry| entry.message.as_str())
             .collect();
         assert!(
-            said.iter().any(|m| m.to_lowercase().contains("active map")),
-            "an unreadable project SHALL NOT stop the map being restored: {said:?}"
+            said.iter().any(|m| m.contains("Restored active map")
+                || m.contains("failed to register active map")),
+            "an unreadable project SHALL NOT stop the restore reaching the map: {said:?}"
         );
     }
 

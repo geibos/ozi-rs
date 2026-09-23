@@ -351,7 +351,8 @@ const dictionaries = {
     "inspector.waypointSymbolFailed": "Could not set the symbol",
     "palette.measure": "Measure distance",
     "palette.measureStop": "Stop measuring",
-    "map.measureHint": "Click to measure · Esc to finish",
+    "map.measureHint":
+      "Click to measure · 3 points give an area · Esc to finish",
     "palette.ring": "Radius ring",
     "palette.ringStop": "Clear the ring",
     "map.ringCentreHint": "Click the centre · Esc to finish",
@@ -744,7 +745,7 @@ const dictionaries = {
     "inspector.waypointSymbolFailed": "Не удалось задать значок",
     "palette.measure": "Измерить расстояние",
     "palette.measureStop": "Закончить измерение",
-    "map.measureHint": "Клик — мерить · Esc — закончить",
+    "map.measureHint": "Клик — мерить · с 3 точек площадь · Esc — закончить",
     "palette.ring": "Круг по радиусу",
     "palette.ringStop": "Убрать круг",
     "map.ringCentreHint": "Клик — центр · Esc — закончить",

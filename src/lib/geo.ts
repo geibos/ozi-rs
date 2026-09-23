@@ -119,3 +119,73 @@ export function ringAround(centre: LatLon, km: number, steps = 64): LatLon[] {
 function toDegrees(radians: number): number {
   return (radians * 180) / Math.PI;
 }
+
+/**
+ * The area of the polygon these points close, in square kilometres.
+ *
+ * OziExplorer's measuring tool is called "Distance & Area", and the area is
+ * the half a coordinator actually writes down: a sector is handed to a crew as
+ * "прочесать 2.4 км²", and the number decides how many people it takes and how
+ * long it will run. Measuring it by eye off a scale bar is what the tool
+ * exists to stop.
+ *
+ * The polygon is treated as closed whether or not the last point repeats the
+ * first — a crew clicking round a sector stops when the shape is obvious, not
+ * when it is arithmetically shut.
+ *
+ * Equirectangular projection about the polygon's own mean latitude, then the
+ * shoelace formula. Over a search sector — kilometres, not hundreds of them —
+ * this is within a fraction of a percent of the spherical answer, and unlike
+ * the spherical excess formula it does not lose precision on the small
+ * shapes that are the normal case. Fewer than three points enclose nothing.
+ */
+export function polygonAreaSqKm(points: LatLon[]): number {
+  // A crew that clicked back to the start has not drawn a different sector.
+  // The repeated point would otherwise be counted twice in the mean latitude
+  // that sets the projection, and the same shape would measure differently
+  // depending on where the clicking stopped.
+  const ring =
+    points.length > 1 &&
+    points[0].lat === points[points.length - 1].lat &&
+    points[0].lon === points[points.length - 1].lon
+      ? points.slice(0, -1)
+      : points;
+  if (ring.length < 3) return 0;
+
+  const meanLat = ring.reduce((sum, point) => sum + point.lat, 0) / ring.length;
+  const cosLat = Math.cos((meanLat * Math.PI) / 180);
+  const kmPerDegree = (Math.PI * EARTH_RADIUS_KM) / 180;
+
+  let twiceArea = 0;
+  for (let i = 0; i < ring.length; i += 1) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const ax = a.lon * cosLat * kmPerDegree;
+    const ay = a.lat * kmPerDegree;
+    const bx = b.lon * cosLat * kmPerDegree;
+    const by = b.lat * kmPerDegree;
+    twiceArea += ax * by - bx * ay;
+  }
+  return Math.abs(twiceArea) / 2;
+}
+
+/**
+ * An area in the unit a coordinator would say it in.
+ *
+ * Hectares in the middle: a sector of 40 га is a sentence a Russian search
+ * coordinator says, where "0.4 км²" is one they would have to convert.
+ */
+export function formatMeasuredArea(sqKm: number, locale: "ru" | "en"): string {
+  if (sqKm <= 0) return "";
+  if (sqKm < 0.01) {
+    const sqMetres = Math.round(sqKm * 1_000_000);
+    return locale === "ru" ? `${sqMetres} м²` : `${sqMetres} m²`;
+  }
+  if (sqKm < 1) {
+    const hectares = sqKm * 100;
+    const rounded = hectares.toFixed(hectares < 10 ? 1 : 0);
+    return locale === "ru" ? `${rounded} га` : `${rounded} ha`;
+  }
+  const rounded = sqKm.toFixed(sqKm < 10 ? 2 : 1);
+  return locale === "ru" ? `${rounded} км²` : `${rounded} km²`;
+}

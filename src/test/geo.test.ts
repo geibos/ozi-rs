@@ -5,6 +5,8 @@ import {
   formatMeasuredDistance,
   pathLengthKm,
   ringAround,
+  polygonAreaSqKm,
+  formatMeasuredArea,
 } from "../lib/geo";
 
 /**
@@ -109,5 +111,82 @@ describe("a ring of a given radius", () => {
       expect(point.lon).toBeGreaterThanOrEqual(-180);
       expect(point.lon).toBeLessThanOrEqual(180);
     }
+  });
+});
+
+/**
+ * OziExplorer's measuring tool is "Distance & Area", and the area is the half
+ * a coordinator writes down: a sector is handed over as "прочесать 2.4 км²",
+ * and that number decides how many people it takes.
+ */
+describe("polygonAreaSqKm", () => {
+  it("has nothing to measure until three points enclose something", () => {
+    expect(polygonAreaSqKm([])).toBe(0);
+    expect(polygonAreaSqKm([{ lat: 59.95, lon: 31.6 }])).toBe(0);
+    expect(
+      polygonAreaSqKm([
+        { lat: 59.95, lon: 31.6 },
+        { lat: 59.96, lon: 31.6 },
+      ]),
+    ).toBe(0);
+  });
+
+  it("measures a square sector at the latitude these searches happen", () => {
+    // One kilometre north-south, one east-west, at 60° north — where the
+    // longitude degree is half the length of the latitude degree, which is
+    // exactly what a flat shoelace on raw degrees would get wrong.
+    const kmPerDegLat = (Math.PI * 6371) / 180;
+    const dLat = 1 / kmPerDegLat;
+    const dLon = dLat / Math.cos((60 * Math.PI) / 180);
+    const square = [
+      { lat: 60, lon: 31 },
+      { lat: 60, lon: 31 + dLon },
+      { lat: 60 + dLat, lon: 31 + dLon },
+      { lat: 60 + dLat, lon: 31 },
+    ];
+    expect(polygonAreaSqKm(square)).toBeCloseTo(1, 2);
+  });
+
+  it("does not care which way round the sector was clicked", () => {
+    const square = [
+      { lat: 60, lon: 31 },
+      { lat: 60, lon: 31.02 },
+      { lat: 60.01, lon: 31.02 },
+      { lat: 60.01, lon: 31 },
+    ];
+    expect(polygonAreaSqKm(square)).toBeCloseTo(
+      polygonAreaSqKm([...square].reverse()),
+      6,
+    );
+  });
+
+  it("closes the shape whether or not the crew clicked back to the start", () => {
+    const open = [
+      { lat: 60, lon: 31 },
+      { lat: 60, lon: 31.02 },
+      { lat: 60.01, lon: 31.02 },
+    ];
+    const closed = [...open, open[0]];
+    expect(polygonAreaSqKm(closed)).toBeCloseTo(polygonAreaSqKm(open), 6);
+  });
+});
+
+describe("formatMeasuredArea", () => {
+  it("says a sector in the unit a coordinator would say it in", () => {
+    // Hectares in the middle: "40 га" is a sentence; "0.4 км²" is a
+    // conversion.
+    expect(formatMeasuredArea(0.4, "ru")).toBe("40 га");
+    expect(formatMeasuredArea(2.43, "ru")).toBe("2.43 км²");
+    expect(formatMeasuredArea(24.3, "ru")).toBe("24.3 км²");
+    expect(formatMeasuredArea(0.005, "ru")).toBe("5000 м²");
+  });
+
+  it("says nothing when nothing is enclosed", () => {
+    expect(formatMeasuredArea(0, "ru")).toBe("");
+  });
+
+  it("answers in English too", () => {
+    expect(formatMeasuredArea(0.4, "en")).toBe("40 ha");
+    expect(formatMeasuredArea(2.43, "en")).toBe("2.43 km²");
   });
 });

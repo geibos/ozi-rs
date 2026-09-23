@@ -48,12 +48,26 @@ use super::plt::{PltImportError, decode_plt_bytes};
 #[derive(Debug, Clone, PartialEq)]
 pub struct WptImport {
     source_path: String,
+    /// Line 2 of the file, as written.
+    ///
+    /// Read and carried rather than acted on here: this application does not
+    /// transform between datums (an explicit non-goal, owner decision
+    /// 2026-07-16), but silently taking coordinates from a file that is not in
+    /// WGS 84 puts the marks 100–150 m from where the other headquarters meant
+    /// them, with nothing said. The map-open path has warned about this since
+    /// it was written; the waypoint reader did not, until an outside reviewer
+    /// pointed at it on 2026-09-23.
+    datum: String,
     waypoints: Vec<Waypoint>,
 }
 
 impl WptImport {
     pub fn source_path(&self) -> &str {
         &self.source_path
+    }
+
+    pub fn datum(&self) -> &str {
+        &self.datum
     }
 
     pub fn waypoints(&self) -> &[Waypoint] {
@@ -105,10 +119,12 @@ pub fn import_wpt_text(source_path: String, text: &str) -> Result<WptImport, Wpt
         return Err(WptImportError::NotAWaypointFile);
     }
 
-    // Lines 2–4 are the datum and two reserved lines. The datum is read and
-    // discarded on purpose: the owner fixed the working datum to WGS 84 on
-    // 2026-07-16, and transforming between datums is an explicit non-goal.
-    for _ in 0..3 {
+    // Line 2 is the datum; lines 3 and 4 are reserved. The datum is carried
+    // out to the caller, which warns when it is not WGS 84 — transforming
+    // between datums is a non-goal, but taking the coordinates without saying
+    // so is how marks end up 100–150 m from where they were meant.
+    let datum = lines.next().unwrap_or_default().trim().to_owned();
+    for _ in 0..2 {
         lines.next();
     }
 
@@ -122,6 +138,7 @@ pub fn import_wpt_text(source_path: String, text: &str) -> Result<WptImport, Wpt
 
     Ok(WptImport {
         source_path,
+        datum,
         waypoints,
     })
 }
@@ -204,6 +221,15 @@ mod tests {
 
     /// A file that is not a waypoint file must be refused rather than read as
     /// a scatter of marks somewhere off the coast of Africa.
+    /// A file in another datum is read, and the fact is carried out so the
+    /// caller can say so. Found by an outside reviewer, 2026-09-23.
+    #[test]
+    fn the_datum_the_file_declares_is_carried_out() {
+        let text = "OziExplorer Waypoint File Version 1.1\r\nPulkovo 1942\r\nReserved 2\r\nReserved 3\r\n1,ШТАБ,53.9,27.5,0,0,1\r\n";
+        let import = import_wpt_text("/tmp/x.wpt".to_owned(), text).expect("import");
+        assert_eq!(import.datum(), "Pulkovo 1942");
+    }
+
     #[test]
     fn refuses_a_file_that_is_not_one() {
         let plt = "OziExplorer Track Point File Version 2.0\r\nWGS 84\r\n";

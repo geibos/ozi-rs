@@ -146,7 +146,16 @@ fn sanitise_text(input: &str, max_chars: usize) -> String {
         .take(max_chars)
         .map(|ch| match ch {
             // A comma is replaced, not escaped, and that is a deliberate
-            // departure from the original.
+            // departure from the original — taken with one thing unproven,
+            // stated here rather than hidden.
+            //
+            // What is certain: byte 209 is `С` in Windows-1251, so *reading*
+            // it as a comma would put one inside «СТАРТ». What is not:
+            // whether the original, reading a cp1251 file, substitutes that
+            // byte anyway. If it does, it mangles «СТАРТ» whatever we write,
+            // and not escaping saves nothing on the way out — it only avoids
+            // adding a second way to be wrong. Settling it needs a round trip
+            // through a Russian OziExplorer, which nobody here has run.
             //
             // OziExplorer reserves `chr(209)` for a comma inside a text field
             // and turns it back on reading. `chr(209)` is a *byte*, and these

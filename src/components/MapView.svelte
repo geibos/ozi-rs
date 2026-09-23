@@ -79,7 +79,7 @@
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
   import {
     declutter,
-    positionsOf,
+    segmentsOf,
     type LabelCandidate,
   } from "$lib/track-labels";
   import {
@@ -88,6 +88,8 @@
     formatMeasuredDistance,
     pathLengthKm,
     ringAround,
+    polygonAreaSqKm,
+    formatMeasuredArea,
   } from "$lib/geo";
   import { isEditableTarget } from "$lib/editable-target";
   import {
@@ -315,7 +317,7 @@
           typeof properties.color === "string"
             ? properties.color
             : "rgba(255,255,255,1)",
-        positions: positionsOf(feature.geometry),
+        segments: segmentsOf(feature.geometry),
         selected:
           selected !== null &&
           String(selected.layerId) === layerId &&
@@ -1677,6 +1679,17 @@
       <span class="font-mono text-sm"
         >{formatMeasuredDistance(pathLengthKm($measuredPoints), $locale)}</span
       >
+      {#if $measuredPoints.length >= 3}
+        <!-- OziExplorer's tool is "Distance & Area", and the area is the half
+             a coordinator writes down: a sector is handed over as "прочесать
+             2.4 км²". It appears once three points enclose something. -->
+        <span class="font-mono text-sm opacity-90"
+          >· {formatMeasuredArea(
+            polygonAreaSqKm($measuredPoints),
+            $locale,
+          )}</span
+        >
+      {/if}
       <span class="ml-2 opacity-70">{$i18n("map.measureHint")}</span>
     </div>
   {/if}

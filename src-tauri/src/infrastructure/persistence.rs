@@ -45,6 +45,17 @@ struct PersistedProject {
     project: Project,
 }
 
+/// Just the version, read before anything else is parsed.
+///
+/// Every other field is ignored, so this succeeds on a file whose contents
+/// this build could not otherwise understand — which is the only case where
+/// knowing the version matters.
+#[derive(serde::Deserialize)]
+struct ProjectFormatStamp {
+    #[serde(default)]
+    format_version: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PersistedAppSession {
     pub last_project_path: Option<PathBuf>,
@@ -134,13 +145,22 @@ pub fn save_project(project: &Project, path: &Path) -> Result<(), PersistenceErr
 
 pub fn load_project(path: &Path) -> Result<Project, PersistenceError> {
     let json = std::fs::read_to_string(path).map_err(PersistenceError::Io)?;
-    let envelope: PersistedProject = serde_json::from_str(&json).map_err(PersistenceError::Json)?;
-    if envelope.format_version > CURRENT_PROJECT_FORMAT_VERSION {
+    // The version is read on its own, and first. Reading the whole envelope
+    // and only then checking the number works while a future format still
+    // parses as this one; the day it moves a field, the operator is told
+    // "format error: invalid type at line 412" about a file whose real
+    // problem is that it comes from a newer build. The diagnosis has to
+    // survive exactly the case it exists for. Found by an outside reviewer,
+    // 2026-09-23.
+    let stamp: ProjectFormatStamp = serde_json::from_str(&json).map_err(PersistenceError::Json)?;
+    if stamp.format_version > CURRENT_PROJECT_FORMAT_VERSION {
         return Err(PersistenceError::FromTheFuture {
-            found: envelope.format_version,
+            found: stamp.format_version,
             supported: CURRENT_PROJECT_FORMAT_VERSION,
         });
     }
+
+    let envelope: PersistedProject = serde_json::from_str(&json).map_err(PersistenceError::Json)?;
     let mut project = envelope.project;
     // Normalize legacy projects to satisfy the default-layers invariant
     // declared by the `layers` capability. Existing layers are preserved
@@ -632,6 +652,29 @@ mod tests {
         std::fs::write(&path, serde_json::to_string_pretty(&value).expect("write")).expect("write");
 
         load_project(&path).expect("a project from before the version still opens");
+    }
+
+    /// The diagnosis has to survive the case it exists for: a future format
+    /// this build cannot parse at all. Reading the whole file and only then
+    /// looking at the number told the operator "format error" about a file
+    /// whose real problem is that it is newer. Found by an outside reviewer,
+    /// 2026-09-23.
+    #[test]
+    fn a_future_format_this_build_cannot_parse_still_says_it_is_from_the_future() {
+        let dir = temp_dir("format-version-unparseable-future");
+        let path = dir.join("newer.ozp");
+        // A shape this build has no idea about, carrying only the number it
+        // can be sure of.
+        std::fs::write(
+            &path,
+            r#"{ "format_version": 99, "search": { "routes": [], "marks": [] } }"#,
+        )
+        .expect("write");
+
+        match load_project(&path) {
+            Err(PersistenceError::FromTheFuture { found, .. }) => assert_eq!(found, 99),
+            other => panic!("SHALL name the version, not the parse, got {other:?}"),
+        }
     }
 
     /// The direction that actually loses work: an older build opening a file a
