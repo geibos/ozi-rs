@@ -379,6 +379,7 @@ const HANDLERS: StandAnswers = {
       symbol: null,
       visible: true,
       color: null,
+      description: null,
     });
     standEmit("state-changed", undefined);
     return null;
@@ -482,6 +483,7 @@ const HANDLERS: StandAnswers = {
     return null;
   },
   cancel_download: () => true,
+  set_waypoint_description: () => null,
   // A project is one search. The stand answers by emptying what this session
   // has accumulated, so the effect is on the screen rather than implied.
   new_project: () => {
@@ -524,6 +526,9 @@ const HANDLERS: StandAnswers = {
         symbol: "18",
         visible: true,
         color: null,
+        // The note travels with the mark; a `.wpt` from another штаб carries
+        // it in field 11.
+        description: "второй лагерь, вода из колонки",
       },
       {
         id: 951,
@@ -533,6 +538,7 @@ const HANDLERS: StandAnswers = {
         symbol: "18",
         visible: true,
         color: null,
+        description: "дальше болото, без сапог не ходить",
       },
     ]);
     standEmit("state-changed", undefined);

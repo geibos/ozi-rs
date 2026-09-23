@@ -133,6 +133,13 @@ fn write_waypoint(out: &mut String, waypoint: &Waypoint) {
     out.push_str("    <name>");
     xml_escape_into(out, waypoint.name());
     out.push_str("</name>\n");
+    // `<desc>` before `<sym>`: the GPX schema fixes the order of a waypoint's
+    // children, and a reader that validates rejects the file otherwise.
+    if let Some(description) = waypoint.description() {
+        out.push_str("    <desc>");
+        xml_escape_into(out, description);
+        out.push_str("</desc>\n");
+    }
     if let Some(symbol) = waypoint.symbol() {
         out.push_str("    <sym>");
         xml_escape_into(out, symbol);
@@ -322,6 +329,10 @@ mod tests {
         let mut headquarters = Waypoint::new(WaypointId::new(1), "ШТАБ", 59.95243, 31.59681);
         // `set_symbol` hands back the previous symbol, not a result.
         let _ = headquarters.set_symbol(Some("flag".to_owned()));
+        // The note beside the mark: the place is «ШТАБ», the reason is what a
+        // crew is sent to, and it was dropped in both directions until
+        // 2026-09-23.
+        let _ = headquarters.set_description(Some("сбор в 06:00, вода есть".to_owned()));
         // One without a symbol: absent must stay absent rather than become a
         // default, which would put a mark on the map nobody placed.
         let plain = Waypoint::new(WaypointId::new(2), "Задача 1", 59.8, 31.7);
@@ -336,6 +347,9 @@ mod tests {
 
         assert_eq!(waypoints[0].name(), "ШТАБ");
         assert_eq!(waypoints[0].symbol(), Some("flag"));
+        // The note travels with the place. Without it the штаб next door gets
+        // a pin and no reason for it.
+        assert_eq!(waypoints[0].description(), Some("сбор в 06:00, вода есть"));
         assert!(
             (waypoints[0].latitude() - 59.95243).abs() < 1e-9
                 && (waypoints[0].longitude() - 31.59681).abs() < 1e-9,
@@ -348,6 +362,7 @@ mod tests {
             None,
             "a waypoint with no symbol must not acquire one on the way back"
         );
+        assert_eq!(waypoints[1].description(), None, "nor a note it never had");
     }
 
     /// The colour the writer emits is read back — pinned on the reading side,

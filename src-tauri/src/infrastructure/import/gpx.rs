@@ -370,6 +370,11 @@ fn convert_waypoint(waypoint_index: usize, file_stem: &str, waypoint: gpx::Waypo
     if let Some(symbol) = waypoint.symbol {
         let _ = imported_waypoint.set_symbol(Some(symbol));
     }
+    // The note beside the mark. A mark called «улика» is the place; the note
+    // is what a crew is actually sent to, and it was dropped on the way in.
+    if let Some(description) = waypoint.description {
+        let _ = imported_waypoint.set_description(Some(description));
+    }
 
     imported_waypoint
 }

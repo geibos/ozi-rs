@@ -26,4 +26,4 @@
 
 - [x] 5.1 `just ci` green
 - [x] 5.2 Walked on the stand 2026-09-23: created «День 3 · ЛИСА», renamed it to «День 3», deleted it — the active layer moved to «Треки» and the toast read «Слой удалён — Cmd+Z вернёт». `docs/progress/2026-09-23-layers/layer-menu.png`
-- [ ] 5.3 `just smoke` green
+- [x] 5.3 `just smoke` green (2026-09-23, both journeys against a bundle built the same hour; the layer journey added to the gate that day walks create → active → delete over real IPC)

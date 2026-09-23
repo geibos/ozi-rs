@@ -10,7 +10,9 @@ The application shell: the desktop window, frontend stack and routing, the UI ki
 - Legacy spec `docs/superpowers/specs/2026-05-17-shadcn-ui-kit-svelte-design.md` (2026-05-17, executed via archived `migrate-to-sveltekit`, `add-design-tokens-and-shadcn`, `2026-05-17-migrate-panels-to-shadcn`): stay on Svelte, adopt shadcn-svelte over bits-ui, SvelteKit + adapter-static, routes `/` and `/project`, felte + zod forms, track colours outside the theme, third-party credits, ESLint/Prettier/svelte-check baseline; rationale: meetily-grade polish without a framework migration. Codified as: "Frontend is bootstrapped via SvelteKit with adapter-static", "Top-level surfaces live at distinct routes `/` and `/project`", "UI primitives are sourced from the shadcn-svelte library", "All in-app panels render through shadcn-svelte primitives and Tailwind utility classes that consume semantic tokens", "Form panels use felte with zod resolvers", "Track and waypoint colours are isolated from the theme system", "Third-party dependencies are credited", "Icons come from Lucide via `@lucide/svelte`", "Toasts and tooltips are hosted once in the root layout" | D4/D5 (Catppuccin as the single colour source, HSL semantic layer derived from the flavour) superseded by the native token layer; the HSL-triplet contract survives inside the Catppuccin pack requirement; D8 tooling gates are codified in `ci-pipeline` ("Continuous integration pipeline on pull requests and main").
 - Legacy spec `docs/superpowers/specs/2026-05-17-meetily-inspired-future-work.md` (2026-05-17, backlog): not codified — backlog only. Its item A1 (command palette) later shipped as "A global Cmd-K command palette is available everywhere…"; remaining ideas are kept as a backlog list outside the specs.
 - Owner decision (2026-09-19): theme requirements stand although `ThemePicker.svelte` is currently unmounted; the picker returns with the toolbar/palette migration (`revive-ui-cycle` follow-up `migrate-toolbar-and-palette`).
+
 ## Requirements
+
 ### Requirement: System provides a Catppuccin theme selector with five options
 
 The system SHALL continue to offer the Catppuccin palette family — Auto (follow OS), Latte, Frappé, Macchiato, or Mocha — as an OPT-IN theme pack rather than the default. The default theme of the application SHALL be the native auto/light/dark Zinc + Teal system declared in `src/lib/tokens.css`; the Catppuccin selector SHALL become reachable from settings rather than being the front-line theme picker.
@@ -1205,3 +1207,40 @@ three and the interface has no rule for choosing between them.
 - **WHEN** a badge shows how many points a drawing has
 - **THEN** it is worded without a noun that would need to agree with the number
 
+### Requirement: A layer select says which layer is active
+
+The accessible name of a layer select SHALL carry the name of the layer that
+is active, not only the kind of layer it selects.
+
+A control announced as "track layer" tells a screen reader half of what it
+is; the value itself lives in an element the packaged application's
+accessibility tree does not publish, so it is unreadable from outside as well.
+
+#### Scenario: A layer is active
+
+- **WHEN** a track layer is active
+- **THEN** the select's accessible name carries that layer's name
+
+#### Scenario: No layer is active
+
+- **WHEN** no layer is active
+- **THEN** the select's accessible name is the kind of layer alone
+
+### Requirement: The colour theme is chosen from the command palette
+
+The command palette SHALL offer each colour theme as its own entry, mark the
+one in use, and apply a chosen theme immediately as well as remembering it.
+
+The theme selector this capability requires had no surface at all after the
+workspace redesign: the picker component was mounted nowhere and the palette's
+entry pointed at a sidebar that no longer existed.
+
+#### Scenario: Choosing a theme
+
+- **WHEN** the operator picks a theme from the palette
+- **THEN** the interface changes to it at once, and the choice survives a restart
+
+#### Scenario: Seeing which theme is in use
+
+- **WHEN** the operator opens the palette
+- **THEN** the theme currently in use is marked

@@ -117,6 +117,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::rename_waypoint,
         commands::set_waypoint_symbol,
         commands::set_waypoint_color,
+        commands::set_waypoint_description,
         commands::simplify_track,
         commands::sort_track_points,
         commands::crop_track_to_extent,

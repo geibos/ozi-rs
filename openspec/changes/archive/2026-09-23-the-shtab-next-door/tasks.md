@@ -22,4 +22,4 @@
 
 - [x] 4.1 `just ci` green
 - [x] 4.2 Walked on the stand 2026-09-23: importing a `.wpt` put «ШТАБ-2» and «Рубеж» in the Waypoints tab and took the map from two markers to four. The first attempt put the marks into the fixture's existing layer, which looked right in the list and drew nothing — the marker reconciler gates on a fingerprint over the layer set, and an import into an existing layer does not move it. The stand creates a layer per file now, as the backend does. `docs/progress/2026-09-23-wpt-import/wpt-imported.png`
-- [ ] 4.3 `just smoke` green
+- [x] 4.3 `just smoke` green (2026-09-23, both journeys against a bundle built the same hour; the layer journey added to the gate that day walks create → active → delete over real IPC)

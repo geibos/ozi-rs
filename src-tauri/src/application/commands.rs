@@ -131,6 +131,13 @@ pub enum ProjectCommand {
         old_color: Option<[u8; 4]>,
         new_color: Option<[u8; 4]>,
     },
+    /// The note beside a mark: what a crew is actually sent to.
+    SetWaypointDescription {
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_description: Option<String>,
+        new_description: Option<String>,
+    },
     SimplifyTrack {
         layer_id: LayerId,
         track_id: TrackId,
@@ -697,6 +704,19 @@ impl ProjectCommand {
                 project.rename_waypoint_in_layer(*layer_id, *waypoint_id, new_name.clone())?;
                 Ok(())
             }
+            Self::SetWaypointDescription {
+                layer_id,
+                waypoint_id,
+                new_description,
+                ..
+            } => {
+                project.set_waypoint_description_in_layer(
+                    *layer_id,
+                    *waypoint_id,
+                    new_description.clone(),
+                )?;
+                Ok(())
+            }
             Self::SetWaypointSymbol {
                 layer_id,
                 waypoint_id,
@@ -1132,6 +1152,17 @@ impl ProjectCommand {
                 waypoint_id: *waypoint_id,
                 old_name: new_name.clone(),
                 new_name: old_name.clone(),
+            },
+            Self::SetWaypointDescription {
+                layer_id,
+                waypoint_id,
+                old_description,
+                new_description,
+            } => Self::SetWaypointDescription {
+                layer_id: *layer_id,
+                waypoint_id: *waypoint_id,
+                old_description: new_description.clone(),
+                new_description: old_description.clone(),
             },
             Self::SetWaypointSymbol {
                 layer_id,

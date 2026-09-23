@@ -124,7 +124,10 @@ pub fn sample_app_state() -> AppState {
     // One waypoint carries a colour of its own, one does not: on a search map
     // the symbol says what a mark is and the colour says whose it is, and the
     // stand has to show both cases or it shows neither.
-    for (id, name, lat, lon, symbol, visible, color) in [
+    // One carries a note and one does not, for the same reason: the note is
+    // what a crew is actually sent to, and it travels to the штаб next door
+    // through GPX and WPT, so the stand has to show both cases.
+    for (id, name, lat, lon, symbol, visible, color, description) in [
         (
             1u64,
             "ШТАБ",
@@ -133,8 +136,18 @@ pub fn sample_app_state() -> AppState {
             Some("flag"),
             true,
             Some([37u8, 99, 235, 255]),
+            Some("сбор в 06:00, вода есть"),
         ),
-        (2, "ЗАБРОС", 59.951938, 31.596359, None, true, None),
+        (
+            2,
+            "ЗАБРОС",
+            59.951938,
+            31.596359,
+            None,
+            true,
+            None,
+            Some("заброска групп, подъезд с юга"),
+        ),
         (
             3,
             "Проход у полю",
@@ -143,9 +156,13 @@ pub fn sample_app_state() -> AppState {
             Some("camp"),
             false,
             None,
+            None,
         ),
     ] {
         let mut waypoint = Waypoint::new(WaypointId::new(id), name, lat, lon);
+        if let Some(description) = description {
+            waypoint.set_description(Some(description.to_owned()));
+        }
         if let Some(symbol) = symbol {
             waypoint.set_symbol(Some(symbol.to_owned()));
         }

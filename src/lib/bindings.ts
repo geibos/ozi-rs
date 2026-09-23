@@ -482,6 +482,20 @@ async setWaypointColor(layerId: number, waypointId: number, color: [number, numb
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Set the note beside a mark.
+ * 
+ * The place travels between headquarters; until 2026-09-23 the reason for it
+ * did not, in either direction.
+ */
+async setWaypointDescription(layerId: number, waypointId: number, description: string | null) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_waypoint_description", { layerId, waypointId, description }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async simplifyTrack(layerId: number, trackId: number, tolerance: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("simplify_track", { layerId, trackId, tolerance }) };
@@ -742,7 +756,11 @@ export type WaypointDto = { id: number; name: string; lat: number; lon: number; 
  * not a colour: changing the default later moves every uncoloured
  * waypoint with it.
  */
-color: [number, number, number, number] | null }
+color: [number, number, number, number] | null; 
+/**
+ * The note beside the mark: what a crew is actually sent to.
+ */
+description: string | null }
 
 /** tauri-specta globals **/
 

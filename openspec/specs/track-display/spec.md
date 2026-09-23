@@ -7,7 +7,9 @@ How tracks are presented once they are in a project: per-track colour, line widt
 - ADR-0013 (2026-03-29, accepted): `TrackStyle` (colour, width, visibility) is stored inside the `Track` domain entity rather than in a UI-side style table; rationale: style travels with the project file and round-trips through PLT `COLORREF` and GPX Garmin colour. Codified as: "Each track has independently controllable color, line width, opacity, and visibility"; the persistence and encoding details are codified in `project-persistence` and `track-export`.
 - ADR-0019 (2026-04-25, accepted): render existing point timestamps in the point list, expose the existing colour and line-width mutations through compact track controls, show `YYYYMMDD_Callsign` validation as a warning that never blocks rename/save/export; rationale: docs described these as visible while the UI lacked them. Codified as: "Track points panel exposes per-point attributes", "Each track has independently controllable color, line width, opacity, and visibility", "Track name validation surfaces a non-blocking warning for non-conforming names", "Validation pattern is alphabet-agnostic and does not validate calendar dates" | style changes stay outside the undo stack per ADR-0019/ADR-0017 — the undo boundary is codified in `undo-redo`, not here.
 - ADR-0020 (2026-04-28, accepted), Tracks section: many tracks at once, tens of thousands of points per track, per-track colour and line style, point-by-point walkthrough with per-point info, warning-only name validation; rationale: full-day SAR tracks routinely exceed 30k points. Codified as: the requirements above plus "System computes and surfaces per-track statistics" (archived `add-track-statistics-ui`); per-segment delivery is added by the active `revive-ui-cycle` change | next/previous walkthrough controls are not codified — points are click-selectable only (`docs/feature-status.md`, row "Track point walkthrough"); the scope itself is recorded in `product-scope`.
+
 ## Requirements
+
 ### Requirement: Each track has independently controllable color, line width, opacity, and visibility
 
 The system SHALL store `color`, `line_width`, `opacity`, and `visible` per `Track`, and SHALL render each track using its own style. These mutations are immediate visual updates and are NOT recorded in undo history (see `undo-redo`).
@@ -255,3 +257,82 @@ fetches in flight.
 - **AND** the first answers last
 - **THEN** the map draws the second fetch's geometry
 
+### Requirement: A track carries its name on the map
+
+Every visible track that has a name SHALL show that name on the map, drawn in
+the track's own colour, positioned at the point half way along the route
+measured by length.
+
+A day of recordings is a dozen coloured lines. Without names the only way to
+find one is to read its colour off the list and hunt.
+
+The position SHALL be measured by distance rather than by point index: a crew
+that stopped for twenty minutes logs a crowd of points at the rest stop, and
+an index midpoint puts the name there rather than on the route.
+
+#### Scenario: A day's routes on the map
+
+- **WHEN** the operator looks at a day of imported tracks
+- **THEN** each visible track has its name on it, in its own colour
+
+#### Scenario: A track that stopped for a break
+
+- **WHEN** a track's points are crowded at one end and sparse across the rest
+- **THEN** its name sits half way along the distance walked, not among the crowded points
+
+### Requirement: Names that do not fit are dropped, not stacked
+
+Names that would overlap on screen SHALL be reduced to those that fit. A
+selected track SHALL keep its name; otherwise the longer route SHALL keep it.
+
+Below the zoom at which a whole district fits on screen, no names SHALL be
+drawn: at that scale they are a smear rather than information.
+
+#### Scenario: Two tracks crossing at the same place
+
+- **WHEN** two tracks' midpoints fall within a name's width of each other
+- **THEN** one name is drawn, not two overlapping
+
+#### Scenario: The operator selects a track in a crowd
+
+- **WHEN** a track is selected and its name would otherwise be dropped
+- **THEN** its name is the one drawn
+
+### Requirement: A name sits on a line the crew actually walked
+
+A track's name SHALL be placed half way along the longest segment of that
+track, not half way along its segments taken as one run.
+
+A track is split where the recording stopped. Half the combined length falls
+in the gap whenever the two stretches are far apart, and a name floating over
+empty forest belongs to nothing.
+
+#### Scenario: A track recorded in two stretches a kilometre apart
+
+- **WHEN** a track has two segments with a kilometre of nothing between them
+- **THEN** its name sits on one of the segments, not between them
+
+### Requirement: Which name survives is decided by distance walked
+
+When names compete for room, the system SHALL keep the selected track's name
+first and then the name of the track whose crew walked furthest, measured in
+distance rather than in the number of recorded points.
+
+A navigator logging once a second at a rest stop records more points than a
+long route logged once a minute. Whose callsign stays on the map must not be
+decided by how often somebody's GPS wrote a line.
+
+#### Scenario: A rest stop against a long route
+
+- **WHEN** a short track with a thousand crowded points competes with a long track with two
+- **THEN** the long track keeps its name
+
+### Requirement: Names are kept apart by the room they take
+
+Overlap SHALL be judged by the space each name occupies on screen, not by the
+distance between their anchor points.
+
+#### Scenario: Two long names sixty pixels apart
+
+- **WHEN** two long names' anchors are further apart than the minimum spacing but their text overlaps
+- **THEN** only one of them is drawn

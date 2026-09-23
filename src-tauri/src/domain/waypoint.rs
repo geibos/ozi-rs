@@ -38,6 +38,19 @@ pub struct Waypoint {
     /// attribute for the same effect.
     #[serde(default)]
     color: Option<[u8; 4]>,
+    /// What the mark means, in the crew's words.
+    ///
+    /// A mark called «улика» is the place; the note beside it — «красная
+    /// куртка, 200 м от просеки» — is what a crew is sent to. OziExplorer
+    /// carries it in field 11 of a `.wpt` and GPX in `<desc>`, and this
+    /// application dropped it in both directions: the place survived the
+    /// exchange between headquarters and the reason for it did not.
+    ///
+    /// `None` for a mark with nothing to say, which is not the same as an
+    /// empty note somebody typed and cleared. Every project saved before this
+    /// field existed reads as `None`.
+    #[serde(default)]
+    description: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -54,6 +67,7 @@ impl Waypoint {
             longitude,
             visible: true,
             color: None,
+            description: None,
         }
     }
 
@@ -63,6 +77,25 @@ impl Waypoint {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    /// Set the note, answering with what it was. An empty note is `None`:
+    /// clearing the field means the mark has nothing to say, not that it says
+    /// nothing.
+    pub fn set_description(&mut self, description: Option<String>) -> Option<String> {
+        let normalised = description.and_then(|d| {
+            let trimmed = d.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_owned())
+            }
+        });
+        std::mem::replace(&mut self.description, normalised)
     }
 
     pub fn symbol(&self) -> Option<&str> {

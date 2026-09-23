@@ -9,7 +9,9 @@ Covers how track data enters a project from files: the single Import dialog (GPX
 - Change `bootstrap-current-state`: first behaviour-level requirements; its "into the active track layer" wording never matched `application/import.rs`, which creates `Imported tracks: <path>` and `Imported waypoints: <path>` layers — replaced in `codify-architecture-decisions`.
 - Change `fix-plt-import-encoding-detection` (2026-05-17): PLT bytes decode via BOM → strict UTF-8 → `chardetng` → Windows-1251 fallback; rationale: field PLT files from Russian Windows are cp1251, newer ones UTF-8 or UTF-16. Codified as: PLT import accepts Windows-1251 encoded text. GPX import has no such chain; it relies on the XML encoding declaration.
 - CJ-3 (`docs/customer-journeys.md`) and the July 2026 import work: one Import dialog with a combined GPX/PLT/ZIP filter, `.zip` routed through the GPX import command, and a recursive "Import folder…" for per-date subfolders that reports per-file failures instead of aborting; rationale: volunteers bring a folder or a ZIP from several navigators, and the twin GPX/PLT buttons were indistinguishable. Codified as: Single import dialog accepts GPX, PLT and ZIP files; Recursive folder import of GPX and PLT files.
+
 ## Requirements
+
 ### Requirement: System imports GPX files into the active track layer
 
 The system SHALL accept GPX files via a file picker and SHALL import all tracks contained in the file into the active track layer as `Track` entities with their original geometry preserved.
@@ -151,3 +153,91 @@ topographic basemap is made of.
 - **WHEN** the same folder is imported into a fresh project on two occasions
 - **THEN** the tracks come out in the same colours both times
 
+### Requirement: Files dropped on the window are imported
+
+Dropping files on the application window SHALL import them exactly as the
+import dialog does, and SHALL report how many of them landed.
+
+A day's recordings arrive as a handful of files from several navigators.
+Dropping them is how anybody expects to hand them over.
+
+#### Scenario: A day's files dropped at once
+
+- **WHEN** the operator drops a GPX and an OziExplorer waypoint file on the window
+- **THEN** both are imported, their tracks and marks appear on the map, and the summary says two of two
+
+#### Scenario: A folder dropped
+
+- **WHEN** the operator drops a folder of per-date subfolders
+- **THEN** it goes through the recursive import rather than being refused
+
+### Requirement: One dispatch behind every import surface
+
+Which reader a file reaches SHALL be decided in one place, shared by the
+import dialog and the window's drop target, so the two cannot accept different
+things.
+
+An import that fails SHALL NOT stop the files after it; the failures SHALL be
+reported together once the rest have landed, naming each file.
+
+#### Scenario: One unreadable file among a day's
+
+- **WHEN** one file of ten cannot be read
+- **THEN** the other nine are imported and the report names the one that failed
+
+### Requirement: OziExplorer waypoint files import
+
+The system SHALL import OziExplorer Waypoint Files (`.wpt`), reading each
+row's name, latitude, longitude and symbol, and SHALL place them in a waypoint
+layer named after the source file.
+
+A file whose first line is not the waypoint-file signature SHALL be refused
+rather than parsed, and rows that carry no usable position — the placeholder
+rows the original writes for empty GPS slots, and blank lines — SHALL be
+skipped without failing the import.
+
+#### Scenario: A waypoint file from another headquarters
+
+- **WHEN** the operator imports a `.wpt` handed over by a headquarters running OziExplorer
+- **THEN** its marks appear on the map and in the Waypoints tab, in a layer named after the file
+
+#### Scenario: A file that is not a waypoint file
+
+- **WHEN** the operator picks a `.plt` or any other file through the waypoint-file path
+- **THEN** the import is refused with a message, and no marks are created
+
+#### Scenario: Placeholder rows
+
+- **WHEN** the file carries placeholder rows for empty GPS slots
+- **THEN** those rows produce no marks and the rest of the file still imports
+
+### Requirement: Cyrillic in an OziExplorer file reads as written
+
+Text in an OziExplorer file SHALL be decoded through the same chain the track
+files use — byte-order mark, strict UTF-8, statistical detection, then
+Windows-1251 — because the files these crews exchange were written on Russian
+Windows.
+
+The `chr(209)` escape the format reserves for a comma inside a text field
+SHALL NOT be interpreted. That escape is a byte, and in Windows-1251 the byte
+is `С`: interpreting it would put a comma inside ordinary Russian words.
+
+#### Scenario: A mark named СТАРТ
+
+- **WHEN** a Windows-1251 waypoint file carries a mark named «СТАРТ»
+- **THEN** the mark is named «СТАРТ», with no comma in it
+
+### Requirement: A waypoint file in another datum says so
+
+When an imported OziExplorer waypoint file declares a datum that is not in the
+WGS 84 family, the system SHALL warn that the coordinates may be displaced.
+
+This application does not transform between datums, and does not intend to.
+Taking the coordinates in silence puts another headquarters' marks 100–150 m
+from where they meant them, and nobody finds out until a crew is standing
+there.
+
+#### Scenario: A file from a headquarters working in Pulkovo 1942
+
+- **WHEN** a `.wpt` declaring a non-WGS 84 datum is imported
+- **THEN** the marks are imported and a warning about the possible displacement is recorded

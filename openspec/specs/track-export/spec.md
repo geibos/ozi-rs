@@ -8,7 +8,9 @@ Covers writing tracks out of a project: whole-layer GPX export with the Garmin c
 - Change `bootstrap-current-state`: GPX layer export with `<gpxx:DisplayColor>`, single-track PLT export with COLORREF BGR colour and OLE dates, and the `<bundle>/10-Tracks/<track>.<ext>` default path; codified as the existing requirements of this spec.
 - Commits 0d17104 (2026-04-28) and f5f44bb (2026-07-14, M0 data-loss fixes): the PLT properties line was rewritten to the ten-field order OziExplorer and `import/plt.rs::parse_track_style` expect (visible, width, COLORREF, name, fixed tail) and the output switched from UTF-8 to Windows-1251 with CRLF, guarded by an export → import round-trip test; rationale: OziExplorer on Russian Windows showed mojibake and misread columns (CJ-6). Codified as: PLT export writes the OziExplorer 2.1 track layout; PLT export text is Windows-1251 with CRLF line endings.
 - ADR-0022 (2026-04-28, accepted): export taxonomy "GPX (tracks/waypoints), PLT (tracks), WPT (waypoints)"; only the taxonomy touches this capability — WPT itself is codified in `waypoints`. Not codified: a waypoint GPX export — `build_waypoint_gpx_xml` exists in `export/gpx.rs` but no command or UI calls it (`export_gpx` exports track layers only).
+
 ## Requirements
+
 ### Requirement: System exports the active track layer to GPX
 
 The system SHALL provide an "Export GPX" action that writes the contents of the active track layer to a user-chosen `.gpx` file containing all tracks, segments, and points.
@@ -154,3 +156,28 @@ refusal SHALL leave no file behind.
 - **WHEN** the project holds neither tracks nor waypoints
 - **THEN** the export is refused and no file is written
 
+### Requirement: A comma in a name is replaced, not escaped
+
+When writing OziExplorer files, a comma inside a text field SHALL be replaced
+with a space rather than written as the `chr(209)` escape the format reserves.
+
+The escape is a byte, and these files are Windows-1251, where that byte is
+`С`. Reading it as a comma would put one inside «СТАРТ», which settles the
+import side.
+
+The export side rests on one thing that has not been checked: whether the
+original substitutes that byte when reading a cp1251 file regardless of who
+wrote it. If it does, a name with a `С` in it is mangled whatever this
+application writes, and not escaping only avoids adding a second way to be
+wrong. A round trip through a Russian OziExplorer would settle it; nobody has
+run one.
+
+#### Scenario: A track named with a comma
+
+- **WHEN** a track named «ЛИСА15, вечер» is exported to PLT or WPT
+- **THEN** the field carries «ЛИСА15  вечер» and the record is not broken
+
+#### Scenario: A name carrying a Cyrillic С
+
+- **WHEN** a mark named «СТАРТ» makes the trip out and back
+- **THEN** it is still named «СТАРТ»

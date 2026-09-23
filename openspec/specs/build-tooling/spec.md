@@ -9,7 +9,9 @@ Define the `justfile` as the single entry point for developer and agent workflow
 - change `fix-dev-release-rebuild` (archived 2026-05-26, implemented): `just run-release` must be a no-op when no input changed while `just build` / `just release` keep going through `npm run tauri build`; rationale: the build-and-launch loop was rebuilding the whole app on every run, and bypassing the Tauri CLI on the bundled path would break parity with the CI smoke build. Codified as: `just run-release` SHALL be a no-op when inputs are unchanged, Canonical bundled build path SHALL remain `npm run tauri build`.
 - ADR-0024 (2026-04-28, accepted; narrowed by ADR-0025 in `revive-ui-cycle`) together with the M1 `just smoke` gate (AGENTS.md "E2E gate"): the end-to-end gate for app-touching changes is an Appium Mac2 smoke run from `tools/ozi-rs-mcp/tests/`, invoked as `just smoke`, and it stays out of `just ci` because it seizes the screen; rationale: Playwright cannot exercise Tauri IPC, protocols or window lifecycle, and GUI-seizing runs must be batched, not run per check. Codified as: (revive-ui-cycle) Stand, fixtures and screenshot recipes are available through `just` — `just smoke [<N>]` runs the per-CJ smokes and `just ci` SHALL NOT include Appium smoke.
 - `docs/native-qa-mcp.md` §"Registering with an MCP client" and `opencode.json` (2026-05, implemented for opencode only): the MCP server is started through `cargo run` so a stale prebuilt binary can never serve a session; rationale: `.mcp.json` still points at `target/release/ozi-rs-mcp`, and that binary (built 2026-05-26) served sessions for months after the July fixes. Codified as: (revive-ui-cycle, agent-workflow) The native QA MCP server is always built from source.
+
 ## Requirements
+
 ### Requirement: `just run-release` SHALL be a no-op when inputs are unchanged
 
 A second invocation of `just run-release` immediately following a first successful invocation, with no modification to any tracked Rust source under `src-tauri/src/`, no modification to any tracked frontend source under `src/`, no modification to `Cargo.toml` / `Cargo.lock` / `package.json` / `package-lock.json` / `tauri.conf.json` / `svelte.config.js` / `vite.config.ts` / `tailwind` configuration files, and no change to capability or icon files referenced by `tauri.conf.json`, SHALL produce no observable build work. Specifically:
@@ -96,3 +98,22 @@ another describes a state the application never has.
 - **WHEN** a folder import is played
 - **THEN** the new tracks appear in the list and are drawn on the map, in the colours the list shows
 
+### Requirement: The gate walks more than one journey, one at a time
+
+The customer-journey gate SHALL cover more than the editing spine, and SHALL
+run its journeys sequentially.
+
+Each journey drives the packaged application through a session that owns the
+screen. Two at once click into each other's window: the first time a second
+journey was added, both failed, including the one that had passed on its own
+a minute earlier.
+
+#### Scenario: Two journeys in one run
+
+- **WHEN** the gate is run
+- **THEN** each journey runs in turn, and one journey's session never interferes with another's
+
+#### Scenario: Layers in the packaged application
+
+- **WHEN** the gate walks the layer journey
+- **THEN** a layer is created from the library, becomes the active one, and is removed again, all over real IPC

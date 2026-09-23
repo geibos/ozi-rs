@@ -367,6 +367,28 @@ export async function deleteWaypointLayer(layerId: bigint): Promise<void> {
   );
 }
 
+/**
+ * The note beside a mark.
+ *
+ * A mark called «улика» is the place; the note is what a crew is sent to. It
+ * travels to the штаб next door through GPX `<desc>` and WPT field 11 — in
+ * both directions, since 2026-09-23. `null` clears it.
+ */
+export async function setWaypointDescription(
+  layerId: bigint,
+  waypointId: bigint,
+  description: string | null,
+): Promise<void> {
+  await unwrap(
+    "set_waypoint_description",
+    commands.setWaypointDescription(
+      toIdNumber(layerId),
+      toIdNumber(waypointId),
+      description,
+    ),
+  );
+}
+
 export async function setTrackColor(
   layerId: bigint,
   trackId: bigint,

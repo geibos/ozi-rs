@@ -345,6 +345,25 @@ impl WaypointLayer {
         Ok(waypoint.set_name(new_name))
     }
 
+    /// Set the note beside a mark, answering with what it was.
+    pub fn set_waypoint_description(
+        &mut self,
+        waypoint_id: u64,
+        description: Option<String>,
+    ) -> Result<Option<String>, ProjectLayerError> {
+        let Some(waypoint) = self
+            .waypoints
+            .iter_mut()
+            .find(|waypoint| waypoint.id().value() == waypoint_id)
+        else {
+            return Err(ProjectLayerError::WaypointNotFound(
+                self.id,
+                WaypointId::new(waypoint_id),
+            ));
+        };
+        Ok(waypoint.set_description(description))
+    }
+
     pub fn set_waypoint_symbol(
         &mut self,
         waypoint_id: u64,
@@ -736,6 +755,19 @@ impl Project {
         let waypoint_id = waypoint_id.into_u64();
         let layer = self.waypoint_layer_mut(layer_id)?;
         layer.set_waypoint_symbol(waypoint_id, symbol)
+    }
+
+    /// Set the note beside a mark, answering with what it was.
+    pub fn set_waypoint_description_in_layer<L: LayerIdLike, W: WaypointIdLike>(
+        &mut self,
+        layer_id: L,
+        waypoint_id: W,
+        description: Option<String>,
+    ) -> Result<Option<String>, ProjectLayerError> {
+        let layer_id = layer_id.into_u64();
+        let waypoint_id = waypoint_id.into_u64();
+        let layer = self.waypoint_layer_mut(layer_id)?;
+        layer.set_waypoint_description(waypoint_id, description)
     }
 
     pub fn set_waypoint_color_in_layer<L: LayerIdLike, W: WaypointIdLike>(

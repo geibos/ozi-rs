@@ -10,7 +10,9 @@ Undo and redo for every project edit in the Rust core: the `ProjectCommand` voca
 - ADR-0021 (2026-04-28, accepted): keep ADR-0017 as-is for MVP and beyond — depth stays 100, no hybrid/thinned history; rationale: SAR sessions produce far fewer than 100 distinct actions, drags already collapse into one delta, deltas are cheap next to the tile cache, and thinning would break the invariant that any stack prefix composes to a valid state. Codified as: Command stack is delta-based with maximum depth 100 (the rejection of thinning is a non-decision and adds no requirement).
 - Commit f5f44bb (2026-07-14, landed): `SplitSegment`/`JoinSegments` made exact inverses — split no longer copied the split point into both halves, so each undo/redo cycle had been adding a phantom `TrackPoint` with a duplicate id that leaked into `.ozp` and GPX/PLT exports; join rejects empty segments so its reverse is always well-defined. Codified as: Undo and redo never duplicate or reassign identifiers.
 - CJ-7 slice 1.1, commit c60dc6e (2026-07-15, landed; `docs/customer-journeys.md`): dirty flag derived structurally from `CommandStack::mutation_count` (apply, merge, undo, redo) plus `AppState::style_revision` (non-undoable setters), cleared only by successful save/load/restore; Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z bound globally in the root layout; rationale: field operators must never lose an hour of work to a missed dirty flag or an unreachable undo. Codified as: Every project mutation marks the project dirty until saved; Undo and redo are reachable through global keyboard chords. Note: `docs/frontend-architecture.md` still claims there are no Ctrl+Z bindings; the code (`src/routes/+layout.svelte:165-185`) is authoritative.
+
 ## Requirements
+
 ### Requirement: All non-trivial edits flow through `ProjectCommand`
 
 The system SHALL express all non-trivial project edits — track CRUD and geometry, waypoint CRUD and symbol changes, drawing, simplification, layer CRUD — as variants of `ProjectCommand`. Each command SHALL validate inputs before applying and SHALL produce a computed inverse for undo.
@@ -116,3 +118,42 @@ command the system refuses SHALL leave the history exactly as it was.
 - **WHEN** a command fails to apply after something was undone
 - **THEN** redo is still available and still holds what it held
 
+### Requirement: Removing a layer is undoable with its contents
+
+Undoing the removal of a layer SHALL restore the layer together with
+everything it held. Restoring the layer's name alone is a silent loss of the
+work inside it.
+
+#### Scenario: A layer of forty tracks removed and taken back
+
+- **WHEN** a track layer holding forty tracks is removed and the operator undoes it
+- **THEN** the layer is back with all forty tracks, their names, geometry and styles
+
+#### Scenario: A waypoint layer removed and taken back
+
+- **WHEN** a waypoint layer holding marks is removed and the operator undoes it
+- **THEN** the layer is back with every mark, its symbol and its colour
+
+### Requirement: Renaming a layer is undoable
+
+A layer's name SHALL change through the command stack, so that renaming can be
+undone and redone like every other edit.
+
+#### Scenario: A rename taken back
+
+- **WHEN** a layer is renamed and the operator undoes it
+- **THEN** the layer carries the name it had before
+
+### Requirement: Renaming a layer that is not there is an error
+
+A rename aimed at a layer the project does not hold SHALL fail rather than
+report success.
+
+A command that answers `Ok` without doing anything still clears the redo
+history and counts a mutation — the operator loses a redo they had, for an
+edit that never happened.
+
+#### Scenario: A rename of a layer that has been removed
+
+- **WHEN** a rename names a layer that is not in the project
+- **THEN** the command fails and the redo history is untouched

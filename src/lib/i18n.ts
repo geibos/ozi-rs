@@ -112,6 +112,10 @@ const dictionaries = {
     "trackInspector.lineWidthFailed": "Failed to change the line width",
     "trackInspector.deleteFailed": "Failed to delete the track",
     "points.detailFailed": "Failed to load the track's points",
+    "inspector.waypointDescription": "Note",
+    "inspector.waypointDescriptionPlaceholder":
+      "What this mark means — travels with it to the next headquarters",
+    "inspector.waypointDescriptionFailed": "Could not save the note",
     "inspector.waypointRenameFailed": "Failed to rename the waypoint",
     "inspector.waypointVisibilityFailed":
       "Failed to change the waypoint's visibility",
@@ -513,6 +517,10 @@ const dictionaries = {
     "trackInspector.lineWidthFailed": "Не удалось изменить толщину линии",
     "trackInspector.deleteFailed": "Не удалось удалить трек",
     "points.detailFailed": "Не удалось загрузить точки трека",
+    "inspector.waypointDescription": "Заметка",
+    "inspector.waypointDescriptionPlaceholder":
+      "Что это за отметка — уедет вместе с ней в соседний штаб",
+    "inspector.waypointDescriptionFailed": "Не удалось сохранить заметку",
     "inspector.waypointRenameFailed": "Не удалось переименовать точку",
     "inspector.waypointVisibilityFailed":
       "Не удалось переключить видимость точки",

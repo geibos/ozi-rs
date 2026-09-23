@@ -12,7 +12,9 @@ Covers how a `Project` is composed of `MapLayer`, `TrackLayer` and `WaypointLaye
 - auto-create-default-layers (2026-05-20, archived): added "An open project always contains at least one track layer and one waypoint layer" and "Active layer IDs are non-null whenever a project is open"; rationale: fresh projects must accept a first track or waypoint without a null-ID early return.
 - fix-non-destructive-waypoint-rendering (archived): extended "Selecting an active layer is non-destructive" with the waypoint-layer scenarios.
 - redesign-library-sidebar (2026-05-26, archived): added "Selecting a Library row activates the row's owning layer".
+
 ## Requirements
+
 ### Requirement: Project is composed of independent map, track, and waypoint layers
 
 The system SHALL represent `MapLayer`, `TrackLayer`, and `WaypointLayer` as distinct concepts within a `Project`, each carrying its own identifier and contents. A project MAY contain multiple track layers and multiple waypoint layers.
@@ -121,3 +123,45 @@ The Library's active-layer selectors (in the Tracks and Waypoints tab headers) S
 - **WHEN** layer "A" is the active track layer AND the user clicks a Track row whose owning layer is also "A"
 - **THEN** the system does NOT call `set_active_track_layer` (the active layer is unchanged); `$selectedTrack` is updated as usual
 
+### Requirement: The operator can create, rename and remove layers
+
+The system SHALL let the operator create a track layer or a waypoint layer,
+rename any layer, and remove any layer, from the library tab that lists it.
+Creating a layer SHALL answer with the new layer's identifier so the caller
+can make it active without reading the state back.
+
+A day of recordings arrives as files and every file becomes a layer named
+after its path. Without these the operator cannot tidy what the import made,
+cannot discard a folder taken in by mistake, and cannot start an empty layer
+to draw a plan into.
+
+#### Scenario: A layer created from the library
+
+- **WHEN** the operator creates a track layer and gives it a name
+- **THEN** the layer appears in the list under that name and can be made active
+
+#### Scenario: A layer renamed
+
+- **WHEN** the operator renames a layer the import called `Imported tracks: /Volumes/…/day3.gpx`
+- **THEN** the list, the active-layer control and the saved project all carry the new name
+
+#### Scenario: A layer removed
+
+- **WHEN** the operator removes a layer
+- **THEN** the layer and everything in it leave the project, and the map stops drawing them
+
+### Requirement: Removing the active layer leaves another one active
+
+When the removed layer is the active one, the system SHALL make another layer
+of the same kind active rather than leaving no active layer, so that drawing
+and waypoint placement keep a target.
+
+#### Scenario: Removing the active track layer
+
+- **WHEN** the active track layer is removed and other track layers remain
+- **THEN** one of the remaining track layers becomes active
+
+#### Scenario: Removing the last layer of its kind
+
+- **WHEN** the only track layer is removed
+- **THEN** the project is left with no active track layer, and creating one makes it active again

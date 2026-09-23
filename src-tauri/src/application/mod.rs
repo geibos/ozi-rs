@@ -913,6 +913,41 @@ impl AppState {
         Ok(report)
     }
 
+    /// Set the note beside a mark, undoably.
+    ///
+    /// A mark called «улика» is the place; the note is what a crew is sent to,
+    /// and it travels through GPX `<desc>` and WPT field 11 to the штаб next
+    /// door.
+    pub fn apply_set_waypoint_description(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        new_description: Option<String>,
+    ) -> Result<(), ProjectLayerError> {
+        let old_description = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|layer| layer.id() == layer_id)
+            .ok_or(ProjectLayerError::WaypointLayerUnavailable(layer_id))?
+            .waypoints()
+            .iter()
+            .find(|waypoint| waypoint.id() == waypoint_id)
+            .ok_or(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))?
+            .description()
+            .map(str::to_owned);
+
+        let cmd = commands::ProjectCommand::SetWaypointDescription {
+            layer_id,
+            waypoint_id,
+            old_description,
+            new_description,
+        };
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|commands::CommandError::ProjectLayer(e)| e)
+    }
+
     pub fn apply_set_waypoint_color(
         &mut self,
         layer_id: LayerId,

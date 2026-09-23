@@ -17,6 +17,7 @@
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
+  import { Textarea } from "$lib/components/ui/textarea";
   import {
     activeWaypointLayerId,
     appState,
@@ -31,6 +32,7 @@
     renameWaypoint,
     setWaypointSymbol,
     setWaypointColor,
+    setWaypointDescription,
     toggleWaypointVisible,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -47,6 +49,14 @@
   let waypoint = $state<WaypointData | null>(null);
   let nameDraft = $state("");
   let nameDirty = $state(false);
+  /**
+   * The note beside the mark, as it is being typed.
+   *
+   * Its own draft, like the name: a field that writes on every keystroke puts
+   * one undo step on the stack per letter.
+   */
+  let descriptionDraft = $state("");
+  let descriptionDirty = $state(false);
 
   $effect(() => {
     const id = $selectedWaypointId;
@@ -64,10 +74,44 @@
       const found = all.find((w) => BigInt(w.id) === id) ?? null;
       waypoint = found;
       if (found && !nameDirty) nameDraft = found.name;
+      if (found && !descriptionDirty)
+        descriptionDraft = found.description ?? "";
     } catch (error) {
       reportEditFailure("inspector.waypointLoadFailed", error);
       waypoint = null;
     }
+  }
+
+  async function commitDescription() {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    const trimmed = descriptionDraft.trim();
+    const current = wp.description ?? "";
+    if (trimmed === current) {
+      descriptionDirty = false;
+      return;
+    }
+    try {
+      // An emptied field is a mark with nothing to say, which is not the same
+      // as a mark whose note is an empty string.
+      await setWaypointDescription(
+        layerId,
+        BigInt(wp.id),
+        trimmed.length === 0 ? null : trimmed,
+      );
+      descriptionDirty = false;
+      await loadWaypoint(layerId, BigInt(wp.id));
+    } catch (error) {
+      reportEditFailure("inspector.waypointDescriptionFailed", error);
+      descriptionDraft = current;
+      descriptionDirty = false;
+    }
+  }
+
+  function handleDescriptionInput(event: Event) {
+    descriptionDraft = (event.currentTarget as HTMLTextAreaElement).value;
+    descriptionDirty = true;
   }
 
   async function commitName() {
@@ -250,6 +294,30 @@
       {/if}
     </Button>
   </header>
+
+  <!-- The note beside the mark. «улика» is the place; «красная куртка, 200 м
+       от просеки» is what a crew is sent to, and it travels to the штаб next
+       door through GPX and WPT. -->
+  <div class="border-border border-b px-2 py-1.5">
+    <Textarea
+      value={descriptionDraft}
+      oninput={handleDescriptionInput}
+      onblur={commitDescription}
+      onkeydown={(e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          descriptionDraft = waypoint?.description ?? "";
+          descriptionDirty = false;
+          (e.currentTarget as HTMLTextAreaElement).blur();
+        }
+      }}
+      disabled={!waypoint}
+      rows={2}
+      placeholder={$t("inspector.waypointDescriptionPlaceholder")}
+      aria-label={$t("inspector.waypointDescription")}
+      class="min-h-0 resize-none text-xs"
+      data-testid="waypoint-description"
+    />
+  </div>
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-4"

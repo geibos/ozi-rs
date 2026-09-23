@@ -6,8 +6,8 @@
 //! - Windows-1251 encoding (Cyrillic locale matches existing OziExplorer assets)
 //! - CRLF line endings
 //!
-//! Waypoints in this domain only carry `(name, symbol, latitude, longitude)`;
-//! elevation/timestamp are not modelled. Missing values use OziExplorer defaults
+//! Waypoints in this domain carry `(name, symbol, latitude, longitude,
+//! description)`; elevation and timestamp are not modelled. Missing values use OziExplorer defaults
 //! (date `0`, altitude `-777` ft).
 
 use crate::domain::Waypoint;
@@ -58,7 +58,11 @@ where
             status = STATUS,
             fg = FOREGROUND_COLOR,
             bg = BACKGROUND_COLOR,
-            desc = "",
+            // Field 11 is the note beside the mark. It went out empty until
+            // 2026-09-23, so a mark handed to the штаб next door arrived as a
+            // place with no reason attached. Forty characters is the format's
+            // limit.
+            desc = sanitise_text(waypoint.description().unwrap_or_default(), 40),
             alt = ALTITUDE_UNKNOWN,
             font_size = FONT_SIZE,
             font_style = FONT_STYLE,

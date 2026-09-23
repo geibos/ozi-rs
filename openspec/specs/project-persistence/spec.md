@@ -9,7 +9,9 @@ Covers how a SAR project and the bounded app session reach disk and come back: t
 - ADR-0002 (2026-03-29, accepted): a project is a standalone file that references its active map and does not own the bundle directory; rationale: switching maps must not lose tracks, and bundles of tens of gigabytes must be shared across projects. Codified as: Project model is independent from map bundle data; Missing referenced files degrade to a non-panicking state (the ADR's open follow-up on vanished bundle paths). The ADR's "eframe persistent storage" for the active-map reference is superseded by the JSON session file (`PersistedAppSession` in `src-tauri/src/infrastructure/persistence.rs`).
 - Code, no ADR (2026-07, merged with the m0-data-loss fixes): every project and session write goes through temp file + fsync + rename so a failed save never truncates the existing file; rationale: a failed in-place write previously destroyed the only copy of the project. Codified as: Project and session files are written atomically.
 - Legacy doc `docs/persistence-session.md` (2026-04): session restore is bounded to the last project path and the active map reference; rationale: predictable startup without stale UI state. Codified as: Startup session restore is bounded to last project and active map; Specific UI and history state is intentionally NOT restored; Missing referenced files degrade to a non-panicking state; Session restore registers the active map layer so the workspace lands at calibrated bounds. Not codified: the session-file location (`app_data_dir()/session.json`, with a macOS legacy-path fallback — `src-tauri/src/lib.rs`, `resolve_session_path`) because it is not an ADR decision; the doc itself is stale (it names `default_app_session_path` and `new_with_session_path`, which no longer exist).
+
 ## Requirements
+
 ### Requirement: Project is persisted as a JSON `.ozp` file
 
 The system SHALL serialize a project — including its layer composition, tracks, waypoints, and per-track style — as JSON to a user-chosen `.ozp` file via a Save action, and SHALL deserialize the same format via a Load action.
@@ -238,3 +240,114 @@ LizaAlert catalogue, since they are different things.
 - **WHEN** a project is opened from the first screen or from the command palette
 - **THEN** the same thing happens: it is loaded, remembered, and the map is framed on it
 
+### Requirement: A project file says which format it is
+
+A saved project SHALL carry a format version. A project file without one SHALL
+be read as the oldest format and open unchanged, because that is every project
+saved before the version existed.
+
+#### Scenario: A project saved by this build
+
+- **WHEN** a project is saved
+- **THEN** the file carries the format version this build writes, and the rest of its shape is unchanged
+
+#### Scenario: A project saved before versions existed
+
+- **WHEN** a project file carrying no format version is opened
+- **THEN** it opens with its contents intact
+
+### Requirement: A project from a newer build is refused, not degraded
+
+A project file whose format version is newer than the running build
+understands SHALL NOT be opened. The system SHALL say that the file was
+written by a newer version.
+
+Opening it would read the parts this build knows, drop the rest, and write
+that loss back over the other headquarters' file the moment the operator
+saved. A project exchanged between штабы has to be safe in both directions.
+
+#### Scenario: A file from the штаб running a newer build
+
+- **WHEN** a project file declares a format version above the one this build supports
+- **THEN** the open is refused and the operator is told the file comes from a newer version
+
+### Requirement: A search can be started fresh
+
+The system SHALL provide a way to empty the project: no tracks, no waypoints,
+the default track and waypoint layers restored, no file path, and an empty
+undo history.
+
+A project is one search. Without this, the crew that finishes one operation
+and starts the next keeps adding to the same document, and yesterday's routes
+stay under today's.
+
+The undo history SHALL be cleared rather than carried over, so that undo
+cannot walk back into a search that is over and put its tracks on the map
+again.
+
+#### Scenario: Starting the next search
+
+- **WHEN** the operator starts a new project
+- **THEN** the map and both library tabs are empty, the default layers are present, and undo cannot bring the old work back
+
+#### Scenario: The next save asks where
+
+- **WHEN** the operator saves after starting a new project
+- **THEN** the system asks for a path rather than overwriting the file the previous search was saved to
+
+### Requirement: Starting a search keeps the maps
+
+Starting a new project SHALL leave the loaded bundle and the active raster map
+in place. The map is the ground and the project is the work on it; a second
+search in the same district should not blank the screen.
+
+#### Scenario: A second search in the same district
+
+- **WHEN** the operator starts a new project while a raster map is open
+- **THEN** the same map is still displayed, with nothing drawn on it
+
+### Requirement: Unsaved work is not discarded silently
+
+Starting a new project while the current one has unsaved changes SHALL ask the
+operator first, and SHALL do nothing if they decline.
+
+#### Scenario: Unsaved changes
+
+- **WHEN** the operator starts a new project with unsaved changes and declines the question
+- **THEN** the project is untouched
+
+### Requirement: A restore that cannot find the project still opens the map
+
+Restoring a session SHALL restore the project and the active map
+independently. A project that is missing or cannot be read SHALL be reported
+and SHALL NOT prevent the active map from being restored.
+
+CJ-2 puts a laptop in a field camp with no link and asks for a working map
+inside a minute. The map is on the disk whether or not the project beside it
+still is.
+
+#### Scenario: The project file has been moved
+
+- **WHEN** the session names a project file that no longer exists, and an active map that does
+- **THEN** the map is restored, and the missing project is reported
+
+#### Scenario: The project file cannot be read
+
+- **WHEN** the session names a project file that fails to parse, and an active map that is present
+- **THEN** the map is restored, and the unreadable project is reported
+
+### Requirement: The format version is read before the rest of the file
+
+The system SHALL read a project's format version on its own, before parsing
+the rest of the file, so that a file from a newer build is reported as such
+even when this build cannot parse its contents at all.
+
+Reading the whole file first works only while a future format still parses as
+this one. The day it moves a field, the operator is told "format error" about
+a file whose real problem is that it is newer — the diagnosis failing in
+exactly the case it exists for.
+
+#### Scenario: A newer format this build cannot parse
+
+- **WHEN** a project file declares a newer version and holds a structure this build does not understand
+- **THEN** the operator is told the file comes from a newer version, not that it is malformed

@@ -18,9 +18,13 @@
 //!
 //! Four header lines, then one waypoint per line across 24 comma-separated
 //! fields. The ones that mean something to this application are 2 (name),
-//! 3 (latitude), 4 (longitude) and 6 (symbol). Everything else is either a
-//! GPS-upload detail, a label style, or a proximity alarm — none of which this
-//! product models.
+//! 3 (latitude), 4 (longitude), 6 (symbol) and 11 (description). Everything
+//! else is either a GPS-upload detail, a label style, or a proximity alarm —
+//! none of which this product models.
+//!
+//! Field 11 is the note beside the mark, and it is the half that matters: a
+//! mark called «улика» is the place, «красная куртка, 200 м от просеки» is
+//! what a crew is sent to.
 //!
 //! The encoding is whatever the machine that wrote the file used, which for
 //! the crews this tool serves means Windows-1251 more often than not. The
@@ -194,6 +198,12 @@ fn parse_row(line: &str, index: usize) -> Option<Waypoint> {
         let _ = waypoint.set_symbol(Some(symbol.to_owned()));
     }
 
+    // Field 11 is the description. Dropping it made the exchange between
+    // headquarters carry the place and not the reason for it.
+    if let Some(description) = fields.get(10).map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        let _ = waypoint.set_description(Some(description.to_owned()));
+    }
+
     Some(waypoint)
 }
 
@@ -217,6 +227,16 @@ mod tests {
         assert!((wp.latitude() - 53.9).abs() < 1e-9);
         assert!((wp.longitude() - 27.5667).abs() < 1e-9);
         assert_eq!(wp.symbol(), Some("18"));
+        assert_eq!(wp.description(), Some("Базовый лагерь"));
+    }
+
+    /// A mark with nothing to say has no note, which is not the same as an
+    /// empty one.
+    #[test]
+    fn a_mark_with_no_note_has_none() {
+        let text = format!("{HEADER}1,Отметка,53.1,27.2,0,0,1,0,0,65535,,0,0,0,-777\r\n");
+        let import = import_wpt_text("/tmp/x.wpt".to_owned(), &text).expect("import");
+        assert_eq!(import.waypoints()[0].description(), None);
     }
 
     /// A file that is not a waypoint file must be refused rather than read as
@@ -282,6 +302,7 @@ mod tests {
 
         let mut camp = Waypoint::new(WaypointId::new(1), "ШТАБ", 53.9, 27.5667);
         let _ = camp.set_symbol(Some("camp".to_owned()));
+        let _ = camp.set_description(Some("место сбора".to_owned()));
         let drop_off = Waypoint::new(WaypointId::new(2), "ЛИСА15, вечер", 59.9524, 31.5960);
 
         let mut written = Vec::new();
@@ -304,6 +325,8 @@ mod tests {
         // has a `С` in it. What matters is that the trip is now *checked*.
         assert_eq!(back.waypoints()[1].name(), "ЛИСА15  вечер");
         assert_eq!(back.waypoints()[1].symbol(), None);
+        // The note travels too, which is what the exchange is for.
+        assert_eq!(back.waypoints()[0].description(), Some("место сбора"));
     }
 
     /// Windows-1251 is what the crews' files carry, and the decoding chain is

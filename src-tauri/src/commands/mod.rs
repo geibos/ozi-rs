@@ -1206,6 +1206,32 @@ pub fn new_project(state: State<SharedState>, app: AppHandle) -> Result<(), Stri
     Ok(())
 }
 
+/// Set the note beside a mark.
+///
+/// The place travels between headquarters; until 2026-09-23 the reason for it
+/// did not, in either direction.
+#[tauri::command]
+#[specta::specta]
+pub fn set_waypoint_description(
+    layer_id: u64,
+    waypoint_id: u64,
+    description: Option<String>,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state
+        .apply_set_waypoint_description(
+            LayerId::new(layer_id),
+            WaypointId::new(waypoint_id),
+            description,
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Layer management ──────────────────────────────────────────────────────────
 //
 // A day of recordings arrives as files and every file becomes a layer named
@@ -1950,6 +1976,8 @@ pub struct WaypointDto {
     /// not a colour: changing the default later moves every uncoloured
     /// waypoint with it.
     pub color: Option<[u8; 4]>,
+    /// The note beside the mark: what a crew is actually sent to.
+    pub description: Option<String>,
 }
 
 #[tauri::command]
@@ -1978,6 +2006,7 @@ pub fn waypoint_dtos(waypoints: &[crate::domain::Waypoint]) -> Vec<WaypointDto> 
             lat: w.latitude(),
             lon: w.longitude(),
             symbol: w.symbol().map(str::to_owned),
+            description: w.description().map(str::to_owned),
             visible: w.visible(),
             color: w.color(),
         })
