@@ -14,13 +14,11 @@ archived — `codify-architecture-decisions` and `revive-ui-cycle` both closed o
 against the source, the second after moving its unbuilt requirements out rather
 than archiving requirements the code does not meet.
 
-**The desktop smoke gate is down as of 19:41 on 2026-09-23**, and it is the
-Accessibility grant rather than the application: the Appium log's own line is
-`Failed to initialize for UI testing … "Timed out while enabling automation
-mode."`, under a message about a crashed proxy that says nothing about
-permissions. The gate ran green at 16:24 the same day with nothing changed in
-between. `docs/native-qa-mcp.md` has the procedure; the grant is the owner's to
-give and the two attempts allowed have been used.
+**The desktop smoke gate is green** — both journeys, 2026-09-23 at 20:26,
+against a bundle built from the current tree. It went down at 19:41 the same
+evening and came back when the Accessibility grant was given again; the log
+line that names that failure and the procedure for it are in
+`docs/native-qa-mcp.md`, because it is the third time the grant has gone.
 
 **All eight Customer Journeys walk end to end on the stand**, and
 `docs/customer-journeys.md` now says what is true rather than what was true in
