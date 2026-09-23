@@ -258,6 +258,25 @@ Rewritten on 2026-09-22 at the end of a long autonomous run, because the
 previous queue had been overtaken by the work done since. Ordered by what it
 buys; meant to be re-read and re-ordered rather than followed blindly.
 
+**Overtaken again on 2026-09-23.** Most of what follows is done. What the day
+actually settled, so the queue below can be read against it:
+
+- Both remaining OpenSpec changes closed. `codify-architecture-decisions`
+  merged after all thirteen capability deltas were read against the source —
+  seven said something the code does not, and the corrections are in that
+  commit. `revive-ui-cycle` closed on what it delivered, with its three
+  unbuilt pieces moved to `finish-the-rebuild` rather than archived as met.
+- All eight Customer Journeys walk end to end on the stand. CJ-1 and CJ-8 were
+  walked for the first time; CJ-8 found two defects and CJ-1 none.
+- Everything the OziExplorer reference marks as core is built: calibrating a
+  picture, opening a `.map` beside an ordinary image, a coordinate grid,
+  distance between marks, track replay, and files attached to a mark.
+- The desktop gate is green against a bundle built from the current tree.
+
+What is left is in `finish-the-rebuild` — the screenshot matrix, the view-model
+layer and a smoke journey for the six Customer Journeys that have none — plus
+the owner decisions listed below. None of it is visible to an operator.
+
 ### Blocked on the owner
 
 1. **Review and archive `codify-architecture-decisions`.** Fifty-five of the
