@@ -100,6 +100,7 @@
     raiseMeasureLayer,
   } from "$lib/maplibre/measure-layer";
   import { pendingClicks } from "$lib/drawing-clicks";
+  import { measuredBetween, snapToWaypoint } from "$lib/measure-snap";
   import {
     attachGraticule,
     type GraticuleHandle,
@@ -129,6 +130,9 @@
    * cancelled it — so a route plotted at any normal pace lost most of its
    * points silently. See `$lib/drawing-clicks`.
    */
+  /** "ШТАБ → ЗАБРОС", when the tape caught a mark at both ends. */
+  const measuredMarks = $derived(measuredBetween($measuredPoints));
+
   let graticuleHandle: GraticuleHandle | null = null;
 
   function syncGraticule() {
@@ -1160,10 +1164,24 @@
       if ($measuringActive) {
         // Measuring takes the click whole: a click meant for the tape should
         // not also select a track or drop a waypoint.
-        measuredPoints.update((points) => [
-          ...points,
+        //
+        // And it catches on a mark. "How far from the headquarters to the
+        // drop-off" is the commonest measurement there is, and clicking as
+        // near each mark as the hand manages is eighty metres out at a
+        // two-kilometre view — for a number that goes out over the radio.
+        const snapped = snapToWaypoint(
           { lat: e.lngLat.lat, lon: e.lngLat.lng },
-        ]);
+          [...appliedWaypoints.values()].map((w) => ({
+            lat: w.lat,
+            lon: w.lon,
+            name: w.name,
+          })),
+          (at) => {
+            const point = map!.project([at.lon, at.lat]);
+            return { x: point.x, y: point.y };
+          },
+        );
+        measuredPoints.update((points) => [...points, snapped]);
         return;
       }
       if ($projectionActive) {
@@ -1736,6 +1754,16 @@
             $locale,
           )}</span
         >
+        <!-- When both ends caught a mark, say which two. It is the answer to
+             "от штаба до заброса сколько" in the words the question was asked
+             in, and it is also what makes the catching visible: nothing else
+             on screen would show that the click moved to the marker. -->
+        {#if measuredMarks}
+          <span
+            class="ml-2 font-mono text-sm opacity-90"
+            data-testid="measure-between">{measuredMarks}</span
+          >
+        {/if}
         <span class="ml-2 opacity-70">{$i18n("map.measureHint")}</span>
       {/if}
     </div>

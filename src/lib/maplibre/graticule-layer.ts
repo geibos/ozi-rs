@@ -47,6 +47,15 @@ export function attachGraticule(map: maplibregl.Map): GraticuleHandle {
   };
 
   const refresh = () => {
+    // The style has to be loaded before a source can be added, and this is
+    // attached from an effect that can run before it is. MapLibre answers that
+    // with a throw rather than a wait, so the wait is here: `styledata` fires
+    // when the style lands and `refresh` runs again from it.
+    if (!map.isStyleLoaded()) {
+      map.once("styledata", refresh);
+      return;
+    }
+
     const bounds = map.getBounds();
     const lines = graticule({
       south: bounds.getSouth(),

@@ -582,7 +582,13 @@ graticuleVisible.subscribe((on) => {
 });
 
 export const measuringActive = writable(false);
-export const measuredPoints = writable<{ lat: number; lon: number }[]>([]);
+/**
+ * The tape's vertices. `name` is the mark a vertex was taken from, when the
+ * click landed near one — see `$lib/measure-snap`.
+ */
+export const measuredPoints = writable<
+  { lat: number; lon: number; name?: string | null }[]
+>([]);
 
 /**
  * What the tape is measuring: a length, or an area.

@@ -387,9 +387,10 @@ are written down so the choice is the owner's rather than an omission.
   and always lands on a number a person can say, named at the edges, offered
   from the command palette and remembered. OziExplorer also draws UTM and
   national grids; those are not built and were not the part that mattered.
-- **Distance Between Waypoints.** The ruler measures anything, but not "from
-  this mark to that one" in a click. Two marks and a distance is how a task is
-  sized.
+- ~~**Distance Between Waypoints.**~~ Built on 2026-09-23
+  (`the-tape-catches-a-mark`): rather than OziExplorer's dialog of waypoint
+  pairs, the ruler catches hold of a mark the click lands near, and names both
+  when a measurement has a mark at each end.
 - **Track Replay.** Playing a recording back in time. "Where was the group at
   half past two" is answered today by reading the points table, which has the
   times in it — slower, but not missing.
