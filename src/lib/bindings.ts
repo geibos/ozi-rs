@@ -133,6 +133,22 @@ async saveProject(path: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Start the next search.
+ * 
+ * A project is one search, and nothing created an empty one until now: a crew
+ * that finished an operation and began the next kept adding to the same
+ * document. Asking before discarding unsaved work is the caller's job — the
+ * frontend already owns that question for the close guard.
+ */
+async newProject() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("new_project") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async loadProjectFile(path: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("load_project_file", { path }) };

@@ -826,6 +826,31 @@ impl AppState {
     /// recents and framed the map on a project that was never loaded. Saving
     /// already returned its errors; this is the other half of that pair.
     /// External review, 2026-09-22.
+    /// Empty the project: the next search starts here.
+    ///
+    /// A project is one search. Nothing created an empty one until now, so a
+    /// crew that finished an operation and began the next kept adding to the
+    /// same document — yesterday's routes under today's, two operations mixed
+    /// in one Tracks tab, and no way out short of quitting and deleting the
+    /// session file.
+    ///
+    /// The history is cleared rather than carried over. Undo that could walk
+    /// back into a finished search and put its tracks on the map again is not
+    /// an undo anybody wants.
+    ///
+    /// The bundle and the active raster stay. The map is the ground; the
+    /// project is the work on it, and a second search in the same district
+    /// should not blank the screen.
+    pub fn new_project(&mut self) {
+        self.project = Project::untitled();
+        self.project_path = None;
+        self.history = CommandStack::default();
+        self.style_revision = 0;
+        self.mark_project_saved();
+        self.update_status(DiagnosticLevel::Info, "New project");
+        self.persist_session_snapshot();
+    }
+
     pub fn load_project_from(&mut self, path: PathBuf) -> Result<(), String> {
         match persistence::load_project(&path) {
             Ok(project) => {
@@ -3101,6 +3126,74 @@ mod tests {
             }
             _ => panic!("a map already on disk SHALL open without a download"),
         }
+    }
+
+    /// A crew finishes one search and starts the next. Until this existed,
+    /// they kept adding to the same document.
+    #[test]
+    fn a_new_project_is_empty_and_undo_cannot_undo_it() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(state.create_track_layer("Day two".to_owned()).unwrap());
+        let mut track = Track::new(TrackId::new(1), "ЛИСА15");
+        let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+        segment.add_point(TrackPoint::new(TrackPointId::new(1), 53.9, 27.5));
+        track.add_segment(segment);
+        state
+            .project_mut()
+            .add_track_to_layer(layer_id, track)
+            .expect("add track");
+        assert!(state.track_layers().iter().any(|l| !l.tracks().is_empty()));
+
+        state.new_project();
+
+        assert!(
+            state
+                .track_layers()
+                .iter()
+                .all(|layer| layer.tracks().is_empty()),
+            "the next search SHALL start with nothing drawn"
+        );
+        // The invariant the `layers` capability declares survives.
+        assert!(!state.track_layers().is_empty());
+        assert!(!state.project_waypoint_layers().is_empty());
+
+        // Undo that walks back into a finished search and puts its tracks on
+        // the map again is not an undo anybody wants.
+        state.undo();
+        assert!(
+            state
+                .track_layers()
+                .iter()
+                .all(|layer| layer.tracks().is_empty()),
+            "undo SHALL NOT reach past the start of a new search"
+        );
+    }
+
+    /// The map is the ground; the project is the work on it. A second search
+    /// in the same district should not blank the screen.
+    #[test]
+    fn a_new_project_keeps_the_map_that_is_open() {
+        let mut state = AppState::new();
+        state.lizaalert.active_map = Some(ActiveMapSelection {
+            kind: ActiveMapKind::SqliteTiles,
+            project_name: "2026-07-08 Lavrovo".to_owned(),
+            package_name: "topo".to_owned(),
+            remote_url: "https://example.invalid/topo.sqlitedb".to_owned(),
+            local_path: std::path::PathBuf::from("/tmp/topo.sqlitedb"),
+            center: MapCenter {
+                lat: 59.95,
+                lon: 31.6,
+            },
+            base_zoom: 16,
+        });
+
+        state.new_project();
+
+        assert!(
+            state.lizaalert.active_map.is_some(),
+            "the raster the crew is looking at SHALL survive a new search"
+        );
     }
 
     /// The path an operator actually takes: delete the layer the import made,

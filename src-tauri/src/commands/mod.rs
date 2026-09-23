@@ -1192,6 +1192,20 @@ pub fn redo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Start the next search.
+///
+/// A project is one search, and nothing created an empty one until now: a crew
+/// that finished an operation and began the next kept adding to the same
+/// document. Asking before discarding unsaved work is the caller's job — the
+/// frontend already owns that question for the close guard.
+#[tauri::command]
+#[specta::specta]
+pub fn new_project(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
+    lock_app_state(state.inner())?.new_project();
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Layer management ──────────────────────────────────────────────────────────
 //
 // A day of recordings arrives as files and every file becomes a layer named

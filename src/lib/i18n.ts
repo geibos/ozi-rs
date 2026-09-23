@@ -47,6 +47,14 @@ const dictionaries = {
     "palette.projectFileType": "OziRS project",
     "palette.recentNeedsProject":
       "Open the project in the bundle loader; then this map becomes available.",
+    "palette.newProject": "New search (empty project)",
+    "newProject.title": "Start a new search",
+    "newProject.message":
+      "The project has unsaved changes. Start a new search and discard them?",
+    "newProject.discard": "Start without saving",
+    "newProject.cancel": "Cancel",
+    "newProject.done": "New search started",
+    "newProject.failed": "Could not start a new search",
     "palette.saveProject": "Save project…",
     "palette.openProject": "Open project…",
     "palette.undo": "Undo",
@@ -436,6 +444,14 @@ const dictionaries = {
     "palette.projectFileType": "Проект OziRS",
     "palette.recentNeedsProject":
       "Откройте проект в загрузчике бандлов — тогда эта карта станет доступна.",
+    "palette.newProject": "Новый поиск (пустой проект)",
+    "newProject.title": "Начать новый поиск",
+    "newProject.message":
+      "В проекте есть несохранённые изменения. Начать новый поиск и потерять их?",
+    "newProject.discard": "Начать без сохранения",
+    "newProject.cancel": "Отмена",
+    "newProject.done": "Начат новый поиск",
+    "newProject.failed": "Не удалось начать новый поиск",
     "palette.saveProject": "Сохранить проект…",
     "palette.openProject": "Открыть проект…",
     "palette.undo": "Отменить",

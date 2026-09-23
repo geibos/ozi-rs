@@ -301,6 +301,15 @@ export async function renameTrack(
 }
 
 /**
+ * Start the next search: an empty project, the default layers, no file path
+ * and no history. The bundle and the active raster stay — the map is the
+ * ground, the project is the work on it.
+ */
+export async function newProject(): Promise<void> {
+  await unwrap("new_project", commands.newProject());
+}
+
+/**
  * Layer management.
  *
  * A day of recordings arrives as files and every file becomes a layer named

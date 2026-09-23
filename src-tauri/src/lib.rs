@@ -79,6 +79,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::open_local_bundle,
         commands::set_bundles_root,
         commands::save_project,
+        commands::new_project,
         commands::load_project_file,
         commands::import_gpx,
         commands::import_plt,

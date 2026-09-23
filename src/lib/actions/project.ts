@@ -8,13 +8,21 @@
  */
 import { get } from "svelte/store";
 import {
+  confirm as confirmDialog,
   open as openFileDialog,
   save as saveDialog,
 } from "@tauri-apps/plugin-dialog";
 import { toast } from "svelte-sonner";
-import { loadProjectFile, redo, saveProject, undo } from "$lib/api";
+import { loadProjectFile, newProject, redo, saveProject, undo } from "$lib/api";
 import { t } from "$lib/i18n";
-import { projectPath, requestAllDataFocus } from "$lib/stores";
+import {
+  activeTrackLayerId,
+  activeWaypointLayerId,
+  appState,
+  projectDirty,
+  projectPath,
+  requestAllDataFocus,
+} from "$lib/stores";
 import {
   PROJECT_OPEN_EXTENSIONS,
   PROJECT_SAVE_EXTENSION,
@@ -115,5 +123,46 @@ export async function openProjectFile(known?: string): Promise<void> {
   } catch (error) {
     if (known !== undefined) forgetProject(known);
     toast.error(translate("toast.openFailed"), { description: String(error) });
+  }
+}
+
+/**
+ * Start the next search.
+ *
+ * A project is one search. Without this a crew that finished an operation and
+ * began the next kept adding to the same document, and yesterday's routes
+ * stayed on the map under today's.
+ *
+ * The question before discarding is the one the close guard asks, for the same
+ * reason: an hour of marking is an hour of marking whether the window is
+ * closing or the operator is moving on.
+ */
+export async function startNewProject(): Promise<void> {
+  const translate = get(t);
+  try {
+    if (get(projectDirty)) {
+      const go = await confirmDialog(translate("newProject.message"), {
+        title: translate("newProject.title"),
+        kind: "warning",
+        okLabel: translate("newProject.discard"),
+        cancelLabel: translate("newProject.cancel"),
+      });
+      if (!go) return;
+    }
+    await newProject();
+    // The old ids point at layers that no longer exist. Reading the new
+    // project's defaults back is what keeps drawing and waypoint placement
+    // pointed at something.
+    await appState.refresh();
+    const state = get(appState);
+    activeTrackLayerId.set(
+      state?.track_layers?.[0] ? BigInt(state.track_layers[0].id) : null,
+    );
+    activeWaypointLayerId.set(
+      state?.waypoint_layers?.[0] ? BigInt(state.waypoint_layers[0].id) : null,
+    );
+    toast.success(translate("newProject.done"));
+  } catch (error) {
+    toast.error(translate("newProject.failed"), { description: String(error) });
   }
 }

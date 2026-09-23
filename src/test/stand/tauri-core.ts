@@ -232,6 +232,15 @@ let nextStandLayerId = 900;
 /** Marks an import put into a layer of its own, keyed by that layer's id. */
 const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
 
+/**
+ * True once this session has started a new search.
+ *
+ * The fixture is a project with work in it; a new search is a project with
+ * none. Without this the stand answered `new_project` and went on serving the
+ * fixture's tracks, so the screen said one thing and the toast another.
+ */
+let projectEmptied = false;
+
 function previewedAppState(): AppStateDto {
   const fixture =
     requestedState() === "cold" ? coldStartFixture : appStateFixture;
@@ -241,6 +250,11 @@ function previewedAppState(): AppStateDto {
   let base: AppStateDto = importedTracks.length
     ? { ...fixture, tracks: [...fixture.tracks, ...importedTracks] }
     : fixture;
+  if (projectEmptied) {
+    // Everything the search held goes; the bundle and the active raster stay,
+    // because the map is the ground and the project is the work on it.
+    base = { ...base, tracks: [] };
+  }
   if (standTrackLayers || standWaypointLayers) {
     const trackLayers = standTrackLayers ?? base.track_layers;
     const waypointLayers = standWaypointLayers ?? base.waypoint_layers;
@@ -317,29 +331,33 @@ const HANDLERS: StandAnswers = {
   // JSON; the fixture is a typed FeatureCollection, which is the stricter of
   // the two and what every reader here wants.
   get_tracks_geojson: () =>
-    ({
-      ...tracksGeojsonFixture,
-      features: [
-        ...tracksGeojsonFixture.features,
-        ...importedTracks.map((track, index) => ({
-          type: "Feature",
-          geometry: {
-            type: "MultiLineString",
-            coordinates: [importedGeometry(index)],
-          },
-          properties: { ...track },
-        })),
-      ],
-    }) as unknown as JsonValue,
+    projectEmptied
+      ? ({ type: "FeatureCollection", features: [] } as unknown as JsonValue)
+      : ({
+          ...tracksGeojsonFixture,
+          features: [
+            ...tracksGeojsonFixture.features,
+            ...importedTracks.map((track, index) => ({
+              type: "Feature",
+              geometry: {
+                type: "MultiLineString",
+                coordinates: [importedGeometry(index)],
+              },
+              properties: { ...track },
+            })),
+          ],
+        } as unknown as JsonValue),
   // The rows the Tracks tab reads — its own fixture, not the map's features.
   // Deriving them from the geometry would have made the stand inherit the very
   // omission this listing exists to undo.
-  list_tracks: () => [...tracksListFixture, ...importedTracks],
+  list_tracks: () =>
+    projectEmptied ? [] : [...tracksListFixture, ...importedTracks],
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
       ? trackDetailFixture
       : { id: Number(args?.trackId ?? 0), name: "", segments: [] },
   get_waypoints: (args) => {
+    if (projectEmptied) return [];
     const layerId = Number(args?.layerId);
     const imported = importedWaypointsByLayer.get(layerId);
     if (imported) return imported;
@@ -464,6 +482,23 @@ const HANDLERS: StandAnswers = {
     return null;
   },
   cancel_download: () => true,
+  // A project is one search. The stand answers by emptying what this session
+  // has accumulated, so the effect is on the screen rather than implied.
+  new_project: () => {
+    // The backend replaces the whole document, so the stand has to as well.
+    // Clearing only this session's overlays left the fixture's own tracks in
+    // the list while the toast said a new search had started — the screen
+    // disagreeing with the message, which is the failure this stand exists to
+    // catch.
+    projectEmptied = true;
+    importedTracks.length = 0;
+    placedWaypoints.length = 0;
+    importedWaypointsByLayer.clear();
+    standTrackLayers = [{ id: 1, name: "Tracks" }];
+    standWaypointLayers = [{ id: 1, name: "Waypoints" }];
+    standEmit("state-changed", undefined);
+    return null;
+  },
   // OziExplorer's own waypoint format, from the штаб next door. It has to
   // change the screen, not just answer a summary: an import that renders
   // nowhere is the failure this whole stand exists to stop.

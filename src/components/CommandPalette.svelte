@@ -62,6 +62,7 @@
     doUndo,
     openProjectFile,
     quickSave,
+    startNewProject,
   } from "$lib/actions/project";
   import { openMapShowingDownload } from "$lib/actions/open-map";
   // Aliased: the tracks loop below binds `t`, and a store read inside it
@@ -197,6 +198,13 @@
   function handleFindWaypoint(id: bigint) {
     selectedWaypointId.set(id);
     close();
+  }
+
+  function handleProjectNew() {
+    close();
+    // Asking before discarding lives in the action, with the same question
+    // the close guard asks.
+    void startNewProject();
   }
 
   function handleProjectOpen() {
@@ -452,6 +460,9 @@
 
         {#if !isColdStart}
           <Command.Group heading={$i18n("palette.groupProjectActions")}>
+            <Command.Item value="action:new" onSelect={handleProjectNew}>
+              <span class="flex-1">{$i18n("palette.newProject")}</span>
+            </Command.Item>
             <Command.Item value="action:open" onSelect={handleProjectOpen}>
               <span class="flex-1">{$i18n("palette.openProject")}</span>
             </Command.Item>
