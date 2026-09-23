@@ -39,6 +39,7 @@
     requestAllDataFocus,
     selectedTrack,
     simplifyState,
+    tracksGeometryVersion,
   } from "$lib/stores";
   import {
     createEmptyTrack,
@@ -500,8 +501,34 @@
       preview: null,
     });
     simplifyLivePreview = true;
-    schedulePreview();
+    // The preview is not asked for here. See the effect below: asking from
+    // each opener is how the Track Inspector's Simplify came to open a slider
+    // with no numbers under it at all.
   }
+
+  /**
+   * Keep the preview in step with the dialog, wherever it was opened from.
+   *
+   * There are two ways in — the row's ⋯ menu and the Track Inspector — and
+   * only the first asked for a preview. From the inspector, which is the
+   * natural place because it sits under the track's statistics, the operator
+   * got "Допуск: 10 м" and nothing else until they happened to move the
+   * slider: they could simplify a track having never been told what it would
+   * cost, which is the one thing a live preview exists to prevent.
+   *
+   * The dialog is rendered here, so this is where the preview belongs. The
+   * store read comes first: an effect is subscribed to what it actually
+   * reads, and a guard ahead of the read leaves it subscribed to nothing
+   * (`effect-reads-before-guarding`).
+   */
+  $effect(() => {
+    const state = $simplifyState;
+    const live = simplifyLivePreview;
+    if (!state.active) return;
+    if (!live) return;
+    if (state.preview !== null) return;
+    schedulePreview();
+  });
 
   function closeSimplify() {
     simplifyState.update((s) => ({ ...s, active: false, preview: null }));
@@ -538,6 +565,12 @@
     if (!s.active) return;
     try {
       await simplifyTrack(s.layerId, s.trackId, s.tolerance);
+      // Every operation that changes a track's geometry has to bump this, or
+      // the inspector's cached detail and the map's line go on showing the
+      // points the operator just removed. Simplify was the one of six that
+      // did not: the statistics dropped from five points to three and the
+      // segment table still listed five, which reads as "it did nothing".
+      tracksGeometryVersion.update((v) => v + 1);
       closeSimplify();
     } catch (err) {
       toast.error($i18n("tracksTab.simplifyFailed"), {
@@ -975,8 +1008,15 @@
               step={1}
               value={$simplifyState.tolerance}
               onValueChange={(v) => {
-                simplifyState.update((s) => ({ ...s, tolerance: v as number }));
-                schedulePreview();
+                // Clearing the preview is what asks for a new one: the effect
+                // above watches for a dialog that is open with nothing to
+                // show. Calling `schedulePreview` here as well would fetch
+                // twice for one drag.
+                simplifyState.update((s) => ({
+                  ...s,
+                  tolerance: v as number,
+                  preview: null,
+                }));
               }}
             />
             <div class="flex items-center gap-2">
@@ -984,8 +1024,9 @@
                 bind:checked={simplifyLivePreview}
                 onCheckedChange={(v) => {
                   simplifyLivePreview = v;
-                  if (v) schedulePreview();
-                  else simplifyState.update((s) => ({ ...s, preview: null }));
+                  // Either way the preview is cleared; turning it back on
+                  // lets the effect fetch a fresh one.
+                  simplifyState.update((s) => ({ ...s, preview: null }));
                 }}
               />
               <Label class="text-xs">{$i18n("tracksTab.livePreview")}</Label>

@@ -228,6 +228,59 @@ const placedWaypoints: WaypointDto[] = [];
 let standTrackLayers: LayerSummaryDto[] | null = null;
 let standWaypointLayers: LayerSummaryDto[] | null = null;
 let nextStandLayerId = 900;
+let nextStandTrackId = 500;
+
+/**
+ * The fixture's track detail, as this session has edited it.
+ *
+ * `null` until something edits it, so an untouched session still serves the
+ * fixture exactly. A deep copy on first use: the fixture is imported once and
+ * shared, and mutating it would leak edits into the unit tests that read it.
+ */
+let editedDetail: TrackDetailLike | null = null;
+
+interface TrackDetailPointLike {
+  id: number;
+  lat: number;
+  lon: number;
+  elevation: number | null;
+  timestamp: string | null;
+}
+interface TrackDetailLike {
+  id: number;
+  name: string;
+  segments: { id: number; points: TrackDetailPointLike[] }[];
+}
+
+function detailForEditing(): TrackDetailLike {
+  editedDetail ??= JSON.parse(
+    JSON.stringify(trackDetailFixture),
+  ) as TrackDetailLike;
+  return editedDetail;
+}
+
+/**
+ * The fixture track's row, with its point count taken from the edited detail.
+ *
+ * The count in a row and the points in the inspector are two views of one
+ * track. Editing the detail and leaving the row alone made simplifying look
+ * like it had done nothing — the segments still read 3 and 2, and the
+ * statistics still said five points.
+ */
+function withEditedCounts<
+  T extends { layer_id: number; track_id: number; point_count: number },
+>(rows: readonly T[]): T[] {
+  if (!editedDetail) return [...rows];
+  const points = editedDetail.segments.reduce(
+    (sum, segment) => sum + segment.points.length,
+    0,
+  );
+  return rows.map((row) =>
+    row.layer_id === FIXTURE_TRACK_LAYER && row.track_id === FIXTURE_TRACK
+      ? { ...row, point_count: points }
+      : row,
+  );
+}
 
 /** Marks an import put into a layer of its own, keyed by that layer's id. */
 const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
@@ -247,9 +300,10 @@ function previewedAppState(): AppStateDto {
   // The imported rows belong in the state too, not only in `list_tracks`:
   // MapView redraws off a fingerprint taken from `AppStateDto.tracks`, so an
   // import that left this alone appeared in the list and never on the map.
-  let base: AppStateDto = importedTracks.length
-    ? { ...fixture, tracks: [...fixture.tracks, ...importedTracks] }
-    : fixture;
+  let base: AppStateDto = {
+    ...fixture,
+    tracks: [...withEditedCounts(fixture.tracks), ...importedTracks],
+  };
   if (projectEmptied) {
     // Everything the search held goes; the bundle and the active raster stay,
     // because the map is the ground and the project is the work on it.
@@ -351,10 +405,12 @@ const HANDLERS: StandAnswers = {
   // Deriving them from the geometry would have made the stand inherit the very
   // omission this listing exists to undo.
   list_tracks: () =>
-    projectEmptied ? [] : [...tracksListFixture, ...importedTracks],
+    projectEmptied
+      ? []
+      : [...withEditedCounts(tracksListFixture), ...importedTracks],
   get_track_detail: (args) =>
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
-      ? trackDetailFixture
+      ? (editedDetail ?? trackDetailFixture)
       : { id: Number(args?.trackId ?? 0), name: "", segments: [] },
   get_waypoints: (args) => {
     if (projectEmptied) return [];
@@ -484,6 +540,133 @@ const HANDLERS: StandAnswers = {
   },
   cancel_download: () => true,
   set_waypoint_description: () => null,
+
+  // ── Track editing ──────────────────────────────────────────────────────
+  //
+  // Twelve commands — the whole of CJ-4's editing spine — had no answer here
+  // until 2026-09-23, so the journey a coordinator spends most of their time
+  // in could not be walked on the stand at all. Each of these mutates a
+  // session copy of the fixture's track detail, so the list, the inspector
+  // and the map all move; answering "accepted" would have been the lie this
+  // stand exists to stop.
+  create_empty_track: () => {
+    nextStandTrackId += 1;
+    editedDetail = { id: nextStandTrackId, name: "New Track", segments: [] };
+    standEmit("state-changed", undefined);
+    return nextStandTrackId;
+  },
+  insert_track_point: (args) => {
+    const detail = detailForEditing();
+    const position = args?.position as [number, number] | undefined;
+    const segment = detail.segments[0] ?? { id: 1, points: [] };
+    if (detail.segments.length === 0) detail.segments.push(segment);
+    segment.points.push({
+      id: segment.points.length + 1,
+      lat: position?.[0] ?? 0,
+      lon: position?.[1] ?? 0,
+      elevation: null,
+      timestamp: null,
+    });
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  move_track_point: (args) => {
+    const detail = detailForEditing();
+    const position = args?.position as [number, number] | undefined;
+    for (const segment of detail.segments) {
+      const point = segment.points.find((p) => p.id === Number(args?.pointId));
+      if (!point) continue;
+      point.lat = position?.[0] ?? point.lat;
+      point.lon = position?.[1] ?? point.lon;
+    }
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  delete_track_point: (args) => {
+    const detail = detailForEditing();
+    for (const segment of detail.segments) {
+      const index = segment.points.findIndex(
+        (p) => p.id === Number(args?.pointId),
+      );
+      if (index >= 0) segment.points.splice(index, 1);
+    }
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  sort_track_points: () => {
+    const detail = detailForEditing();
+    for (const segment of detail.segments) {
+      segment.points.sort((a, b) =>
+        String(a.timestamp ?? "").localeCompare(String(b.timestamp ?? "")),
+      );
+    }
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  split_segment: (args) => {
+    const detail = detailForEditing();
+    const index = detail.segments.findIndex(
+      (s) => s.id === Number(args?.segmentId),
+    );
+    if (index >= 0) {
+      const segment = detail.segments[index];
+      const at = Math.max(1, Math.floor(segment.points.length / 2));
+      const tail = segment.points.splice(at);
+      detail.segments.splice(index + 1, 0, {
+        id: Math.max(...detail.segments.map((s) => s.id)) + 1,
+        points: tail,
+      });
+    }
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  join_segments: (args) => {
+    const detail = detailForEditing();
+    const index = detail.segments.findIndex(
+      (s) => s.id === Number(args?.segmentId),
+    );
+    if (index > 0) {
+      detail.segments[index - 1].points.push(...detail.segments[index].points);
+      detail.segments.splice(index, 1);
+    }
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  simplify_track: () => {
+    const detail = detailForEditing();
+    // Every other point, which is what a Douglas–Peucker run looks like from
+    // the outside: fewer points, the same shape.
+    for (const segment of detail.segments) {
+      segment.points = segment.points.filter((_, i) => i % 2 === 0);
+    }
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  crop_track_to_extent: () => {
+    const detail = detailForEditing();
+    for (const segment of detail.segments) {
+      segment.points = segment.points.slice(
+        0,
+        Math.max(1, segment.points.length - 1),
+      );
+    }
+    standEmit("state-changed", undefined);
+    return 1;
+  },
+  crop_track_to_time: () => {
+    const detail = detailForEditing();
+    for (const segment of detail.segments)
+      segment.points = segment.points.slice(1);
+    standEmit("state-changed", undefined);
+    return 1;
+  },
+  move_waypoint: () => null,
+  // Not every map is OZF2: a SQLite tile map has no such metadata, and the
+  // inspector expects this to fail for them. Answering an error is the
+  // faithful thing.
+  get_ozi_metadata: () => {
+    throw new Error("stand: this map is not an OZF2 raster");
+  },
   // A project is one search. The stand answers by emptying what this session
   // has accumulated, so the effect is on the screen rather than implied.
   new_project: () => {
