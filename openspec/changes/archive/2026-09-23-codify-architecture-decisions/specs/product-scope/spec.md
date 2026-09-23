@@ -9,9 +9,11 @@ The product SHALL cover one end-to-end workflow for a LizaAlert search-and-rescu
 - **WHEN** the `tauri_specta::collect_commands!` block in `src-tauri/src/lib.rs` is listed
 - **THEN** it contains at least one command for each stage: bundle open (`open_local_bundle`, `load_project`), track import or drawing (`import_gpx`, `import_plt`, `create_empty_track`), track editing (`move_track_point`, `delete_track_point`), waypoint placement (`add_waypoint`), project persistence (`save_project`, `load_project_file`) and export (`export_gpx`, `export_track_plt`, `export_wpt_waypoints`)
 
-### Requirement: Maps in scope: LizaAlert bundles, local folders, MBTiles, OZF2, OSM fallback
+### Requirement: Maps in scope: LizaAlert bundles, local folders, MBTiles, OziExplorer rasters, OSM fallback
 
-The product SHALL include opening a LizaAlert map bundle from the online catalog and from a previously downloaded local folder, switching between the maps of one bundle (typically Topo and Satellite) without restarting the application, rendering SQLite/MBTiles tile maps and OZF2 raster maps, and falling back to OpenStreetMap online tiles when no local map is active. Opening a bundle directly by URL is part of the declared scope.
+The product SHALL include opening a LizaAlert map bundle from the online catalog and from a previously downloaded local folder, switching between the maps of one bundle (typically Topo and Satellite) without restarting the application, rendering SQLite/MBTiles tile maps and OziExplorer rasters, and falling back to OpenStreetMap online tiles when no local map is active. Opening a bundle directly by URL is part of the declared scope.
+
+An OziExplorer raster is a `.map` beside either an OZF2 file or an ordinary picture; both are in scope, because the pair a headquarters is handed is far more often the second. A picture that arrives with no `.map` at all SHALL be calibratable in the product rather than sent back to OziExplorer to be prepared. Both are specified in `tile-rendering`.
 
 #### Scenario: Map commands are registered
 
@@ -70,28 +72,32 @@ The product SHALL include adding waypoints by clicking on the map, moving, renam
 - **WHEN** the specta command registry in `src-tauri/src/lib.rs` is listed
 - **THEN** it contains `add_waypoint`, `move_waypoint`, `rename_waypoint`, `delete_waypoint`, `set_waypoint_symbol`, `toggle_waypoint_visible`, `get_waypoints` and `export_wpt_waypoints`
 
-### Requirement: WPT waypoint export is in the MVP; WPT import is not
+### Requirement: WPT waypoints go both ways
 
-The product SHALL export all waypoints of the active waypoint layer to the OziExplorer WPT format with a WGS-84 header, offered alongside GPX (tracks and waypoints) and PLT (tracks), and SHALL default the destination to the active bundle's track folder when one is known. WPT import SHALL NOT be part of the MVP; waypoint import stays GPX-based.
+The product SHALL export all waypoints of the active waypoint layer to the OziExplorer WPT format with a WGS-84 header, offered alongside GPX (tracks and waypoints) and PLT (tracks), and SHALL default the destination to the active bundle's track folder when one is known.
+
+It SHALL also import that format. The scope was written when import was deferred and waypoint import stayed GPX-based, which was wrong about the field: the headquarters next door runs OziExplorer itself and hands over `.wpt`. Writing a format this application cannot read makes an exchange that only works in one direction. The behaviour is specified in `track-import` ("OziExplorer waypoint files import").
 
 #### Scenario: WPT exporter and default-path command exist
 
 - **WHEN** the specta command registry and `src-tauri/src/infrastructure/export/` are listed
 - **THEN** `export_wpt_waypoints` and `get_wpt_export_default_path` are registered and `wpt.rs` exists in the export module
 
-#### Scenario: No WPT importer exists
+#### Scenario: The importer exists too
 
 - **WHEN** the specta command registry and `src-tauri/src/infrastructure/import/` are listed
-- **THEN** no command name contains `import_wpt` and the import module has no `wpt` file
+- **THEN** `import_wpt` is registered and `wpt.rs` exists in the import module
 
-### Requirement: On-map field tools in scope: distance, radius circle, projection
+### Requirement: On-map field tools in scope: distance, area, radius circle, projection
 
-The product scope SHALL include three on-map tools: measuring a distance, drawing a circle of an explicit radius centred on a point or on the cursor, and placing a waypoint by projection (azimuth plus distance) from a selected point. Once a tool ships it SHALL be reachable from the main workspace without developer-console workarounds.
+The product scope SHALL include four on-map tools: measuring a distance, measuring an area, drawing a circle of an explicit radius centred on a point or on the cursor, and placing a waypoint by projection (azimuth plus distance) from a selected point. Once a tool ships it SHALL be reachable from the main workspace without developer-console workarounds.
+
+Distance and area are separate tools, not one tool that guesses: a coordinator measuring how far a crew still has to walk wants a length, and a coordinator sizing a sector wants an area, and being handed the other one costs a click and a moment of doubt at the worst time. A circle SHALL state both its radius and the area it covers, for the same reason (owner decision, 2026-09-23).
 
 #### Scenario: Tools are tracked as MVP scope
 
 - **WHEN** `docs/requirements.md` § "MVP Non-Goals", `docs/roadmap.md` § "Deferred (post-1.0)" and `docs/feature-status.md` are read
-- **THEN** none of the three tools appears under the non-goal or deferred headings, and the feature-status matrix has one row per tool
+- **THEN** none of the four tools appears under the non-goal or deferred headings, and the feature-status matrix has one row per tool
 
 #### Scenario: A shipped tool is a first-class command
 
@@ -173,19 +179,28 @@ The product SHALL NOT include KML import or export in the MVP; KML stays recorde
 - **WHEN** `docs/roadmap.md` and `docs/requirements.md` are read
 - **THEN** KML appears as remaining or low-priority work and is absent from `docs/requirements.md` § "MVP Scope"
 
-### Requirement: Navigator sync and full layer management are post-MVP
+### Requirement: Navigator sync is post-MVP; layers are managed in the product
 
-USB upload to and pull from navigators, FTP automation, and a full layer manager (create, rename, delete, reorder layers) SHALL NOT be part of the MVP; they remain recorded future work. The MVP interface exposes active-layer selection only.
+USB upload to and pull from navigators and FTP automation SHALL NOT be part of the MVP; they remain recorded future work.
 
-#### Scenario: No layer-management or device-sync commands
+Layer management is not among them any more. Creating, renaming and deleting track and waypoint layers is in the product, because a day's work does not fit in one layer: a search has a layer per group and a layer of finds, and an operator who cannot make one has nowhere to put the second group. Reordering layers is still not provided. The behaviour is specified in `layers`.
+
+#### Scenario: No device-sync commands
 
 - **WHEN** the specta command registry in `src-tauri/src/lib.rs` is listed
-- **THEN** no command name contains `create_layer`, `rename_layer`, `delete_layer`, `reorder`, `usb` or `ftp`
+- **THEN** no command name contains `reorder`, `usb` or `ftp`
 
-#### Scenario: Full layer management is recorded as remaining work
+#### Scenario: Layers can be made, renamed and removed
+
+- **WHEN** the same registry is listed
+- **THEN** it contains `create_track_layer`, `create_waypoint_layer`,
+  `rename_track_layer`, `rename_waypoint_layer`, `delete_track_layer` and
+  `delete_waypoint_layer`
+
+#### Scenario: Reordering is recorded as remaining work
 
 - **WHEN** `docs/roadmap.md` is read
-- **THEN** full layer management UI is listed as remaining work, not as delivered
+- **THEN** reordering layers is listed as remaining work, not as delivered
 
 ### Requirement: Never planned: datum, geodesy, telemetry, routes, polygons, privileged tracks
 

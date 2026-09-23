@@ -23,7 +23,7 @@ The domain SHALL store a waypoint's symbol as an optional free-form string, not 
 
 ### Requirement: System exports waypoints to OziExplorer WPT
 
-The system SHALL provide an "Export WPT" action for a waypoint layer (offered from the Waypoints panel layer menu, the Waypoint inspector and the command palette) that writes all waypoints of the chosen layer to a user-selected `.wpt` file in OziExplorer Waypoint File version 1.1 format. The file SHALL start with the four header lines `OziExplorer Waypoint File Version 1.1`, `WGS 84`, `Reserved 2`, `Reserved 3`, followed by one row per waypoint with 24 comma-separated fields: sequential number starting at 1, name (truncated to 14 characters, commas and line breaks replaced by spaces), latitude and longitude in WGS84 decimal degrees with six decimals, date `0`, symbol code, status `1`, map display format `0`, foreground colour `0`, background colour `65535`, empty description, `0`, `0`, `0`, altitude `-777`, font size `6`, font style `0`, symbol size `17`, `0`, `0`, `0` and three empty trailing fields. Waypoints model neither elevation nor timestamp, so altitude SHALL always be `-777` and date `0`. Every line SHALL be encoded as Windows-1251 and terminated with `\r\n`.
+The system SHALL provide an "Export WPT" action for a waypoint layer (offered from the Waypoints panel layer menu, the Waypoint inspector and the command palette) that writes all waypoints of the chosen layer to a user-selected `.wpt` file in OziExplorer Waypoint File version 1.1 format. The file SHALL start with the four header lines `OziExplorer Waypoint File Version 1.1`, `WGS 84`, `Reserved 2`, `Reserved 3`, followed by one row per waypoint with 24 comma-separated fields: sequential number starting at 1, name (truncated to 14 characters, commas and line breaks replaced by spaces), latitude and longitude in WGS84 decimal degrees with six decimals, date `0`, symbol code, status `1`, map display format `0`, foreground colour `0`, background colour `65535`, the mark's note truncated to 40 characters (empty when it has none), `0`, `0`, `0`, altitude `-777`, font size `6`, font style `0`, symbol size `17`, `0`, `0`, `0` and three empty trailing fields. Waypoints model neither elevation nor timestamp, so altitude SHALL always be `-777` and date `0`. Field 11 is the note (`A mark carries a note`): the name of a mark is the place and the note is what a crew is sent to, and a headquarters running OziExplorer reads it there. Every line SHALL be encoded as Windows-1251 and terminated with `\r\n`.
 
 The symbol code SHALL be derived from the waypoint's symbol string: a string that parses as an integer SHALL be written as that number; known names SHALL map case-insensitively to OziExplorer codes — of the picker keys, `flag` → 9, `camp` → 18, `danger` → 19, `water` → 30 (further OziExplorer names such as `house`, `fuel`, `anchor`, `skull`, `star` are mapped as well); an absent symbol or any other string, including the picker keys `shelter`, `meeting-point`, `start`, `finish`, `viewpoint` and `parking`, SHALL be written as the default code `0`.
 
@@ -38,6 +38,11 @@ The export dialog SHALL pre-fill `<active bundle>/<layer name>.wpt` when a bundl
 
 - **WHEN** a waypoint named `Стоянка` is exported to WPT
 - **THEN** its row contains the cp1251 byte sequence for `Стоянка`, the file contains no UTF-8 sequence for it, and every line ends with `\r\n`
+
+#### Scenario: The note travels in field 11
+
+- **WHEN** a mark named `улика` carrying the note `красная куртка, 200 м от просеки` is exported to WPT
+- **THEN** field 11 of its row holds that note, with the comma replaced so the row keeps its 24 fields
 
 #### Scenario: Picker key without a WPT code falls back to 0
 

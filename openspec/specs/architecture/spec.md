@@ -1,4 +1,13 @@
-## ADDED Requirements
+# architecture Specification
+
+## Purpose
+Covers the structural invariants of the Rust backend that every other capability relies on: the four-module layering and its dependency direction, the thin Tauri command layer over `AppState`, opaque `u64` newtype identifiers, `TrackStyle` as domain data, the Rust edition, `tracing`-based logging, the background-work and async model as implemented, the `ozf2` decoding boundary and the generated IPC bindings.
+
+### Decision history
+
+ADR-0001 (2026-03-22) four layers, domain pure, edits via commands — codified as the layering and thin-handler requirements, edit rule in `undo-redo`; reality: application and infrastructure share data types both ways. ADR-0006 (2026-03-29) OZF2 decoder behind one adapter — codified; the crate is crates.io `ozf2 = "0.1"`, not a path sibling. ADR-0009 (2026-03-30) `tracing` + env-filter — codified. ADR-0011 (2026-03-23) no async runtime — not codified, stale: tokio drives concurrent downloads; reality codified as "Long-running work runs off the IPC thread and reports via events". ADR-0013 (2026-03-29) `TrackStyle` on `Track` — codified. ADR-0014 (2026-03-23) u64 newtypes, caller-assigned — codified. ADR-0015 (2026-03-23) edition 2024 — codified, pin in `ci-pipeline`. ADR-0016 (2026-03-30) Tauri 2 IPC — codified as generated bindings; manual `types.ts` mirroring superseded by tauri-specta. ADR-0003 superseded by ADR-0016; ADR-0005 superseded by ADR-0017.
+
+## Requirements
 
 ### Requirement: Backend is layered into domain, application, infrastructure, commands
 
@@ -15,8 +24,12 @@ The Rust backend (`src-tauri/src`) SHALL be organised into four modules with the
 
 #### Scenario: Tauri types do not leak below the commands layer
 
-- **WHEN** `grep -rl tauri src-tauri/src/domain src-tauri/src/application src-tauri/src/infrastructure` is run
+- **WHEN** `grep -rl 'tauri::' src-tauri/src/domain src-tauri/src/application src-tauri/src/infrastructure` is run
 - **THEN** it prints nothing
+
+  (The path `src-tauri` carries the word, so a check that greps for `tauri`
+  rather than `tauri::` reports a doc comment naming the manifest and finds
+  nothing wrong.)
 
 #### Scenario: Infrastructure does not drive application state
 
@@ -81,12 +94,17 @@ Every Rust crate in the workspace (`src-tauri`, `tools/ozi-rs-mcp`) SHALL declar
 
 ### Requirement: Backend logging goes through `tracing` filtered by `RUST_LOG`
 
-The backend SHALL emit diagnostics only through the `tracing` macros; `println!` and `eprintln!` SHALL NOT appear in `src-tauri/src`. `run()` in `lib.rs` SHALL install a `tracing_subscriber::fmt` subscriber whose `EnvFilter` is read from `RUST_LOG` and defaults to `info`. `AppState::push_diagnostic` SHALL be the single path that both emits a `tracing` event at the matching level (`Info` → `info!`, `Warning` → `warn!`, `Error` → `error!`) and appends the entry to the in-app diagnostics ring buffer of 200 entries exposed through `AppStateDto.diagnostics`.
+The backend SHALL emit diagnostics only through the `tracing` macros; `println!` and `eprintln!` SHALL NOT appear in the product code under `src-tauri/src` — test modules may print, since a test run by hand reports on stdout. `run()` in `lib.rs` SHALL install a `tracing_subscriber::fmt` subscriber whose `EnvFilter` is read from `RUST_LOG` and defaults to `info`. `AppState::push_diagnostic` SHALL be the single path that both emits a `tracing` event at the matching level (`Info` → `info!`, `Warning` → `warn!`, `Error` → `error!`) and appends the entry to the in-app diagnostics ring buffer of 200 entries exposed through `AppStateDto.diagnostics`.
 
 #### Scenario: No ad-hoc printing in the backend
 
-- **WHEN** `grep -rn 'println!\|eprintln!' src-tauri/src` is run
-- **THEN** it prints nothing
+- **WHEN** `src-tauri/src` is searched for `println!` and `eprintln!` outside
+  `#[cfg(test)]` modules
+- **THEN** nothing is found
+
+  (Test code prints: an ignored integration test that walks the real catalogue
+  reports what it found on stdout, which is the whole point of running it by
+  hand. The rule is about the product, not about the test that exercises it.)
 
 #### Scenario: Log level follows the environment
 
@@ -119,16 +137,19 @@ Every `#[tauri::command]` handler SHALL be a synchronous function that returns p
 
 ### Requirement: OZF2 rasters are decoded only through the `ozf2` crate adapter
 
-OZF2 decoding SHALL be provided by the external `ozf2` crate (crates.io, `ozf2 = "0.1"` in `src-tauri/Cargo.toml`) and SHALL be reached only through the adapter `src-tauri/src/infrastructure/import/ozi_raster.rs`, which wraps it in `OziRasterTileSource` / `DecodedOziRasterTile`. No other module SHALL import `ozf2::` types. A `.map` file whose raster is not OZF2 SHALL fail with `OziRasterDecodeError::UnsupportedRasterKind` rather than being partially decoded.
+OZF2 decoding SHALL be provided by the external `ozf2` crate (crates.io, `ozf2 = "0.1"` in `src-tauri/Cargo.toml`) and SHALL be reached only through the adapter `src-tauri/src/infrastructure/import/ozi_raster.rs`, which wraps it in `OziRasterTileSource` / `DecodedOziRasterTile`. No other module SHALL import `ozf2::` types.
+
+The adapter serves the other raster kind — a `.map` beside an ordinary picture — through the same types, so a caller never learns which it was given (`tile-rendering`). A raster the adapter reads neither way, such as the encrypted `.ozfx3`, SHALL fail with `OziRasterDecodeError::UnsupportedRasterKind` rather than being partially decoded.
 
 #### Scenario: The adapter is the only user of the crate
 
 - **WHEN** `grep -rln 'ozf2::' src-tauri/src` is run
 - **THEN** the only file printed is `src-tauri/src/infrastructure/import/ozi_raster.rs`
 
-#### Scenario: Unsupported raster kind is rejected
+#### Scenario: A raster neither reader understands is rejected
 
-- **WHEN** `open_ozi_raster_tile_source` is called with metadata whose `raster_kind()` is not `Ozf2`
+- **WHEN** `open_ozi_raster_tile_source` is called with metadata whose
+  `raster_kind()` is `Ozfx3` or `Unsupported`
 - **THEN** it returns `Err(OziRasterDecodeError::UnsupportedRasterKind(_))`
 
 ### Requirement: Typed IPC commands are registered once and generate TypeScript bindings

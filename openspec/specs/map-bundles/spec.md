@@ -8,7 +8,9 @@ Covers the map bundle as a unit of storage separate from the project: what a bun
 - ADR-0002 (2026-03-29, accepted): map bundle (a directory of georeferenced rasters, downloaded or opened locally, shared by many projects) and project are distinct concepts, and the app keeps a configurable bundles root with one subdirectory per bundle; rationale: earlier versions lost track data when the map changed and had no home for several operations over the same area. Codified as: Map bundle is a directory containing one or more georeferenced raster maps; User can open a local bundle from a chosen directory; Bundles root directory is user-configurable; Active map is tracked per project and is switchable without unloading overlays; Bundles root defaults to Documents and holds one directory per bundle. Reality note: the root chosen via `set_bundles_root` is held in memory only and re-derived from the Documents folder at every start (`src-tauri/src/application/mod.rs:565-567`, `src-tauri/src/lib.rs:28-34`; `PersistedAppSession` has no such field), so the "persists across app restarts" clause of the user-configurable requirement is not met today.
 - Legacy plan `docs/superpowers/plans/2026-04-12-production-bugs-fix.md` (executed): parallel per-file downloads and incremental map availability replaced the monolithic bundle load; rationale: users waited for whole multi-gigabyte bundles before any map could be opened. Codified as: Bundle catalog and cached maps remain interactive during an in-flight download; Per-map availability inside the active bundle streams into the UI live; Bundle download progress is observable from every surface that lists the downloading project's maps. Its "pre-created hidden bundle-loader window" (Task 5) is superseded: the loader is a component mounted on the `/` route (`src/routes/+page.svelte`), and `src/lib/windows.ts` no longer exists.
 - Owner decision (2026-09-19): code is primary. The persistence promise in "Bundles root directory is user-configurable" stands and the in-memory-only implementation is fixed in `revive-ui-cycle` slice 0.3 (bundles root stored in the session file and restored at startup).
+
 ## Requirements
+
 ### Requirement: Map bundle is a directory containing one or more georeferenced raster maps
 
 The system SHALL treat a map bundle as a filesystem directory that may contain SQLite MBTiles (`*.sqlitedb`) and/or OziExplorer raster maps (`*.map` paired with `*.ozf2`). A bundle MAY include a `10-Tracks/` subfolder for exported track files.
@@ -537,3 +539,21 @@ told when the first such map becomes available.
 - **WHEN** several maps of the same bundle land in turn
 - **THEN** the operator is told once, not once per file
 
+### Requirement: Bundles root defaults to Documents and holds one directory per bundle
+
+Unless the user has chosen another directory in the current session, the bundles root SHALL be `<platform Documents directory>/LizaAlert Maps`, resolved through the Tauri path resolver at startup. When the Documents directory cannot be resolved, the system SHALL fall back to a relative `bundles` directory and log a warning instead of failing to start. Each LizaAlert bundle SHALL live in its own subdirectory of the bundles root named by the project slug (`<bundles root>/<slug>/`), and the system SHALL treat a project as cached when `<bundles root>/<slug>/2-Coordinates.txt` exists.
+
+#### Scenario: Default root on a fresh start
+
+- **WHEN** the application starts and the user has not changed the bundles root in this session AND downloads the project with slug `2026-03-29_demo`
+- **THEN** the bundle files land under `<Documents>/LizaAlert Maps/2026-03-29_demo/`
+
+#### Scenario: Bundles are sibling directories under the root
+
+- **WHEN** two projects with slugs `2026-03-29_demo` and `2026-04-02_forest` have been downloaded
+- **THEN** the bundles root contains the two sibling directories `2026-03-29_demo/` and `2026-04-02_forest/`, each holding only its own bundle files
+
+#### Scenario: Cached marker drives the catalog status
+
+- **WHEN** `<bundles root>/<slug>/2-Coordinates.txt` exists for a catalog entry
+- **THEN** that entry is reported as cached in the bundle catalog and can be opened without network access

@@ -8,7 +8,9 @@ Covers the integration with `maps.lizaalert.ru`: streaming the project catalog a
 - ADR-0008 (2026-03-28, accepted): use reqwest 0.13 with `default-features = false` and the `rustls` backend; rationale: the endpoint is HTTPS-only and the binary must build without OpenSSL or system TLS on every platform. Codified as: LizaAlert HTTP client uses reqwest with rustls, no native TLS. Partly superseded: the ADR's "blocking API only, no async runtime" no longer holds — tokio is a dependency (`src-tauri/Cargo.toml:33`) and bundle downloads run on the async client with the `stream` feature (`src-tauri/Cargo.toml:26`, `src-tauri/src/infrastructure/lizaalert.rs:543`), while the blocking client remains for listings (`lizaalert.rs:473`). The ADR's remark about the webpki trust store also no longer describes the build: the graph shows reqwest pulling `rustls-platform-verifier` (OS trust store) and no `webpki-roots`.
 - Legacy plan `docs/superpowers/plans/2026-04-12-production-bugs-fix.md` (executed): bounded-concurrency parallel downloads, prefix-ordered scheduling, `completed`/`total` counts on `bundle-progress`; rationale: sequential downloads and a progress bar without data made large bundles unusable. Codified as: Download progress is observable (counts also covered by the `ui-shell` status-bar requirement). Retries were never implemented (no retry or backoff logic in `lizaalert.rs`) and are not codified.
 - Code, no ADR (2026-05 to 2026-07): per-file `.part` write + rename, staged archive extraction, resume of missing files, and offline open of cached bundles; rationale: a cancelled or failed download must never leave a truncated file that the cached-map listing would treat as complete. Codified as: Failed downloads degrade gracefully (modified in this change).
+
 ## Requirements
+
 ### Requirement: System fetches the LizaAlert project list as a stream
 
 The system SHALL fetch the list of available projects from `maps.lizaalert.ru` and SHALL deliver results to the frontend in chunks via a `projects-chunk` event so the UI can render progressively.
@@ -99,12 +101,34 @@ The system SHALL emit `download-progress` events carrying `package_name`, `downl
 
 ### Requirement: Failed downloads degrade gracefully
 
-The system SHALL surface download or extraction failures as user-facing errors, SHALL NOT panic, and SHALL NOT leave the bundles root in a partially-extracted unusable state.
+The system SHALL surface download or extraction failures as user-facing errors and SHALL NOT panic. Failure handling SHALL be atomic per file and per archive, not per bundle:
+
+- a file being downloaded SHALL be written to a sibling temporary file named by appending `.part` to the whole file name (`10-Tracks/b.ozf2` → `10-Tracks/b.ozf2.part`) and renamed to its canonical path only after it is fully written and fsynced, so a file present at its canonical path is always complete; a cancellation mid-stream SHALL remove the partial file; a network error SHALL keep it, because the next attempt resumes from it with a range request, and it SHALL be removed once the attempts at that file are exhausted (see `one-flaky-file-is-not-the-bundle`);
+- a cached OZI archive SHALL be extracted into a sibling staging directory and renamed into place only on success; a failed or interrupted extraction SHALL leave no destination directory, and the next open of the bundle SHALL retry the extraction;
+- files that finished before the failure SHALL remain on disk, and re-selecting the same project SHALL resume by fetching only the missing files;
+- one failing file SHALL NOT abort the other in-flight files of the same bundle; the first error is reported after the remaining workers finish, unless the user cancels.
+
+When the remote listing is unreachable and the bundle is already cached (`<bundles root>/<slug>/2-Coordinates.txt` exists), the system SHALL open the cached bundle instead of reporting an error. When the listing is unreachable and the bundle is not cached, the error SHALL be reported and the application SHALL remain usable.
 
 #### Scenario: Network failure mid-download
 
-- **WHEN** a download is interrupted by a network error
-- **THEN** the system reports the failure to the user, leaves the bundle in either a fully-extracted or fully-removed state, and remains usable for retry
+- **WHEN** a download is interrupted by a network error while `10-Tracks/b.ozf2` is in flight
+- **THEN** the system reports the failure to the user, `10-Tracks/b.ozf2` does not exist at its canonical path, files completed earlier remain on disk, and re-selecting the project fetches only the missing files. `10-Tracks/b.ozf2.part` remains only while attempts at that file are still to come, and is gone once they are exhausted
+
+#### Scenario: Interrupted archive extraction leaves no half-extracted directory
+
+- **WHEN** extraction of a cached OZI archive fails part-way
+- **THEN** no destination directory for that archive exists afterwards, the error is reported, and the next open of the same bundle extracts the archive again
+
+#### Scenario: Cached bundle opens while offline
+
+- **WHEN** the LizaAlert listing is unreachable AND the selected project's bundle directory already contains `2-Coordinates.txt`
+- **THEN** the project opens from the cached files, the `bundle-progress` phase message reads `Opening cached project bundle: …`, and no error is shown
+
+#### Scenario: Uncached bundle offline reports an error
+
+- **WHEN** the LizaAlert listing is unreachable AND the selected project has no cached bundle directory
+- **THEN** the system reports the connection error to the user and remains usable
 
 ### Requirement: LizaAlert project catalog is cached locally with a write timestamp
 
@@ -475,3 +499,26 @@ state of the link better than the machine reports it.
 - **WHEN** the application starts and the machine reports no network
 - **THEN** no catalogue request is made and the catalogue is shown as the saved list with its age
 
+### Requirement: LizaAlert HTTP client uses reqwest with rustls, no native TLS
+
+All HTTP traffic to `maps.lizaalert.ru` SHALL go through `reqwest` built with `default-features = false` and the `rustls` TLS backend, so the binary carries no dependency on OpenSSL or the platform's native TLS library. The catalog root SHALL be addressed over HTTPS (`https://maps.lizaalert.ru/maps/`). Bundle file bodies SHALL be streamed to disk chunk by chunk with a progress callback per chunk; the system SHALL NOT buffer a whole file body in memory before writing it.
+
+#### Scenario: Manifest declares the rustls backend
+
+- **WHEN** the `reqwest` entry in `src-tauri/Cargo.toml` is inspected
+- **THEN** it sets `default-features = false` and its feature list includes `rustls`
+
+#### Scenario: No native TLS in the dependency graph
+
+- **WHEN** `cargo tree -i native-tls` and `cargo tree -i openssl-sys` are run in `src-tauri`
+- **THEN** both report that the package ID matches no package
+
+#### Scenario: Catalog is fetched over HTTPS
+
+- **WHEN** the project list refresh starts
+- **THEN** the first request goes to `https://maps.lizaalert.ru/maps/` and every derived file URL keeps the `https://` scheme
+
+#### Scenario: Large file is streamed, not buffered
+
+- **WHEN** a map package of several hundred megabytes is downloaded
+- **THEN** `download-progress` events with increasing `downloaded_bytes` arrive while the transfer is still running, and the bytes are appended to the on-disk temp file as they arrive

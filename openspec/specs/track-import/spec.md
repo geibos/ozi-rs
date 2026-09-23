@@ -1,48 +1,30 @@
 # track-import Specification
 
 ## Purpose
-Covers how track data enters a project from files: the single Import dialog (GPX, PLT, ZIP), recursive folder import, the archive path that unpacks ZIP entries, PLT text decoding, and the layers each import creates. Waypoints embedded in GPX files are imported here; their editing lives in `waypoints`, map bundles in `map-bundles` and `lizaalert-integration`.
+Covers how track data enters a project from files: the single Import dialog (GPX, PLT, WPT, ZIP) and the window's drop target, recursive folder import, the archive path that unpacks ZIP entries, PLT text decoding, and the layers each import creates. Waypoints embedded in GPX files are imported here; their editing lives in `waypoints`, map bundles in `map-bundles` and `lizaalert-integration`.
 
 ### Decision history
 
 - ADR-0007 (2026-03-28, accepted): archive import is three layers — `infrastructure::import::archive` reads ZIP entries and classifies them by extension only, format adapters (`gpx.rs`, `plt.rs`) parse, `application` orchestrates and registers results through `ProjectCommand`s; rationale: keep OZF2 raster risk out of GPX import and add a format by adding an adapter file. Codified as: ZIP archives import each GPX entry as a source file; GPX import creates track and waypoint layers per source file. Not codified: the layering itself (architecture, not behaviour); PLT/KML/WPT archive entries are classified but no adapter consumes them (`gpx.rs` keeps only `Gpx` entries); the zip-slip guard (`enclosed_name` in `archive.rs`) is only exercised by map-bundle staging in `lizaalert.rs` and belongs to those capabilities.
 - Change `bootstrap-current-state`: first behaviour-level requirements; its "into the active track layer" wording never matched `application/import.rs`, which creates `Imported tracks: <path>` and `Imported waypoints: <path>` layers — replaced in `codify-architecture-decisions`.
 - Change `fix-plt-import-encoding-detection` (2026-05-17): PLT bytes decode via BOM → strict UTF-8 → `chardetng` → Windows-1251 fallback; rationale: field PLT files from Russian Windows are cp1251, newer ones UTF-8 or UTF-16. Codified as: PLT import accepts Windows-1251 encoded text. GPX import has no such chain; it relies on the XML encoding declaration.
-- CJ-3 (`docs/customer-journeys.md`) and the July 2026 import work: one Import dialog with a combined GPX/PLT/ZIP filter, `.zip` routed through the GPX import command, and a recursive "Import folder…" for per-date subfolders that reports per-file failures instead of aborting; rationale: volunteers bring a folder or a ZIP from several navigators, and the twin GPX/PLT buttons were indistinguishable. Codified as: Single import dialog accepts GPX, PLT and ZIP files; Recursive folder import of GPX and PLT files.
+- CJ-3 (`docs/customer-journeys.md`) and the July 2026 import work: one Import dialog with a combined GPX/PLT/ZIP filter, `.zip` routed through the GPX import command, and a recursive "Import folder…" for per-date subfolders that reports per-file failures instead of aborting; rationale: volunteers bring a folder or a ZIP from several navigators, and the twin GPX/PLT buttons were indistinguishable. Codified as: Single import dialog accepts a day's files whatever they are; Recursive folder import of GPX and PLT files. `.wpt` joined the filter on 2026-09-23 (`a-note-on-the-mark`), when the headquarters next door turned out to hand over OziExplorer's own waypoint format.
 
 ## Requirements
 
-### Requirement: System imports GPX files into the active track layer
-
-The system SHALL accept GPX files via a file picker and SHALL import all tracks contained in the file into the active track layer as `Track` entities with their original geometry preserved.
-
-#### Scenario: Single-track GPX file
-
-- **WHEN** the user picks a GPX file containing one track
-- **THEN** the track appears in the Tracks panel and renders on the map in the active track layer
-
-#### Scenario: Multi-track GPX file
-
-- **WHEN** the user picks a GPX file containing multiple tracks
-- **THEN** each track is imported as a separate `Track` entity in the active track layer
-
-### Requirement: System imports ZIP archives containing GPX or PLT files
-
-The system SHALL accept `.zip` archives via the same file pickers used for GPX and PLT, and SHALL classify their entries to import each contained recognized track file.
-
-#### Scenario: ZIP archive of GPX files
-
-- **WHEN** the user picks a ZIP archive containing several GPX files
-- **THEN** every recognized GPX entry is imported as a separate track in the active track layer
-
 ### Requirement: System imports OziExplorer PLT files
 
-The system SHALL accept PLT files (OziExplorer format) and SHALL import their points and segment boundaries into the active track layer.
+The system SHALL accept PLT files (OziExplorer Track Point File) and SHALL import each file as one `Track` in a new track layer named `Imported tracks: <source path>`. The track name SHALL come from the fourth field of the track properties line (line 5), falling back to the file stem when that field is empty; the visibility flag, line width and COLORREF colour SHALL be read from the same line. Point rows SHALL keep latitude, longitude, altitude (feet, `-777` meaning unknown) and the OLE date as timestamp; a point whose third field is `1` SHALL start a new segment. A file whose first line does not start with `OziExplorer Track Point File` SHALL be rejected.
 
 #### Scenario: Single PLT file
 
-- **WHEN** the user picks a PLT file
-- **THEN** the track is imported into the active track layer with its points and segment boundaries preserved
+- **WHEN** the user picks a PLT file whose point rows carry two segment-break flags
+- **THEN** the track is imported into a new track layer with all its points and two segment boundaries preserved
+
+#### Scenario: Missing header
+
+- **WHEN** the user picks a `.plt` file whose first line is not the `OziExplorer Track Point File` signature
+- **THEN** the import fails with an error and the project is unchanged
 
 ### Requirement: PLT import accepts Windows-1251 encoded text
 
@@ -259,3 +241,76 @@ Reading the place and dropping the reason makes the exchange half useful.
 
 - **WHEN** a `.wpt` whose rows carry a description is imported
 - **THEN** each mark carries its note
+
+### Requirement: Single import dialog accepts a day's files whatever they are
+
+The Tracks panel SHALL expose one "Import…" action that opens a native file dialog with a single filter covering the `gpx`, `plt`, `wpt` and `zip` extensions and allows selecting several files at once. The system SHALL import the selected files one after another, routing each by its extension (case-insensitive): `.plt` to the PLT importer, `.wpt` to the OziExplorer waypoint importer, and every other selected file to the GPX importer, which handles `.zip` itself. A failure in one file SHALL NOT stop the import of the remaining files; after the last file the system SHALL show one summary stating how many of the selected files were imported and naming the files that failed.
+
+The routing itself is stated once, in "One dispatch behind every import surface": this requirement is about the dialog, not about a second copy of the rule.
+
+#### Scenario: Mixed GPX, PLT, WPT and ZIP selection
+
+- **WHEN** the user selects `a.gpx`, `b.PLT`, `c.zip` and `улики.wpt` in the Import dialog
+- **THEN** `a.gpx` and `c.zip` are imported through the GPX importer, `b.PLT` through the PLT importer, `улики.wpt` through the waypoint importer, and one summary reports 4 of 4 files imported
+
+#### Scenario: One broken file in a multi-file selection
+
+- **WHEN** the user selects three files and the second one fails to parse
+- **THEN** the first and third files are imported, and one summary reports 2 of 3 files imported and names the failed file
+
+### Requirement: Recursive folder import of GPX and PLT files
+
+The Tracks panel SHALL expose an "Import folder…" action. Given a directory, the system SHALL walk it and all of its subdirectories, collect every file whose extension is `.gpx` or `.plt` (case-insensitive), and import the collected files in sorted path order through the same single-file GPX and PLT importers. ZIP archives found in the folder SHALL NOT be expanded. A file that fails to import SHALL be recorded as skipped with its reason and SHALL NOT abort the remaining files; a subdirectory that cannot be read SHALL be skipped. The system SHALL report the number of imported files, tracks and waypoints and the names of skipped files in one summary. The action SHALL fail with an error when the directory cannot be read or contains no `.gpx` or `.plt` file at all.
+
+#### Scenario: Per-date subfolders
+
+- **WHEN** the user picks a folder `10-Tracks/` containing `2026-07-09/a.gpx` and `2026-07-10/b.plt`
+- **THEN** both files are imported and the summary reports 2 files
+
+#### Scenario: Broken file is skipped, not fatal
+
+- **WHEN** the folder contains two valid GPX files and one `broken.gpx` that fails to parse
+- **THEN** the two valid files are imported and the summary lists `broken.gpx` as skipped
+
+#### Scenario: Folder without track files
+
+- **WHEN** the user picks a folder that contains no `.gpx` or `.plt` file (for example only `.zip` archives)
+- **THEN** the import fails with an error naming the folder and the project is unchanged
+
+### Requirement: GPX import creates track and waypoint layers per source file
+
+The system SHALL import a GPX file as `Track` entities with their original geometry preserved, placing all tracks of the file into a new track layer named `Imported tracks: <source path>`. A track without a `<name>` SHALL be named `<file stem> track <n>`. When the file contains `<wpt>` elements, the system SHALL place them into a new waypoint layer named `Imported waypoints: <source path>`, keeping each waypoint's name, coordinates and `<sym>` text verbatim; a waypoint without a name SHALL be named `<file stem> waypoint <n>`. A file with no tracks SHALL NOT create a track layer and a file with no waypoints SHALL NOT create a waypoint layer. Layer creation and every added track and waypoint SHALL be applied through `ProjectCommand`s on the project history (see `undo-redo`).
+
+#### Scenario: Single-track GPX file
+
+- **WHEN** the user imports `field.gpx` containing one track and no waypoints
+- **THEN** a new track layer `Imported tracks: <path>/field.gpx` appears with that one track, and no waypoint layer is created
+
+#### Scenario: Multi-track GPX file
+
+- **WHEN** the user imports a GPX file containing multiple tracks
+- **THEN** each track is imported as a separate `Track` entity in the same new track layer
+
+#### Scenario: GPX file with waypoints
+
+- **WHEN** the user imports a GPX file with two tracks and three `<wpt>` elements, one of them carrying `<sym>Flag</sym>`
+- **THEN** a track layer with two tracks and a waypoint layer with three waypoints are created, and that waypoint's symbol is the string `Flag`
+
+### Requirement: ZIP archives import each GPX entry as a source file
+
+The system SHALL accept `.zip` archives through the Import dialog and SHALL route them to the archive importer even though they arrive through the GPX import path. The archive layer SHALL classify entries by file extension only (case-insensitive) without inspecting their content; directory entries SHALL be skipped. Every entry classified as GPX, at any folder depth inside the archive, SHALL be parsed and imported exactly as a standalone GPX file would be, using the entry path as its source path. Entries with any other extension (including `.plt`, `.kml`, `.map`, `.wpt` and raster payloads) SHALL be ignored by the track import. The system SHALL parse all GPX entries before applying anything to the project; if any entry fails to parse, the whole archive import SHALL fail and the project SHALL remain unchanged.
+
+#### Scenario: ZIP archive of GPX files in nested folders
+
+- **WHEN** the user imports `tracks.zip` containing `20260709/a.gpx` and `20260710/b.GPX`
+- **THEN** two track layers are created, one per entry, each holding that entry's tracks
+
+#### Scenario: PLT entries inside a ZIP are ignored
+
+- **WHEN** the user imports a ZIP containing `a.gpx` and `b.plt`
+- **THEN** only `a.gpx` is imported, the import succeeds, and `b.plt` is not imported
+
+#### Scenario: Corrupt GPX entry fails the archive
+
+- **WHEN** one GPX entry in the archive is malformed XML
+- **THEN** the archive import fails with an error and no layer is added to the project

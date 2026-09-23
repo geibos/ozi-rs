@@ -35,7 +35,7 @@ When a requested tile does not exist — the `.sqlitedb` has no row for `(x, y, 
 
 ### Requirement: OZF2 map context is opened once per map path and reused
 
-For `ozi://` requests the backend SHALL parse the `.map` file, build the georeference and open the OZF2 tile source once per `map_path` and keep the result in a process-wide cache (`load_ozi_context` in `src-tauri/src/commands/tiles.rs`); subsequent tile requests for the same path SHALL reuse the cached context. Individual decoded tiles are not cached by the backend; MapLibre's own tile cache covers repeat requests.
+For `ozi://` requests the backend SHALL parse the `.map` file, build the georeference and open its raster tile source — OZF2 or an ordinary picture, which the adapter answers alike — once per `map_path`, and keep the result in a process-wide cache (`load_ozi_context` in `src-tauri/src/commands/tiles.rs`); subsequent tile requests for the same path SHALL reuse the cached context. Individual decoded tiles are not cached by the backend; MapLibre's own tile cache covers repeat requests.
 
 #### Scenario: Second tile request reuses the context
 

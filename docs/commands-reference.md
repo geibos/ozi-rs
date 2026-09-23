@@ -43,9 +43,15 @@ non-destructive and immediately visible.
 
 Defined in `src-tauri/src/commands/mod.rs` and `commands/tiles.rs`, and
 registered in `src-tauri/src/lib.rs` — that registry is the list, and this page
-is a description of it. The tables below name the commands a reader is likely
-to look for rather than all of them; when the two disagree, the registry is
-right.
+is a description of it. When the two disagree, the registry is right.
+
+The tables below used to name only the commands a reader was likely to look
+for, which meant twenty of seventy-one were absent — whole areas of the
+application among them: layer management, `.wpt` import, starting a new search.
+A reader looking for one of those found nothing and could reasonably conclude
+it did not exist. They are all here now, and
+`src/test/commands-reference-is-complete.test.ts` fails when a command is
+registered without a line on this page, so the gap cannot open again.
 
 ### Query Commands (read-only)
 
@@ -58,6 +64,7 @@ right.
 | `get_simplified_preview` | Preview of Douglas-Peucker without committing |
 | `get_track_export_default_path` | Suggested active-bundle `10-Tracks/<track>.<ext>` export path, or no suggestion if unavailable |
 | `list_tracks` | Every track in the project as a row: name, style, statistics, no geometry. What the Tracks tab reads |
+| `read_raster_size` | A picture's dimensions, read from its header without decoding it — what the calibration form needs to offer a bottom-right corner |
 
 ### Project / Bundle Management
 
@@ -71,6 +78,12 @@ right.
 | `save_project` | Save project to `.ozp` file |
 | `load_project_file` | Load project from `.ozp` file |
 | `reveal_bundle` | Open active bundle directory in file explorer |
+| `reveal_path` | Open a file manager on any written file — what an export's «Показать» does |
+| `preview_project` | Fetch a bundle's map list without downloading anything |
+| `cancel_project_listing` | Stop the catalogue walk that is running |
+| `cancel_download` | Abort a bundle download; files already on disk stay, and the next attempt resumes |
+| `new_project` | Start a new search: an empty project, keeping the bundle and the active raster |
+| `calibrate_raster` | Write a `.map` for a picture that came without one, and open the pair |
 
 ### Import / Export
 
@@ -78,6 +91,8 @@ right.
 |---------|-------------|
 | `import_gpx` | Import GPX file or ZIP archive |
 | `import_plt` | Import PLT file |
+| `import_wpt` | Import an OziExplorer waypoint file into a layer of its own |
+| `import_tracks_directory` | Walk a folder and its subfolders, importing every `.gpx` and `.plt` |
 | `export_gpx` | Export track layer to GPX |
 | `export_track_plt` | Export single track to PLT |
 | `export_wpt_waypoints` | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF) |
@@ -103,6 +118,7 @@ right.
 | `crop_track_to_extent` | Keep only the points inside the given map extent |
 | `crop_track_to_time` | Keep only the points inside the given time range |
 | `cancel_drawing` | Discard the draw in progress without leaving it on the redo stack |
+| `trim_track_at_point` | Cut everything before or after a chosen point, keeping that point |
 
 ### Track Style (non-undoable, bypass CommandStack)
 
@@ -111,6 +127,8 @@ right.
 | `set_track_color` | Set track RGBA color |
 | `set_track_line_width` | Set track line width |
 | `toggle_track_visible` | Toggle track visibility |
+| `set_all_tracks_visible` | Show or hide every track in one step |
+| `show_only_track` | Show one track and hide the rest |
 
 ### Waypoint Mutations (via CommandStack, undoable)
 
@@ -121,9 +139,22 @@ right.
 | `delete_waypoint` | Delete a waypoint |
 | `rename_waypoint` | Rename a waypoint |
 | `set_waypoint_symbol` | Set or clear waypoint symbol |
+| `set_waypoint_color` | Set or clear a mark's colour |
+| `set_waypoint_description` | Write the note beside a mark — what a crew is actually sent to |
 | `toggle_waypoint_visible` | Flip one waypoint's visibility (style, not an undoable edit) |
 | `set_all_waypoints_visible` | Show or hide every waypoint in one step |
 | `show_only_waypoint` | Show one waypoint and hide the rest |
+
+### Layers (via CommandStack, undoable)
+
+| Command | Description |
+|---------|-------------|
+| `create_track_layer` | Add a track layer, answering its id |
+| `create_waypoint_layer` | Add a waypoint layer, answering its id |
+| `rename_track_layer` | Rename a track layer |
+| `rename_waypoint_layer` | Rename a waypoint layer |
+| `delete_track_layer` | Remove a track layer; undo brings it back with its tracks |
+| `delete_waypoint_layer` | Remove a waypoint layer; undo brings it back with its marks |
 
 ### History
 

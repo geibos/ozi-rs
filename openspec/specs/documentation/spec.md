@@ -1,4 +1,13 @@
-## ADDED Requirements
+# documentation Specification
+
+## Purpose
+Rules for the repository's prose: what docs may claim, how the feature-status matrix is shaped, which navigation docs must track the tree, and where decisions are recorded now that OpenSpec is the normative source.
+
+### Decision history
+
+ADR-0019 (2026-04-25) implemented / backend-only / planned states and `docs/feature-status.md` — codified. Legacy documentation-update design (2026-04-08) one-off resync — tasks done; standing rule codified as "Navigation docs are dated and match the source tree". Change `codify-architecture-decisions` (2026-09-19): decisions move from `docs/adr/` (frozen at 24 pointer stubs) into Purpose decision history and change `design.md` — codified as "Decisions are recorded in OpenSpec, not in new ADR files" and "OpenSpec specs are normative; feature-status is evidence".
+
+## Requirements
 
 ### Requirement: Public docs claim only verified behaviour, in three explicit states
 
@@ -21,7 +30,9 @@ Public documentation (`README.md`, `AGENTS.md`, `docs/*.md`) SHALL describe ever
 
 ### Requirement: Feature-status matrix has fixed columns and a bounded audit vocabulary
 
-`docs/feature-status.md` SHALL be a table with the columns `Feature | Backend | UI | Docs | Status | Evidence | Audit-verified`. `Evidence` SHALL name a concrete artefact (test name, `docs/qa/smoke-*.md`, screenshot or QA log). `Audit-verified` SHALL be `pending` until the smoke has run and afterwards one of `works`, `partial`, `broken`, `hidden` or `missing`, optionally followed by a link to the smoke document. The "Registered backend commands" preamble SHALL list exactly the commands in the specta registry.
+`docs/feature-status.md` SHALL be a table with the columns `Feature | Backend | UI | Docs | Status | Evidence | Audit-verified`. `Evidence` SHALL name a concrete artefact (test name, `docs/qa/smoke-*.md`, screenshot or QA log). `Audit-verified` SHALL be `pending` until the smoke has run and afterwards one of `works`, `partial`, `broken`, `hidden` or `missing`, optionally followed by a link to the smoke document.
+
+The "Registered backend commands" preamble SHALL point at the registry rather than copy it. It used to carry the list, and the list went stale the first time a command was added — stating, of features that had shipped, that they had no backend. A copy of a list that changes is a claim that will be false, and the registry is one `grep` away.
 
 #### Scenario: Header row matches the contract
 
@@ -33,14 +44,17 @@ Public documentation (`README.md`, `AGENTS.md`, `docs/*.md`) SHALL describe ever
 - **WHEN** the `Audit-verified` cell of every row is stripped of its parenthesised link
 - **THEN** each value is one of `pending`, `works`, `partial`, `broken`, `hidden`, `missing`
 
-#### Scenario: Command preamble matches the registry
+#### Scenario: The preamble points at the registry
 
-- **WHEN** the command names in the preamble are compared with the commands registered in `src-tauri/src/lib.rs` (`tauri_specta::collect_commands!` plus the `tauri::generate_handler!` tile block)
-- **THEN** the two sets are identical
+- **WHEN** the "Registered backend commands" section is read
+- **THEN** it names `src-tauri/src/lib.rs` as the source of truth and gives the
+  command that prints the current list, and holds no list of its own
 
 ### Requirement: Navigation docs are dated and match the source tree
 
-`AGENTS.md`, `docs/project-map.md`, `docs/architecture.md`, `docs/frontend-architecture.md`, `docs/feature-status.md`, `docs/requirements.md` and `docs/roadmap.md` SHALL carry a `> Last verified against code: YYYY-MM-DD` line directly under their title, refreshed whenever the document is re-verified. Every file path these documents cite SHALL exist, and `docs/commands-reference.md` SHALL list every registered IPC command and every `ProjectCommand` variant.
+`AGENTS.md`, `docs/project-map.md`, `docs/architecture.md`, `docs/frontend-architecture.md`, `docs/feature-status.md`, `docs/requirements.md` and `docs/roadmap.md` SHALL carry a `> Last verified against code: YYYY-MM-DD` line directly under their title, refreshed whenever the document is re-verified. Every file path these documents cite as part of the current tree SHALL exist, and `docs/commands-reference.md` SHALL list every registered IPC command and every `ProjectCommand` variant.
+
+A path named as something that was removed — "the former `src/lib/windows.ts` was deleted in the workspace redesign" — is history, not a citation, and a path given as a naming pattern (`docs/adr/adr-NNNN-slug.md`) names a shape rather than a file. Neither is a broken reference.
 
 #### Scenario: Verification date is present
 
@@ -49,13 +63,20 @@ Public documentation (`README.md`, `AGENTS.md`, `docs/*.md`) SHALL describe ever
 
 #### Scenario: Cited paths exist
 
-- **WHEN** every repository path in `docs/project-map.md` is resolved
+- **WHEN** every repository path in `docs/project-map.md` that the text presents
+  as part of the current tree is resolved
 - **THEN** each path exists in the working tree
 
 #### Scenario: Command reference is complete
 
 - **WHEN** every command registered in `src-tauri/src/lib.rs` (`collect_commands!` and the `generate_handler!` tile block) is searched in `docs/commands-reference.md`
-- **THEN** every registered command has a row
+- **THEN** every registered command has a row, and
+  `src/test/commands-reference-is-complete.test.ts` fails when one does not
+
+#### Scenario: The reference does not describe what was removed
+
+- **WHEN** a command is deleted from the registry
+- **THEN** its row must go too, and the same test says so
 
 ### Requirement: Decisions are recorded in OpenSpec, not in new ADR files
 
