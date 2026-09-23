@@ -77,9 +77,23 @@ function leaveAll(): void {
  * asked for: drawing needs a track layer to draw into, and saying so is better
  * than a chip that lights up over a map that ignores the clicks.
  */
+/**
+ * Which request is the current one.
+ *
+ * Entering drawing mode takes two IPC round trips, and an operator who presses
+ * Рисование and then Измерение before the first answers used to end up in
+ * both: the late answer turned drawing on over a map already handed to the
+ * ruler, so the chip said one thing and the clicks did another. Found by a
+ * reviewer, 2026-09-23. Every request takes a number and the stale ones stop.
+ */
+let requestCounter = 0;
+
 export async function setInteractionMode(
   mode: InteractionMode,
 ): Promise<InteractionMode> {
+  const request = (requestCounter += 1);
+  const superseded = () => request !== requestCounter;
+
   if (mode !== "view" && currentMode() === mode) {
     leaveAll();
     return "view";
@@ -108,7 +122,9 @@ export async function setInteractionMode(
 
   try {
     const trackId = await createEmptyTrack(layerId, "New Track");
+    if (superseded()) return currentMode();
     const detail = await getTrackDetail(layerId, trackId);
+    if (superseded()) return currentMode();
     drawingTrackLayerId.set(layerId);
     drawingTrackId.set(trackId);
     drawingSegmentId.set(BigInt(detail.segments[0].id));
@@ -119,6 +135,7 @@ export async function setInteractionMode(
     // The scratch track may or may not have been created; either way the mode
     // must not come on over a map that has nothing to draw into.
     console.error("Failed to start track drawing mode", error);
+    if (superseded()) return currentMode();
     toast.error(get(t)("tracksTab.drawStartFailed"), {
       description: String(error),
     });

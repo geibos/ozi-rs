@@ -77,11 +77,33 @@ export function chooseStep(span: number, wanted = 4): number {
   return GRID_STEPS_DEGREES[GRID_STEPS_DEGREES.length - 1];
 }
 
+/**
+ * Longitude back into −180…180.
+ *
+ * A view that runs past the antimeridian produces line values of 180.5 or 181,
+ * and `181°E` is not a coordinate anybody can read out over a radio. Found by
+ * a reviewer, 2026-09-23.
+ */
+export function normaliseLon(lon: number): number {
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
+}
+
 /** Degrees as a map reader writes them: `59°56'` or `59°56'15"`. */
 export function formatDegrees(value: number, kind: "lat" | "lon"): string {
-  const hemisphere =
-    kind === "lat" ? (value < 0 ? "S" : "N") : value < 0 ? "W" : "E";
-  const magnitude = Math.abs(value);
+  const shown = kind === "lon" ? normaliseLon(value) : value;
+  // The antimeridian belongs to neither hemisphere and is written bare; the
+  // equator likewise. `180°W` is not wrong, exactly, but nobody says it.
+  const onTheLine = shown === 0 || Math.abs(shown) === 180;
+  const hemisphere = onTheLine
+    ? ""
+    : kind === "lat"
+      ? shown < 0
+        ? "S"
+        : "N"
+      : shown < 0
+        ? "W"
+        : "E";
+  const magnitude = Math.abs(shown);
   // Rounded to whole seconds first, so 59.999999 does not print as 59°59'60".
   const totalSeconds = Math.round(magnitude * 3600);
   const degrees = Math.floor(totalSeconds / 3600);
@@ -106,8 +128,16 @@ export function formatDegrees(value: number, kind: "lat" | "lon"): string {
  */
 export function graticule(bounds: GridBounds, wanted = 4): GridLine[] {
   const latSpan = bounds.north - bounds.south;
-  const lonSpan = bounds.east - bounds.west;
+  // A view straddling the antimeridian arrives with west greater than east —
+  // MapLibre reports 179 … −179 for it. Unwrapping the eastern edge past 180
+  // keeps the lines marching the way the view runs; the labels normalise back,
+  // so a meridian drawn at 180.5 is named 179°30'W. Before this the whole grid
+  // came back empty there. Found by a reviewer, 2026-09-23.
+  const unwrappedEast =
+    bounds.east < bounds.west ? bounds.east + 360 : bounds.east;
+  const lonSpan = unwrappedEast - bounds.west;
   if (!(latSpan > 0) || !(lonSpan > 0)) return [];
+  bounds = { ...bounds, east: unwrappedEast };
 
   const latStep = chooseStep(latSpan, wanted);
   const lonStep = chooseStep(lonSpan, wanted);

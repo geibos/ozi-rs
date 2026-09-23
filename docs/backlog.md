@@ -369,7 +369,7 @@ and the palette slice; these were not.
 
   The application already probes the network at launch — the catalogue walk —
   and its failure is stronger evidence than `navigator`. Acting on it needs the
-  backend to say *why* the walk failed: a transport error means no reach, a 500
+  backend to say _why_ the walk failed: a transport error means no reach, a 500
   from maps.lizaalert.ru means the link is fine and the backdrop should stay.
   Until that distinction exists, removing the backdrop on any catalogue error
   would take it away from an operator whose link works. Noticed walking CJ-2 on

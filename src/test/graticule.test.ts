@@ -52,6 +52,13 @@ describe("formatDegrees", () => {
     expect(formatDegrees(30, "lon")).toBe("30°E");
   });
 
+  it("writes the antimeridian and the equator bare", () => {
+    // Neither belongs to a hemisphere, and nobody says "180 west".
+    expect(formatDegrees(180, "lon")).toBe("180°");
+    expect(formatDegrees(-180, "lon")).toBe("180°");
+    expect(formatDegrees(0, "lat")).toBe("0°");
+  });
+
   it("writes minutes with a leading zero", () => {
     expect(formatDegrees(59 + 6 / 60, "lat")).toBe("59°06'N");
   });
@@ -106,6 +113,24 @@ describe("graticule", () => {
     const lines = graticule({ south: 88, west: 0, north: 90, east: 40 });
     for (const line of lines.filter((l) => l.kind === "lat")) {
       expect(Math.abs(line.degrees)).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it("draws a grid across the antimeridian", () => {
+    // MapLibre reports a view straddling the line as west 179, east −179.
+    // Before this the whole grid came back empty there. Chukotka is the case.
+    // Found by a reviewer, 2026-09-23.
+    const lines = graticule({ south: 64, west: 179, north: 65, east: -179 });
+    expect(lines.filter((l) => l.kind === "lon").length).toBeGreaterThan(2);
+  });
+
+  it("never names a longitude that does not exist", () => {
+    // A line drawn at 180.5 is 179°30'W, and "181°E" is not a coordinate
+    // anybody can read out over a radio.
+    const lines = graticule({ south: 64, west: 179, north: 65, east: -179 });
+    for (const line of lines.filter((l) => l.kind === "lon")) {
+      const degrees = Number(line.label.match(/^(\d+)°/)![1]);
+      expect(degrees, line.label).toBeLessThanOrEqual(180);
     }
   });
 

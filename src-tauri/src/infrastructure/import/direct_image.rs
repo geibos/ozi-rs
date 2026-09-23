@@ -14,7 +14,6 @@
 //! why [`MAX_PIXELS`] exists: a field laptop that runs out of memory gives no
 //! reason for it, and a refusal that names the size does.
 
-use image::imageops::FilterType;
 use image::{DynamicImage, ImageReader};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -144,32 +143,26 @@ impl DirectImageRaster {
 
     fn from_image(image: DynamicImage) -> Self {
         let base = image.to_rgba8();
+        let (width, height) = (base.width(), base.height());
+        // The decoded image is dropped here rather than kept for the resizes:
+        // it is another four bytes a pixel alive for the whole build, and
+        // `image::resize` would add a float buffer of half the height on top
+        // — about sixteen bytes a pixel at the peak against the four the limit
+        // was written for. Found by a reviewer, 2026-09-23.
+        drop(image);
+
         let mut levels = vec![Level {
-            width: base.width(),
-            height: base.height(),
+            width,
+            height,
             rgba: base.into_raw(),
         }];
 
-        let mut current = image;
         loop {
-            let (width, height) = (current.width(), current.height());
-            if width.min(height) <= MIN_LEVEL_SIDE {
+            let last = levels.last().expect("level 0 exists");
+            if last.width.min(last.height) <= MIN_LEVEL_SIDE {
                 break;
             }
-            // Triangle filtering: a map halved by nearest neighbour loses thin
-            // contour lines entirely, which is most of what a topographic sheet
-            // is made of.
-            current = current.resize_exact(
-                (width / 2).max(1),
-                (height / 2).max(1),
-                FilterType::Triangle,
-            );
-            let rgba = current.to_rgba8();
-            levels.push(Level {
-                width: rgba.width(),
-                height: rgba.height(),
-                rgba: rgba.into_raw(),
-            });
+            levels.push(halve(last));
         }
 
         Self { levels }
@@ -216,6 +209,45 @@ impl DirectImageRaster {
             out.extend_from_slice(&level.rgba[start..end]);
         }
         Some((width, height, out))
+    }
+}
+
+/// One level, halved.
+///
+/// A box filter over each 2×2 block, rather than nearest neighbour: a
+/// topographic sheet is mostly thin contour lines, and dropping every other
+/// pixel loses them. Done over the RGBA buffer directly, so the only memory
+/// this costs is the level it produces — a quarter of the one before it.
+fn halve(source: &Level) -> Level {
+    let width = (source.width / 2).max(1);
+    let height = (source.height / 2).max(1);
+    let mut rgba = Vec::with_capacity((width as usize) * (height as usize) * 4);
+
+    for y in 0..height {
+        for x in 0..width {
+            // The four source pixels this one stands for. An odd edge reuses
+            // the last row or column rather than reading past it.
+            let x0 = (x * 2).min(source.width - 1) as usize;
+            let x1 = (x * 2 + 1).min(source.width - 1) as usize;
+            let y0 = (y * 2).min(source.height - 1) as usize;
+            let y1 = (y * 2 + 1).min(source.height - 1) as usize;
+            let row0 = y0 * source.width as usize;
+            let row1 = y1 * source.width as usize;
+
+            for channel in 0..4 {
+                let sum = u32::from(source.rgba[(row0 + x0) * 4 + channel])
+                    + u32::from(source.rgba[(row0 + x1) * 4 + channel])
+                    + u32::from(source.rgba[(row1 + x0) * 4 + channel])
+                    + u32::from(source.rgba[(row1 + x1) * 4 + channel]);
+                rgba.push((sum / 4) as u8);
+            }
+        }
+    }
+
+    Level {
+        width,
+        height,
+        rgba,
     }
 }
 
@@ -267,6 +299,43 @@ mod tests {
         let (width, height, pixels) = raster.tile_rgba(0, 3, 3).expect("tile 3,3");
         assert_eq!((width, height), (232, 232));
         assert_eq!(pixels.len(), 232 * 232 * 4);
+    }
+
+    /// Halving must average, not sample: a contour line one pixel wide is
+    /// most of what a topographic sheet carries, and dropping every other
+    /// pixel loses half of them.
+    #[test]
+    fn halving_averages_rather_than_samples() {
+        // A 2×2 block of one white pixel and three black ones becomes one
+        // pixel of a quarter white — nearest neighbour would make it white or
+        // black depending on which corner it read.
+        let mut image = RgbaImage::new(2, 2);
+        image.put_pixel(0, 0, image::Rgba([255, 255, 255, 255]));
+        image.put_pixel(1, 0, image::Rgba([0, 0, 0, 255]));
+        image.put_pixel(0, 1, image::Rgba([0, 0, 0, 255]));
+        image.put_pixel(1, 1, image::Rgba([0, 0, 0, 255]));
+
+        let level = super::halve(&super::Level {
+            width: 2,
+            height: 2,
+            rgba: image.into_raw(),
+        });
+
+        assert_eq!((level.width, level.height), (1, 1));
+        assert_eq!(level.rgba[0], 63, "one white corner of four is a quarter");
+        assert_eq!(level.rgba[3], 255, "opaque stays opaque");
+    }
+
+    #[test]
+    fn halving_an_odd_side_does_not_read_past_the_edge() {
+        // 3×3 halves to 1×1, and the block for it runs off the picture.
+        let level = super::halve(&super::Level {
+            width: 3,
+            height: 3,
+            rgba: vec![128; 3 * 3 * 4],
+        });
+        assert_eq!((level.width, level.height), (1, 1));
+        assert_eq!(level.rgba, vec![128, 128, 128, 128]);
     }
 
     #[test]

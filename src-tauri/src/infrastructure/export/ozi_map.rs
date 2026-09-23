@@ -302,11 +302,20 @@ impl AffineFit {
     }
 
     /// Ground metres per picture pixel, for the `MM1B` line OziExplorer reads.
+    ///
+    /// Both components of the step, not just the longitude one. A photograph
+    /// of a sheet on a table is rotated, and for a map turned ninety degrees a
+    /// step along X is pure latitude — so measuring only the longitude wrote
+    /// `MM1B,0.000000` for a picture whose pixels are very much a size. Found
+    /// by a reviewer, 2026-09-23.
     fn metres_per_pixel(&self) -> f64 {
         let (lat0, lon0) = self.pixel_to_lat_lon(0.0, 0.0);
-        let (_, lon1) = self.pixel_to_lat_lon(1.0, 0.0);
+        let (lat1, lon1) = self.pixel_to_lat_lon(1.0, 0.0);
+        let metres_per_lat_degree = 111_320.0;
         let metres_per_lon_degree = 111_320.0 * lat0.to_radians().cos();
-        ((lon1 - lon0) * metres_per_lon_degree).abs()
+        let east = (lon1 - lon0) * metres_per_lon_degree;
+        let north = (lat1 - lat0) * metres_per_lat_degree;
+        east.hypot(north)
     }
 }
 
@@ -441,6 +450,29 @@ mod tests {
         // Corner 3 is pixel (1600,1200), which is the second.
         assert!(text.contains("MMPLL,3,30.400000,59.950000"));
         assert!(text.contains("IWH,Map Image Width/Height,1600,1200"));
+    }
+
+    /// A photograph of a sheet on a table is rotated; for a map turned ninety
+    /// degrees a step along X is pure latitude, and measuring only the
+    /// longitude wrote a pixel size of zero.
+    #[test]
+    fn metres_per_pixel_survives_a_rotated_calibration() {
+        // X runs north, Y runs east: a sheet photographed sideways.
+        let points = vec![
+            point(0.0, 0.0, 60.0, 30.0),
+            point(1000.0, 0.0, 60.01, 30.0),
+            point(0.0, 1000.0, 60.0, 30.02),
+        ];
+        let text = build_calibration_map("боком", "photo.jpg", 1000, 1000, &points).expect("build");
+        let line = text
+            .lines()
+            .find(|line| line.starts_with("MM1B,"))
+            .expect("MM1B");
+        let metres: f64 = line["MM1B,".len()..].trim().parse().expect("a number");
+        assert!(
+            metres > 0.5 && metres < 5.0,
+            "a thousand pixels over 0.01° of latitude is about 1.1 m a pixel, got {metres}"
+        );
     }
 
     #[test]

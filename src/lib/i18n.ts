@@ -122,7 +122,8 @@ const dictionaries = {
     "inspector.attachments": "Files",
     "inspector.attachmentsHint":
       "Photographs and scans that belong to this mark, referenced by their place on this machine. Nothing is copied — moving a file, or opening the project on another computer, will not find it.",
-    "inspector.attachmentShowFailed": "Could not open the file — it may have moved",
+    "inspector.attachmentShowFailed":
+      "Could not open the file — it may have moved",
     "inspector.attachmentAdd": "Attach a file…",
     "inspector.attachmentShow": "Show",
     "inspector.attachmentRemove": "Detach",
@@ -565,7 +566,8 @@ const dictionaries = {
     "inspector.attachments": "Файлы",
     "inspector.attachmentsHint":
       "Фотографии и сканы, относящиеся к этой точке, по их месту на этой машине. Ничего не копируется: если файл переместить или открыть проект на другом компьютере, он не найдётся.",
-    "inspector.attachmentShowFailed": "Не удалось открыть файл — возможно, он переехал",
+    "inspector.attachmentShowFailed":
+      "Не удалось открыть файл — возможно, он переехал",
     "inspector.attachmentAdd": "Прикрепить файл…",
     "inspector.attachmentShow": "Показать",
     "inspector.attachmentRemove": "Открепить",
