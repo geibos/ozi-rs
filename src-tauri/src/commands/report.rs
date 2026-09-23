@@ -190,6 +190,16 @@ fn about_text() -> String {
 fn capture_window(app: &AppHandle, target: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
+        // Asked before capturing, because afterwards there is nothing to ask:
+        // see `may_capture_the_screen`.
+        if !may_capture_the_screen() {
+            return Err(
+                "нет разрешения на запись экрана — macOS отдала бы картинку рабочего стола \
+                 вместо окна"
+                    .to_owned(),
+            );
+        }
+
         let window = app
             .get_webview_window("main")
             .ok_or_else(|| "нет окна".to_owned())?;
@@ -213,10 +223,8 @@ fn capture_window(app: &AppHandle, target: &Path) -> Result<(), String> {
         if !status.success() {
             return Err(format!("screencapture вернул {status}"));
         }
-        // A refused Screen Recording grant still exits zero and writes
-        // nothing, so the file is what says whether it worked.
         if !target.exists() {
-            return Err("снимок не записан — вероятно, нет разрешения на запись экрана".to_owned());
+            return Err("снимок не записан".to_owned());
         }
         Ok(())
     }
@@ -224,6 +232,43 @@ fn capture_window(app: &AppHandle, target: &Path) -> Result<(), String> {
     {
         let _ = (app, target);
         Err("снимок экрана пока только на macOS".to_owned())
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    /// Answers whether this application may record the screen. Does not ask.
+    fn CGPreflightScreenCaptureAccess() -> bool;
+    /// Shows the system's request, once per application, and returns at once.
+    fn CGRequestScreenCaptureAccess() -> bool;
+}
+
+/// Whether macOS will actually hand over the screen, and a request if not.
+///
+/// This exists because `screencapture` does not fail without the grant. It
+/// exits zero and writes a perfectly good PNG of the **desktop wallpaper**,
+/// with every window missing. Found on 2026-09-23 by looking at what the
+/// first walk in the packaged application produced: a 588 KB picture of the
+/// owner's wallpaper, which the previous check — does the file exist — was
+/// happy with. An operator would have sent a folder believing their screen
+/// was in it.
+///
+/// So the question is asked of the system instead, before capturing.
+/// `CGPreflightScreenCaptureAccess` answers without prompting; when the
+/// answer is no, `CGRequestScreenCaptureAccess` shows the system's request
+/// once and returns immediately — macOS grants it only after the application
+/// is restarted, so this run has no screenshot either way, and says so.
+#[cfg(target_os = "macos")]
+fn may_capture_the_screen() -> bool {
+    // SAFETY: both are parameterless CoreGraphics entry points returning a
+    // C `bool`; they are always safe to call, on any thread, and take and
+    // hold no pointers.
+    unsafe {
+        if CGPreflightScreenCaptureAccess() {
+            return true;
+        }
+        CGRequestScreenCaptureAccess()
     }
 }
 
@@ -315,6 +360,32 @@ mod tests {
         assert_eq!(
             super::capture_rect(0.0, 0.0, 800.0, 600.0, 0.0),
             "0,0,800,600"
+        );
+    }
+
+    /// Guard test: pins a defect class by reading the source, and proves no
+    /// behaviour on its own.
+    ///
+    /// The first version of `capture_window` decided the capture had worked by
+    /// asking whether the file existed. It always does: without the Screen
+    /// Recording grant `screencapture` writes the desktop wallpaper and exits
+    /// zero. The only honest question is the one put to the system before
+    /// capturing, so this fails if that question is ever dropped or reordered
+    /// after the capture.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_permission_is_asked_before_the_screen_is_taken() {
+        let source = include_str!("report.rs");
+        let preflight = source
+            .find("may_capture_the_screen()")
+            .expect("the permission is asked at all");
+        let capture = source
+            .find("Command::new(\"screencapture\")")
+            .expect("something still takes the picture");
+        assert!(
+            preflight < capture,
+            "the grant must be checked before screencapture runs, or a refusal \
+             is written to disk as a picture of the wallpaper"
         );
     }
 

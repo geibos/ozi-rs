@@ -59,7 +59,7 @@ const dictionaries = {
     "report.saved": "Moment saved",
     "report.savedNoShot": "Moment saved, without the screen",
     "report.noShotWhy":
-      "The screenshot needs Screen Recording for this application — System Settings → Privacy & Security. The rest of the report is there.",
+      "The screenshot needs Screen Recording for this application: allow it in System Settings → Privacy & Security → Screen Recording, then restart ozi-rs. Everything else is in the report.",
     "report.show": "Show",
     "report.describe": "What happened?",
     "report.notePlaceholder": "Did X, expected Y, got Z",
@@ -516,7 +516,7 @@ const dictionaries = {
     "report.saved": "Момент сохранён",
     "report.savedNoShot": "Момент сохранён, без экрана",
     "report.noShotWhy":
-      "Для снимка нужно разрешение на запись экрана для этого приложения — «Системные настройки» → «Конфиденциальность и безопасность». Остальное в отчёте есть.",
+      "Для снимка нужно разрешение на запись экрана для этого приложения: включите его в «Системных настройках» → «Конфиденциальность и безопасность» → «Запись экрана» и перезапустите ozi-rs. Остальное в отчёте есть.",
     "report.show": "Показать",
     "report.describe": "Что случилось?",
     "report.notePlaceholder": "Сделал X, ждал Y, получил Z",

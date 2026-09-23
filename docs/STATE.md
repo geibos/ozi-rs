@@ -5,10 +5,9 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-**Two OpenSpec changes are open.** `a-folder-for-one-moment` is the newest —
-the owner asked on 2026-09-23 for a way to capture a moment while using the
-application, and it is built and green; its last task is the one an agent
-cannot tick, see below. `finish-the-rebuild` carries the three pieces of the
+**One OpenSpec change is open.** `a-folder-for-one-moment` was archived on
+2026-09-23, the day the owner asked for it, after the walk in the packaged
+application found and closed a real defect in it. `finish-the-rebuild` carries the three pieces of the
 development cycle that were never built: the screenshot matrix, the view-model
 layer, and a smoke journey for the six Customer Journeys that have none —
 nothing in it is visible to an operator. Everything else is archived — `codify-architecture-decisions` and `revive-ui-cycle` both closed on
@@ -25,15 +24,21 @@ and, if the operator writes one, `note.txt`. Deliberately not behind a debug
 flag: the strangeness happens in the field, on a release build. The screenshot
 is taken first and the description asked after, so nothing covers the screen.
 
-What is proved and what is not: the folder, the four files, the note and the
-rectangle arithmetic are covered by tests — including that `screencapture -R`
-takes points and not pixels, checked from the shell on 2026-09-23 (a 400×300
-rectangle writes an 800×600 PNG at scale 2). What no test covers is the first
-run in the packaged application, where macOS asks for Screen Recording once.
-Refusing that grant costs the screenshot and nothing else: the report still
-appears, and the toast says the snapshot is missing and why. That single walk
-is task 1.8 of `a-folder-for-one-moment` and the reason the change is not yet
-archived.
+It is walked in the packaged application by `smoke_report_capture_moment`,
+which presses the chord and reads the folder back off disk — and that walk is
+why the feature works. The first one produced a 588 KB picture of the owner's
+**desktop wallpaper**: without the Screen Recording grant `screencapture` does
+not fail, it exits zero and writes an image with every window missing, so the
+check it had — does the file exist — was satisfied by it. The report would have
+been handed over with the wrong picture in it and nobody the wiser. It now asks
+`CGPreflightScreenCaptureAccess` before capturing and writes no screenshot at
+all when the answer is no, saying in the toast to allow it and restart. Looked
+at afterwards, not inferred: the folder holds the window itself, framed to its
+edges.
+
+Grant it once per machine — System Settings › Privacy & Security › Screen
+Recording › ozi-rs — or the folders arrive complete but without their
+pictures.
 
 **Verified after the review fixes, 2026-09-23 at 20:36.** The desktop gate
 passed against a bundle built from the tree as it stands, and the stand was

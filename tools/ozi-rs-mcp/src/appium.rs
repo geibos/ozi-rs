@@ -834,6 +834,77 @@ pub fn appium_click_element_offsets_with_session_id(
     }
 }
 
+/// Command (⌘) as WebDriver spells it.
+pub const META: char = '\u{E03D}';
+/// Shift (⇧) as WebDriver spells it.
+pub const SHIFT: char = '\u{E008}';
+
+/// Hold the modifiers, tap the key, let everything go — in that order.
+///
+/// `appium_press_key_with_session_id` sends one key down and up, which cannot
+/// express a chord: an application listening for Shift+⌘+D sees a bare `d`.
+/// A chord is one `actions` call, because modifiers released between calls do
+/// not overlap the key press.
+///
+/// The modifiers come back up in reverse order, as a hand does. Leaving one
+/// down poisons every later press in the session — the next click arrives as
+/// a Command-click, which is a different gesture.
+pub fn appium_press_chord_with_session_id(
+    server_url: &str,
+    session_id: &str,
+    modifiers: &[char],
+    key: char,
+) -> AppiumToolResult {
+    let mut actions: Vec<serde_json::Value> = Vec::new();
+    for m in modifiers {
+        actions.push(json!({ "type": "keyDown", "value": m.to_string() }));
+    }
+    actions.push(json!({ "type": "keyDown", "value": key.to_string() }));
+    actions.push(json!({ "type": "keyUp", "value": key.to_string() }));
+    for m in modifiers.iter().rev() {
+        actions.push(json!({ "type": "keyUp", "value": m.to_string() }));
+    }
+
+    let body = json!({
+        "actions": [{ "type": "key", "id": "keyboard", "actions": actions }]
+    });
+    match webdriver_request(
+        "POST",
+        server_url,
+        &format!("/session/{session_id}/actions"),
+        Some(&body),
+    ) {
+        Ok(response) if response.status_code < 400 => AppiumToolResult {
+            ok: true,
+            tool: "appium_press_chord".to_owned(),
+            available: true,
+            error_kind: None,
+            missing: Vec::new(),
+            message: Some(format!(
+                "Pressed {} modifier(s) + U+{:04X} in session {session_id}",
+                modifiers.len(),
+                key as u32
+            )),
+            session_id: Some(session_id.to_owned()),
+            install_hints: Vec::new(),
+            artifact_paths: Vec::new(),
+        },
+        Ok(response) => appium_failure_result(
+            "appium_press_chord",
+            "webdriver_error",
+            format!(
+                "Chord actions failed with HTTP {}: {}",
+                response.status_code, response.body
+            ),
+        ),
+        Err(error) => appium_failure_result(
+            "appium_press_chord",
+            "webdriver_unreachable",
+            format!("Chord actions could not be sent: {error}"),
+        ),
+    }
+}
+
 /// Press and release a single key via W3C key actions. `key` is either a
 /// literal character or a WebDriver key codepoint (e.g. `'\u{E00C}'` = Escape,
 /// `'\u{E007}'` = Enter).

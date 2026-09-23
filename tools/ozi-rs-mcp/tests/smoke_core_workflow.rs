@@ -47,10 +47,10 @@
 use std::{path::Path, process::Command, thread, time::Duration};
 
 use ozi_rs_mcp::appium::{
-    DEFAULT_APPIUM_SERVER_URL, appium_click_element_offsets_with_session_id,
+    DEFAULT_APPIUM_SERVER_URL, META, SHIFT, appium_click_element_offsets_with_session_id,
     appium_click_with_session_id, appium_doctor, appium_launch_session_with_app_path,
-    appium_page_source_with_session_id, appium_press_key_with_session_id,
-    appium_stop_session_with_session_id,
+    appium_page_source_with_session_id, appium_press_chord_with_session_id,
+    appium_press_key_with_session_id, appium_stop_session_with_session_id,
 };
 
 const ESCAPE: char = '\u{E00C}';
@@ -518,4 +518,181 @@ fn smoke_cj5_draw_track() {
 
     drop(guard);
     println!("\n=== smoke_core_workflow: PASSED ===");
+}
+
+/// The moment captured into a folder, walked in the packaged application.
+///
+/// This is the one thing about the report that no other test can reach. The
+/// unit tests cover the folder's contents and the rectangle arithmetic; the
+/// stand covers the toast and the note box. Neither has a window, and a report
+/// whose whole point is a picture of the window is not proved without one.
+///
+/// It asserts the folder and the three files that need no permission, and
+/// only *reports* on `screenshot.png`, because whether macOS has been given
+/// Screen Recording for this bundle is a fact about the machine and not about
+/// the code. The application is built to survive that refusal — the folder
+/// still appears — and this test is built the same way, so a missing grant
+/// does not turn the gate red for something no commit can fix.
+///
+/// The folder it makes is removed afterwards: the operator's reports are
+/// theirs, and a test's leftovers in that directory are noise in the thing
+/// they are meant to hand over.
+#[test]
+#[ignore = "requires built app + Appium Mac2 server; run via `just smoke`"]
+fn smoke_report_capture_moment() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root");
+    let app_bundle = workspace.join("target/debug/bundle/macos/ozi-rs.app");
+    assert!(
+        app_bundle.exists(),
+        "app bundle missing at {} — run `just build` first",
+        app_bundle.display(),
+    );
+
+    let reports_root = std::path::PathBuf::from(std::env::var("HOME").expect("HOME"))
+        .join("Documents")
+        .join("ozi-rs-отчёты");
+    let before = report_folders(&reports_root);
+
+    let doctor = appium_doctor();
+    assert!(doctor.ok, "Appium Mac2 is not ready: {doctor:?}");
+
+    kill_wedged_wda();
+    kill_app_instances();
+    thread::sleep(Duration::from_secs(2));
+
+    let launch = appium_launch_session_with_app_path(
+        true,
+        DEFAULT_APPIUM_SERVER_URL,
+        &app_bundle.to_string_lossy(),
+    );
+    assert!(launch.ok, "appium_launch_session failed: {launch:?}");
+    let guard = SessionGuard {
+        server_url: DEFAULT_APPIUM_SERVER_URL.to_owned(),
+        session_id: launch.session_id.clone().expect("session id"),
+    };
+    let server = guard.server_url.as_str();
+    let sid = guard.session_id.as_str();
+
+    // The window has to be there before it is worth photographing.
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(20),
+        "workspace tabs",
+        |s| contains_any(s, &TRACKS_TAB) && contains_any(s, &WAYPOINTS_TAB),
+    );
+    println!("ok: the workspace is up");
+
+    let chord = appium_press_chord_with_session_id(server, sid, &[SHIFT, META], 'd');
+    assert!(chord.ok, "pressing Shift+Cmd+D failed: {chord:?}");
+
+    // `screencapture` is a second process, and on a first run macOS may be
+    // deciding about a permission, so this waits rather than looking once.
+    let folder = poll_for_new_report(&reports_root, &before, Duration::from_secs(25));
+    let folder = folder.unwrap_or_else(|| {
+        panic!(
+            "no new folder appeared under {} within 25s — Shift+Cmd+D did not reach \
+             the application, or save_report failed. The toast text is in the app log.",
+            reports_root.display()
+        )
+    });
+    println!("ok: the folder appeared at {}", folder.display());
+
+    for name in ["diagnostics.txt", "state.json", "about.txt"] {
+        let file = folder.join(name);
+        let body = std::fs::read_to_string(&file)
+            .unwrap_or_else(|e| panic!("{} is not readable: {e}", file.display()));
+        assert!(!body.trim().is_empty(), "{} is empty", file.display());
+    }
+
+    // Not just present — the right file. A folder of four empty files would
+    // pass a presence check and tell a reader nothing.
+    let diagnostics = std::fs::read_to_string(folder.join("diagnostics.txt")).expect("read");
+    assert!(
+        diagnostics.contains("Последние сообщения приложения"),
+        "diagnostics.txt is not the diagnostics file: {diagnostics}"
+    );
+    let state = std::fs::read_to_string(folder.join("state.json")).expect("read");
+    assert!(
+        state.contains("\"project_name\"") && state.contains("\"diagnostics\""),
+        "state.json is not the application state: {state}"
+    );
+    let about = std::fs::read_to_string(folder.join("about.txt")).expect("read");
+    assert!(
+        about.contains("ozi-rs ") && about.contains("macos"),
+        "about.txt does not name the build and the machine: {about}"
+    );
+    println!("ok: diagnostics, state and build are all in it and all say what they should");
+
+    // The picture, reported and not required — see the doc comment.
+    let shot = folder.join("screenshot.png");
+    match std::fs::metadata(&shot) {
+        Ok(meta) if meta.len() > 0 => {
+            // Since the preflight went in, a file here means the system said
+            // yes — the wallpaper-instead-of-window case writes nothing.
+            println!("ok: screenshot.png is there, {} bytes", meta.len());
+        }
+        Ok(_) => println!(
+            "NOTE: screenshot.png is empty — screencapture ran and wrote nothing. \
+             Check Screen Recording for ozi-rs in System Settings › Privacy."
+        ),
+        Err(_) => println!(
+            "NOTE: no screenshot.png — macOS has not been given Screen Recording for \
+             this bundle, and the application declined to write the wallpaper picture \
+             it would otherwise have got. The report is complete otherwise, which is \
+             the designed behaviour; allow it in System Settings › Privacy › Screen \
+             Recording and restart ozi-rs to get the picture too."
+        ),
+    }
+
+    // Kept when asked, because a run that produced the wrong picture looks
+    // exactly like a run that produced the right one from here: the assertions
+    // above cannot tell a window from a wallpaper, only a human eye can, and
+    // it needs the file to still be there.
+    if std::env::var_os("OZI_KEEP_REPORT").is_some() {
+        println!("kept for inspection: {}", folder.display());
+    } else {
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    drop(guard);
+    println!("\n=== smoke_report_capture_moment: PASSED ===");
+}
+
+/// The report folders that exist right now, as a sorted list of paths.
+fn report_folders(root: &Path) -> Vec<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut found: Vec<std::path::PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    found.sort();
+    found
+}
+
+/// Wait for a folder that was not there before, answering it once it is.
+fn poll_for_new_report(
+    root: &Path,
+    before: &[std::path::PathBuf],
+    timeout: Duration,
+) -> Option<std::path::PathBuf> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        if let Some(fresh) = report_folders(root)
+            .into_iter()
+            .find(|p| !before.contains(p))
+        {
+            return Some(fresh);
+        }
+        if std::time::Instant::now() >= deadline {
+            return None;
+        }
+        thread::sleep(SOURCE_POLL_STEP);
+    }
 }
