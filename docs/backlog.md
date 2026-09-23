@@ -374,3 +374,30 @@ and the palette slice; these were not.
   Until that distinction exists, removing the backdrop on any catalogue error
   would take it away from an operator whose link works. Noticed walking CJ-2 on
   2026-09-23.
+
+## What OziExplorer has and this does not
+
+Re-checked against `docs/reference/oziexplorer.md` on 2026-09-23, after the
+calibration and field-tool work. Everything the reference marks **[ЯДРО]** is
+now built except these four, none of which was ever agreed into scope — they
+are written down so the choice is the owner's rather than an omission.
+
+- **Сетка координат на карте.** A lat/lon grid drawn over the raster, with the
+  labels. Штабы describe sectors by coordinates on the radio, and reading one
+  off a map with no grid means clicking and reading the status bar. The most
+  likely of the four to be missed. OziExplorer also draws UTM and national
+  grids; the lat/lon one is the part that matters here.
+- **Distance Between Waypoints.** The ruler measures anything, but not "from
+  this mark to that one" in a click. Two marks and a distance is how a task is
+  sized.
+- **Track Replay.** Playing a recording back in time. "Where was the group at
+  half past two" is answered today by reading the points table, which has the
+  times in it — slower, but not missing.
+- **Вложения к точке.** A photo attached to a mark — the found item, the
+  footprint. This needs files inside the `.ozp`, which is a change to the
+  format rather than a feature on top of it, and the format is the thing two
+  headquarters exchange.
+
+Deliberately not listed: Track Move (a track is a recording, not a drawing),
+Routes, Events, Point Sets, live GPS, printing, DEM relief, and the GIS import
+formats — all recorded as non-goals in `product-scope`.

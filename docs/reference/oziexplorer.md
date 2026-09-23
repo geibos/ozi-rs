@@ -67,8 +67,8 @@ Android**. Формат карт эволюционировал: `OZF2` → `OZF
 «К чему стремимся» ниже).
 
 - **Карты**
-  - Calibrating Maps (калибровка по 1–30 точкам) — **[ЯДРО]** (у нас — импорт готового `.map`)
-  - Image Formats Supported (BMP/TIF/PNG/JPG/ECW/SID + OZF2/x3/4) — **[ЯДРО частично]** (OZF2)
+  - Calibrating Maps (калибровка по 1–30 точкам) — **[ЯДРО]** ✅ с 23.09.2026: импорт готового `.map` и привязка картинки, у которой его нет (два угла в форме, бэкенд принимает любое число точек)
+  - Image Formats Supported (BMP/TIF/PNG/JPG/ECW/SID + OZF2/x3/4) — **[ЯДРО]** ✅ OZF2, JPEG, PNG, TIFF, BMP, GIF, WebP. ECW/SID и `.ozfx3` — нет: первые два проприетарные, третий зашифрован
   - Map Projections (14 проекций/грид-систем), France Grids — **[позже]** (репроецирование — non-goal)
   - Import: DRG, GeoTIFF, BSB, NOS/GEO, NV.Digital, Maptech PCX/RML, QuoVadis, ECW, SID, Kompass — **[не берём]**
   - Map Searching: Index Map, Name Search, Find Map, Blank Map — **[позже]**
@@ -81,13 +81,13 @@ Android**. Формат карт эволюционировал: `OZF2` → `OZF
 - **GPS Receivers**: Garmin, Magellan, Lowrance/Eagle, MLR, Brunton/Silva, Tripmate,
   Earthmate, Bluetooth/USB/NMEA/Windows GPS; upload/download waypoints/tracks/routes — **[не берём]**
 - **Объекты карты**
-  - Waypoints (свойства, вложения, список, проекция точки) — **[ЯДРО]**
-  - Tracks (Track Control, List, Replay, Move, Profile, Filter, проекция точки) — **[ЯДРО]**
+  - Waypoints (свойства, список, проекция точки) — **[ЯДРО]** ✅; вложения (фото к точке) — **нет**, см. `docs/backlog.md`
+  - Tracks (Track Control, List, Profile, Filter, проекция точки) — **[ЯДРО]** ✅ (Filter = упрощение Дугласа–Пекера с превью); **Replay** и **Move** — нет, см. `docs/backlog.md`
   - Routes (Route Editor, свойства) — **[не берём]**
   - Events, Map Features, Map Comments, Points (Point Sets) — **[не берём]** (Points ≈ waypoints концептуально)
 - **Import / Export**: text-файлы, MapInfo MIF, ESRI Shape, ArcInfo E00 — **[не берём]**
   (у нас вместо этого GPX/PLT — см. ниже)
-- **Измерения**: Distance & Area, Distance/Bearing, Distance Between Waypoints — **[позже]**
+- **Измерения**: Distance & Area ✅ (отдельными инструментами), Distance/Bearing ✅ (проекция точки), круг по радиусу ✅; **Distance Between Waypoints** — нет, см. `docs/backlog.md`
 - **Grids**: отображение сетки Lat/Lon и других (UTM, OSGB, Irish) — **[позже]**
 - **Printing**: печать карт и списков — **[не берём]** ([ADR-0023](../adr/adr-0023-no-map-printing.md))
 - **OziExplorer3D / Elevation**: 3D-рельеф из DEM (USA DEM, DTED, GTOPO30, GLOBE) — **[не берём]**
@@ -327,11 +327,11 @@ Command Palette, темизация, локализация (ru/en). «Сдел�
 
 | Область оригинала | Берём? | Статус в ozi-rs / как делаем удобнее |
 | --- | --- | --- |
-| Растровые карты (OZF2), калибровка `.map` | **Ядро** | Есть: OZF2 + SQLite/MBTiles тайлы, аффинная привязка. Плюс бандлы «ЛизаАлерт» |
+| Растровые карты, калибровка `.map` | **Ядро** | Есть: OZF2, обычные картинки (JPEG/PNG/TIFF/BMP/GIF/WebP) и SQLite/MBTiles тайлы; аффинная привязка; привязка картинки без `.map` пишет настоящий `.map` рядом. Плюс бандлы «ЛизаАлерт» |
 | Треки: `.plt` импорт/экспорт, GPX | **Ядро** | Есть. Редактирование move/delete/insert/draw, упрощение (Douglas-Peucker) с превью |
-| Треки: sort по времени, crop, split/join UI | **Ядро (в работе)** | Backend частично; UI — Milestone 2 (CJ-4) |
-| Точки (waypoints) | **Ядро** | Есть: add/move/rename/symbol/visibility. Импорт `.wpt` — нет (через GPX), экспорт `.wpt` — есть |
-| On-map инструменты: линейка, круг (центр+радиус), проекция точки (азимут+дистанция) | **Берём (в работе)** | Аналог Distance/Area + Project Waypoint; Milestone 2 (CJ-5) |
+| Треки: sort по времени, crop, split/join, обрезка по точке | **Ядро** | Есть, с UI в таблице сегментов и инспекторе; каждый шаг откатывается |
+| Точки (waypoints) | **Ядро** | Есть: add/move/rename/symbol/цвет/заметка/visibility; импорт и экспорт `.wpt` и GPX. Вложений (фото) нет |
+| On-map инструменты: линейка, площадь, круг (центр+радиус), проекция точки (азимут+дистанция) | **Берём** | Есть все четыре. Длина и площадь — отдельные инструменты (решение владельца 23.09); круг называет и радиус, и площадь |
 | Проекции / репроецирование | Позже/нет | Проекция читается как строка; репроецирования нет (non-goal) |
 | Управление датумами | **Не берём** | Только предупреждение о non-WGS84 |
 | Moving Map, live-GPS, тревоги, AIS, автопилот | **Не берём** | Нет обмена с GPS-устройствами (non-goal) |
@@ -340,6 +340,11 @@ Command Palette, темизация, локализация (ru/en). «Сдел�
 | Печать карт и списков | **Не берём** | [ADR-0023](../adr/adr-0023-no-map-printing.md) |
 | 3D / рельеф из DEM | **Не берём** | Non-goal |
 | Seamless maps, Name Search, Index Map | Позже | Возможные улучшения поиска/склейки карт |
+| Track Replay (проигрывание трека во времени) | Позже | Нет. «Где была группа в 14:30» отвечается таблицей точек с временами |
+| Track Move (сдвиг трека целиком) | Позже | Нет. В поиске почти не нужен: трек — это запись, а не чертёж |
+| Вложения к точке (фото находки) | Позже | Нет. Требует хранения файлов в `.ozp`, то есть смены формата |
+| Distance Between Waypoints | Позже | Нет. Линейка меряет что угодно, но не «от метки до метки» в один клик |
+| Сетка координат на карте (Lat/Lon, UTM) | Позже | Нет. Штабы описывают сектора координатами, так что сетка была бы к месту |
 
 > **GPS-устройства.** Целевые навигаторы пользователей (напр. Garmin **GPSMAP 78**) отдают
 > треки и точки файлами (GPX и родственные форматы), которые ozi-rs импортирует напрямую.
@@ -348,6 +353,8 @@ Command Palette, темизация, локализация (ru/en). «Сдел�
 
 Границы scope зафиксированы в [`requirements.md`](../requirements.md) (MVP Scope / Non-Goals)
 и [ADR-0020](../adr/adr-0020-mvp-scope.md). Терминология проекта — в [`glossary.md`](../glossary.md).
+
+> Сверено с кодом 2026-09-23.
 
 ## Источники
 
