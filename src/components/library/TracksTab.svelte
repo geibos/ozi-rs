@@ -17,6 +17,7 @@
    * switches the active layer first (see `layers` capability extension).
    */
   import { Button, buttonVariants } from "$lib/components/ui/button";
+  import { reportExported } from "$lib/actions/export-result";
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Popover from "$lib/components/ui/popover";
@@ -318,7 +319,10 @@
       defaultPath: defaultPath ?? `${t.name}.gpx`,
       filters: [{ name: "GPX", extensions: ["gpx"] }],
     } as Parameters<typeof open>[0]);
-    if (path) await exportGpx(t.layerId, path as string);
+    if (path) {
+      await exportGpx(t.layerId, path as string);
+      reportExported(path as string);
+    }
   }
 
   async function handleExportPlt(t: TrackFeature) {
@@ -328,7 +332,10 @@
       defaultPath: defaultPath ?? `${t.name}.plt`,
       filters: [{ name: "PLT", extensions: ["plt"] }],
     } as Parameters<typeof open>[0]);
-    if (path) await exportTrackPlt(t.layerId, t.trackId, path as string);
+    if (path) {
+      await exportTrackPlt(t.layerId, t.trackId, path as string);
+      reportExported(path as string);
+    }
   }
 
   /** Strip directories from a path for compact failure reporting. */

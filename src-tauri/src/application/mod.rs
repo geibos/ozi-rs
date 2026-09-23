@@ -2287,7 +2287,7 @@ fn infer_bundle_dir_from_map_path(
     Some(parent.to_path_buf())
 }
 
-fn reveal_in_file_manager(path: &std::path::Path) {
+pub(crate) fn reveal_in_file_manager(path: &std::path::Path) {
     #[cfg(target_os = "macos")]
     {
         let _ = std::process::Command::new("open").arg(path).spawn();

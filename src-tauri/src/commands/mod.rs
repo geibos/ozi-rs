@@ -2103,6 +2103,26 @@ pub fn reveal_bundle(state: State<SharedState>) -> Result<(), String> {
     Ok(())
 }
 
+/// Show a file the application just wrote, in the system's file manager.
+///
+/// CJ-6 ends with a file being handed to a group, and the last step of that
+/// is finding it. `reveal_bundle` only ever showed the active bundle's
+/// directory; an export could land anywhere the operator chose, and a path in
+/// a toast is not something anybody retypes at four in the morning.
+///
+/// Refuses a path that does not exist rather than opening a window on
+/// nothing.
+#[tauri::command]
+#[specta::specta]
+pub fn reveal_path(path: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    if !path.exists() {
+        return Err(format!("no such file: {}", path.display()));
+    }
+    crate::application::reveal_in_file_manager(&path);
+    Ok(())
+}
+
 // ── Track creation ────────────────────────────────────────────────────────────
 
 #[tauri::command]

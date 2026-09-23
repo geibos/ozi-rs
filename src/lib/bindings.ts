@@ -592,6 +592,25 @@ async revealBundle() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Show a file the application just wrote, in the system's file manager.
+ * 
+ * CJ-6 ends with a file being handed to a group, and the last step of that
+ * is finding it. `reveal_bundle` only ever showed the active bundle's
+ * directory; an export could land anywhere the operator chose, and a path in
+ * a toast is not something anybody retypes at four in the morning.
+ * 
+ * Refuses a path that does not exist rather than opening a window on
+ * nothing.
+ */
+async revealPath(path: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reveal_path", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async exportTrackPlt(layerId: number, trackId: number, path: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("export_track_plt", { layerId, trackId, path }) };

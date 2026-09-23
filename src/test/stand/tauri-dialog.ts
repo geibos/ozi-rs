@@ -31,6 +31,19 @@ export function standCancelDialogs(): void {
   plannedConfirm = false;
 }
 
+// Beside `__stand` and `__standWindow`. A stand walk that imports this module
+// by path can land in a second copy of it — Vite hands an edited module a
+// timestamped URL — and then plans an answer the application never sees, which
+// looks exactly like a dialog the screen forgot to open. Reaching through
+// `window` is reaching through the copy the application itself loaded.
+if (typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).__standDialog = {
+    answerWith: standAnswerDialogsWith,
+    cancel: standCancelDialogs,
+    calls: standDialogCalls,
+  };
+}
+
 export async function open(options?: unknown): Promise<string | null> {
   standDialogCalls.push({ kind: "open", options });
   return plannedAnswer;

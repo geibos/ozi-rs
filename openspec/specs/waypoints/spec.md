@@ -11,7 +11,9 @@ Covers waypoint layers as user data: placing, moving, renaming, deleting and hid
 - Changes `add-waypoint-visibility-toggle` and `fix-non-destructive-waypoint-rendering`: per-waypoint visibility outside the undo history and non-destructive marker updates; codified as: Multiple waypoints render simultaneously with per-waypoint visibility.
 
 - "System exports waypoints to GPX" was a target requirement with no command or UI behind it; the owner kept it on 2026-09-19 ("это по-любасу нужно") and it was implemented on 2026-09-21 — both the Waypoints tab row menu and the Waypoint Inspector offer GPX and WPT.
+
 ## Requirements
+
 ### Requirement: User can add a waypoint by clicking on the map
 
 The system SHALL allow the user to enter waypoint placement mode and click on the map to create a new waypoint in the active waypoint layer at the clicked coordinates as an undoable edit.
@@ -304,3 +306,27 @@ empty pane.
 - **WHEN** loading a waypoint's detail fails
 - **THEN** the operator is told rather than shown an empty inspector
 
+### Requirement: A mark carries a note
+
+A waypoint SHALL carry an optional note, and the operator SHALL be able to
+write and clear it from the Waypoint Inspector. Setting it SHALL be undoable.
+
+The name of a mark is the place; the note is what a crew is actually sent to.
+
+A mark with no note SHALL hold none, which is not the same as holding an empty
+one: clearing the field means the mark has nothing to say.
+
+#### Scenario: Writing a note
+
+- **WHEN** the operator writes a note on a mark and leaves the field
+- **THEN** the note is saved with the mark and undo takes it back
+
+#### Scenario: Clearing a note
+
+- **WHEN** the operator empties the note field
+- **THEN** the mark holds no note rather than an empty one
+
+#### Scenario: A project saved before notes existed
+
+- **WHEN** such a project is opened
+- **THEN** its marks load with no notes and nothing else about them changes

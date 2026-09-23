@@ -52,8 +52,72 @@ const TRANSPARENT_PNG = Uint8Array.from([
  * Without it the stand leaves the app mid-flight: `load_projects` sets the
  * "refreshing…" hint, and only a state update clears it, so the hint sat there
  * forever and the first screen always looked like it was still loading.
+ *
+ * This list held two names until 2026-09-23 and the application emits after
+ * fifty-four, which made the stand produce defects that do not exist: the
+ * unsaved-changes indicator never turned after an edit, because the only thing
+ * that tells the interface a command landed is this event. A screen that
+ * refreshes itself hid the gap; a screen that waits for the event looked
+ * broken here and worked in the packaged application — the exact inversion the
+ * stand exists to prevent. `stand-emits-what-the-app-emits.test.ts` keeps the
+ * two in step.
  */
-const EMITS_STATE_CHANGED = new Set(["preview_project", "set_bundles_root"]);
+const EMITS_STATE_CHANGED = new Set([
+  "add_waypoint",
+  "cancel_drawing",
+  "create_empty_track",
+  "create_track_layer",
+  "create_waypoint_layer",
+  "crop_track_to_extent",
+  "crop_track_to_time",
+  "delete_track",
+  "delete_track_layer",
+  "delete_track_point",
+  "delete_waypoint",
+  "delete_waypoint_layer",
+  "export_all_tracks_gpx",
+  "export_gpx",
+  "export_gpx_waypoints",
+  "export_wpt_waypoints",
+  "import_gpx",
+  "import_plt",
+  "import_tracks_directory",
+  "import_wpt",
+  "insert_track_point",
+  "join_segments",
+  "load_project",
+  "load_project_file",
+  "load_projects",
+  "move_track_point",
+  "move_waypoint",
+  "new_project",
+  "open_local_bundle",
+  "open_selected_map",
+  "preview_project",
+  "redo",
+  "rename_track",
+  "rename_track_layer",
+  "rename_waypoint",
+  "rename_waypoint_layer",
+  "save_project",
+  "set_all_tracks_visible",
+  "set_all_waypoints_visible",
+  "set_bundles_root",
+  "set_track_color",
+  "set_track_line_width",
+  "set_waypoint_color",
+  "set_waypoint_description",
+  "set_waypoint_symbol",
+  "show_only_track",
+  "show_only_waypoint",
+  "simplify_track",
+  "sort_track_points",
+  "split_segment",
+  "toggle_track_visible",
+  "toggle_waypoint_visible",
+  "trim_track_at_point",
+  "undo",
+]);
 
 const ACCEPTED_WITHOUT_DATA = new Set([
   "set_all_tracks_visible",
@@ -294,6 +358,75 @@ const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
  */
 let projectEmptied = false;
 
+/**
+ * Whether the project in hand differs from the project on disk.
+ *
+ * The real application marks the project changed from two places — every
+ * undoable `ProjectCommand` and every style setter — and clears it on save, on
+ * loading a file and on starting a new search. The stand served the fixture's
+ * fixed `project_dirty: false`, so the dot in the title bar could never
+ * appear and the close guard could never fire. CJ-7 is entirely about "did my
+ * work survive", and it was the one journey that could not be walked here at
+ * all: an edit, a save and a close all looked identical.
+ */
+let standProjectDirty = false;
+
+/** Where the project was last written, once a save has answered a dialog. */
+let standSavedPath: string | null = null;
+
+/** Commands after which the project in hand matches the one on disk. */
+const MAKES_THE_PROJECT_CLEAN = new Set([
+  "save_project",
+  "load_project_file",
+  "new_project",
+]);
+
+/**
+ * Commands that touch the session rather than the project: the bundle
+ * catalogue, the active raster, where bundles live. None of them is work a
+ * coordinator would lose.
+ */
+const LEAVES_THE_PROJECT_ALONE = new Set([
+  "preview_project",
+  // Reading the catalogue, not the project. Missing it here was the first
+  // thing this model got wrong: `load_projects` runs on every start, so the
+  // stand opened with the dot already on and the indicator meant nothing.
+  "load_projects",
+  "load_project",
+  "open_local_bundle",
+  "open_selected_map",
+  "set_bundles_root",
+]);
+
+/** Asking, writing out and cancelling all leave the project as it was. */
+const READ_ONLY_PREFIXES = ["get_", "list_", "export_", "cancel_", "reveal_"];
+
+/**
+ * Stated as "everything changes the project unless it is listed", so a command
+ * added tomorrow marks it changed without anybody remembering to come here.
+ * The cost of that default being wrong is a stray dot in a title bar; the cost
+ * of the other default is a journey that quietly stops being walkable.
+ */
+export function standCommandChangesTheProject(command: string): boolean {
+  if (MAKES_THE_PROJECT_CLEAN.has(command)) return false;
+  if (READ_ONLY_PREFIXES.some((prefix) => command.startsWith(prefix))) {
+    return false;
+  }
+  return !LEAVES_THE_PROJECT_ALONE.has(command);
+}
+
+function noteProjectMutation(command: string, args: Args | undefined): void {
+  if (MAKES_THE_PROJECT_CLEAN.has(command)) {
+    standProjectDirty = false;
+    if (command === "save_project" && typeof args?.path === "string") {
+      standSavedPath = args.path;
+    }
+    if (command === "new_project") standSavedPath = null;
+    return;
+  }
+  if (standCommandChangesTheProject(command)) standProjectDirty = true;
+}
+
 function previewedAppState(): AppStateDto {
   const fixture =
     requestedState() === "cold" ? coldStartFixture : appStateFixture;
@@ -303,6 +436,9 @@ function previewedAppState(): AppStateDto {
   let base: AppStateDto = {
     ...fixture,
     tracks: [...withEditedCounts(fixture.tracks), ...importedTracks],
+    project_dirty: standProjectDirty,
+    project_saved: standSavedPath !== null || fixture.project_saved,
+    project_path: standSavedPath ?? fixture.project_path,
   };
   if (projectEmptied) {
     // Everything the search held goes; the bundle and the active raster stay,
@@ -540,6 +676,7 @@ const HANDLERS: StandAnswers = {
   },
   cancel_download: () => true,
   set_waypoint_description: () => null,
+  reveal_path: () => null,
 
   // ── Track editing ──────────────────────────────────────────────────────
   //
@@ -798,6 +935,7 @@ if (typeof window !== "undefined") {
 
 export async function invoke<T>(command: string, args?: Args): Promise<T> {
   standCalls.push({ command, args });
+  noteProjectMutation(command, args);
 
   if (
     requestedFailure() === "catalogue" &&

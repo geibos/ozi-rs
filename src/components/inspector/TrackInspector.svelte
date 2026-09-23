@@ -13,6 +13,7 @@
    * endpoints in `src/lib/api.ts`. No direct store mutation. No new IPC.
    */
   import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
+  import { reportExported } from "$lib/actions/export-result";
   import { reportEditFailure } from "$lib/edit-failure";
   import CalendarClockIcon from "@lucide/svelte/icons/calendar-clock";
   import CropIcon from "@lucide/svelte/icons/crop";
@@ -147,7 +148,10 @@
         defaultPath: defaultPath ?? `${s.name}.gpx`,
         filters: [{ name: "GPX", extensions: ["gpx"] }],
       } as Parameters<typeof open>[0]);
-      if (path) await exportGpx(sel.layerId, path as string);
+      if (path) {
+        await exportGpx(sel.layerId, path as string);
+        reportExported(path as string);
+      }
     } catch (error) {
       toast.error($t("trackInspector.exportGpxFailed"), {
         description: String(error),
@@ -166,7 +170,10 @@
         defaultPath: defaultPath ?? `${s.name}.plt`,
         filters: [{ name: "PLT", extensions: ["plt"] }],
       } as Parameters<typeof open>[0]);
-      if (path) await exportTrackPlt(sel.layerId, sel.trackId, path as string);
+      if (path) {
+        await exportTrackPlt(sel.layerId, sel.trackId, path as string);
+        reportExported(path as string);
+      }
     } catch (error) {
       toast.error($t("trackInspector.exportPltFailed"), {
         description: String(error),

@@ -25,6 +25,7 @@
    *   - `⌘R` / `Ctrl+R` — Reveal in Finder for map results
    */
   import { goto } from "$app/navigation";
+  import { reportExported } from "$lib/actions/export-result";
   import { resolve } from "$app/paths";
   import { get } from "svelte/store";
   import * as Dialog from "$lib/components/ui/dialog";
@@ -302,7 +303,10 @@
         defaultPath: defaultPath ?? `${name}.gpx`,
         filters: [{ name: "GPX", extensions: ["gpx"] }],
       });
-      if (path) await exportGpx(layerId, path);
+      if (path) {
+        await exportGpx(layerId, path);
+        reportExported(path as string);
+      }
     } catch (error) {
       toast.error($i18n("palette.exportTrackFailed"), {
         description: String(error),
@@ -317,7 +321,10 @@
         defaultPath: defaultPath ?? "waypoints.wpt",
         filters: [{ name: "OziExplorer WPT", extensions: ["wpt"] }],
       });
-      if (path) await exportWptWaypoints(layerId, path);
+      if (path) {
+        await exportWptWaypoints(layerId, path);
+        reportExported(path as string);
+      }
     } catch (error) {
       toast.error($i18n("palette.exportWaypointsFailed"), {
         description: String(error),

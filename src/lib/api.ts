@@ -305,6 +305,16 @@ export async function renameTrack(
  * and no history. The bundle and the active raster stay — the map is the
  * ground, the project is the work on it.
  */
+/**
+ * Show a file in the system's file manager.
+ *
+ * CJ-6 ends with a file handed to a group, and the last step of that is
+ * finding it. A path in a toast is not something anybody retypes.
+ */
+export async function revealPath(path: string): Promise<void> {
+  await unwrap("reveal_path", commands.revealPath(path));
+}
+
 export async function newProject(): Promise<void> {
   await unwrap("new_project", commands.newProject());
 }

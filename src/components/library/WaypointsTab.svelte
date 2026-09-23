@@ -13,6 +13,7 @@
    * `visible` flag, toggled through `toggle_waypoint_visible`.
    */
   import { get } from "svelte/store";
+  import { reportExported } from "$lib/actions/export-result";
   import { locale, t } from "$lib/i18n";
   import { layerDisplayName } from "$lib/layer-names";
   import { Button, buttonVariants } from "$lib/components/ui/button";
@@ -294,8 +295,10 @@
     try {
       if (format === "gpx") {
         await exportGpxWaypoints(layerId, path as string);
+        reportExported(path as string);
       } else {
         await exportWptWaypoints(layerId, path as string);
+        reportExported(path as string);
       }
     } catch (err) {
       toast.error(get(t)("waypointsTab.exportFailed"), {

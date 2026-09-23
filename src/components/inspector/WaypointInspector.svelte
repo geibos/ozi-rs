@@ -9,6 +9,7 @@
    * remains available through the project command bus).
    */
   import EyeIcon from "@lucide/svelte/icons/eye";
+  import { reportExported } from "$lib/actions/export-result";
   import { reportEditFailure } from "$lib/edit-failure";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
@@ -196,8 +197,10 @@
       if (!path) return;
       if (format === "gpx") {
         await exportGpxWaypoints(layerId, path as string);
+        reportExported(path as string);
       } else {
         await exportWptWaypoints(layerId, path as string);
+        reportExported(path as string);
       }
     } catch (error) {
       toast.error($t("inspector.exportFailed"), {
