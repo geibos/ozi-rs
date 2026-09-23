@@ -22,9 +22,22 @@ import type { LatLon } from "./geo";
  * would fit the screen better and be useless on the radio.
  */
 export const GRID_STEPS_DEGREES = [
-  10, 5, 2, 1,
-  30 / 60, 20 / 60, 10 / 60, 5 / 60, 2 / 60, 1 / 60,
-  30 / 3600, 20 / 3600, 10 / 3600, 5 / 3600, 2 / 3600, 1 / 3600,
+  10,
+  5,
+  2,
+  1,
+  30 / 60,
+  20 / 60,
+  10 / 60,
+  5 / 60,
+  2 / 60,
+  1 / 60,
+  30 / 3600,
+  20 / 3600,
+  10 / 3600,
+  5 / 3600,
+  2 / 3600,
+  1 / 3600,
 ] as const;
 
 export interface GridBounds {

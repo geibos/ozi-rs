@@ -561,6 +561,21 @@ export const editModeActive = writable(false);
  * Off by default — the map is usually read, not measured — and remembered per
  * machine, because a coordinator who wants it wants it every time.
  */
+/**
+ * Where the crew was at the moment the replay slider is on, or `null` when
+ * nothing is being played back.
+ *
+ * A recording is a list of places with times on them, and a headquarters asks
+ * the question the other way round — "where were they at half past two". The
+ * inspector works the position out; the map draws it.
+ */
+export const replayPosition = writable<{
+  lat: number;
+  lon: number;
+  atMs: number;
+  inGap: boolean;
+} | null>(null);
+
 export const graticuleVisible = writable(readStoredGraticule());
 
 function readStoredGraticule(): boolean {

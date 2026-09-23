@@ -391,9 +391,10 @@ are written down so the choice is the owner's rather than an omission.
   (`the-tape-catches-a-mark`): rather than OziExplorer's dialog of waypoint
   pairs, the ruler catches hold of a mark the click lands near, and names both
   when a measurement has a mark at each end.
-- **Track Replay.** Playing a recording back in time. "Where was the group at
-  half past two" is answered today by reading the points table, which has the
-  times in it — slower, but not missing.
+- ~~**Track Replay.**~~ Built on 2026-09-23
+  (`where-were-they-at-half-past-two`): a slider over the track's own clock, a
+  marker where the crew was, interpolated between recorded points, and a
+  silence longer than five minutes marked as a guess rather than a fix.
 - **Вложения к точке.** A photo attached to a mark — the found item, the
   footprint. This needs files inside the `.ozp`, which is a change to the
   format rather than a feature on top of it, and the format is the thing two

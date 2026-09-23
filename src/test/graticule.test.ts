@@ -83,8 +83,9 @@ describe("graticule", () => {
     for (const line of lines.filter((l) => l.kind === "lat")) {
       // Every line stands at a whole number of its step — that is what makes
       // it sayable.
-      expect(Math.abs(line.degrees / step - Math.round(line.degrees / step)))
-        .toBeLessThan(1e-9);
+      expect(
+        Math.abs(line.degrees / step - Math.round(line.degrees / step)),
+      ).toBeLessThan(1e-9);
     }
   });
 

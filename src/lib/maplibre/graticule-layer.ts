@@ -25,7 +25,10 @@ export interface GraticuleHandle {
   detach(): void;
 }
 
-function firstExistingLayer(map: maplibregl.Map, ids: string[]): string | undefined {
+function firstExistingLayer(
+  map: maplibregl.Map,
+  ids: string[],
+): string | undefined {
   for (const id of ids) {
     if (map.getLayer(id)) return id;
   }
@@ -123,8 +126,10 @@ function placeLabels(
   clearLabels();
   const bounds = map.getBounds();
   // A little inside the edge, so the text is not half off the canvas.
-  const lonAtLeft = bounds.getWest() + (bounds.getEast() - bounds.getWest()) * 0.02;
-  const latAtTop = bounds.getNorth() - (bounds.getNorth() - bounds.getSouth()) * 0.02;
+  const lonAtLeft =
+    bounds.getWest() + (bounds.getEast() - bounds.getWest()) * 0.02;
+  const latAtTop =
+    bounds.getNorth() - (bounds.getNorth() - bounds.getSouth()) * 0.02;
 
   for (const line of lines) {
     const at =

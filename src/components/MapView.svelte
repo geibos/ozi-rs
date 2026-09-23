@@ -22,6 +22,7 @@
     measuringActive,
     measuredPoints,
     graticuleVisible,
+    replayPosition,
     setMeasuring,
     ringActive,
     ringCentre,
@@ -132,6 +133,48 @@
    */
   /** "ШТАБ → ЗАБРОС", when the tape caught a mark at both ends. */
   const measuredMarks = $derived(measuredBetween($measuredPoints));
+
+  /**
+   * Where the crew was at the moment the replay slider is on.
+   *
+   * A marker rather than a layer: it is one point, it moves on every frame of
+   * a playback, and a source rewritten ten times a second is a source that
+   * makes the map stutter.
+   */
+  let replayMarker: maplibregl.Marker | null = null;
+
+  $effect(() => {
+    const at = $replayPosition;
+    if (!map) return;
+    if (at === null) {
+      replayMarker?.remove();
+      replayMarker = null;
+      return;
+    }
+    if (replayMarker === null) {
+      const element = document.createElement("div");
+      element.setAttribute("data-testid", "replay-marker");
+      element.style.cssText = [
+        "width: 16px",
+        "height: 16px",
+        "border-radius: 50%",
+        "border: 2px solid #fff",
+        "box-shadow: 0 0 0 1px rgba(0,0,0,0.5)",
+        "pointer-events: none",
+      ].join(";");
+      replayMarker = new maplibregl.Marker({ element }).setLngLat([
+        at.lon,
+        at.lat,
+      ]);
+      replayMarker.addTo(map);
+    } else {
+      replayMarker.setLngLat([at.lon, at.lat]);
+    }
+    // Amber in a silence: the position there is interpolated across a gap the
+    // navigator did not record, and it should not look like a fix.
+    const element = replayMarker.getElement();
+    element.style.background = at.inGap ? "#f59e0b" : "#2563eb";
+  });
 
   let graticuleHandle: GraticuleHandle | null = null;
 

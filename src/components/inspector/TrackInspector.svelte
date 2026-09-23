@@ -12,6 +12,7 @@
    * All actions dispatch through the existing `ProjectCommand`-shaped
    * endpoints in `src/lib/api.ts`. No direct store mutation. No new IPC.
    */
+  import { onDestroy } from "svelte";
   import ArrowUpDownIcon from "@lucide/svelte/icons/arrow-up-down";
   import { reportExported } from "$lib/actions/export-result";
   import { reportEditFailure } from "$lib/edit-failure";
@@ -23,6 +24,12 @@
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
   import LineChartIcon from "@lucide/svelte/icons/line-chart";
   import { elevationProfile, profilePath } from "$lib/elevation-profile";
+  import {
+    formatMoment,
+    positionAt,
+    replayRange,
+  } from "$lib/track-replay";
+  import { replayPosition } from "$lib/stores";
   import LocateIcon from "@lucide/svelte/icons/locate";
   import SlidersHorizontalIcon from "@lucide/svelte/icons/sliders-horizontal";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
@@ -67,6 +74,75 @@
   const elevation = $derived(
     trackDetail ? elevationProfile(trackDetail.segments) : null,
   );
+
+  /**
+   * Playing the recording back.
+   *
+   * "Where were they at half past two" is answered from the points table today
+   * by scrolling a few thousand rows looking for a timestamp. OziExplorer has
+   * Track Replay for it, and a coordinator who has used it misses it here.
+   */
+  const replay = $derived(trackDetail ? replayRange(trackDetail.segments) : null);
+  let replayAtMs = $state<number | null>(null);
+  let playing = $state(false);
+  let playTimer: number | null = null;
+
+  /** The slider starts at the beginning of whichever track is selected. */
+  $effect(() => {
+    const range = replay;
+    replayAtMs = range ? range.fromMs : null;
+    stopPlaying();
+  });
+
+  /** Position follows the moment, and the map draws it. */
+  $effect(() => {
+    const detail = trackDetail;
+    const moment = replayAtMs;
+    if (!detail || moment === null) {
+      replayPosition.set(null);
+      return;
+    }
+    replayPosition.set(positionAt(detail.segments, moment));
+  });
+
+  function stopPlaying() {
+    playing = false;
+    if (playTimer !== null) {
+      window.clearInterval(playTimer);
+      playTimer = null;
+    }
+  }
+
+  function togglePlaying() {
+    if (playing) {
+      stopPlaying();
+      return;
+    }
+    const range = replay;
+    if (!range) return;
+    // A minute of the recording per tick, ten ticks a second: a six-hour walk
+    // plays in a minute, which is about as long as anybody watches.
+    const step = 60_000;
+    if (replayAtMs === null || replayAtMs >= range.toMs) {
+      replayAtMs = range.fromMs;
+    }
+    playing = true;
+    playTimer = window.setInterval(() => {
+      if (replayAtMs === null) return;
+      const next = replayAtMs + step;
+      if (next >= range.toMs) {
+        replayAtMs = range.toMs;
+        stopPlaying();
+        return;
+      }
+      replayAtMs = next;
+    }, 100);
+  }
+
+  onDestroy(() => {
+    stopPlaying();
+    replayPosition.set(null);
+  });
   let detailKey = $state<string | null>(null);
   let lineWidthDraft = $state(3);
 
@@ -468,6 +544,53 @@
     {:else}
       <p class="text-muted-foreground text-[11px]">
         {$t("inspector.elevationNone")}
+      </p>
+    {/if}
+  </section>
+
+  <!-- Playing the recording back: "where were they at half past two". -->
+  <section
+    class="bg-card border-border space-y-1.5 rounded-[var(--radius-card)] border p-3"
+  >
+    <h3 class="flex items-baseline justify-between text-xs font-semibold">
+      <span>{$t("inspector.replay")}</span>
+      {#if replay && replayAtMs !== null}
+        <span
+          class="text-muted-foreground font-mono text-[11px]"
+          data-testid="replay-moment">{formatMoment(replayAtMs)}</span
+        >
+      {/if}
+    </h3>
+    {#if replay && replayAtMs !== null}
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="border-border h-6 rounded-sm border px-2 text-[11px]"
+          onclick={togglePlaying}
+          data-testid="replay-play"
+        >
+          {playing ? $t("inspector.replayPause") : $t("inspector.replayPlay")}
+        </button>
+        <input
+          type="range"
+          class="flex-1"
+          min={replay.fromMs}
+          max={replay.toMs}
+          step={1000}
+          bind:value={replayAtMs}
+          oninput={stopPlaying}
+          data-testid="replay-slider"
+          aria-label={$t("inspector.replay")}
+        />
+      </div>
+      {#if $replayPosition?.inGap}
+        <p class="text-[11px] text-amber-600" data-testid="replay-gap">
+          {$t("inspector.replayGap")}
+        </p>
+      {/if}
+    {:else}
+      <p class="text-muted-foreground text-[11px]">
+        {$t("inspector.replayNone")}
       </p>
     {/if}
   </section>

@@ -232,6 +232,13 @@ const dictionaries = {
     "inspector.hideTrack": "Hide track",
     "inspector.showTrack": "Show track",
     "inspector.elevation": "Elevation",
+    "inspector.replay": "Where they were",
+    "inspector.replayNone":
+      "The recording carries no times, so there is nothing to play back",
+    "inspector.replayGap":
+      "no signal here — the line across the gap is a guess",
+    "inspector.replayPlay": "Play",
+    "inspector.replayPause": "Pause",
     "inspector.elevationNone": "This recording carries no elevation",
     "inspector.elevationRange": "{min}–{max} m",
     "inspector.elevationChart": "Elevation along the track",
@@ -657,6 +664,12 @@ const dictionaries = {
     "inspector.hideTrack": "Скрыть трек",
     "inspector.showTrack": "Показать трек",
     "inspector.elevation": "Высота",
+    "inspector.replay": "Где были",
+    "inspector.replayNone":
+      "В записи нет времён — проигрывать нечего",
+    "inspector.replayGap": "здесь связи не было — линия через пропуск это догадка",
+    "inspector.replayPlay": "Пуск",
+    "inspector.replayPause": "Пауза",
     "inspector.elevationNone": "В этой записи нет высоты",
     "inspector.elevationRange": "{min}–{max} м",
     "inspector.elevationChart": "Высота вдоль трека",

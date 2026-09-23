@@ -52,9 +52,9 @@ describe("snapToWaypoint", () => {
     ];
     const click = { lat: 59.9, lon: 30.3002 };
     expect(snapToWaypoint(click, together, project).name).toBe("первая");
-    expect(
-      snapToWaypoint(click, [...together].reverse(), project).name,
-    ).toBe("вторая");
+    expect(snapToWaypoint(click, [...together].reverse(), project).name).toBe(
+      "вторая",
+    );
   });
 
   it("measures the reach on screen, not on the ground", () => {
@@ -63,7 +63,10 @@ describe("snapToWaypoint", () => {
     // operator is actually doing.
     const click = { lat: 59.9, lon: 30.32 };
     const zoomedOut = (at: LatLon) => ({ x: at.lon * 100, y: -at.lat * 100 });
-    const zoomedIn = (at: LatLon) => ({ x: at.lon * 10000, y: -at.lat * 10000 });
+    const zoomedIn = (at: LatLon) => ({
+      x: at.lon * 10000,
+      y: -at.lat * 10000,
+    });
     expect(snapToWaypoint(click, marks, zoomedOut).name).toBe("ШТАБ");
     expect(snapToWaypoint(click, marks, zoomedIn).name).toBe(null);
   });
