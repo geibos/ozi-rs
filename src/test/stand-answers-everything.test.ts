@@ -70,6 +70,29 @@ describe("the stand answers every command", () => {
     ).toEqual([]);
   });
 
+  /**
+   * Tauri rejects an `invoke` with the `Err(String)` the command returned, and
+   * the interface shows what it is handed. The stand threw `Error` objects, so
+   * every failure screen here read "{}" where the packaged application shows
+   * the reason — which makes an error screen, the thing least often looked at,
+   * the thing least worth looking at. The one exception is a command with no
+   * fixture: that is a defect in the stand, not in the application, and it
+   * should arrive loudly and with a stack.
+   */
+  it("rejects a command the way Tauri rejects one", () => {
+    const thrown = [...standCore.matchAll(/throw new Error\(([\s\S]{0,80})/g)].map(
+      (m) => m[1].replace(/\s+/g, " ").trim(),
+    );
+    const unexpected = thrown.filter(
+      (text) => !text.includes("stand: no fixture answers"),
+    );
+    expect(
+      unexpected,
+      "throw the string the Rust command would have returned, not an Error: " +
+        "an interface that renders the rejection shows `{}` for an Error.",
+    ).toEqual([]);
+  });
+
   it("does not carry reasons for commands that no longer exist", () => {
     const commands = new Set(
       [...bindings.matchAll(/TAURI_INVOKE\("([a-z0-9_]+)"/g)].map((m) => m[1]),

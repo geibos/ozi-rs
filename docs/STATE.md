@@ -5,6 +5,32 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
+Two OpenSpec changes are left — `codify-architecture-decisions`, which needs
+the owner's review before its 63 requirements merge, and `revive-ui-cycle`.
+Everything else is archived; three more closed on 2026-09-23
+(`a-note-on-the-mark`, `walking-cj4`, `every-export-says-so`,
+`a-tolerance-in-metres`).
+
+Last merged slice: **a tolerance in metres** (2026-09-23) — the owner reported
+that simplification cleans a track far too hard, and it did: the slider is
+labelled «Допуск: {n} м» and its number went into a Rust parameter called
+`tolerance` whose unit, recorded in a doc comment three files away, was
+kilometres. One metre simplified at one kilometre; there was no setting at
+which the control did anything but destroy the track. The unit now lives in the
+name — `tolerance_m` / `toleranceM` out to the generated bindings — and a test
+reads the bindings to keep it there. Two things had hidden it: the domain tests
+all passed kilometres, correctly, so the algorithm was proved right about a
+question nobody was asking; and the stand's preview kept every second point
+whatever the slider said.
+
+Before it, **every export says so** (2026-09-23): four of the five ways out of
+the application were silent on success, and walking CJ-6 found it. The same
+walk found three defects in the stand rather than the product — it emitted
+`state-changed` after two commands where the application emits after
+fifty-four, it served a fixed `project_dirty: false`, and its window registered
+the close guard and never fired it. CJ-6 and CJ-7 now walk end to end, and
+three tests read the Rust to keep the stand honest.
+
 Fifty-five changes were archived on 2026-09-22 and their requirements are in
 the baseline. Two are left: `codify-architecture-decisions`, which needs the
 owner's review before its 63 requirements merge, and `revive-ui-cycle`, which

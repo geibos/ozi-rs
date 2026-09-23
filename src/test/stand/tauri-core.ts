@@ -662,9 +662,7 @@ const HANDLERS: StandAnswers = {
     // them reported "5 из 5", which is the one thing a mixed drop exists to
     // tell the truth about. Found walking CJ-3 on 2026-09-23.
     if (/\.[a-z0-9]{1,5}$/i.test(label)) {
-      throw new Error(
-        `не удалось прочитать каталог: ${label} — это файл, а не папка`,
-      );
+      throw `не удалось прочитать каталог: ${label} — это файл, а не папка`;
     }
     importOneLayer(label, 3);
     // Counts, not a sentence: the interface does the wording now. One file is
@@ -825,7 +823,7 @@ const HANDLERS: StandAnswers = {
   // inspector expects this to fail for them. Answering an error is the
   // faithful thing.
   get_ozi_metadata: () => {
-    throw new Error("stand: this map is not an OZF2 raster");
+    throw "не OZF2-растр: у этой карты нет такой метаинформации";
   },
   // A project is one search. The stand answers by emptying what this session
   // has accumulated, so the effect is on the screen rather than implied.
@@ -964,9 +962,11 @@ export async function invoke<T>(command: string, args?: Args): Promise<T> {
     requestedFailure() === "catalogue" &&
     (command === "load_projects" || command === "preview_project")
   ) {
-    throw new Error(
-      "bundle listing unreachable and not cached: error sending request for url (https://maps.lizaalert.ru/maps/)",
-    );
+    // A string, not an `Error`: Tauri rejects an `invoke` with the `Err(String)`
+    // the command returned, and the interface shows what it is handed. Throwing
+    // an `Error` here made every failure screen on the stand read "{}" where
+    // the packaged application shows the reason.
+    throw "bundle listing unreachable and not cached: error sending request for url (https://maps.lizaalert.ru/maps/)";
   }
 
   if (EMITS_STATE_CHANGED.has(command)) {
