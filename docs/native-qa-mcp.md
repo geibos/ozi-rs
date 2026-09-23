@@ -86,6 +86,38 @@ machine may need independent grants for:
 Grant Screen Recording for Tier 1 screenshots and Accessibility for Appium Mac2
 UI actions, then restart the affected host process so macOS applies the grant.
 
+#### Granting it, step by step
+
+The grant is the owner's to give — macOS will not accept it from a script, by
+design. It has been lost twice, both times to an Xcode update, and each time
+the symptom was the same and unhelpful: `capture_screenshot` answers with a
+completely black frame and no error, and the Mac2 driver host dies the moment a
+session starts. Neither says "permission".
+
+1. **System Settings → Privacy & Security → Screen & System Audio Recording.**
+   Add the terminal application the agent runs in (Terminal, iTerm, or the
+   Claude Code host). If it is already listed, switch it off and on again —
+   after an OS update the entry survives while the grant behind it does not.
+2. **System Settings → Privacy & Security → Accessibility.** Add the same
+   application. Appium's Mac2 driver clicks through the accessibility API, and
+   without this every `appium_click` fails with an element it cannot see.
+3. **Quit and reopen that application.** macOS applies a TCC grant when the
+   process starts, not when the switch is flipped; a running process keeps the
+   old answer until it is restarted.
+4. **Check it took**, rather than trusting the switch:
+
+   ```
+   cargo run -p ozi-rs-mcp -- --self-check     # the server is reachable
+   just smoke                                  # a journey clicks the real app
+   ```
+
+   A black screenshot after step 3 means the grant went to a different process
+   than the one running the tools — most often the terminal was granted while
+   the agent runs inside an editor, or the other way round.
+
+The grant is per host process and does not transfer between machines, between
+terminal applications, or across a major OS upgrade.
+
 ## Repo-root resolution
 
 `config::repo_root()` finds the ozi-rs repository:

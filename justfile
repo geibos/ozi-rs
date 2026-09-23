@@ -52,12 +52,13 @@ run-release:
 # pre-merge gate for any change touching the app: run it before merging.
 # Requires a `just build` artifact and a running Appium server
 # (`appium --address 127.0.0.1 --port 4723`, driver: `appium driver install mac2`).
-smoke:
+# Run the desktop smoke journeys. `just smoke cj3` runs one of them.
+smoke filter="":
     # `--test-threads=1`: each journey drives the real application through a
     # Mac2 session that owns the screen. Two of them at once click into each
     # other's window — the first time a second journey was added, both failed,
     # including the one that had just passed on its own.
-    cargo test --manifest-path tools/ozi-rs-mcp/Cargo.toml --test smoke_core_workflow -- --ignored --nocapture --test-threads=1
+    cargo test --manifest-path tools/ozi-rs-mcp/Cargo.toml --test smoke_core_workflow {{filter}} -- --ignored --nocapture --test-threads=1
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 

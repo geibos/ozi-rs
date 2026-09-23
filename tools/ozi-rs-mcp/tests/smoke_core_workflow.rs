@@ -1,5 +1,28 @@
 //! E2E smoke gate: drives the REAL app through the core editing workflow.
 //!
+//! # One journey per Customer Journey
+//!
+//! The journeys here are named `smoke_cj<N>_<what>` after the entries in
+//! `docs/customer-journeys.md`, so `just smoke cj3` runs one of them and the
+//! naming says which part of the product a failure is about. Where a CJ has no
+//! journey yet, this is what it is waiting for — written down rather than left
+//! as an empty test that passes:
+//!
+//! | CJ | Journey | State |
+//! |----|---------|-------|
+//! | 1. Download maps before setting out | — | needs a fake catalogue server; the real one is a thousand pages and a live dependency |
+//! | 2. Field start with no network | — | needs a launch with the link down and a cached bundle staged in a temp bundles root |
+//! | 3. Collect a day's tracks | `smoke_cj3_layer_management` | layers only; the import half needs fixture `.gpx`/`.plt`/`.wpt`/`.zip` files and a file dialog the Mac2 driver can answer |
+//! | 4. Clean up a track | — | needs a track in the project before the journey starts, which means loading a fixture `.ozp` at launch |
+//! | 5. Plan the work | `smoke_cj5_draw_track` | drawing is covered end to end |
+//! | 6. Hand the data out | — | blocked on the same file dialog as CJ-3's import half |
+//! | 7. Do not lose the work | — | the close guard cannot be walked: dismissing a native quit dialog ends the Mac2 session |
+//! | 8. Exchange projects between headquarters | — | needs two bundles root directories and a project file moved between them |
+//!
+//! The stand (`just stand`) walks all eight, and has found the defects in most
+//! of them. It is not evidence for the desktop (ADR-0024); this file is, and
+//! the gap above is the honest size of that evidence today.
+//!
 //! Scenario (every step asserts, nothing passes silently):
 //!   1. Mac2 session launches the bundled app (`ru.lizaalert.ozi-rs`).
 //!   2. Workspace renders (accessibility tree contains the Library tabs) —
@@ -184,7 +207,7 @@ fn click_any_label(server: &str, sid: &str, labels: &[&str]) -> bool {
 /// (`appium_type_text` reached a keyboard shortcut instead of the field).
 #[test]
 #[ignore = "requires built app + Appium Mac2 server; run via `just smoke`"]
-fn smoke_layer_management() {
+fn smoke_cj3_layer_management() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)
@@ -305,7 +328,7 @@ fn smoke_layer_management() {
 
 #[test]
 #[ignore = "requires built app + Appium Mac2 server; run via `just smoke`"]
-fn smoke_core_workflow_draw_track() {
+fn smoke_cj5_draw_track() {
     let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)

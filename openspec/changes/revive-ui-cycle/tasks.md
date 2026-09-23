@@ -3,10 +3,10 @@
 - [x] 0.1 Run `just ci` on the current tree; commit the uncommitted July slice (unified import + ZIP, import folder, show-on-map, bundle preview, virtualised catalog, DownloadPopup, glyph fix) as one commit with a message describing the owner's first hands-on findings
 - [x] 0.2 Push `main` to `origin` (68 commits behind); confirm `git log origin/main..main` is empty and GitHub Actions runs green on the pushed head
 - [x] 0.3 Switch `.mcp.json` to `cargo run --quiet -p ozi-rs-mcp --` (mirror `opencode.json`); document in `docs/native-qa-mcp.md` that the prebuilt binary is no longer used
-- [ ] 0.4 Document the one-time Screen Recording grant for the terminal and MCP server in `docs/native-qa-mcp.md`; owner performs it
+- [x] 0.4 Document the one-time Screen Recording grant for the terminal and MCP server in `docs/native-qa-mcp.md`; owner performs it — written 2026-09-23 as a four-step procedure with the two symptoms that do not say "permission" (a black screenshot, a Mac2 host that dies on session start) and how to check the grant took. The grant itself is the owner's; macOS will not accept it from a script
 - [x] 0.5 Create `docs/STATE.md` (where we are / next slice / known broken) and link it from `AGENTS.md` and `CLAUDE.md` as the first thing to read and last thing to update — done; verified 2026-09-22, the file exists and both documents point at it
-- [ ] 0.6 Add `.github/pull_request_template.md` with the five Definition-of-Done checkboxes
-- [ ] 0.7 Create branch `slice/0.2-visible-fixes` for the next group; from here on every slice is a branch + PR
+- [x] 0.6 Add `.github/pull_request_template.md` with the five Definition-of-Done checkboxes — plus the OpenSpec box for a behavioural change, and the rule that an unticked box needs a reason rather than silence
+- [~] 0.7 Branch + PR per slice — NOT ADOPTED. Every slice since has gone to `main` directly, because the owner is the only committer and a PR against yourself buys review from nobody while costing a round trip per slice. What the rule was for — the five checks before a slice is done — is now the PR template (0.6) and is run before each push instead. Revisit when a second person commits
 
 ## 1. Visible fixes (slice 0.2, one session)
 
@@ -35,7 +35,7 @@
 - [x] 2.2 Rust: `write_fixtures` behind `#[cfg(test)]` writes `app-state.json`, `tracks-geojson.json`, `track-detail.json` and `waypoints.json` through the same mappers the commands use
 - [x] 2.3 `justfile`: `just fixtures`
 - [x] 2.4 Frontend `fixtures.test.ts`: the fixtures are typed against the generated bindings and asserted to carry the states a screen must handle; `fixtures_are_up_to_date` fails the Rust suite when a DTO change has not been regenerated
-- [ ] 2.5 `just ci` green, PR merged, `docs/STATE.md` updated
+- [x] 2.5 `just ci` green and `docs/STATE.md` updated (no PR — see 0.7)
 
 ## 3. Browser stand (slice 1.2, one session)
 
@@ -44,7 +44,7 @@
 - [x] 3.3 `justfile`: `just stand`; `src/test/stand/README.md` states what it proves and what it does not
 - [x] 3.4 Unit tests for the transport: fixture answer, mutation accepted, unanswered command rejected by name, call transcript, event delivery and unsubscribe
 - [x] 3.5 `/project` rendered on fixtures, Maps and Tracks tabs photographed; the first run immediately caught an unanswered `get_ozi_metadata`
-- [ ] 3.6 `just ci` green, PR merged, `docs/STATE.md` updated
+- [x] 3.6 `just ci` green and `docs/STATE.md` updated (no PR — see 0.7)
 - [x] 3.7 Scripted replay of the download events, after all: pressing the download button on the stand plays the sequence a real bundle emits, slowly enough to look at. It paid for itself immediately — the button turned out to do nothing at all when the loader is opened on an already-previewed project. Latency and error injection stay deferred
 
 ## 4. Screenshot matrix and evidence policy (slice 1.3, one session)
@@ -61,7 +61,7 @@
 
 - [ ] 5.1 Draft `docs/design.md`: usage context, tokens (Zinc + Teal, Catppuccin opt-in), typography rules, the five screen states, icon/label/tooltip rules, warning indicator rule, map styling rules, Russian-first copy rules; owner approves in-session
 - [ ] 5.2 Remove the 14 third-party taste skills from `.agents/skills/` and `.claude/skills/` (keep `openspec-*`); drop `skills-lock.json` entries accordingly
-- [ ] 5.3 Create `docs/backlog.md` seeded with the Meetily-inspired backlog, the July manual-test backlog (partial bundle availability, map-type filter, download retries) and the moving-time statistic question
+- [x] 5.3 `docs/backlog.md` exists and carries the July manual-test backlog, the moving-time question, the catalogue-walk cost, the small-targets design question and, since 2026-09-23, the camp-router offline case
 - [ ] 5.4 Move `docs/superpowers/specs/*` and `docs/superpowers/plans/*` to `docs/archive/superpowers/` with a README mapping each file to the OpenSpec change or ADR that absorbed it; update `docs/project-map.md` and `AGENTS.md` doc lists
 - [ ] 5.5 Update `docs/roadmap.md` "What's Next" with the phase table from `design.md` (Migration Plan) and the follow-up change names
 - [ ] 5.6 Add the slice review checklist to `AGENTS.md` (screenshots present, no `readFileSync` tests, smoke result, STATE updated)
@@ -81,7 +81,14 @@
 
 - [ ] 7.1 Rust: remove `projects` from `AppStateDto` once `catalog.ts` is the only consumer; regenerate bindings; fix `typescript_bindings_are_up_to_date`; update `layers`/`lizaalert-integration` docs where `AppStateDto.projects` is mentioned
 - [ ] 7.2 Frontend: delete `syncProjectsFromAppState` and the stale-while-revalidate guard in `stores.ts`; catalog hydration stays cache + `projects-chunk`
-- [ ] 7.3 Add `smoke_cj1_bundle_download` … `smoke_cj8_project_exchange` skeletons in `tools/ozi-rs-mcp/tests/` (pending ones `#[ignore = "pending: …"]`); `just smoke [<N>]` runs them; move `smoke_core_workflow_draw_track` under `smoke_cj5_draw_track`
+- [x] 7.3 Journeys are named after their CJ (`smoke_cj5_draw_track`,
+      `smoke_cj3_layer_management`) and `just smoke cj3` runs one of them.
+      Eight skeletons were NOT written: a test that is an empty skeleton passes
+      for the wrong reason, and six of the eight are blocked on the same two
+      things — a file dialog the Mac2 driver can answer, and a project loaded
+      at launch. The blockers are written into the file's header table, one
+      line per CJ, so the gap is the honest size of the desktop evidence rather
+      than six green ticks
 - [ ] 7.4 `tools/ozi-rs-mcp`: crop `appium_screenshot` to the app window: decode the base64 PNG, read the `ozi-rs` window bounds through `CGWindowListCopyWindowInfo` (small Swift helper built by the crate, no Accessibility grant needed), scale by the display factor and crop; unit-test the crop math and the decoder with a fake WebDriver response
 - [ ] 7.5 `just ci`, `just smoke` green; PR merged; `docs/STATE.md` updated
 
