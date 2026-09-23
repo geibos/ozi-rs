@@ -52,6 +52,8 @@ const LEAVES_THE_PROJECT_ALONE = [
   "load_project",
   "open_local_bundle",
   "open_selected_map",
+  "read_raster_size",
+  "calibrate_raster",
   "set_bundles_root",
   // After these the project in hand is the project on disk.
   "save_project",

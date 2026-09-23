@@ -63,6 +63,7 @@ const TRANSPARENT_PNG = Uint8Array.from([
  * two in step.
  */
 const EMITS_STATE_CHANGED = new Set([
+  "calibrate_raster",
   "add_waypoint",
   "cancel_drawing",
   "create_empty_track",
@@ -358,6 +359,9 @@ const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
  */
 let projectEmptied = false;
 
+/** True once a picture has been calibrated, so the workspace has a map. */
+let rasterCalibrated = false;
+
 /**
  * Whether the project in hand differs from the project on disk.
  *
@@ -388,6 +392,10 @@ const MAKES_THE_PROJECT_CLEAN = new Set([
  */
 const LEAVES_THE_PROJECT_ALONE = new Set([
   "preview_project",
+  // Reading a picture's header, and opening the map written for it: the
+  // active raster is the ground, not the work on it.
+  "read_raster_size",
+  "calibrate_raster",
   // Reading the catalogue, not the project. Missing it here was the first
   // thing this model got wrong: `load_projects` runs on every start, so the
   // stand opened with the dot already on and the indicator meant nothing.
@@ -429,7 +437,9 @@ function noteProjectMutation(command: string, args: Args | undefined): void {
 
 function previewedAppState(): AppStateDto {
   const fixture =
-    requestedState() === "cold" ? coldStartFixture : appStateFixture;
+    requestedState() === "cold" && !rasterCalibrated
+      ? coldStartFixture
+      : appStateFixture;
   // The imported rows belong in the state too, not only in `list_tracks`:
   // MapView redraws off a fingerprint taken from `AppStateDto.tracks`, so an
   // import that left this alone appeared in the list and never on the map.
@@ -585,6 +595,20 @@ const HANDLERS: StandAnswers = {
   // `Cannot read properties of undefined (reading 'map')` inside MapView and
   // the dialog showed two empty numbers. A stub with the wrong shape is the
   // same failure as a stub that returns `undefined`, wearing a hat.
+  // A picture a headquarters was handed: 1600×1200, the size of a screenshot.
+  read_raster_size: () => ({ width: 1600, height: 1200 }),
+  // The calibration lands beside the picture, named after it, and the map
+  // opens. The stand has one raster, so what is walked here is the form and
+  // what it says afterwards.
+  calibrate_raster: (args) => {
+    const path = typeof args?.imagePath === "string" ? args.imagePath : "";
+    // A calibrated picture is an open map, so the cold-start fixture stops
+    // being the answer: without this the toast said the map had opened and
+    // the screen went straight back to the launcher, which is the shape of
+    // the bug rather than the shape of the feature.
+    rasterCalibrated = true;
+    return path.replace(/\.[^./\\]+$/, "") + ".map";
+  },
   get_simplified_preview: (args) => {
     // The tolerance is metres, and the answer has to move with it. This kept
     // every second point whatever the slider said, so on the stand the slider
@@ -595,7 +619,10 @@ const HANDLERS: StandAnswers = {
     // which is the part a screen is read for.
     const toleranceM =
       typeof args?.toleranceM === "number" ? args.toleranceM : 10;
-    const step = Math.max(1, Math.round(Math.log2(Math.max(1, toleranceM)) + 1));
+    const step = Math.max(
+      1,
+      Math.round(Math.log2(Math.max(1, toleranceM)) + 1),
+    );
     const segments = trackDetailFixture.segments.map((segment) => {
       const kept = segment.points.filter(
         (_, index) => index % step === 0 || index === segment.points.length - 1,

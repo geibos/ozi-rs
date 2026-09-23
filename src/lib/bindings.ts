@@ -611,6 +611,39 @@ async revealPath(path: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Read a picture's dimensions without decoding it.
+ * 
+ * The calibration form asks for corners in pixels, and it cannot offer the
+ * bottom-right one without knowing where that is.
+ */
+async readRasterSize(path: string) : Promise<Result<RasterSizeDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("read_raster_size", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Tie a picture to the Earth and open it.
+ * 
+ * A headquarters is sometimes handed an image and nothing else — a screenshot
+ * of a web map, a photograph of a sheet on a table. This writes the `.map`
+ * OziExplorer would have come with, beside the picture and in its name, and
+ * then opens the pair. The file is a real OziExplorer one, so the same folder
+ * works on somebody else's laptop in OziExplorer itself.
+ * 
+ * Answers the path of the `.map` that was written.
+ */
+async calibrateRaster(imagePath: string, title: string, points: CalibrationPointDto[]) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("calibrate_raster", { imagePath, title, points }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async exportTrackPlt(layerId: number, trackId: number, path: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("export_track_plt", { layerId, trackId, path }) };
@@ -712,6 +745,10 @@ listing_busy: boolean;
 bundle_busy: boolean; downloading_maps: string[]; current_project: LizaProjectDto | null; active_map: ActiveMapDto | null; diagnostics: DiagnosticDto[]; track_layers: LayerSummaryDto[]; waypoint_layers: LayerSummaryDto[]; track_layer_count: number; waypoint_layer_count: number; tracks: TrackSummaryDto[] }
 export type BundleEntryDto = { name: string; is_dir: boolean; size_bytes: number | null }
 /**
+ * One place in the picture whose position on the Earth the operator knows.
+ */
+export type CalibrationPointDto = { pixel_x: number; pixel_y: number; lat: number; lon: number }
+/**
  * What a day's export wrote, so the interface can say it.
  */
 export type DayExportDto = { tracks: number; waypoints: number }
@@ -757,6 +794,10 @@ slug: string; name: string; center_lat: number; center_lon: number; maps: LizaMa
  */
 contents: BundleEntryDto[] }
 export type PointDetailDto = { id: number; lat: number; lon: number; elevation: number | null; timestamp: string | null }
+/**
+ * The size of a picture, so the calibration form knows what it is working on.
+ */
+export type RasterSizeDto = { width: number; height: number }
 export type SegmentDetailDto = { id: number; points: PointDetailDto[] }
 export type SimplifiedPreviewDto = { original_count: number; simplified_count: number; segments: SimplifiedSegmentDto[] }
 export type SimplifiedSegmentDto = { id: number; original_count: number; simplified_count: number; kept_points: PointDetailDto[] }

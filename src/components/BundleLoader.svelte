@@ -58,6 +58,7 @@
   import { openProjectFile } from "$lib/actions/project";
   import { getRecentProjects } from "$lib/recent-projects";
   import { formatCatalogueAge } from "$lib/catalogue-age";
+  import CalibratePicture from "./CalibratePicture.svelte";
   import { openMapShowingDownload } from "$lib/actions/open-map";
   import { bundleSlugFromUrl } from "$lib/bundle-url";
   import { formatBytes, formatOptionalBytes } from "$lib/format-bytes";
@@ -482,6 +483,9 @@
     }
   }
 
+  /** Whether the calibration form is showing under the footer buttons. */
+  let calibrateOpen = $state(false);
+
   async function handleSetBundlesRoot() {
     const dir = await open({ directory: true, multiple: false });
     if (dir) await setBundlesRoot(dir as string);
@@ -659,6 +663,26 @@
       <button onclick={handleSetBundlesRoot} class="footer-btn muted">
         {$t("loader.setBundlesRoot")}
       </button>
+      <!-- A picture and nothing else is what a headquarters is handed when
+           there is no bundle for the area: a screenshot of a web map, a
+           photograph of a sheet. Until this it had no way in at all. -->
+      <button
+        onclick={() => (calibrateOpen = !calibrateOpen)}
+        class="footer-btn muted"
+        data-testid="loader-calibrate-picture"
+      >
+        {$t("loader.calibratePicture")}
+      </button>
+      {#if calibrateOpen}
+        <CalibratePicture
+          onDone={() => {
+            calibrateOpen = false;
+            bundleLoaderOpen.set(false);
+            if (onCloseRequest) onCloseRequest();
+            else goto(resolve("/project"));
+          }}
+        />
+      {/if}
     </div>
   </div>
 

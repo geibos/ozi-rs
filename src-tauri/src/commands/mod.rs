@@ -2123,6 +2123,84 @@ pub fn reveal_path(path: String) -> Result<(), String> {
     Ok(())
 }
 
+// ── Calibrating a picture ─────────────────────────────────────────────────────
+
+/// The size of a picture, so the calibration form knows what it is working on.
+#[derive(serde::Serialize, specta::Type)]
+pub struct RasterSizeDto {
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Read a picture's dimensions without decoding it.
+///
+/// The calibration form asks for corners in pixels, and it cannot offer the
+/// bottom-right one without knowing where that is.
+#[tauri::command]
+#[specta::specta]
+pub fn read_raster_size(path: String) -> Result<RasterSizeDto, String> {
+    let path = PathBuf::from(path);
+    let (width, height) = image::ImageReader::open(&path)
+        .map_err(|error| format!("не удалось открыть {}: {error}", path.display()))?
+        .with_guessed_format()
+        .map_err(|error| format!("не удалось открыть {}: {error}", path.display()))?
+        .into_dimensions()
+        .map_err(|error| format!("не удалось прочитать {}: {error}", path.display()))?;
+    Ok(RasterSizeDto { width, height })
+}
+
+/// One place in the picture whose position on the Earth the operator knows.
+#[derive(serde::Deserialize, specta::Type)]
+pub struct CalibrationPointDto {
+    pub pixel_x: f64,
+    pub pixel_y: f64,
+    pub lat: f64,
+    pub lon: f64,
+}
+
+/// Tie a picture to the Earth and open it.
+///
+/// A headquarters is sometimes handed an image and nothing else — a screenshot
+/// of a web map, a photograph of a sheet on a table. This writes the `.map`
+/// OziExplorer would have come with, beside the picture and in its name, and
+/// then opens the pair. The file is a real OziExplorer one, so the same folder
+/// works on somebody else's laptop in OziExplorer itself.
+///
+/// Answers the path of the `.map` that was written.
+#[tauri::command]
+#[specta::specta]
+pub fn calibrate_raster(
+    state: State<SharedState>,
+    app: AppHandle,
+    image_path: String,
+    title: String,
+    points: Vec<CalibrationPointDto>,
+) -> Result<String, String> {
+    use crate::infrastructure::export::{CalibrationPoint, write_calibration_map};
+
+    let image_path = PathBuf::from(image_path);
+    let size = read_raster_size(image_path.display().to_string())?;
+
+    let points: Vec<CalibrationPoint> = points
+        .into_iter()
+        .map(|p| CalibrationPoint {
+            pixel_x: p.pixel_x,
+            pixel_y: p.pixel_y,
+            lat: p.lat,
+            lon: p.lon,
+        })
+        .collect();
+
+    let map_path = write_calibration_map(&image_path, &title, size.width, size.height, &points)
+        .map_err(|error| error.to_string())?;
+
+    lock_app_state(state.inner())?
+        .open_local_ozi_map(&map_path)
+        .map_err(|error| error.to_string())?;
+    let _ = app.emit("state-changed", ());
+    Ok(map_path.display().to_string())
+}
+
 // ── Track creation ────────────────────────────────────────────────────────────
 
 #[tauri::command]

@@ -315,6 +315,32 @@ export async function revealPath(path: string): Promise<void> {
   await unwrap("reveal_path", commands.revealPath(path));
 }
 
+/**
+ * Tying a picture to the Earth.
+ *
+ * A headquarters is sometimes handed an image and nothing else — a screenshot
+ * of a web map, a photograph of a sheet on a table. `calibrateRaster` writes
+ * the `.map` OziExplorer would have come with, beside the picture, and opens
+ * the pair; the file is a real OziExplorer one, so the same folder works on
+ * somebody else's laptop in OziExplorer itself. It answers the path written.
+ */
+export async function readRasterSize(
+  path: string,
+): Promise<{ width: number; height: number }> {
+  return unwrap("read_raster_size", commands.readRasterSize(path));
+}
+
+export async function calibrateRaster(
+  imagePath: string,
+  title: string,
+  points: Array<{ pixel_x: number; pixel_y: number; lat: number; lon: number }>,
+): Promise<string> {
+  return unwrap(
+    "calibrate_raster",
+    commands.calibrateRaster(imagePath, title, points),
+  );
+}
+
 export async function newProject(): Promise<void> {
   await unwrap("new_project", commands.newProject());
 }

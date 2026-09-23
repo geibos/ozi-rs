@@ -129,6 +129,8 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::get_simplified_preview,
         commands::reveal_bundle,
         commands::reveal_path,
+        commands::read_raster_size,
+        commands::calibrate_raster,
         commands::export_track_plt,
         commands::export_wpt_waypoints,
         commands::export_gpx_waypoints,
