@@ -43,6 +43,7 @@
     tracksGeometryVersion,
     visibleWaypointLayers,
     waypointsFingerprint,
+    measureMode,
   } from "../lib/stores";
   import {
     deleteTrackPoint,
@@ -604,6 +605,7 @@
   // waypoint layers are re-added underneath it as the project changes.
   $effect(() => {
     const points = $measuredPoints;
+    const mode = $measureMode;
     const centre = $ringCentre;
     const radius = $ringRadiusKm;
     if (!map || !mapLoaded) return;
@@ -613,6 +615,9 @@
       map,
       projected === null ? points : [projected.from, projected.to],
       ring,
+      // Closed only while measuring an area: the outline has to agree with
+      // the number beside it.
+      mode === "area" && projected === null,
     );
     raiseMeasureLayer(map);
   });
@@ -1676,21 +1681,35 @@
       class="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-sm bg-black/70 px-2 py-1 text-center text-xs text-white tabular-nums"
       data-testid="measure-readout"
     >
-      <span class="font-mono text-sm"
-        >{formatMeasuredDistance(pathLengthKm($measuredPoints), $locale)}</span
-      >
-      {#if $measuredPoints.length >= 3}
-        <!-- OziExplorer's tool is "Distance & Area", and the area is the half
-             a coordinator writes down: a sector is handed over as "прочесать
-             2.4 км²". It appears once three points enclose something. -->
-        <span class="font-mono text-sm opacity-90"
-          >· {formatMeasuredArea(
-            polygonAreaSqKm($measuredPoints),
+      {#if $measureMode === "area"}
+        <!-- Area first, perimeter beside it: a sector is described by both —
+             "прочесать 2.4 км², обойти по кромке 6 км". -->
+        <span class="font-mono text-sm"
+          >{formatMeasuredArea(polygonAreaSqKm($measuredPoints), $locale) ||
+            "—"}</span
+        >
+        {#if $measuredPoints.length >= 3}
+          <span class="font-mono text-sm opacity-90"
+            >· {formatMeasuredDistance(
+              pathLengthKm([...$measuredPoints, $measuredPoints[0]]),
+              $locale,
+            )}</span
+          >
+        {/if}
+        <span class="ml-2 opacity-70">{$i18n("map.areaHint")}</span>
+      {:else}
+        <!-- A length on its own. The area of an open path is not a small
+             number, it is a meaningless one, and a number in a place where
+             people read numbers gets read. Owner, 2026-09-23: "часто надо
+             померить длину". -->
+        <span class="font-mono text-sm"
+          >{formatMeasuredDistance(
+            pathLengthKm($measuredPoints),
             $locale,
           )}</span
         >
+        <span class="ml-2 opacity-70">{$i18n("map.measureHint")}</span>
       {/if}
-      <span class="ml-2 opacity-70">{$i18n("map.measureHint")}</span>
     </div>
   {/if}
 
@@ -1702,6 +1721,17 @@
       <span class="font-mono text-sm"
         >{formatMeasuredDistance($ringRadiusKm, $locale)}</span
       >
+      {#if $ringRadiusKm > 0}
+        <!-- A ring is drawn to say "everything within five hundred metres of
+             the last known position", and the next question is always how much
+             ground that is. Owner, 2026-09-23. -->
+        <span class="font-mono text-sm opacity-90"
+          >· {formatMeasuredArea(
+            Math.PI * $ringRadiusKm * $ringRadiusKm,
+            $locale,
+          )}</span
+        >
+      {/if}
       <span class="ml-2 opacity-70"
         >{$ringCentre === null
           ? $i18n("map.ringCentreHint")

@@ -49,6 +49,7 @@
     selectedTrack,
     selectedWaypointId,
     selectedTheme,
+    measureMode,
   } from "$lib/stores";
   import {
     exportGpx,
@@ -536,14 +537,40 @@
             onSelect={() => {
               // Toggling, not starting: the same key that opened the palette
               // is how a crew reaches for it again to put the tape away.
-              setMeasuring(!$measuringActive);
+              // Reaching for the tape while it is measuring an area switches
+              // it to a length rather than putting it away, because that is
+              // what picking the other tool means.
+              setMeasuring(
+                !($measuringActive && $measureMode === "distance"),
+                "distance",
+              );
               close();
             }}
           >
             <span class="flex-1"
-              >{$measuringActive
+              >{$measuringActive && $measureMode === "distance"
                 ? $i18n("palette.measureStop")
                 : $i18n("palette.measure")}</span
+            >
+          </Command.Item>
+          <Command.Item
+            value="tool:area"
+            onSelect={() => {
+              // A separate tool, not a number beside the length. Owner,
+              // 2026-09-23: a length is what a crew measures most often, and
+              // an area quoted for an open path is a meaningless number in a
+              // place people read numbers.
+              setMeasuring(
+                !($measuringActive && $measureMode === "area"),
+                "area",
+              );
+              close();
+            }}
+          >
+            <span class="flex-1"
+              >{$measuringActive && $measureMode === "area"
+                ? $i18n("palette.areaStop")
+                : $i18n("palette.area")}</span
             >
           </Command.Item>
           <Command.Item

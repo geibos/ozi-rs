@@ -525,6 +525,21 @@ export const measuringActive = writable(false);
 export const measuredPoints = writable<{ lat: number; lon: number }[]>([]);
 
 /**
+ * What the tape is measuring: a length, or an area.
+ *
+ * Two tools, not one readout carrying both. Owner, 2026-09-23: "часто надо
+ * померить длину" — how long is this ride, how far from the road to the
+ * stream — and for an open path the enclosed area is not a small number, it
+ * is a meaningless one. Showing it beside the length invites reading it.
+ *
+ * The area mode closes the shape and reports what it encloses, with the
+ * perimeter beside it, because a sector is described by both: "прочесать 2.4
+ * км², обойти по кромке 6 км".
+ */
+export type MeasureMode = "distance" | "area";
+export const measureMode = writable<MeasureMode>("distance");
+
+/**
  * The radius ring: click a centre, click again to set the radius.
  *
  * A search draws these constantly — everything within five hundred metres of
@@ -542,8 +557,12 @@ export const ringRadiusKm = writable(0);
  * for the ring's centre must not also extend the tape. One function so that
  * invariant lives in one place rather than in each caller.
  */
-export function setMeasuring(active: boolean): void {
+export function setMeasuring(
+  active: boolean,
+  mode: MeasureMode = "distance",
+): void {
   measuredPoints.set([]);
+  measureMode.set(mode);
   measuringActive.set(active);
   if (active) {
     setRingOff();

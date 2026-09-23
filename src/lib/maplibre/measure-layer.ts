@@ -57,6 +57,15 @@ export function updateMeasureLayer(
   map: MapLibreMap,
   points: { lat: number; lon: number }[],
   ring: { lat: number; lon: number }[] = [],
+  /**
+   * Draw the tape as a closed shape.
+   *
+   * The area tool reports what the points enclose, and an outline left open
+   * reads as a path while the number beside it claims an area. The closing
+   * edge is the difference between "I measured this sector" and "I measured
+   * this walk".
+   */
+  closed = false,
 ): void {
   const source = map.getSource(MEASURE_SOURCE);
   if (!source || !("setData" in source)) return;
@@ -75,7 +84,10 @@ export function updateMeasureLayer(
       properties: {},
       geometry: {
         type: "LineString",
-        coordinates: points.map((p) => [p.lon, p.lat]),
+        coordinates: (closed && points.length >= 3
+          ? [...points, points[0]]
+          : points
+        ).map((p) => [p.lon, p.lat]),
       },
     });
   }
