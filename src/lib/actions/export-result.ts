@@ -32,10 +32,15 @@ export function baseName(path: string): string {
  * The toast names the file, not the path: a path in a corner is not something
  * anybody retypes, which is what the action is for.
  */
-export function reportExported(path: string): void {
+export function reportExported(path: string, detail?: string): void {
   const translate = get(t);
+  // `detail` is for the one export that has something to add: the day export
+  // counts what it wrote, and "three tracks and three marks" is how a
+  // coordinator checks the day is all there. The path still goes under it,
+  // because the counts do not tell anybody where the file is.
+  const description = detail ? `${detail} · ${path}` : path;
   toast.success(translate("export.done").replace("{file}", baseName(path)), {
-    description: path,
+    description,
     action: {
       label: translate("export.reveal"),
       onClick: () => {

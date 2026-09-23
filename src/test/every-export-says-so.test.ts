@@ -12,7 +12,11 @@ import { join } from "path";
  * noticed because the failure looks like success until somebody goes to check
  * whether the file exists.
  *
- * Found by walking CJ-6 on the stand, 2026-09-23.
+ * Found by walking CJ-6 on the stand, 2026-09-23. The day export was found
+ * later the same day, walking a whole session end to end: it said "three
+ * tracks and three marks" and never said where they went, which is the half a
+ * coordinator handing the file over actually needs. It passed this guard,
+ * because the guard read the file rather than the call — see below.
  */
 const EXPORT_CALLS = [
   "exportGpx",
@@ -38,16 +42,25 @@ describe("every export tells the operator it happened", () => {
 
     for (const file of componentFiles("src/components")) {
       const source = readFileSync(file, "utf-8");
+      const lines = source.split("\n");
+
       for (const call of EXPORT_CALLS) {
-        if (!new RegExp(`await ${call}\\s*\\(`).test(source)) continue;
-        // Either the shared reporter, or a success toast of its own — the day
-        // export writes its own summary with counts, which says more than the
-        // shared one could.
-        const reports =
-          source.includes("reportExported(") ||
-          source.includes("toast.success");
-        if (reports) continue;
-        offenders.push(`${file}: calls ${call} and says nothing on success`);
+        const pattern = new RegExp(`await ${call}\\s*\\(`);
+        lines.forEach((line, index) => {
+          if (!pattern.test(line)) return;
+          // The twenty lines after the call, not the whole file. The first
+          // version of this checked the file and let the day export through
+          // for a year's worth of a day: `TracksTab.svelte` contains both
+          // `reportExported(` and a `toast.success` belonging to other
+          // things, so every export in it passed whatever it actually did.
+          // A guard that checks the neighbourhood instead of the file is the
+          // difference between catching that and not.
+          const after = lines.slice(index, index + 20).join("\n");
+          if (after.includes("reportExported(")) return;
+          offenders.push(
+            `${file}:${index + 1}: calls ${call} and does not report it`,
+          );
+        });
       }
     }
 

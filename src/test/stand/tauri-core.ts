@@ -721,7 +721,17 @@ const HANDLERS: StandAnswers = {
     const map = (appStateFixture.current_project?.maps ?? []).find(
       (m) => m.name === mapName,
     );
-    if (!map || map.downloaded) return "";
+    if (!map || map.downloaded) {
+      // Opening a map that is already on disk gives the session an active
+      // map, which is what the launcher waits for before it leaves for the
+      // workspace. Without this the commonest thing a coordinator does — pick
+      // a bundle, then pick Topo — went nowhere on the stand, and the cold
+      // start could not reach the map at all. Found walking a whole session
+      // end to end, 2026-09-23.
+      standWorkspaceOpened = true;
+      standEmit("state-changed", undefined);
+      return "";
+    }
     const id = `stand-map-${Date.now()}`;
     playMapDownload(id, mapName);
     return id;

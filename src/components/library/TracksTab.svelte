@@ -439,7 +439,13 @@
       } as Parameters<typeof open>[0]);
       if (!path) return;
       const written = await exportAllTracksGpx(path as string);
-      toast.success(
+      // The counts and the file, not one or the other. The counts say the day
+      // is all there; the file's name and the way to it are what a
+      // coordinator handing it over actually needs, and this was the one
+      // export that gave the first and not the second — while the requirement
+      // it is held to says every export names the file it wrote.
+      reportExported(
+        path as string,
         $i18n("tracksTab.exportAllDone")
           .replace("{tracks}", String(written.tracks))
           .replace("{waypoints}", String(written.waypoints)),
