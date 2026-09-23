@@ -79,6 +79,24 @@ const DRAW_TRACK: [&str; 2] = ["Нарисовать трек", "Draw a track"];
 /// which is its default. Both spellings, like everything else here.
 const MAP_CANVAS: [&str; 2] = ["Холст карты", "Map canvas"];
 const SCRATCH_TRACK_NAME: &str = "New Track";
+/// `layers.menu`, `layers.new`, `layers.create`, `layers.delete` and the
+/// default name a new track layer is given. Held against the dictionaries by
+/// `src/test/smoke-label-contract.test.ts`.
+const LAYER_MENU: [&str; 2] = ["Действия со слоем", "Layer actions"];
+const LAYER_NEW: [&str; 2] = ["Новый слой…", "New layer…"];
+const LAYER_CREATE: [&str; 2] = ["Создать", "Create"];
+const LAYER_DELETE: [&str; 2] = ["Удалить слой", "Delete layer"];
+/// The layer select's accessible name carries which layer is active.
+///
+/// It used to be the bare label «Слой треков», and the current value lived in
+/// a span that WKWebView does not publish — so no assertion about *which*
+/// layer is active was possible from outside. Saying what is selected is also
+/// what an accessible name is for: a screen reader announcing "track layer"
+/// and not which one is announcing half the control.
+const LAYER_SELECT_WITH_NEW: [&str; 2] = [
+    "Слой треков: Новый слой треков",
+    "Track layer: New track layer",
+];
 
 fn contains_any(source: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| source.contains(needle))
@@ -134,6 +152,155 @@ fn poll_source_until<F: Fn(&str) -> bool>(
         }
         thread::sleep(SOURCE_POLL_STEP);
     }
+}
+
+/// Click the first selector that works, answering whether any did.
+///
+/// WKWebView exposes web content with varying roles, and a control's text
+/// lands in `title` with an empty `label` — so every lookup tries both, and a
+/// caller that cares which one worked gets it back.
+fn click_any_label(server: &str, sid: &str, labels: &[&str]) -> bool {
+    for label in labels {
+        let selector = format!("//*[@title=\"{label}\" or @label=\"{label}\"]");
+        if appium_click_with_session_id(server, sid, Some(&selector)).ok {
+            return true;
+        }
+    }
+    false
+}
+
+/// A second journey through the packaged application: making, and then
+/// unmaking, a layer.
+///
+/// Everything built between 2026-09-22 and 2026-09-23 — layer management,
+/// the waypoint reader, a new search, drag and drop, the names on the map —
+/// had been walked on the stand and never in the packaged application, where
+/// the IPC is real. The stand proves how a screen behaves given an answer;
+/// only this proves the answer comes back.
+///
+/// Layers are the one of those that needs no typing and no file dialog: the
+/// name field arrives filled in, so the whole journey is clicks. That matters
+/// because typing into the webview through Mac2 has never been made to work
+/// (`appium_type_text` reached a keyboard shortcut instead of the field).
+#[test]
+#[ignore = "requires built app + Appium Mac2 server; run via `just smoke`"]
+fn smoke_layer_management() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root");
+    let app_bundle = workspace.join("target/debug/bundle/macos/ozi-rs.app");
+    assert!(
+        app_bundle.exists(),
+        "app bundle missing at {} — run `just build` first",
+        app_bundle.display(),
+    );
+
+    let doctor = appium_doctor();
+    assert!(doctor.ok, "Appium Mac2 is not ready: {doctor:?}");
+
+    kill_wedged_wda();
+    kill_app_instances();
+    thread::sleep(Duration::from_secs(2));
+
+    let launch = appium_launch_session_with_app_path(
+        true,
+        DEFAULT_APPIUM_SERVER_URL,
+        &app_bundle.to_string_lossy(),
+    );
+    assert!(launch.ok, "appium_launch_session failed: {launch:?}");
+    let guard = SessionGuard {
+        server_url: DEFAULT_APPIUM_SERVER_URL.to_owned(),
+        session_id: launch.session_id.clone().expect("session id"),
+    };
+    let server = guard.server_url.as_str();
+    let sid = guard.session_id.as_str();
+
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(20),
+        "workspace tabs",
+        |s| contains_any(s, &TRACKS_TAB) && contains_any(s, &WAYPOINTS_TAB),
+    );
+
+    assert!(
+        click_any_label(server, sid, &TRACKS_TAB),
+        "the Tracks tab SHALL be reachable"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(10),
+        "the Tracks tab's controls",
+        |s| contains_any(s, &LAYER_MENU),
+    );
+    println!("ok: Tracks tab open with the layer menu on it");
+
+    // A layer, made from the menu. The name arrives filled in, so this is
+    // the whole journey: menu → New layer… → Create.
+    assert!(
+        click_any_label(server, sid, &LAYER_MENU),
+        "the layer menu SHALL open"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(5),
+        "the layer menu's entries",
+        |s| contains_any(s, &LAYER_NEW),
+    );
+    assert!(
+        click_any_label(server, sid, &LAYER_NEW),
+        "New layer… SHALL be clickable"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(5),
+        "the name field, filled in",
+        |s| contains_any(s, &LAYER_CREATE),
+    );
+    assert!(
+        click_any_label(server, sid, &LAYER_CREATE),
+        "Create SHALL be clickable"
+    );
+
+    // `create_track_layer` over real IPC, and the answer used to make the new
+    // layer active — which is the whole reason the command returns an id.
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(10),
+        "the new layer, active",
+        |s| contains_any(s, &LAYER_SELECT_WITH_NEW),
+    );
+    println!("ok: layer created and made active (create_track_layer IPC works)");
+
+    // And unmade, so the packaged application is left as it was found.
+    assert!(
+        click_any_label(server, sid, &LAYER_MENU),
+        "the layer menu SHALL open again"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(5),
+        "the layer menu's entries",
+        |s| contains_any(s, &LAYER_DELETE),
+    );
+    assert!(
+        click_any_label(server, sid, &LAYER_DELETE),
+        "Delete layer SHALL be clickable"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(10),
+        "the layer gone and another one active",
+        |s| !contains_any(s, &LAYER_SELECT_WITH_NEW),
+    );
+    println!("ok: layer deleted, another made active (delete_track_layer IPC works)");
 }
 
 #[test]

@@ -76,6 +76,7 @@
   );
 
   const waypointLayers = $derived($appState?.waypoint_layers ?? []);
+
   const waypointLayerSelectValue = $derived(
     $activeWaypointLayerId !== null ? $activeWaypointLayerId.toString() : "",
   );
@@ -86,6 +87,13 @@
     const layer = waypointLayers.find((l) => BigInt(l.id) === id);
     return layer ? layerDisplayName(layer.name, $locale) : null;
   });
+
+  /** See the Tracks tab: the accessible name says which layer is active. */
+  const layerSelectLabel = $derived(
+    activeWaypointLayerName === null
+      ? $t("waypointsTab.layer")
+      : `${$t("waypointsTab.layer")}: ${activeWaypointLayerName}`,
+  );
 
   /** See the Tracks tab: an inline card, not a modal, in a narrow rail. */
   let layerEdit = $state<{ mode: "create" | "rename"; name: string } | null>(
@@ -310,7 +318,7 @@
           onValueChange={(v) => v && activeWaypointLayerId.set(BigInt(v))}
         >
           <Select.Trigger
-            aria-label={$t("waypointsTab.layer")}
+            aria-label={layerSelectLabel}
             size="sm"
             class="min-w-0 flex-1"
           >

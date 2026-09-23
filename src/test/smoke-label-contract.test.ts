@@ -44,6 +44,18 @@ const CONTRACT: { key: MessageKey; what: string }[] = [
   { key: "tracksTab.finishTrack", what: "the drawing toggle with its count" },
   { key: "shell.mapCanvas", what: "the map canvas the smoke clicks on" },
   { key: "tracksTab.createTrack", what: "the drawing toggle at rest" },
+  { key: "layers.menu", what: "the layer menu the smoke opens" },
+  { key: "layers.new", what: "the new-layer entry" },
+  { key: "layers.create", what: "the button that commits a new layer" },
+  { key: "layers.delete", what: "the delete-layer entry" },
+  {
+    key: "layers.defaultTrackName",
+    what: "the name a new track layer arrives with, which is why the journey needs no typing",
+  },
+  {
+    key: "tracksTab.layer",
+    what: "the layer select, whose accessible name carries which layer is active",
+  },
 ];
 
 describe("the smoke gate's label contract", () => {

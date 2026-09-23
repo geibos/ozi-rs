@@ -105,6 +105,7 @@
   let simplifyDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   const trackLayers = $derived($appState?.track_layers ?? []);
+
   const trackLayerSelectValue = $derived(
     $activeTrackLayerId !== null ? $activeTrackLayerId.toString() : "",
   );
@@ -117,6 +118,21 @@
     )?.name;
     return name === undefined ? null : layerDisplayName(name, $locale);
   });
+
+  /**
+   * The layer select's accessible name, carrying which layer is active.
+   *
+   * The bare label said "track layer" and left the current value in a span
+   * that WKWebView does not publish — so a screen reader announced half the
+   * control, and nothing outside the application could see which layer was
+   * active either. Both halves come from the dictionary; the colon is
+   * punctuation, not language.
+   */
+  const layerSelectLabel = $derived(
+    activeTrackLayerName === null
+      ? $i18n("tracksTab.layer")
+      : `${$i18n("tracksTab.layer")}: ${activeTrackLayerName}`,
+  );
 
   $effect(() => {
     if ($appState) {
@@ -545,7 +561,7 @@
           disabled={$drawingModeActive}
         >
           <Select.Trigger
-            aria-label={$i18n("tracksTab.layer")}
+            aria-label={layerSelectLabel}
             size="sm"
             class="min-w-0 flex-1"
             title={activeTrackLayerName}
