@@ -4,6 +4,8 @@
   import { page } from "$app/state";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
+  import { importPaths } from "$lib/actions/import-paths";
   import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
   import {
     appendProjectsChunk,
@@ -19,6 +21,7 @@
     finishDownload,
     projectDirty,
     projectsLoading,
+    requestAllDataFocus,
     resetBundleDownloadState,
     updateDownloadProgress,
   } from "../lib/stores";
@@ -169,6 +172,44 @@
         projectsLoading.set(false);
         catalogueError.set(String(error));
       });
+    })();
+
+    // CJ-3: a day's recordings arrive as a handful of files, and dropping
+    // them on the window is how anybody expects to hand them over. The
+    // dispatch is the picker's, in `$lib/actions/import-paths`, so the two
+    // surfaces cannot drift — which is how the picker came to accept `.wpt`
+    // while nothing else did.
+    (async () => {
+      try {
+        const unlistenDrop = await getCurrentWebview().onDragDropEvent(
+          async (event) => {
+            if (event.payload.type !== "drop") return;
+            const paths = event.payload.paths ?? [];
+            if (paths.length === 0) return;
+            const translate = get(t);
+            const outcome = await importPaths(paths);
+            if (outcome.imported > 0) requestAllDataFocus();
+            const summary = translate("tracksTab.importDone")
+              .replace("{count}", String(outcome.imported))
+              .replace("{total}", String(paths.length));
+            if (outcome.failed.length === 0) {
+              toast.success(summary);
+            } else {
+              // Nine files of a day that worked matter more than the one that
+              // did not, so this is a success with a caveat.
+              toast.warning(summary, {
+                description: outcome.failed.join(", "),
+              });
+            }
+          },
+        );
+        if (cancelled) unlistenDrop();
+        else unlistens.push(unlistenDrop);
+      } catch (error) {
+        // A webview without drag-and-drop is not a reason to fail the launch;
+        // the picker is still there.
+        console.error("drag and drop unavailable", error);
+      }
     })();
 
     // CJ-7 close guard: intercept a window close while the project has

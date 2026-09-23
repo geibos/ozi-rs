@@ -56,7 +56,9 @@ describe("Maps tab — open-project affordance (task A)", () => {
 describe("Tracks tab — unified import (tasks B & C)", () => {
   it("offers a single import dialog including zip archives", () => {
     expect(tracksTabSource).toContain("library-import-tracks");
-    expect(tracksTabSource).toContain('extensions: ["gpx", "plt", "wpt", "zip"]');
+    // The list lives in `$lib/actions/import-paths`, shared with the window's
+    // drop target; what it holds is checked in `import-paths.test.ts`.
+    expect(tracksTabSource).toContain("IMPORTABLE_EXTENSIONS");
     expect(tracksTabSource).toContain("multiple: true");
   });
 

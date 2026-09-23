@@ -24,10 +24,11 @@ const ROOTS = ["src/components", "src/routes"];
  */
 const ALLOWED = new Map<string, string>([
   [
-    "src/components/library/TracksTab.svelte:Failed to import track file",
-    "Reported in aggregate after the loop: a folder import must not abort on " +
-      "one bad file, and one toast per file would bury the summary. The toast " +
-      "that follows names every file that failed.",
+    "src/routes/+layout.svelte:drag and drop unavailable",
+    "A webview that cannot register a drag-and-drop handler is not a failure " +
+      "the operator can act on, and it is not a failure of anything they " +
+      "asked for — the Import… picker is still there. Telling them at launch " +
+      "that a feature they have not reached for is missing would be noise.",
   ],
   [
     "src/components/inspector/MapInspector.svelte:MapInspector: getOziMetadata failed",

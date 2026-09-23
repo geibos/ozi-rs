@@ -56,16 +56,24 @@ describe("Library Tracks tab — import / create-track affordances", () => {
     expect(tracksSource).not.toContain("library-import-plt");
   });
 
-  it("offers gpx, plt AND zip in the unified file filter (backend unpacks zip archives of gpx)", () => {
-    expect(tracksSource).toContain('extensions: ["gpx", "plt", "wpt", "zip"]');
+  it("offers every importable format in the unified file filter", () => {
+    // The list itself lives in `$lib/actions/import-paths`, so the picker and
+    // the window's drop target cannot offer different things. What the list
+    // contains, and where each extension goes, is covered by behaviour in
+    // `import-paths.test.ts`.
+    expect(tracksSource).toContain("IMPORTABLE_EXTENSIONS");
   });
 
   it("allows multi-select in the unified import dialog", () => {
     expect(tracksSource).toContain("multiple: true");
   });
 
-  it("routes .plt files to importPlt by extension", () => {
-    expect(tracksSource).toContain('endsWith(".plt")');
+  it("routes the picked files through the shared import dispatch", () => {
+    // Which reader each extension reaches is a behaviour, and it is tested as
+    // one in `import-paths.test.ts`. Asserting that this component's source
+    // spells `endsWith(".plt")` checked the spelling of a branch, and went on
+    // passing after the branch moved out of the component.
+    expect(tracksSource).toContain("importPaths(paths)");
   });
 
   it("renders the Import folder button wired to the recursive backend import", () => {

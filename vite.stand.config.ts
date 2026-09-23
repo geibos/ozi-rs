@@ -28,6 +28,10 @@ export default defineConfig({
       { find: "@tauri-apps/api/core", replacement: stand("tauri-core") },
       { find: "@tauri-apps/api/event", replacement: stand("tauri-event") },
       { find: "@tauri-apps/api/window", replacement: stand("tauri-window") },
+      {
+        find: "@tauri-apps/api/webview",
+        replacement: stand("tauri-webview"),
+      },
       { find: "@tauri-apps/plugin-dialog", replacement: stand("tauri-dialog") },
     ],
   },

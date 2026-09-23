@@ -50,9 +50,6 @@
     getTrackDetail,
     getTrackExportDefaultPath,
     listTracks,
-    importGpx,
-    importPlt,
-    importWpt,
     importTracksDirectory,
     renameTrack,
     createTrackLayer,
@@ -65,6 +62,10 @@
     simplifyTrack,
     toggleTrackVisible,
   } from "$lib/api";
+  import {
+    IMPORTABLE_EXTENSIONS,
+    importPaths,
+  } from "$lib/actions/import-paths";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import UploadIcon from "@lucide/svelte/icons/upload";
@@ -314,10 +315,6 @@
   }
 
   /** Strip directories from a path for compact failure reporting. */
-  function baseName(path: string): string {
-    const parts = path.split(/[\\/]/);
-    return parts[parts.length - 1] || path;
-  }
 
   /**
    * Single "Import…" entry point. One dialog with a combined GPX/PLT/ZIP
@@ -335,7 +332,7 @@
         filters: [
           {
             name: $i18n("tracksTab.importFilterName"),
-            extensions: ["gpx", "plt", "wpt", "zip"],
+            extensions: [...IMPORTABLE_EXTENSIONS],
           },
         ],
       });
@@ -344,25 +341,9 @@
         Array.isArray(selection) ? selection : [selection]
       ) as string[];
 
-      let imported = 0;
-      const failed: string[] = [];
-      for (const path of paths) {
-        try {
-          const lower = path.toLowerCase();
-          if (lower.endsWith(".plt")) {
-            await importPlt(path);
-          } else if (lower.endsWith(".wpt")) {
-            // OziExplorer's own waypoint format, from the штаб next door.
-            await importWpt(path);
-          } else {
-            await importGpx(path);
-          }
-          imported += 1;
-        } catch (err) {
-          console.error("Failed to import track file", path, err);
-          failed.push(baseName(path));
-        }
-      }
+      // The dispatch lives in `$lib/actions/import-paths` because dropping
+      // files on the window asks for exactly the same thing.
+      const { imported, failed } = await importPaths(paths);
 
       const summary = $i18n("tracksTab.importDone")
         .replace("{count}", String(imported))

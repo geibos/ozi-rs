@@ -2,10 +2,47 @@ use crate::domain::Project;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+/// The `.ozp` format this build writes and can read.
+///
+/// Bump it when a change to what a project holds would make an older build
+/// read the file wrongly rather than merely incompletely. A field that is
+/// `Option`, or carries `#[serde(default)]`, does not need a bump: an older
+/// build reads it as absent and everything it does know still lands.
+///
+/// Version 0 is every file written before this existed. There is no
+/// difference in content — the number is the thing that was missing.
+pub const CURRENT_PROJECT_FORMAT_VERSION: u32 = 1;
+
 #[derive(Debug)]
 pub enum PersistenceError {
     Io(std::io::Error),
     Json(serde_json::Error),
+    /// The file was written by a newer build of this application.
+    ///
+    /// Opening it anyway would read the parts we understand, drop the rest,
+    /// and — the moment the operator saved — write that loss back over the
+    /// other headquarters' file. A project exchanged between штабы has to be
+    /// safe in both directions, so this refuses rather than degrades.
+    FromTheFuture {
+        found: u32,
+        supported: u32,
+    },
+}
+
+/// A project on disk: what the domain holds, plus the number that says which
+/// build wrote it.
+///
+/// `flatten` keeps the JSON the shape it has always had, with one key added,
+/// so every `.ozp` written before this reads unchanged. The envelope lives
+/// here rather than on `Project` because a format version is a fact about a
+/// file, not about a search — and the layering forbids persistence leaking
+/// into the domain.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PersistedProject {
+    #[serde(default)]
+    format_version: u32,
+    #[serde(flatten)]
+    project: Project,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -39,6 +76,13 @@ impl fmt::Display for PersistenceError {
         match self {
             Self::Io(error) => write!(f, "file error: {error}"),
             Self::Json(error) => write!(f, "format error: {error}"),
+            Self::FromTheFuture { found, supported } => write!(
+                f,
+                "this project was written by a newer version of ozi-rs \
+                 (format {found}; this build reads up to {supported}). \
+                 Opening it here would drop what this build does not know, \
+                 and saving would write that loss back over the original."
+            ),
         }
     }
 }
@@ -48,6 +92,7 @@ impl std::error::Error for PersistenceError {
         match self {
             Self::Io(error) => Some(error),
             Self::Json(error) => Some(error),
+            Self::FromTheFuture { .. } => None,
         }
     }
 }
@@ -79,13 +124,24 @@ fn write_atomic(path: &Path, contents: &str) -> Result<(), PersistenceError> {
 }
 
 pub fn save_project(project: &Project, path: &Path) -> Result<(), PersistenceError> {
-    let json = serde_json::to_string_pretty(project).map_err(PersistenceError::Json)?;
+    let envelope = PersistedProject {
+        format_version: CURRENT_PROJECT_FORMAT_VERSION,
+        project: project.clone(),
+    };
+    let json = serde_json::to_string_pretty(&envelope).map_err(PersistenceError::Json)?;
     write_atomic(path, &json)
 }
 
 pub fn load_project(path: &Path) -> Result<Project, PersistenceError> {
     let json = std::fs::read_to_string(path).map_err(PersistenceError::Io)?;
-    let mut project: Project = serde_json::from_str(&json).map_err(PersistenceError::Json)?;
+    let envelope: PersistedProject = serde_json::from_str(&json).map_err(PersistenceError::Json)?;
+    if envelope.format_version > CURRENT_PROJECT_FORMAT_VERSION {
+        return Err(PersistenceError::FromTheFuture {
+            found: envelope.format_version,
+            supported: CURRENT_PROJECT_FORMAT_VERSION,
+        });
+    }
+    let mut project = envelope.project;
     // Normalize legacy projects to satisfy the default-layers invariant
     // declared by the `layers` capability. Existing layers are preserved
     // and only missing kinds get a default appended (in memory only —
@@ -147,7 +203,10 @@ pub fn resolve_session_path(
 
 #[cfg(test)]
 mod tests {
-    use super::{load_app_session, load_project, resolve_session_path, save_project};
+    use super::{
+        CURRENT_PROJECT_FORMAT_VERSION, PersistenceError, load_app_session, load_project,
+        resolve_session_path, save_project,
+    };
     use crate::domain::{LayerId, Project, TrackLayer, Waypoint, WaypointId, WaypointLayer};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -531,8 +590,77 @@ mod tests {
     /// layers; this covers what is inside them.
     ///
     /// If this fails after a field is added, the field wants a default — or,
-    /// if it truly cannot have one, the format wants a version and a migration,
-    /// which it does not have (tracked as CJ-8).
+    /// if it truly cannot have one, the format wants a migration. The version
+    /// number arrived on 2026-09-23; a migration has still to be written the
+    /// day one is needed.
+    /// CJ-8 is two headquarters passing a `.ozp` back and forth, and until
+    /// 2026-09-23 the file carried nothing that said which build wrote it.
+    #[test]
+    fn a_saved_project_says_which_format_it_is() {
+        let dir = temp_dir("format-version-written");
+        let path = dir.join("search.ozp");
+        save_project(&Project::untitled(), &path).expect("save");
+
+        let value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("json");
+        assert_eq!(
+            value
+                .get("format_version")
+                .and_then(serde_json::Value::as_u64),
+            Some(u64::from(CURRENT_PROJECT_FORMAT_VERSION)),
+        );
+        // The rest of the shape is unchanged, or every project a crew has
+        // saved stops loading.
+        assert!(value.get("track_layers").is_some());
+        assert!(value.get("waypoint_layers").is_some());
+    }
+
+    /// A file with no version is every project written before this existed,
+    /// and it has to keep opening.
+    #[test]
+    fn a_project_without_a_version_is_the_oldest_one() {
+        let dir = temp_dir("format-version-absent");
+        let path = dir.join("legacy.ozp");
+        save_project(&Project::untitled(), &path).expect("save");
+
+        let mut value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("json");
+        value
+            .as_object_mut()
+            .expect("object")
+            .remove("format_version");
+        std::fs::write(&path, serde_json::to_string_pretty(&value).expect("write")).expect("write");
+
+        load_project(&path).expect("a project from before the version still opens");
+    }
+
+    /// The direction that actually loses work: an older build opening a file a
+    /// newer one wrote. Reading it would drop what this build does not know,
+    /// and the next save would write that loss back over the other штаб's
+    /// file. Refusing is the only safe answer until a migration exists.
+    #[test]
+    fn a_project_from_the_future_is_refused_rather_than_degraded() {
+        let dir = temp_dir("format-version-future");
+        let path = dir.join("newer.ozp");
+        save_project(&Project::untitled(), &path).expect("save");
+
+        let mut value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("read")).expect("json");
+        value.as_object_mut().expect("object").insert(
+            "format_version".to_owned(),
+            serde_json::Value::from(CURRENT_PROJECT_FORMAT_VERSION + 7),
+        );
+        std::fs::write(&path, serde_json::to_string_pretty(&value).expect("write")).expect("write");
+
+        match load_project(&path) {
+            Err(PersistenceError::FromTheFuture { found, supported }) => {
+                assert_eq!(found, CURRENT_PROJECT_FORMAT_VERSION + 7);
+                assert_eq!(supported, CURRENT_PROJECT_FORMAT_VERSION);
+            }
+            other => panic!("SHALL refuse a newer format, got {other:?}"),
+        }
+    }
+
     #[test]
     fn a_project_from_an_early_build_still_loads_with_its_contents() {
         let raw = r#"{
