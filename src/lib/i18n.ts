@@ -371,6 +371,8 @@ const dictionaries = {
     "palette.ringStop": "Clear the ring",
     "map.ringCentreHint": "Click the centre · Esc to finish",
     "map.ringRadiusHint": "Click to set the radius · Esc to finish",
+    "palette.graticule": "Show the coordinate grid",
+    "palette.graticuleOff": "Hide the coordinate grid",
     "palette.projection": "Place a waypoint by bearing",
     "palette.projectionStop": "Cancel placing by bearing",
     "map.projectionOriginHint":
@@ -792,6 +794,8 @@ const dictionaries = {
     "palette.ringStop": "Убрать круг",
     "map.ringCentreHint": "Клик — центр · Esc — закончить",
     "map.ringRadiusHint": "Клик — радиус · Esc — закончить",
+    "palette.graticule": "Показать сетку координат",
+    "palette.graticuleOff": "Скрыть сетку координат",
     "palette.projection": "Отложить точку по азимуту",
     "palette.projectionStop": "Отменить откладывание",
     "map.projectionOriginHint": "Клик — от какой точки · Esc — закончить",

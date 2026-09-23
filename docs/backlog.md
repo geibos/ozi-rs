@@ -382,11 +382,11 @@ calibration and field-tool work. Everything the reference marks **[ЯДРО]** i
 now built except these four, none of which was ever agreed into scope — they
 are written down so the choice is the owner's rather than an omission.
 
-- **Сетка координат на карте.** A lat/lon grid drawn over the raster, with the
-  labels. Штабы describe sectors by coordinates on the radio, and reading one
-  off a map with no grid means clicking and reading the status bar. The most
-  likely of the four to be missed. OziExplorer also draws UTM and national
-  grids; the lat/lon one is the part that matters here.
+- ~~**Сетка координат на карте.**~~ Built on 2026-09-23
+  (`a-grid-to-read-sectors-off`): lat/lon lines on a step that follows the zoom
+  and always lands on a number a person can say, named at the edges, offered
+  from the command palette and remembered. OziExplorer also draws UTM and
+  national grids; those are not built and were not the part that mattered.
 - **Distance Between Waypoints.** The ruler measures anything, but not "from
   this mark to that one" in a click. Two marks and a distance is how a task is
   sized.

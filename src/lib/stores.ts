@@ -553,6 +553,34 @@ export const editModeActive = writable(false);
  * go when the tool is switched off. A measurement a crew wants to keep is a
  * track, which they can already draw.
  */
+/**
+ * Whether the coordinate grid is drawn over the map.
+ *
+ * A search is cut into sectors and the sectors go out over the radio as
+ * coordinates; every paper sheet a headquarters uses carries a grid for that.
+ * Off by default — the map is usually read, not measured — and remembered per
+ * machine, because a coordinator who wants it wants it every time.
+ */
+export const graticuleVisible = writable(readStoredGraticule());
+
+function readStoredGraticule(): boolean {
+  try {
+    if (typeof localStorage === "undefined") return false;
+    return localStorage.getItem("ozi:graticule") === "on";
+  } catch {
+    return false;
+  }
+}
+
+graticuleVisible.subscribe((on) => {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem("ozi:graticule", on ? "on" : "off");
+  } catch {
+    // A remembered preference is not worth a toast.
+  }
+});
+
 export const measuringActive = writable(false);
 export const measuredPoints = writable<{ lat: number; lon: number }[]>([]);
 

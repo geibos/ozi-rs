@@ -39,6 +39,7 @@
     bundleLoaderPreselect,
     commandPaletteOpen,
     measuringActive,
+    graticuleVisible,
     setMeasuring,
     ringActive,
     setRing,
@@ -604,6 +605,20 @@
               >{$projectionActive
                 ? $i18n("palette.projectionStop")
                 : $i18n("palette.projection")}</span
+            >
+          </Command.Item>
+          <!-- The grid the sectors are read off. -->
+          <Command.Item
+            value="tool:graticule"
+            onSelect={() => {
+              graticuleVisible.update((on) => !on);
+              close();
+            }}
+          >
+            <span class="flex-1"
+              >{$graticuleVisible
+                ? $i18n("palette.graticuleOff")
+                : $i18n("palette.graticule")}</span
             >
           </Command.Item>
           <Command.Item value="setting:gps" onSelect={handleGpsSetting}>

@@ -21,6 +21,7 @@
     drawingModeActive,
     measuringActive,
     measuredPoints,
+    graticuleVisible,
     setMeasuring,
     ringActive,
     ringCentre,
@@ -100,6 +101,10 @@
   } from "$lib/maplibre/measure-layer";
   import { pendingClicks } from "$lib/drawing-clicks";
   import {
+    attachGraticule,
+    type GraticuleHandle,
+  } from "$lib/maplibre/graticule-layer";
+  import {
     TRACKS_LAYER_SELECTED,
     highlightTrack,
     initTracksLayer,
@@ -124,6 +129,19 @@
    * cancelled it — so a route plotted at any normal pace lost most of its
    * points silently. See `$lib/drawing-clicks`.
    */
+  let graticuleHandle: GraticuleHandle | null = null;
+
+  function syncGraticule() {
+    if (!map) return;
+    const wanted = $graticuleVisible;
+    if (wanted && graticuleHandle === null) {
+      graticuleHandle = attachGraticule(map);
+    } else if (!wanted && graticuleHandle !== null) {
+      graticuleHandle.detach();
+      graticuleHandle = null;
+    }
+  }
+
   const drawingClicks = pendingClicks<{ lat: number; lon: number }>({
     commit: async ({ lat, lon }) => {
       const layerId = $drawingTrackLayerId;
@@ -1090,6 +1108,11 @@
       initTracksLayer(map);
       initMeasureLayer(map);
 
+      // The grid the sectors are read off. Attached when it is asked for and
+      // taken off when it is not: a layer that can only be added is a layer
+      // that leaks, and this one redraws on every camera move.
+      syncGraticule();
+
       // Pointer affordance over track lines (CJ-4 click-to-select).
       // Registered after initTracksLayer so the delegated events bind to
       // an existing layer. The mode guards keep the crosshair cursors of
@@ -1403,6 +1426,7 @@
       contextMenu = null;
     }
     applyEditModeMapInteraction($editModeActive);
+    syncGraticule();
 
     if (!$editModeActive || !$selectedTrack) {
       clearPointMarkers();
