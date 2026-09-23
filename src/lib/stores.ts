@@ -782,13 +782,16 @@ export const simplifyState = writable<{
   active: boolean;
   layerId: bigint;
   trackId: bigint;
-  tolerance: number;
+  /** Metres — what the slider shows. The algorithm works in kilometres and
+   * the conversion belongs on the Rust side of the boundary, where the
+   * parameter is named for its unit. */
+  toleranceM: number;
   preview: SimplifiedPreview | null;
 }>({
   active: false,
   layerId: BigInt(0),
   trackId: BigInt(0),
-  tolerance: 10,
+  toleranceM: 10,
   preview: null,
 });
 /**

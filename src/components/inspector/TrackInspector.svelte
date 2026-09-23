@@ -202,7 +202,7 @@
       active: true,
       layerId: sel.layerId,
       trackId: sel.trackId,
-      tolerance: 10,
+      toleranceM: 10,
       preview: null,
     });
   }

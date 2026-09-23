@@ -1744,12 +1744,12 @@ pub fn simplify_track(
     app: AppHandle,
     layer_id: u64,
     track_id: u64,
-    tolerance: f64,
+    tolerance_m: f64,
 ) -> Result<(), String> {
     use crate::domain::{LayerId, TrackId};
     let mut app_state = lock_app_state(state.inner())?;
     app_state
-        .apply_simplify_track(LayerId::new(layer_id), TrackId::new(track_id), tolerance)
+        .apply_simplify_track(LayerId::new(layer_id), TrackId::new(track_id), tolerance_m)
         .map_err(|e| format!("{e}"))?;
     let _ = app.emit("state-changed", ());
     Ok(())
@@ -2034,9 +2034,9 @@ pub fn get_simplified_preview(
     state: State<SharedState>,
     layer_id: u64,
     track_id: u64,
-    tolerance: f64,
+    tolerance_m: f64,
 ) -> Result<SimplifiedPreviewDto, String> {
-    use crate::domain::{LayerId, TrackId, simplify_track_points};
+    use crate::domain::{LayerId, TrackId, simplify_track_points_m};
     let app_state = lock_app_state(state.inner())?;
     let lid = LayerId::new(layer_id);
     let tid = TrackId::new(track_id);
@@ -2061,7 +2061,7 @@ pub fn get_simplified_preview(
         .iter()
         .map(|seg| {
             let pts = seg.points();
-            let kept_indices = simplify_track_points(pts, tolerance);
+            let kept_indices = simplify_track_points_m(pts, tolerance_m);
             let original_count = pts.len();
             let simplified_count = kept_indices.len();
             total_original += original_count;

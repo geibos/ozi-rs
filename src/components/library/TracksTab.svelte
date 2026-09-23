@@ -504,7 +504,7 @@
       active: true,
       layerId: t.layerId,
       trackId: t.trackId,
-      tolerance: 10,
+      toleranceM: 10,
       preview: null,
     });
     simplifyLivePreview = true;
@@ -555,7 +555,7 @@
         const preview = await getSimplifiedPreview(
           s.layerId,
           s.trackId,
-          s.tolerance,
+          s.toleranceM,
         );
         simplifyState.update((cur) => ({ ...cur, preview }));
       } catch (err) {
@@ -571,7 +571,7 @@
     const s = $simplifyState;
     if (!s.active) return;
     try {
-      await simplifyTrack(s.layerId, s.trackId, s.tolerance);
+      await simplifyTrack(s.layerId, s.trackId, s.toleranceM);
       // Every operation that changes a track's geometry has to bump this, or
       // the inspector's cached detail and the map's line go on showing the
       // points the operator just removed. Simplify was the one of six that
@@ -1005,7 +1005,7 @@
             <Label class="text-xs">
               {$i18n("tracksTab.tolerance").replace(
                 "{tolerance}",
-                String($simplifyState.tolerance),
+                String($simplifyState.toleranceM),
               )}
             </Label>
             <Slider
@@ -1013,7 +1013,7 @@
               min={1}
               max={1000}
               step={1}
-              value={$simplifyState.tolerance}
+              value={$simplifyState.toleranceM}
               onValueChange={(v) => {
                 // Clearing the preview is what asks for a new one: the effect
                 // above watches for a dialog that is open with nothing to
@@ -1021,7 +1021,7 @@
                 // twice for one drag.
                 simplifyState.update((s) => ({
                   ...s,
-                  tolerance: v as number,
+                  toleranceM: v as number,
                   preview: null,
                 }));
               }}

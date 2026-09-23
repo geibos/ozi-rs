@@ -496,9 +496,9 @@ async setWaypointDescription(layerId: number, waypointId: number, description: s
     else return { status: "error", error: e  as any };
 }
 },
-async simplifyTrack(layerId: number, trackId: number, tolerance: number) : Promise<Result<null, string>> {
+async simplifyTrack(layerId: number, trackId: number, toleranceM: number) : Promise<Result<null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("simplify_track", { layerId, trackId, tolerance }) };
+    return { status: "ok", data: await TAURI_INVOKE("simplify_track", { layerId, trackId, toleranceM }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -576,9 +576,9 @@ async getWaypoints(layerId: number) : Promise<Result<WaypointDto[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async getSimplifiedPreview(layerId: number, trackId: number, tolerance: number) : Promise<Result<SimplifiedPreviewDto, string>> {
+async getSimplifiedPreview(layerId: number, trackId: number, toleranceM: number) : Promise<Result<SimplifiedPreviewDto, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_simplified_preview", { layerId, trackId, tolerance }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_simplified_preview", { layerId, trackId, toleranceM }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

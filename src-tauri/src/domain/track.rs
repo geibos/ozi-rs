@@ -529,6 +529,23 @@ pub fn simplify_track_points(points: &[TrackPoint], tolerance: f64) -> Vec<usize
     kept.into_iter().collect()
 }
 
+/// Simplify with the tolerance the operator actually typed, in **metres**.
+///
+/// The slider in the Tracks tab is labelled «Допуск: {n} м» and runs from 1 to
+/// 1000. Its number went across the IPC boundary into `tolerance` — a
+/// parameter whose unit was written down only in this file's doc comment — and
+/// was read as kilometres. So the gentlest setting the interface offers, one
+/// metre, simplified at one kilometre, and a day's walk around a search area
+/// came back as three points. The operator saw a slider that destroyed the
+/// track wherever they put it, which is what "нормализация чистит слишком
+/// сильно" means. Reported by the owner, 2026-09-23.
+///
+/// The unit now lives in the name, all the way out to the generated bindings,
+/// which is the only place it cannot be lost.
+pub fn simplify_track_points_m(points: &[TrackPoint], tolerance_m: f64) -> Vec<usize> {
+    simplify_track_points(points, tolerance_m / 1000.0)
+}
+
 fn rdp(
     points: &[TrackPoint],
     start: usize,
@@ -574,7 +591,7 @@ fn rdp(
 mod tests {
     use super::{
         Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
-        simplify_track_points,
+        simplify_track_points, simplify_track_points_m,
     };
 
     #[test]
@@ -878,6 +895,32 @@ mod tests {
     fn simplify_two_points_returns_both_indices() {
         let points = [pt(1, 55.0, 37.0), pt(2, 55.1, 37.1)];
         assert_eq!(simplify_track_points(&points, 0.01), vec![0, 1]);
+    }
+
+    /// A crew walking a 1 km leg with a 50 m bulge in the middle of it.
+    ///
+    /// At the slider's gentlest setting the bulge is detail and must survive;
+    /// at 100 m it is noise and goes. Read as kilometres, both settings took
+    /// the track down to its two ends.
+    #[test]
+    fn simplify_in_metres_keeps_a_fifty_metre_bulge_at_ten_metres() {
+        // 0.00045° of latitude is about 50 m.
+        let points = [
+            pt(1, 55.0, 37.0),
+            pt(2, 55.00045, 37.0078),
+            pt(3, 55.0, 37.0156),
+        ];
+
+        assert_eq!(
+            simplify_track_points_m(&points, 10.0),
+            vec![0, 1, 2],
+            "a 50 m deviation is detail at a 10 m tolerance"
+        );
+        assert_eq!(
+            simplify_track_points_m(&points, 100.0),
+            vec![0, 2],
+            "the same deviation is noise at a 100 m tolerance"
+        );
     }
 
     #[test]

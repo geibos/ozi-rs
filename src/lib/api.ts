@@ -778,14 +778,19 @@ export async function setWaypointColor(
   );
 }
 
+/** `toleranceM` is metres — the number the slider shows. See the Rust side. */
 export async function simplifyTrack(
   layerId: bigint,
   trackId: bigint,
-  tolerance: number,
+  toleranceM: number,
 ): Promise<void> {
   await unwrap(
     "simplify_track",
-    commands.simplifyTrack(toIdNumber(layerId), toIdNumber(trackId), tolerance),
+    commands.simplifyTrack(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      toleranceM,
+    ),
   );
 }
 
@@ -841,17 +846,18 @@ export async function getWaypoints(layerId: bigint): Promise<WaypointData[]> {
   return unwrap("get_waypoints", commands.getWaypoints(toIdNumber(layerId)));
 }
 
+/** `toleranceM` is metres — the number the slider shows. See the Rust side. */
 export async function getSimplifiedPreview(
   layerId: bigint,
   trackId: bigint,
-  tolerance: number,
+  toleranceM: number,
 ): Promise<SimplifiedPreview> {
   return unwrap(
     "get_simplified_preview",
     commands.getSimplifiedPreview(
       toIdNumber(layerId),
       toIdNumber(trackId),
-      tolerance,
+      toleranceM,
     ),
   );
 }

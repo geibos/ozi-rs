@@ -585,9 +585,21 @@ const HANDLERS: StandAnswers = {
   // `Cannot read properties of undefined (reading 'map')` inside MapView and
   // the dialog showed two empty numbers. A stub with the wrong shape is the
   // same failure as a stub that returns `undefined`, wearing a hat.
-  get_simplified_preview: () => {
+  get_simplified_preview: (args) => {
+    // The tolerance is metres, and the answer has to move with it. This kept
+    // every second point whatever the slider said, so on the stand the slider
+    // did nothing to the numbers under it — which is how a unit bug in that
+    // very slider (metres read as kilometres, so 1 m simplified at 1 km) went
+    // four months without anybody seeing it. The stand does not run
+    // Douglas-Peucker; it answers a count that falls as the tolerance rises,
+    // which is the part a screen is read for.
+    const toleranceM =
+      typeof args?.toleranceM === "number" ? args.toleranceM : 10;
+    const step = Math.max(1, Math.round(Math.log2(Math.max(1, toleranceM)) + 1));
     const segments = trackDetailFixture.segments.map((segment) => {
-      const kept = segment.points.filter((_, index) => index % 2 === 0);
+      const kept = segment.points.filter(
+        (_, index) => index % step === 0 || index === segment.points.length - 1,
+      );
       return {
         id: segment.id,
         original_count: segment.points.length,
@@ -643,6 +655,17 @@ const HANDLERS: StandAnswers = {
     importOneLayer(standFileLabel(args?.path, "20260708_Veter2.plt"), 1),
   import_tracks_directory: (args) => {
     const label = standFileLabel(args?.path, "20260921");
+    // A folder import of something that is plainly a file is what the frontend
+    // falls back to when it does not recognise an extension, and the real
+    // command answers that with an error. Answering "imported" instead was the
+    // stand's own lie: dropping a day's files with a stray `заметка.txt` among
+    // them reported "5 из 5", which is the one thing a mixed drop exists to
+    // tell the truth about. Found walking CJ-3 on 2026-09-23.
+    if (/\.[a-z0-9]{1,5}$/i.test(label)) {
+      throw new Error(
+        `не удалось прочитать каталог: ${label} — это файл, а не папка`,
+      );
+    }
     importOneLayer(label, 3);
     // Counts, not a sentence: the interface does the wording now. One file is
     // reported unreadable, because the caveat branch is a screen too.

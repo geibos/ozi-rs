@@ -36,3 +36,14 @@ export function standDropFiles(paths: string[]): void {
     handler({ payload: { type: "drop", paths, position: { x: 640, y: 400 } } });
   }
 }
+
+// Beside `__stand`, `__standWindow` and `__standDialog`. Importing this module
+// by path from a walk can land in a second copy of it — Vite gives an edited
+// module a timestamped URL — and a drop played there reaches nobody, which
+// reads as "drag and drop does nothing".
+if (typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).__standWebview = {
+    drop: standDropFiles,
+    armed: () => handlers.length,
+  };
+}

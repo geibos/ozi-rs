@@ -1686,13 +1686,21 @@ impl AppState {
         Ok(removed)
     }
 
+    /// Simplify a track to the tolerance the operator set, in **metres**.
+    ///
+    /// Metres because that is what the slider says and what the number means
+    /// by the time it gets here; the command and the algorithm below work in
+    /// kilometres. The conversion lived nowhere for four months, so every
+    /// setting of a 1–1000 m slider simplified at 1–1000 km. See
+    /// `domain::track::simplify_track_points_m`.
     pub fn apply_simplify_track(
         &mut self,
         layer_id: LayerId,
         track_id: TrackId,
-        tolerance_km: f64,
+        tolerance_m: f64,
     ) -> Result<(), ProjectLayerError> {
-        let cmd = commands::ProjectCommand::simplify_track(layer_id, track_id, tolerance_km);
+        let cmd =
+            commands::ProjectCommand::simplify_track(layer_id, track_id, tolerance_m / 1000.0);
         self.history
             .apply(&mut self.project, &cmd)
             .map_err(|e| match e {
