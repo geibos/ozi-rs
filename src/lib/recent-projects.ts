@@ -15,6 +15,8 @@
  * Rust session file: the session remembers one project, this remembers where
  * the others are.
  */
+import { writable, type Readable } from "svelte/store";
+
 export const RECENT_PROJECTS_KEY = "ozi:recent-projects:v1";
 export const MAX_RECENT_PROJECTS = 8;
 
@@ -79,10 +81,32 @@ export function rememberProject(path: string, now = Date.now()): void {
       ...existing,
     ].slice(0, MAX_RECENT_PROJECTS);
     localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(next));
+    publishRecentProjects();
   } catch {
     // A convenience list is not worth a toast, and the quota it could exceed
     // is shared with the catalogue cache, which matters more.
   }
+}
+
+/**
+ * The list as a store, so a screen showing it does not show yesterday's.
+ *
+ * `BundleLoader` read `getRecentProjects()` into a plain `const` at component
+ * init, which in Svelte 5 is read once. Opening a colleague's `.ozp` from that
+ * very screen left the list without it — and the loader is also the Sheet that
+ * opens over the workspace, where the component can stay mounted for a whole
+ * session. A list of recent things that is a snapshot of one moment is the
+ * same lie as a copy of a list that changes. Found walking CJ-8, 2026-09-23.
+ */
+const recentProjectsStore = writable<RecentProject[]>(getRecentProjects());
+
+export const recentProjects: Readable<RecentProject[]> = {
+  subscribe: recentProjectsStore.subscribe,
+};
+
+/** Re-read from storage and tell everyone showing the list. */
+function publishRecentProjects(): void {
+  recentProjectsStore.set(getRecentProjects());
 }
 
 /** Forget one project — for a path that no longer opens. */
@@ -91,6 +115,7 @@ export function forgetProject(path: string): void {
     if (typeof localStorage === "undefined") return;
     const next = getRecentProjects().filter((p) => p.path !== path);
     localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(next));
+    publishRecentProjects();
   } catch {
     // As above.
   }

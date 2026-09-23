@@ -56,7 +56,7 @@
   import { toast } from "svelte-sonner";
   import { filterProjects } from "$lib/project-list";
   import { openProjectFile } from "$lib/actions/project";
-  import { getRecentProjects } from "$lib/recent-projects";
+  import { recentProjects } from "$lib/recent-projects";
   import { formatCatalogueAge } from "$lib/catalogue-age";
   import CalibratePicture from "./CalibratePicture.svelte";
   import { openMapShowingDownload } from "$lib/actions/open-map";
@@ -499,12 +499,30 @@
    * rather than reactively — the list only changes as a result of opening
    * something, which replaces this screen.
    */
-  const recentProjects = getRecentProjects().slice(0, 3);
+  // A store, not a snapshot: opening a project from this very screen used to
+  // leave the list without it.
+  const recentThree = $derived($recentProjects.slice(0, 3));
 
   const listAge = $derived(formatCatalogueAge($catalogueWrittenAt, $locale));
 
-  function handleOpenProjectFile() {
-    void openProjectFile();
+  /**
+   * Leave the launcher for the work.
+   *
+   * Opening a bundle has always done this; opening a `.ozp` did not, so a
+   * coordinator handed a colleague's project opened it and went on looking at
+   * the catalogue, with their work loaded behind it and nothing to say so.
+   * Found walking CJ-8, 2026-09-23.
+   */
+  function goToWorkspace() {
+    bundleLoaderOpen.set(false);
+    if (onCloseRequest) onCloseRequest();
+    else goto(resolve("/project"));
+  }
+
+  async function handleOpenProjectFile(known?: string) {
+    // Only when it landed: a cancelled dialog or a file that would not read
+    // must leave the operator where they were, with the error they were given.
+    if (await openProjectFile(known)) goToWorkspace();
   }
 </script>
 
@@ -638,19 +656,19 @@
            arriving with yesterday's work had to know the palette existed. The
            launch screen is where they are standing. -->
       <button
-        onclick={handleOpenProjectFile}
+        onclick={() => void handleOpenProjectFile()}
         class="footer-btn"
         data-testid="loader-open-project-file"
       >
         {$t("loader.openProjectFile")}
       </button>
-      {#if recentProjects.length > 0}
+      {#if recentThree.length > 0}
         <div class="recent-projects" data-testid="loader-recent-projects">
-          {#each recentProjects as project (project.path)}
+          {#each recentThree as project (project.path)}
             <button
               class="recent-project"
               title={project.path}
-              onclick={() => void openProjectFile(project.path)}
+              onclick={() => void handleOpenProjectFile(project.path)}
             >
               {project.name}
             </button>

@@ -61,7 +61,9 @@ describe("holding a click on the map", () => {
       commit: async (name) => {
         // A slow first commit must not let the second overtake it: each is
         // told the index to insert at, and two at once read the same one.
-        await new Promise((resolve) => setTimeout(resolve, name === "a" ? 5 : 0));
+        await new Promise((resolve) =>
+          setTimeout(resolve, name === "a" ? 5 : 0),
+        );
         committed.push(name);
       },
       setTimer: clock.setTimer,

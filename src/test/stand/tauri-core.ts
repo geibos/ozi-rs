@@ -359,8 +359,16 @@ const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
  */
 let projectEmptied = false;
 
-/** True once a picture has been calibrated, so the workspace has a map. */
-let rasterCalibrated = false;
+/**
+ * True once this session has done something that gives the operator a
+ * workspace: calibrated a picture, or opened a saved project.
+ *
+ * The cold-start fixture has no active map, and `/project` sends a visitor
+ * back to the launcher when there is none — so without this a journey that
+ * opens something from the launcher went straight back to the launcher, which
+ * is the shape of a bug rather than the shape of the feature.
+ */
+let standWorkspaceOpened = false;
 
 /**
  * Whether the project in hand differs from the project on disk.
@@ -377,6 +385,9 @@ let standProjectDirty = false;
 
 /** Where the project was last written, once a save has answered a dialog. */
 let standSavedPath: string | null = null;
+
+/** The `.ozp` this session opened, if any. */
+let standOpenedProjectPath: string | null = null;
 
 /** Commands after which the project in hand matches the one on disk. */
 const MAKES_THE_PROJECT_CLEAN = new Set([
@@ -437,7 +448,7 @@ function noteProjectMutation(command: string, args: Args | undefined): void {
 
 function previewedAppState(): AppStateDto {
   const fixture =
-    requestedState() === "cold" && !rasterCalibrated
+    requestedState() === "cold" && !standWorkspaceOpened
       ? coldStartFixture
       : appStateFixture;
   // The imported rows belong in the state too, not only in `list_tracks`:
@@ -447,8 +458,12 @@ function previewedAppState(): AppStateDto {
     ...fixture,
     tracks: [...withEditedCounts(fixture.tracks), ...importedTracks],
     project_dirty: standProjectDirty,
-    project_saved: standSavedPath !== null || fixture.project_saved,
-    project_path: standSavedPath ?? fixture.project_path,
+    project_saved:
+      standSavedPath !== null ||
+      standOpenedProjectPath !== null ||
+      fixture.project_saved,
+    project_path:
+      standSavedPath ?? standOpenedProjectPath ?? fixture.project_path,
   };
   if (projectEmptied) {
     // Everything the search held goes; the bundle and the active raster stay,
@@ -472,10 +487,17 @@ function previewedAppState(): AppStateDto {
       ),
     };
   }
-  const project = base.current_project;
-  if (previewedSlug === null || !project) return base;
+  if (previewedSlug === null) return base;
   // The whole project, with its slug moved: the loader matches on the slug, so
   // a partial object here would have been a project with nothing in it.
+  //
+  // The fallback to the warm fixture is what makes CJ-1 walkable. A cold start
+  // has no current project by definition, so previewing a search from the
+  // catalogue — the first thing that journey does — left the maps column on
+  // "Загрузка списка карт…" for ever, and the stand could not show the one
+  // screen the journey is about. Found walking CJ-1, 2026-09-23.
+  const project = base.current_project ?? appStateFixture.current_project;
+  if (!project) return base;
   return {
     ...base,
     current_project: { ...project, slug: previewedSlug },
@@ -619,7 +641,7 @@ const HANDLERS: StandAnswers = {
     // being the answer: without this the toast said the map had opened and
     // the screen went straight back to the launcher, which is the shape of
     // the bug rather than the shape of the feature.
-    rasterCalibrated = true;
+    standWorkspaceOpened = true;
     return path.replace(/\.[^./\\]+$/, "") + ".map";
   },
   get_simplified_preview: (args) => {
@@ -712,7 +734,14 @@ const HANDLERS: StandAnswers = {
   // Opening a saved project: the stand has one project, so this reports
   // success and leaves the fixture in place. What the flow is checked for is
   // the framing, the recents and the toast, all of which are frontend.
-  load_project_file: () => {
+  load_project_file: (args) => {
+    // The path lands in the state, the way the real command puts it there.
+    // It used to answer "accepted" and leave the fixture alone, so the
+    // launcher could not tell an opened project from a cancelled dialog and
+    // never left for the workspace. Found walking CJ-8, 2026-09-23.
+    if (typeof args?.path === "string") standOpenedProjectPath = args.path;
+    standProjectDirty = false;
+    standWorkspaceOpened = true;
     standEmit("state-changed", undefined);
     return null;
   },

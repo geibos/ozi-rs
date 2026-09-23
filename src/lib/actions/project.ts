@@ -103,8 +103,14 @@ export async function doRedo(): Promise<void> {
  *
  * A path that fails is dropped from the recents: an entry that errors every
  * time it is chosen is worse than no entry.
+ *
+ * Answers whether a project was opened, so the caller can act on it. The
+ * launcher has to leave for the workspace when one lands, and it cannot tell
+ * from the outside: a cancelled dialog and a file that would not read both
+ * leave the stores as they were, and so does re-opening the project that is
+ * already open — which is exactly what the recent list is for.
  */
-export async function openProjectFile(known?: string): Promise<void> {
+export async function openProjectFile(known?: string): Promise<boolean> {
   const translate = get(t);
   let path = known ?? null;
   try {
@@ -112,7 +118,7 @@ export async function openProjectFile(known?: string): Promise<void> {
       const chosen = await openFileDialog({
         filters: [PROJECT_OPEN_FILTER],
       } as Parameters<typeof openFileDialog>[0]);
-      if (!chosen) return; // cancelled — not an error
+      if (!chosen) return false; // cancelled — not an error
       path = chosen as string;
     }
     await loadProjectFile(path);
@@ -120,9 +126,11 @@ export async function openProjectFile(known?: string): Promise<void> {
     // Without this the project's tracks land wherever the camera happens to
     // point, which looks exactly like a project that did not load.
     requestAllDataFocus();
+    return true;
   } catch (error) {
     if (known !== undefined) forgetProject(known);
     toast.error(translate("toast.openFailed"), { description: String(error) });
+    return false;
   }
 }
 
