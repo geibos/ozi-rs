@@ -78,6 +78,11 @@
   } from "$lib/map-bounds";
   import { waypointColorCss, waypointGlyph } from "$lib/waypoint-symbols";
   import {
+    declutter,
+    positionsOf,
+    type LabelCandidate,
+  } from "$lib/track-labels";
+  import {
     destinationPoint,
     distanceKm,
     formatMeasuredDistance,
@@ -267,6 +272,109 @@
     if (!map || !mapLoaded) return;
     const geojson = await getTracksGeojson();
     updateTracksLayer(map, geojson);
+    lastTracksGeojson = geojson;
+    refreshTrackLabels();
+  }
+
+  /**
+   * The names on the map.
+   *
+   * A day of recordings drew in twelve colours with not one name on it. The
+   * symbol layer that would have carried them needs SDF glyphs this
+   * application does not bundle, and pointing the style at a remote glyphs URL
+   * does not merely lose the labels — it stops the *lines* rendering offline.
+   * So the names are DOM markers, like the waypoints, and the collision
+   * avoidance a symbol layer would have done is in `track-labels.ts`.
+   *
+   * Kept in step with the camera as well as the data: a label is placed by
+   * where it lands on screen, so panning and zooming change which names fit.
+   */
+  let lastTracksGeojson: GeoJSON.FeatureCollection | null = null;
+  const trackLabelMarkers = new Map<string, maplibregl.Marker>();
+  /** Below this the whole district is on screen and names are a smear. */
+  const LABEL_MIN_ZOOM = 10;
+
+  function labelCandidates(): LabelCandidate[] {
+    const features = (lastTracksGeojson?.features ?? []) as Array<{
+      geometry?: unknown;
+      properties?: Record<string, unknown> | null;
+    }>;
+    const selected = get(selectedTrack);
+    const out: LabelCandidate[] = [];
+    for (const feature of features) {
+      const properties = feature.properties ?? {};
+      if (properties.visible === false) continue;
+      const name = typeof properties.name === "string" ? properties.name : "";
+      if (name.trim().length === 0) continue;
+      const layerId = String(properties.layer_id ?? "");
+      const trackId = String(properties.track_id ?? "");
+      out.push({
+        key: `${layerId}:${trackId}`,
+        name,
+        color:
+          typeof properties.color === "string"
+            ? properties.color
+            : "rgba(255,255,255,1)",
+        positions: positionsOf(feature.geometry),
+        selected:
+          selected !== null &&
+          String(selected.layerId) === layerId &&
+          String(selected.trackId) === trackId,
+      });
+    }
+    return out;
+  }
+
+  function clearTrackLabels() {
+    for (const marker of trackLabelMarkers.values()) marker.remove();
+    trackLabelMarkers.clear();
+  }
+
+  function refreshTrackLabels() {
+    // No `mapLoaded` here on purpose. These are DOM markers, not a style
+    // layer: they need a camera, not a loaded style. Gating on `mapLoaded`
+    // meant the first geometry — which arrives before the style's `load`
+    // fires — drew its lines and no names, and nothing asked again until the
+    // operator happened to pan.
+    if (!map) return;
+    if (map.getZoom() < LABEL_MIN_ZOOM) {
+      clearTrackLabels();
+      return;
+    }
+
+    const placed = declutter(labelCandidates(), (at) =>
+      map.project([at.lon, at.lat]),
+    );
+    const wanted = new Set(placed.map((label) => label.key));
+    for (const [key, marker] of trackLabelMarkers) {
+      if (wanted.has(key)) continue;
+      marker.remove();
+      trackLabelMarkers.delete(key);
+    }
+
+    for (const label of placed) {
+      const existing = trackLabelMarkers.get(label.key);
+      if (existing) {
+        existing.setLngLat([label.at.lon, label.at.lat]);
+        const element = existing.getElement();
+        // `textContent`, never `innerHTML`: a track's name is whatever the
+        // crew typed, and `maplibre-waiver.test.ts` fails on the alternative.
+        if (element.textContent !== label.name)
+          element.textContent = label.name;
+        element.style.color = label.color;
+        continue;
+      }
+      const element = document.createElement("div");
+      element.className = "track-label";
+      element.textContent = label.name;
+      element.style.color = label.color;
+      // The label must never eat a click meant for the line underneath it.
+      element.style.pointerEvents = "none";
+      const marker = new maplibregl.Marker({ element, anchor: "center" })
+        .setLngLat([label.at.lon, label.at.lat])
+        .addTo(map);
+      trackLabelMarkers.set(label.key, marker);
+    }
   }
 
   // Raise track line + label layers above every other layer (notably the
@@ -292,6 +400,9 @@
     const selected = $selectedTrack;
     if (!map) return;
     highlightTrack(map, selected);
+    // A selected track keeps its name when space is short, so the label set
+    // changes with the selection as well as with the camera.
+    refreshTrackLabels();
   });
 
   function openContextMenu(event: MouseEvent, target: PointMenuTarget) {
@@ -990,6 +1101,19 @@
     });
 
     map.on("moveend", updateViewportBounds);
+    // Which names fit depends on where they land on screen, so the set is
+    // recomputed when the camera settles rather than only when the data
+    // changes.
+    //
+    // `idle` as well as `moveend`, and it is not belt and braces. The map
+    // opens at zoom 5 over Moscow and only then flies to the data. The first
+    // geometry arrives at that opening zoom, where every name is suppressed
+    // as a smear; the flight that follows is programmatic and had already
+    // finished by the time this handler was attached, so `moveend` never came
+    // and the map sat there with twelve coloured lines and no names — the
+    // exact thing this change exists to fix.
+    map.on("moveend", refreshTrackLabels);
+    map.on("idle", refreshTrackLabels);
 
     map.on("click", (e) => {
       contextMenu = null;
@@ -1040,6 +1164,7 @@
       stopFpsCounter();
       clearPointMarkers();
       clearWaypointMarkers();
+      clearTrackLabels();
       clearDrawingPreview();
       mapViewportBounds.set(null);
       if (pendingDrawingClickTimeout !== null) {
@@ -1197,6 +1322,12 @@
         const geojson = await getTracksGeojson();
         updateTracksLayer(map, geojson);
         raiseTrackLayers();
+        // This is the branch a cold start takes, and it is the third place
+        // that draws the geometry. The names were added to the other two
+        // first and did not appear at all until this one had them too —
+        // worth remembering before adding a fourth.
+        lastTracksGeojson = geojson;
+        refreshTrackLabels();
         appliedTracksFingerprint = fp;
       });
       return;
@@ -1211,6 +1342,11 @@
       if (!trackGeometryRuns.isCurrent(run)) return;
       updateTracksLayer(map, geojson);
       raiseTrackLayers();
+      // The names are DOM markers, so they follow the geometry rather than the
+      // source. This is the path the map actually takes on a data change;
+      // `refreshTrackGeometry` is the explicit one the drawing tools call.
+      lastTracksGeojson = geojson;
+      refreshTrackLabels();
     });
   });
 
@@ -1632,6 +1768,31 @@
 </div>
 
 <style>
+  /* The names on the map. A halo rather than a box: a track runs under its
+     own label, and a filled chip would hide the very line the name is for.
+     `text-shadow` in four directions is the cheapest halo that works over
+     both a dark forest and a pale field. */
+  :global(.track-label) {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    /* A white halo, not a dark one. The names are drawn in the track's own
+       colour — saturated red, blue, teal — over a topographic map that is
+       mostly pale green and grey. A dark halo under a saturated hue turns it
+       muddy at 11px; white separates the letters from the map the way a
+       printed map does, and still reads on the dark theme because the text
+       itself stays bright. */
+    text-shadow:
+      0 0 3px rgba(255, 255, 255, 0.95),
+      1px 0 2px rgba(255, 255, 255, 0.9),
+      -1px 0 2px rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(255, 255, 255, 0.9),
+      0 -1px 2px rgba(255, 255, 255, 0.9);
+    user-select: none;
+  }
+
   /* Load-bearing rules for MapLibre marker DOM elements created by
      new maplibregl.Marker({ element }). Tailwind utilities cannot
      reach these because the elements are created via document.createElement

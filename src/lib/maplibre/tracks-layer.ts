@@ -61,8 +61,14 @@ export function initTracksLayer(map: MapLibreMap) {
   // aborted `initTracksLayer` and the track line never got wired up — tracks
   // were invisible while their point markers (DOM) still showed. Add the
   // label layer only when glyphs exist, and never let its failure take the
-  // line down with it. On-map track labels are a follow-up: bundle SDF glyph
-  // PBFs and set `style.glyphs` (also fixes the offline-labels audit finding).
+  // line down with it.
+  //
+  // Since 2026-09-23 the names on the map do not come from here at all: they
+  // are DOM markers, placed and decluttered by `$lib/track-labels`, which
+  // needs no glyphs and therefore no font licence and no megabytes in the
+  // repository. This layer stays because it costs nothing when there are no
+  // glyphs and would be the better renderer if any are ever bundled — a
+  // symbol layer collides and fades text the way a map should.
   if (!map.getGlyphs?.()) return;
   try {
     map.addLayer({
