@@ -45,6 +45,7 @@ run:
 run-release:
     @./scripts/dev-build-frontend.sh
     cargo build --release --manifest-path src-tauri/Cargo.toml --features custom-protocol
+    @just sign-dev target/release/ozi-rs
     ./target/release/ozi-rs
 
 # E2E smoke gate: drives the real bundled app through the core workflow
@@ -67,16 +68,26 @@ build:
     npm run tauri build -- --debug
     @just sign-dev
 
-# Sign the debug bundle with the local development identity, when one exists.
+# Sign a built artifact with the local development identity, when one exists.
 # Without a stable identity every rebuild is a new program to macOS, so the
 # Documents-access prompt returns on each build and blocks the window from
 # opening. Create the identity once with ./scripts/setup-dev-signing.sh.
-sign-dev:
+#
+# Takes the artifact, so the same identity covers the debug bundle (the
+# default) and the unbundled release binary `just run-release` launches.
+# Note what signing an unbundled binary does and does not buy: it keeps the
+# identity stable, but macOS attributes a permission request to the
+# *responsible* process, which for a binary started from a shell is the
+# terminal — so Screen Recording and Documents are asked of, and granted to,
+# whatever launched it. Permissions that belong to ozi-rs itself need it
+# started as a bundle (`just build`, then open the .app).
+sign-dev target="target/debug/bundle/macos/ozi-rs.app":
     #!/usr/bin/env bash
     set -euo pipefail
-    app="target/debug/bundle/macos/ozi-rs.app"
+    app="{{target}}"
     identity="ozi-rs Local Dev"
-    if [ ! -d "$app" ]; then exit 0; fi
+    # -e, not -d: a bundle is a directory, the release binary is a file.
+    if [ ! -e "$app" ]; then exit 0; fi
     if ! security find-identity -v -p codesigning | grep -qF "$identity"; then
       echo "note: no '$identity' signing identity; leaving the ad-hoc signature."
       echo "      run ./scripts/setup-dev-signing.sh to stop the repeated permission prompts."
