@@ -19,10 +19,7 @@ import { join } from "path";
  * quietly converts twice.
  */
 describe("the simplify tolerance", () => {
-  const bindings = readFileSync(
-    join(__dirname, "../lib/bindings.ts"),
-    "utf-8",
-  );
+  const bindings = readFileSync(join(__dirname, "../lib/bindings.ts"), "utf-8");
 
   it("is named for its unit in the generated bindings", () => {
     for (const command of ["simplifyTrack", "getSimplifiedPreview"]) {

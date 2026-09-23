@@ -643,8 +643,15 @@ impl AppState {
         let metadata =
             parse_ozi_map_metadata(&map_path, &contents).map_err(OpenLocalMapError::Parse)?;
 
+        // OZF2 is the optimised form; a `.map` beside an ordinary picture is
+        // OziExplorer's own pairing and the commoner thing a headquarters is
+        // handed — a scan of a sheet, a screenshot, a photograph of a paper map
+        // on a table. Refusing those meant refusing a file OziExplorer opens
+        // without comment, which is most of what "I cannot open my map here"
+        // meant. `.ozfx3` stays refused: it is encrypted and nothing here reads
+        // it.
         match metadata.raster_kind() {
-            OziRasterKind::Ozf2 => {}
+            OziRasterKind::Ozf2 | OziRasterKind::DirectImage(_) => {}
             kind => return Err(OpenLocalMapError::UnsupportedRasterKind(kind.clone())),
         }
 

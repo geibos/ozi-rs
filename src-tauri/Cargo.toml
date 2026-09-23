@@ -42,7 +42,14 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # PNG encoding for tile delivery
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "jpeg",
+    "tiff",
+    "bmp",
+    "gif",
+    "webp",
+] }
 
 # Encoding detection for PLT import (cp1251 / UTF-8 / UTF-16 BOM)
 chardetng = "0.1"

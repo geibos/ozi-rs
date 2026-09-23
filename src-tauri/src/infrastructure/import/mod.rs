@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod direct_image;
 pub mod gpx;
 pub mod ozi_georeference;
 pub mod ozi_map;

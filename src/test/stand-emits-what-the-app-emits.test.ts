@@ -52,9 +52,10 @@ describe("the stand's state-changed events", () => {
     const declared = stand.match(
       /const EMITS_STATE_CHANGED = new Set\(\[([\s\S]*?)\]\);/,
     );
-    expect(declared, "EMITS_STATE_CHANGED is not where this test looks").not.toBe(
-      null,
-    );
+    expect(
+      declared,
+      "EMITS_STATE_CHANGED is not where this test looks",
+    ).not.toBe(null);
     const listed = [
       ...(declared as RegExpMatchArray)[1].matchAll(/"([a-z0-9_]+)"/g),
     ]

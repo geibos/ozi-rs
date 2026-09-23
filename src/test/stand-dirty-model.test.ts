@@ -70,7 +70,9 @@ describe("the stand's unsaved-changes model", () => {
   it("classifies every command the frontend can send", () => {
     const expected = new Set(LEAVES_THE_PROJECT_ALONE);
     const surprises = commands
-      .filter((name) => standCommandChangesTheProject(name) === expected.has(name))
+      .filter(
+        (name) => standCommandChangesTheProject(name) === expected.has(name),
+      )
       .map(
         (name) =>
           `${name}: the stand says it ${
@@ -91,9 +93,10 @@ describe("the stand's unsaved-changes model", () => {
     const stale = LEAVES_THE_PROJECT_ALONE.filter(
       (name) => !commands.includes(name),
     );
-    expect(stale, "a classification that outlives its command is noise").toEqual(
-      [],
-    );
+    expect(
+      stale,
+      "a classification that outlives its command is noise",
+    ).toEqual([]);
   });
 
   it("leaves the project clean through a start that only reads", () => {

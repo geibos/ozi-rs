@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::infrastructure::import::direct_image::{DirectImageRaster, TILE_SIZE};
 use crate::infrastructure::import::{OziMapMetadata, OziRasterKind};
 use ozf2::{DecodedTile, OzfError, OziRaster, PaletteEntry};
 use std::fmt;
@@ -177,19 +178,36 @@ impl DecodedOziRasterTile {
     }
 }
 
+/// Where a level's pixels come from.
+///
+/// OZF2 is the optimised form, already tiled and already pyramided, and it is
+/// what a bundle from maps.lizaalert.ru contains. A plain picture beside a
+/// `.map` is what a headquarters is handed — a scan, a screenshot, a
+/// photograph — and OziExplorer opens both without distinction, so nothing
+/// above this level should have to know which it got.
+#[derive(Debug, Clone)]
+enum RasterBackend {
+    Ozf2(OziRaster),
+    Picture(Box<DirectImageRaster>),
+}
+
 #[derive(Debug, Clone)]
 pub struct OziRasterTileSource {
     source_path: PathBuf,
     levels: Vec<OziRasterLevelMetadata>,
-    raster: OziRaster,
+    backend: RasterBackend,
 }
 
 impl OziRasterTileSource {
-    fn new(source_path: PathBuf, levels: Vec<OziRasterLevelMetadata>, raster: OziRaster) -> Self {
+    fn new(
+        source_path: PathBuf,
+        levels: Vec<OziRasterLevelMetadata>,
+        backend: RasterBackend,
+    ) -> Self {
         Self {
             source_path,
             levels,
-            raster,
+            backend,
         }
     }
 
@@ -214,7 +232,29 @@ impl OziRasterTileSource {
         let level = self
             .level(level_index)
             .ok_or(OzfError::LevelOutOfBounds { level_index })?;
-        let decoded_tile = self.raster.decode_tile(
+
+        let raster = match &self.backend {
+            RasterBackend::Ozf2(raster) => raster,
+            RasterBackend::Picture(picture) => {
+                let (width, height, rgba) = picture.tile_rgba(level_index, tile_x, tile_y).ok_or(
+                    OzfError::TileOutOfBounds {
+                        level_index,
+                        tile_x: u16::try_from(tile_x).unwrap_or(u16::MAX),
+                        tile_y: u16::try_from(tile_y).unwrap_or(u16::MAX),
+                    },
+                )?;
+                return Ok(DecodedOziRasterTile::new(
+                    self.source_path.clone(),
+                    level_index,
+                    tile_x,
+                    tile_y,
+                    width,
+                    height,
+                    rgba,
+                ));
+            }
+        };
+        let decoded_tile = raster.decode_tile(
             level_index,
             u16::try_from(tile_x).map_err(|_| OzfError::TileOutOfBounds {
                 level_index,
@@ -252,6 +292,7 @@ impl OziRasterTileSource {
 pub enum OziRasterDecodeError {
     UnsupportedRasterKind(OziRasterKind),
     Decode(OzfError),
+    Picture(crate::infrastructure::import::direct_image::DirectImageError),
 }
 
 impl fmt::Display for OziRasterDecodeError {
@@ -261,6 +302,7 @@ impl fmt::Display for OziRasterDecodeError {
                 write!(f, "unsupported OZI raster kind for decoding: {kind:?}")
             }
             Self::Decode(error) => write!(f, "failed to decode OZF raster: {error}"),
+            Self::Picture(error) => write!(f, "{error}"),
         }
     }
 }
@@ -270,7 +312,14 @@ impl std::error::Error for OziRasterDecodeError {
         match self {
             Self::UnsupportedRasterKind(_) => None,
             Self::Decode(error) => Some(error),
+            Self::Picture(error) => Some(error),
         }
+    }
+}
+
+impl From<crate::infrastructure::import::direct_image::DirectImageError> for OziRasterDecodeError {
+    fn from(value: crate::infrastructure::import::direct_image::DirectImageError) -> Self {
+        Self::Picture(value)
     }
 }
 
@@ -285,6 +334,7 @@ pub fn open_ozi_raster_tile_source(
 ) -> Result<OziRasterTileSource, OziRasterDecodeError> {
     match metadata.raster_kind() {
         OziRasterKind::Ozf2 => open_ozf2_tile_source(metadata),
+        OziRasterKind::DirectImage(_) => open_picture_tile_source(metadata),
         other => Err(OziRasterDecodeError::UnsupportedRasterKind(other.clone())),
     }
 }
@@ -296,13 +346,19 @@ pub fn decode_ozi_raster_image(
     let base_level = source
         .level(0)
         .ok_or(OzfError::LevelOutOfBounds { level_index: 0 })?;
-    let image = source.raster.decode_rgba_image(0)?;
+    let pixels = match &source.backend {
+        RasterBackend::Ozf2(raster) => raster.decode_rgba_image(0)?.pixels().to_vec(),
+        RasterBackend::Picture(picture) => picture
+            .level_rgba(0)
+            .ok_or(OzfError::LevelOutOfBounds { level_index: 0 })?
+            .to_vec(),
+    };
 
     Ok(DecodedOziRasterImage::new(
         source.source_path.clone(),
         base_level.width(),
         base_level.height(),
-        image.pixels().to_vec(),
+        pixels,
     ))
 }
 
@@ -331,7 +387,36 @@ fn open_ozf2_tile_source(
     Ok(OziRasterTileSource::new(
         metadata.resolved_raster_path().to_path_buf(),
         levels,
-        raster,
+        RasterBackend::Ozf2(raster),
+    ))
+}
+
+/// A `.map` beside an ordinary picture: decode it and cut it into tiles.
+fn open_picture_tile_source(
+    metadata: &OziMapMetadata,
+) -> Result<OziRasterTileSource, OziRasterDecodeError> {
+    let path = metadata.resolved_raster_path().to_path_buf();
+    let picture = DirectImageRaster::open(&path)?;
+
+    let levels = (0..picture.level_count())
+        .filter_map(|level_index| {
+            let (width, height) = picture.level_size(level_index)?;
+            Some(OziRasterLevelMetadata::new(
+                level_index,
+                width,
+                height,
+                TILE_SIZE,
+                TILE_SIZE,
+                width.div_ceil(TILE_SIZE),
+                height.div_ceil(TILE_SIZE),
+            ))
+        })
+        .collect();
+
+    Ok(OziRasterTileSource::new(
+        path,
+        levels,
+        RasterBackend::Picture(Box::new(picture)),
     ))
 }
 
@@ -453,5 +538,93 @@ mod tests {
                 },
             ],
         )
+    }
+}
+
+/// A `.map` beside an ordinary picture, opened the way the application opens
+/// one: parse the calibration file, resolve the raster it names, cut tiles.
+///
+/// The unit tests below the picture reader prove the pyramid and the tile
+/// cutting; this proves the wiring, which is where it was broken — the reader
+/// existed in the `.map` parser's vocabulary (`DirectImage(Jpeg)`,
+/// `DirectImage(Png)`, …) for months while `open_ozi_raster_tile_source`
+/// answered `UnsupportedRasterKind` for every one of them.
+#[cfg(test)]
+mod picture_map_tests {
+    use super::{OziRasterDecodeError, open_ozi_raster_tile_source};
+    use crate::infrastructure::import::{OziRasterKind, parse_ozi_map_metadata};
+    use std::path::PathBuf;
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("ozi-rs-picture-map-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    fn write_picture(dir: &std::path::Path, name: &str, width: u32, height: u32) {
+        let mut image = image::RgbaImage::new(width, height);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            *pixel = image::Rgba([(x % 256) as u8, (y % 256) as u8, 64, 255]);
+        }
+        image.save(dir.join(name)).expect("write picture");
+    }
+
+    fn write_map(dir: &std::path::Path, raster_name: &str) -> PathBuf {
+        let path = dir.join("sheet.map");
+        let contents = format!(
+            "OziExplorer Map Data File Version 2.2\nSheet\n{raster_name}\n1 ,Map Code,\nWGS 84,,   0.0000,   0.0000,WGS 84\nReserved 1\nReserved 2\nMagnetic Variation,,,E\nMap Projection,Mercator,PolyCal,No,AutoCalOnly,No,BSBUseWPX,No\nPoint01,xy,100,200,in, deg,54,30.000,N,48,24.000,E, grid, , , ,N\nPoint02,xy,300,400,in, deg,54,31.000,N,48,25.000,E, grid, , , ,N\n"
+        );
+        std::fs::write(&path, contents).expect("write map");
+        path
+    }
+
+    #[test]
+    fn a_map_beside_a_png_opens_and_hands_out_tiles() {
+        let dir = temp_dir("png");
+        write_picture(&dir, "sheet.png", 600, 400);
+        let map_path = write_map(&dir, "sheet.png");
+
+        let contents = std::fs::read_to_string(&map_path).expect("read map");
+        let metadata = parse_ozi_map_metadata(&map_path, &contents).expect("parse map");
+        assert!(matches!(
+            metadata.raster_kind(),
+            OziRasterKind::DirectImage(_)
+        ));
+
+        let source = open_ozi_raster_tile_source(&metadata).expect("open picture source");
+        let base = source.level(0).expect("level 0");
+        assert_eq!((base.width(), base.height()), (600, 400));
+        assert_eq!((base.tile_columns(), base.tile_rows()), (3, 2));
+
+        let tile = source.decode_rgba_tile(0, 0, 0).expect("tile 0,0");
+        assert_eq!((tile.width(), tile.height()), (256, 256));
+        assert_eq!(tile.rgba_pixels().len(), 256 * 256 * 4);
+
+        // The last column is 600 - 512 = 88 pixels wide, and asking past it is
+        // not an error the caller has to guess at.
+        let edge = source.decode_rgba_tile(0, 2, 0).expect("tile 2,0");
+        assert_eq!(edge.width(), 88);
+        assert!(source.decode_rgba_tile(0, 3, 0).is_err());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_map_naming_a_picture_that_is_not_there_says_so() {
+        let dir = temp_dir("missing");
+        let map_path = write_map(&dir, "sheet.jpg");
+        let contents = std::fs::read_to_string(&map_path).expect("read map");
+        let metadata = parse_ozi_map_metadata(&map_path, &contents).expect("parse map");
+
+        let error = open_ozi_raster_tile_source(&metadata).expect_err("must fail");
+        assert!(matches!(error, OziRasterDecodeError::Picture(_)));
+        assert!(
+            error.to_string().contains("sheet.jpg"),
+            "the message must name the file: {error}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
