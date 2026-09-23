@@ -159,4 +159,4 @@ possible.
 - ADR-0024 — Playwright is not used for desktop QA
 - `docs/native-qa-mcp.md` — MCP tool inventory and usage
 - `docs/testing-strategy.md` — overall test layering
-- `docs/superpowers/specs/2026-04-28-qa-debug-process-design.md` — direction-B spec
+- `docs/archive/superpowers/specs/2026-04-28-qa-debug-process-design.md` — direction-B spec

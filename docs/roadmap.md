@@ -154,26 +154,30 @@ The ADR-0020 must-have list is closed. Every item that stood here on
 - **Recent projects list** — `src/lib/recent-projects.ts`, offered in the
   command palette, beside the recent-maps list it is not the same thing as.
 
-What is left is not a feature list. `docs/STATE.md` holds it: archiving the
-OpenSpec changes, five decisions that are the owner's to make, FTP when they
-are ready, the customer-journey smoke gate (blocked on this machine), and the
-MapLibre 4 → 6 upgrade, which is deliberately not attempted while that gate is
-down.
+What is left is not a feature list. `docs/STATE.md` holds it: five decisions
+that are the owner's to make, FTP when they are ready, the MapLibre 4 → 6
+upgrade, and the internal rebuild — a view-model layer and a screenshot matrix
+— which no operator can see and which is tracked as its own OpenSpec change.
+
+The smoke gate is no longer blocked: two desktop journeys ran green on
+2026-09-23 against a freshly built bundle. Six of the eight Customer Journeys
+still have no desktop journey of their own, and `tools/ozi-rs-mcp/tests/smoke_core_workflow.rs`
+carries a line each saying what stands in the way.
 
 Regressions from the 2026-05-26 workspace redesign, re-checked 2026-09-22:
 
 - ~~Split/join segment UI~~ — the Track Inspector's segments table calls both.
-- **Theme picker** — `ThemePicker.svelte` is still imported by nothing, so the
-  theme cannot be changed from the interface, while `ui-shell` requires a
-  selector. Where the control belongs is a design decision, so it is listed
-  rather than placed; see `docs/backlog.md`.
+- ~~Theme picker~~ — the themes are in the command palette
+  (`CommandPalette.svelte`), which is where a setting changed twice a year
+  belongs. `ThemePicker.svelte` stayed unimported and was dropped.
 - ~~Undo/redo keyboard shortcuts~~ — the layout binds Cmd/Ctrl+Z and
   Shift for redo (`handleGlobalKeydown`, `src/routes/+layout.svelte`).
 
 Other remaining work before 1.0:
 
 - KML import/export (low priority, no current user demand)
-- Full layer management UI (create, rename, delete, reorder); backend supports multiple layers and the UI currently surfaces active-layer selection only
+- Reordering layers. Creating, renaming and deleting them shipped on
+  2026-09-21 (`layers`); reordering is the part still not built.
 
 ## Deferred (post-1.0)
 

@@ -1,5 +1,4 @@
 ## ADDED Requirements
-
 ### Requirement: Components consume application state only through the view-model layer
 
 The frontend SHALL expose application state to components through `src/lib/vm/` modules (`workspace`, `library`, `catalog`, `selection`, `map`), each exporting typed `Readable` stores derived from the latest `AppStateDto` and explicit async actions that call `src/lib/api.ts`. Components under `src/components/` SHALL NOT import `appState` or the legacy mode flags from `src/lib/stores.ts` once their screen has migrated; a lint rule SHALL enforce this for migrated components. During migration, unmigrated components MAY keep their existing imports.
@@ -13,20 +12,6 @@ The frontend SHALL expose application state to components through `src/lib/vm/` 
 
 - **WHEN** a migrated component adds `import { appState } from "$lib/stores"`
 - **THEN** `just lint` fails with the vm-boundary rule naming the file
-
-### Requirement: A single interaction mode governs map input
-
-`src/lib/vm/selection.ts` SHALL expose `interactionMode: Readable<'view' | 'draw' | 'edit' | 'measure' | 'addWaypoint'>` and `setMode(next)`. `setMode` SHALL run the exit logic of the previous mode (clear drawing preview, drop point markers, restore map drag/click handlers) before entering the next one. The legacy flags `drawingModeActive`, `editModeActive`, `addWaypointMode` and `simplifyState.active` SHALL be derived from `interactionMode` during migration and SHALL be deleted when the toolbar migrates.
-
-#### Scenario: Switching modes never leaves two active
-
-- **WHEN** the mode is `draw` with a two-point preview and `setMode('addWaypoint')` is called
-- **THEN** the drawing preview is cleared, the scratch track is cancelled through the existing command, and `interactionMode` reads `addWaypoint`
-
-#### Scenario: Escape returns to view
-
-- **WHEN** any non-`view` mode is active and the user presses Escape on the map
-- **THEN** `interactionMode` reads `view` and map dragging is enabled
 
 ### Requirement: Map behaviour is composed from attachable modules
 
@@ -55,3 +40,18 @@ Every `src/lib/vm/*` module SHALL have unit tests that feed fixtures from `src/t
 
 - **WHEN** two `projects-chunk` payloads with overlapping slugs are applied to `catalog`
 - **THEN** `catalog.projects` contains each slug once and the later name wins
+
+### Requirement: A single interaction mode governs map input
+
+`src/lib/vm/selection.ts` SHALL expose `interactionMode: Readable<'view' | 'draw' | 'edit' | 'measure' | 'addWaypoint'>` and `setMode(next)`. `setMode` SHALL run the exit logic of the previous mode (clear drawing preview, drop point markers, restore map drag/click handlers) before entering the next one. The legacy flags `drawingModeActive`, `editModeActive`, `addWaypointMode` and `simplifyState.active` SHALL be derived from `interactionMode` during migration and SHALL be deleted when the toolbar migrates.
+
+#### Scenario: Switching modes never leaves two active
+
+- **WHEN** the mode is `draw` with a two-point preview and `setMode('addWaypoint')` is called
+- **THEN** the drawing preview is cleared, the scratch track is cancelled through the existing command, and `interactionMode` reads `addWaypoint`
+
+#### Scenario: Escape returns to view
+
+- **WHEN** any non-`view` mode is active and the user presses Escape on the map
+- **THEN** `interactionMode` reads `view` and map dragging is enabled
+

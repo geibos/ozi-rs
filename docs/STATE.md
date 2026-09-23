@@ -5,7 +5,23 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-Two OpenSpec changes are left — `codify-architecture-decisions`, which needs
+**One OpenSpec change is open, and nothing in it is visible to an operator.**
+`finish-the-rebuild` carries the three pieces of the development cycle that
+were never built: the screenshot matrix, the view-model layer, and a smoke
+journey for the six Customer Journeys that have none. Everything else is
+archived — `codify-architecture-decisions` and `revive-ui-cycle` both closed on
+2026-09-23, the first after reading all thirteen of its capability deltas
+against the source, the second after moving its unbuilt requirements out rather
+than archiving requirements the code does not meet.
+
+**Seven of the eight Customer Journeys walk end to end on the stand**, and
+`docs/customer-journeys.md` now says what is true rather than what was true in
+July. Two desktop journeys run green against a freshly built bundle. What is
+still open there: CJ-1 and CJ-8 have not been walked at all, and six CJs have
+no desktop journey — the blockers are one line each in
+`tools/ozi-rs-mcp/tests/smoke_core_workflow.rs`.
+
+Two OpenSpec changes were left — `codify-architecture-decisions`, which needs
 the owner's review before its 63 requirements merge, and `revive-ui-cycle`.
 Everything else is archived; three more closed on 2026-09-23
 (`a-note-on-the-mark`, `walking-cj4`, `every-export-says-so`,

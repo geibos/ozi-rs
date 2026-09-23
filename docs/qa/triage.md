@@ -1,7 +1,7 @@
 # MVP Audit Triage
 
 Date: 2026-05-01
-Source: docs/superpowers/plans/2026-04-28-mvp-audit.md
+Source: docs/archive/superpowers/plans/2026-04-28-mvp-audit.md
 Authoritative scope: ADR-0020
 
 **Sorted by priority (P0 → P3) and task number within each priority.**

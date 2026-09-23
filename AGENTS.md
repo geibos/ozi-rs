@@ -197,6 +197,27 @@ end-to-end proof) → Esc cancels and the scratch track row disappears.
   once. Clean-up duties after every run are in `CLAUDE.md` (stop session, quit app,
   verify with `pgrep`).
 
+## Before a slice is done
+
+Five checks, the same five as `.github/pull_request_template.md`. An unticked
+one needs a reason, not silence.
+
+1. **Gallery entry** — `docs/progress/<date>-<slice>/` with before and after
+   screenshots of the screens the slice touched.
+2. **Tests on behaviour** — new code covered by unit or component tests that
+   check the result. A test that greps the source is not coverage for new code;
+   it is a guard against a defect class returning, which is a different job.
+3. **The journey is green** — if the slice touches a Customer Journey, that
+   CJ's smoke passes and asserts the outcome rather than the presence of a
+   button.
+4. **`just ci` green** — locally, before pushing. The same gates run on the
+   pushed head.
+5. **`docs/STATE.md` updated** — what changed and what is next.
+
+A behavioural change also needs an OpenSpec change that passes
+`openspec validate <change> --strict`. New decisions go in its `design.md` and
+the capability's decision history, never in a new ADR file.
+
 ## Documentation
 
 - `docs/project-map.md` — single-page navigator: where things live, common-task entry points, onboarding read order

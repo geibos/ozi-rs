@@ -125,7 +125,7 @@ The seven P1 predictions should be the *first* targets of the next driven run, b
 
 ## References
 
-- **Plan:** [`docs/superpowers/plans/2026-04-28-mvp-audit.md`](../superpowers/plans/2026-04-28-mvp-audit.md)
+- **Plan:** [`docs/archive/superpowers/plans/2026-04-28-mvp-audit.md`](../archive/superpowers/plans/2026-04-28-mvp-audit.md)
 - **Verification protocol:** [`docs/agent-verification.md`](../agent-verification.md)
 - **MVP scope:** ADR-0020
 - **WPT priority:** ADR-0022

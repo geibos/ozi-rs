@@ -1,6 +1,6 @@
 # 2026-04-29 — Tooling Audit Findings (pre-feature-audit)
 
-The MVP feature audit defined in `docs/superpowers/plans/2026-04-28-mvp-audit.md`
+The MVP feature audit defined in `docs/archive/superpowers/plans/2026-04-28-mvp-audit.md`
 could not start: every Tier-1 and Tier-2 channel of `tools/ozi-rs-mcp` failed to
 deliver evidence end-to-end on the first attempt. Per the anti-loop rule in
 `docs/agent-verification.md`, the run was halted after the fourth consecutive
@@ -281,7 +281,7 @@ Fix sketch:
 1. F4/F7 — keep one focused stale-session repro task: create a session, leave or
    invalidate it, then verify follow-up tools report `webdriver_unresponsive` or
    cleanly require a new session instead of misreporting `server_unavailable`.
-2. Re-run `docs/superpowers/plans/2026-04-28-mvp-audit.md` from Task 1.
+2. Re-run `docs/archive/superpowers/plans/2026-04-28-mvp-audit.md` from Task 1.
 
 The application audit can resume as soon as the live verification gate of
 F1/F6 passes once. F3/F4/F5/F7 do not block it because the verification

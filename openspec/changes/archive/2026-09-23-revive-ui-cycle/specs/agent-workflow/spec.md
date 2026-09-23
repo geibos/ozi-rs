@@ -27,15 +27,6 @@ A slice SHALL be considered done only when all of the following hold: (1) galler
 - **WHEN** a slice PR lacks the gallery entry
 - **THEN** the review checklist marks the PR as not done and it is not merged
 
-### Requirement: Slice equals branch equals pull request
-
-Every slice SHALL be developed on its own branch and merged into `main` through a pull request whose CI is green. Direct commits to `main` SHALL be limited to documentation-only fixes. `main` SHALL be pushed to `origin` after every merge.
-
-#### Scenario: Local and remote stay in sync
-
-- **WHEN** a slice is merged
-- **THEN** `git log origin/main..main` is empty within the same session
-
 ### Requirement: GUI-hijacking verification runs once per session
 
 Test runs that take over the screen (Appium Mac2 smoke, live app launches) SHALL be batched into one run at the end of a session, after all non-GUI verification (`just ci`, `just shots`) has passed. Agents SHALL stop the WebDriver session, quit the app and kill leftover WebDriverAgent processes afterwards.
