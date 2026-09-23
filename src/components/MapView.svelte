@@ -98,6 +98,7 @@
     updateMeasureLayer,
     raiseMeasureLayer,
   } from "$lib/maplibre/measure-layer";
+  import { pendingClicks } from "$lib/drawing-clicks";
   import {
     TRACKS_LAYER_SELECTED,
     highlightTrack,
@@ -116,7 +117,36 @@
   let waypointMarkers = new Map<string, maplibregl.Marker>();
   let drawingPreviewPoints: Array<{ lat: number; lon: number }> = [];
   let drawingCommandCount = 0;
-  let pendingDrawingClickTimeout: number | null = null;
+  /**
+   * Clicks waiting out the double-click window before they become points.
+   *
+   * One click used to be held at a time, and a second one inside the window
+   * cancelled it — so a route plotted at any normal pace lost most of its
+   * points silently. See `$lib/drawing-clicks`.
+   */
+  const drawingClicks = pendingClicks<{ lat: number; lon: number }>({
+    commit: async ({ lat, lon }) => {
+      const layerId = $drawingTrackLayerId;
+      const trackId = $drawingTrackId;
+      const segmentId = $drawingSegmentId;
+      if (layerId === null || trackId === null || segmentId === null) return;
+      try {
+        await insertTrackPoint(
+          layerId,
+          trackId,
+          segmentId,
+          drawingPreviewPoints.length,
+          [lat, lon],
+        );
+        drawingCommandCount += 1;
+        drawingPreviewPoints = [...drawingPreviewPoints, { lat, lon }];
+        drawingPointCount.set(drawingPreviewPoints.length);
+        updateDrawingPreview();
+      } catch (error) {
+        reportEditFailure("map.addDrawingPointFailed", error);
+      }
+    },
+  });
 
   type PointMenuTarget = {
     layerId: bigint;
@@ -214,10 +244,7 @@
     drawingTrackId.set(null);
     drawingSegmentId.set(null);
     drawingPointCount.set(0);
-    if (pendingDrawingClickTimeout !== null) {
-      window.clearTimeout(pendingDrawingClickTimeout);
-      pendingDrawingClickTimeout = null;
-    }
+    drawingClicks.cancel();
     await refreshTrackGeometry();
   }
 
@@ -229,10 +256,7 @@
     // +1 for the command that created the track itself.
     const commandCount = drawingCommandCount + 1;
 
-    if (pendingDrawingClickTimeout !== null) {
-      window.clearTimeout(pendingDrawingClickTimeout);
-      pendingDrawingClickTimeout = null;
-    }
+    drawingClicks.cancel();
 
     try {
       // One discard rather than a loop of undos: undoing left the abandoned
@@ -997,34 +1021,13 @@
       $drawingSegmentId === null
     )
       return;
-    const layerId = $drawingTrackLayerId;
-    const trackId = $drawingTrackId;
-    const segmentId = $drawingSegmentId;
-
-    if (pendingDrawingClickTimeout !== null) {
-      window.clearTimeout(pendingDrawingClickTimeout);
-      pendingDrawingClickTimeout = null;
-    }
-
+    // No cancel here. Cancelling the click before it was what dropped points:
+    // a route plotted at three clicks a second kept about one in five, and the
+    // rest vanished without a word. Only a double-click cancels, and it
+    // cancels every click still waiting, because both of its own halves are
+    // inside the window.
     const { lat, lng } = e.lngLat;
-    pendingDrawingClickTimeout = window.setTimeout(async () => {
-      pendingDrawingClickTimeout = null;
-      try {
-        await insertTrackPoint(
-          layerId,
-          trackId,
-          segmentId,
-          drawingPreviewPoints.length,
-          [lat, lng],
-        );
-        drawingCommandCount += 1;
-        drawingPreviewPoints = [...drawingPreviewPoints, { lat, lon: lng }];
-        drawingPointCount.set(drawingPreviewPoints.length);
-        updateDrawingPreview();
-      } catch (error) {
-        reportEditFailure("map.addDrawingPointFailed", error);
-      }
-    }, 220);
+    drawingClicks.hold({ lat, lon: lng });
   }
 
   onMount(() => {
@@ -1166,10 +1169,7 @@
     map.on("dblclick", (e) => {
       if (!$drawingModeActive) return;
       e.preventDefault();
-      if (pendingDrawingClickTimeout !== null) {
-        window.clearTimeout(pendingDrawingClickTimeout);
-        pendingDrawingClickTimeout = null;
-      }
+      drawingClicks.cancel();
       void finishDrawingMode();
     });
 
@@ -1181,10 +1181,7 @@
       clearTrackLabels();
       clearDrawingPreview();
       mapViewportBounds.set(null);
-      if (pendingDrawingClickTimeout !== null) {
-        window.clearTimeout(pendingDrawingClickTimeout);
-        pendingDrawingClickTimeout = null;
-      }
+      drawingClicks.cancel();
       map.remove();
     };
   });

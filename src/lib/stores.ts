@@ -180,6 +180,38 @@ export const projectDirty = derived(
   ($s) => $s?.project_dirty ?? false,
 );
 export const projectPath = derived(appState, ($s) => $s?.project_path ?? null);
+
+/**
+ * The close guard's question, and the operator's answer.
+ *
+ * The guard runs inside the window's close-request handler, which must call
+ * `preventDefault()` before its first `await`; the question it then asks is a
+ * dialog of our own, because the operating system's confirm box has two
+ * buttons and the answer the operator almost always wants — save, then quit —
+ * is the third. `askBeforeClosing()` opens it and resolves with the choice.
+ */
+export const closeGuardOpen = writable(false);
+
+let closeGuardResolve: ((choice: CloseGuardChoice) => void) | null = null;
+
+export type CloseGuardChoice = "save" | "discard" | "stay";
+
+export function askBeforeClosing(): Promise<CloseGuardChoice> {
+  // A second request while one is open answers the first with "stay": two
+  // dialogs over one window is worse than one question asked again.
+  if (closeGuardResolve) closeGuardResolve("stay");
+  closeGuardOpen.set(true);
+  return new Promise<CloseGuardChoice>((resolve) => {
+    closeGuardResolve = resolve;
+  });
+}
+
+export function resolveCloseGuard(choice: CloseGuardChoice): void {
+  closeGuardOpen.set(false);
+  const resolve = closeGuardResolve;
+  closeGuardResolve = null;
+  resolve?.(choice);
+}
 // Seed synchronously from the persisted catalog cache so the bundle loader
 // renders the previous catalog on its first paint without waiting for any
 // IPC round-trip. Falls back to an empty list on first-ever launch or any

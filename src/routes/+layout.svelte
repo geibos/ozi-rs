@@ -6,7 +6,6 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { importPaths } from "$lib/actions/import-paths";
-  import { confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
   import {
     appendProjectsChunk,
     beginCatalogueRefresh,
@@ -19,6 +18,7 @@
     currentProject,
     downloadPopupHeight,
     finishDownload,
+    askBeforeClosing,
     projectDirty,
     projectsLoading,
     requestAllDataFocus,
@@ -31,6 +31,7 @@
     mayReachNetworkNow,
   } from "../lib/network-reach";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import CloseGuard from "../components/CloseGuard.svelte";
   import { isEditableTarget } from "$lib/editable-target";
   import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
@@ -224,14 +225,26 @@
           async (event) => {
             if (!get(projectDirty)) return; // clean — allow the close
             event.preventDefault();
-            const translate = get(t);
-            const quit = await confirmDialog(translate("closeGuard.message"), {
-              title: translate("closeGuard.title"),
-              kind: "warning",
-              okLabel: translate("closeGuard.quit"),
-              cancelLabel: translate("closeGuard.cancel"),
-            });
-            if (quit) await getCurrentWindow().destroy();
+            // Three answers, so the question is ours rather than the operating
+            // system's two-button confirm: the thing an operator almost always
+            // wants at this moment is to save and then quit, and it used to
+            // not be on offer at all.
+            const choice = await askBeforeClosing();
+            if (choice === "stay") return;
+            if (choice === "save") {
+              try {
+                await quickSave();
+              } catch {
+                // `quickSave` has already said what went wrong. The window
+                // stays open: quitting after a failed save is the one outcome
+                // nobody asked for.
+                return;
+              }
+              // A save-as the operator cancelled leaves the work unsaved, and
+              // quitting then would lose it just as surely.
+              if (get(projectDirty)) return;
+            }
+            await getCurrentWindow().destroy();
           },
         );
         if (cancelled) unlistenClose();
@@ -321,6 +334,8 @@
   <!-- Same corner as `DownloadPopup`, and sonner's viewport always draws over
        it, so the toaster steps above the panel while a download runs. -->
   <Toaster richColors closeButton position="bottom-right" offset={toastEdge} />
+  <!-- CJ-7: the question asked before a window with unsaved work closes. -->
+  <CloseGuard />
 </Tooltip.Provider>
 
 <style>

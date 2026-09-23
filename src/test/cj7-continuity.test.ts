@@ -72,20 +72,42 @@ describe("CJ-7 window close guard (+layout.svelte)", () => {
     expect(layoutSource).toContain("if (!get(projectDirty)) return;");
   });
 
-  it("prevents the close, confirms, then destroys on confirm", () => {
+  it("prevents the close, asks, and offers saving as well as quitting", () => {
+    // The question used to be the operating system's confirm box, which has
+    // two buttons — so "save and quit", the answer an operator almost always
+    // wants at that moment, was not on offer. It is our own dialog now.
     expect(layoutSource).toContain("event.preventDefault();");
-    expect(layoutSource).toContain("confirmDialog(");
-    expect(layoutSource).toContain('translate("closeGuard.message")');
-    expect(layoutSource).toContain('title: translate("closeGuard.title")');
+    expect(layoutSource).toContain("askBeforeClosing()");
+    expect(layoutSource).toContain('if (choice === "stay") return;');
     expect(layoutSource).toContain("getCurrentWindow().destroy()");
+
+    const guard = readFileSync(
+      join(__dirname, "../components/CloseGuard.svelte"),
+      "utf-8",
+    );
+    for (const key of [
+      "closeGuard.title",
+      "closeGuard.message",
+      "closeGuard.saveAndQuit",
+      "closeGuard.quit",
+      "closeGuard.cancel",
+    ]) {
+      expect(guard, `the guard must offer ${key}`).toContain(key);
+    }
+  });
+
+  it("does not quit when the save did not land", () => {
+    // Quitting after a failed save, or after a save-as the operator cancelled,
+    // loses the work just as surely as quitting without saving.
+    expect(layoutSource).toContain("if (get(projectDirty)) return;");
   });
 
   it("has the capability grants the guard needs at runtime", () => {
     // `onCloseRequested`'s JS wrapper calls `window.destroy()` on every
-    // non-prevented close, and the guard shows a plugin-dialog confirm —
-    // both are denied unless the capability lists them explicitly.
+    // non-prevented close, which is denied unless the capability lists it.
+    // The confirm permission is no longer part of this: the question is an
+    // in-app dialog, because the plugin's box has only two buttons.
     expect(capabilitiesSource).toContain("core:window:allow-destroy");
-    expect(capabilitiesSource).toContain("dialog:allow-confirm");
   });
 });
 

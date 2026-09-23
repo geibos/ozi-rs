@@ -88,6 +88,7 @@ const dictionaries = {
     "closeGuard.title": "Unsaved changes",
     "closeGuard.message":
       "The project has unsaved changes. Quit without saving?",
+    "closeGuard.saveAndQuit": "Save and quit",
     "closeGuard.quit": "Quit without saving",
     "closeGuard.cancel": "Cancel",
     "trackInspector.simplify": "Simplify",
@@ -513,6 +514,7 @@ const dictionaries = {
     "closeGuard.title": "Несохранённые изменения",
     "closeGuard.message":
       "В проекте есть несохранённые изменения. Выйти без сохранения?",
+    "closeGuard.saveAndQuit": "Сохранить и выйти",
     "closeGuard.quit": "Выйти без сохранения",
     "closeGuard.cancel": "Отмена",
     "trackInspector.simplify": "Упростить",
