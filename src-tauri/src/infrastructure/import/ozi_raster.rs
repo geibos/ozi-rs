@@ -555,7 +555,10 @@ mod tests {
 #[cfg(test)]
 mod picture_map_tests {
     use super::{OziRasterDecodeError, open_ozi_raster_tile_source};
-    use crate::infrastructure::import::{OziRasterKind, parse_ozi_map_metadata};
+    use crate::infrastructure::export::{CalibrationPoint, write_calibration_map};
+    use crate::infrastructure::import::{
+        OziRasterKind, parse_ozi_georeference, parse_ozi_map_metadata,
+    };
     use std::path::PathBuf;
 
     fn temp_dir(name: &str) -> PathBuf {
@@ -691,6 +694,78 @@ mod picture_map_tests {
         assert_eq!(level1.rgba_pixels()[0], 0);
         // Ten pixels in: columns 20 and 21, mean 20.
         assert_eq!(level1.rgba_pixels()[10 * 4], 20);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Calibration, all the way round, through the pieces a tile request uses.
+    ///
+    /// The writer has its own tests and so does the reader, and they agree —
+    /// but they agree about a `.map` written by the test rather than by the
+    /// application, and neither of them opens a raster. This is the whole
+    /// journey a headquarters makes with a picture that arrived with nothing:
+    /// calibrate it, and then have the map served.
+    #[test]
+    fn a_calibrated_picture_serves_tiles_at_the_coordinates_it_was_given() {
+        let dir = temp_dir("calibrated");
+        write_picture(&dir, "Сагра.png", 1600, 1200);
+
+        // The two corners a coordinator reads off a screenshot of a web map.
+        let top_left = CalibrationPoint {
+            pixel_x: 0.0,
+            pixel_y: 0.0,
+            lat: 60.05,
+            lon: 30.20,
+        };
+        let bottom_right = CalibrationPoint {
+            pixel_x: 1600.0,
+            pixel_y: 1200.0,
+            lat: 59.95,
+            lon: 30.40,
+        };
+        let map_path = write_calibration_map(
+            &dir.join("Сагра.png"),
+            "Сагра",
+            1600,
+            1200,
+            &[top_left, bottom_right],
+        )
+        .expect("write the calibration");
+        assert_eq!(map_path, dir.join("Сагра.map"));
+
+        // Now open it the way the application does.
+        let contents = crate::infrastructure::import::read_ozi_map_text(&map_path).expect("read");
+        let metadata = parse_ozi_map_metadata(&map_path, &contents).expect("parse");
+        assert!(matches!(
+            metadata.raster_kind(),
+            OziRasterKind::DirectImage(_)
+        ));
+
+        // The georeference answers where the operator said the corners are.
+        let georeference =
+            parse_ozi_georeference(metadata.calibration_points()).expect("georeference");
+        for corner in [top_left, bottom_right] {
+            let (lat, lon) = georeference.pixel_to_lat_lon(corner.pixel_x, corner.pixel_y);
+            assert!(
+                (lat - corner.lat).abs() < 1e-4 && (lon - corner.lon).abs() < 1e-4,
+                "corner at ({}, {}) came back as {lat}, {lon}",
+                corner.pixel_x,
+                corner.pixel_y
+            );
+        }
+        // And the middle of the picture is the middle of the ground.
+        let (lat, lon) = georeference.pixel_to_lat_lon(800.0, 600.0);
+        assert!((lat - 60.0).abs() < 1e-4, "middle latitude {lat}");
+        assert!((lon - 30.3).abs() < 1e-4, "middle longitude {lon}");
+
+        // And the raster the `.map` names is served.
+        let source = open_ozi_raster_tile_source(&metadata).expect("open the raster");
+        assert_eq!(
+            source.level(0).map(|l| (l.width(), l.height())),
+            Some((1600, 1200))
+        );
+        let tile = source.decode_rgba_tile(0, 0, 0).expect("first tile");
+        assert_eq!((tile.width(), tile.height()), (256, 256));
 
         let _ = std::fs::remove_dir_all(&dir);
     }

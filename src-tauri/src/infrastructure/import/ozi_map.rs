@@ -92,13 +92,31 @@ impl std::fmt::Display for OziMapParseError {
 
 impl std::error::Error for OziMapParseError {}
 
+/// Read a `.map`, decoding it the way a `.plt` is decoded.
+///
+/// It used to try UTF-8 and fall back to **lossy** UTF-8, which turns every
+/// Windows-1251 byte into `U+FFFD`. So a `.map` written by OziExplorer on a
+/// Russian Windows — where the title and the raster's file name are Cyrillic,
+/// which is the normal case — came back as question marks, and the raster it
+/// names could not be found.
+///
+/// Worse, this application writes `.map` files itself now, in cp1251 as the
+/// format requires: calibrating `Сагра.png` produced a file its own reader
+/// could not read. Found on 2026-09-23 by testing the calibration round trip
+/// through the pipeline that serves tiles, rather than through the writer and
+/// the reader separately, which had agreed with each other about a file
+/// neither of them had written.
+///
+/// `decode_plt_bytes` already had the chain — BOM, strict UTF-8, statistical
+/// detection, cp1251 — and there is no reason for a second one.
 pub fn read_ozi_map_text(path: &Path) -> Result<String, std::io::Error> {
     let bytes = fs::read(path)?;
-
-    match String::from_utf8(bytes) {
-        Ok(text) => Ok(text),
-        Err(error) => Ok(String::from_utf8_lossy(&error.into_bytes()).into_owned()),
-    }
+    Ok(super::plt::decode_plt_bytes(&bytes).unwrap_or_else(|_| {
+        // The chain only fails on bytes no supported encoding accepts. A
+        // calibration file is still better read lossily than not at all: the
+        // header lines are ASCII and the numbers are what a map is made of.
+        String::from_utf8_lossy(&bytes).into_owned()
+    }))
 }
 
 pub fn parse_ozi_map_metadata(
@@ -363,6 +381,31 @@ mod tests {
         );
 
         assert_eq!(resolved, Path::new("archives/field/base.ozf2"));
+    }
+
+    /// A `.map` from a Russian Windows, which is where they come from.
+    ///
+    /// The title and the raster's file name are Cyrillic, written cp1251 as
+    /// the format requires. Before 2026-09-23 this reader tried UTF-8 and fell
+    /// back to lossy UTF-8, so both came back as question marks and the raster
+    /// could not be found at all.
+    #[test]
+    fn read_ozi_map_text_reads_a_cp1251_map() {
+        let dir = std::env::temp_dir().join(format!("ozi-map-cp1251-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("сагра.map");
+
+        let text = "OziExplorer Map Data File Version 2.2\r\nСагра — север\r\nСагра.png\r\n1 ,Map Code,\r\nWGS 84,,   0.0000,   0.0000,WGS 84\r\n";
+        let (bytes, _, _) = encoding_rs::WINDOWS_1251.encode(text);
+        std::fs::write(&path, bytes).expect("write");
+
+        let read = super::read_ozi_map_text(&path).expect("read");
+        assert!(read.contains("Сагра — север"), "title: {read}");
+        assert!(read.contains("Сагра.png"), "raster name: {read}");
+        assert!(!read.contains('\u{FFFD}'), "no replacement characters");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
