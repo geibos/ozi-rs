@@ -2,7 +2,9 @@
 
 ### Requirement: Every project mutation marks the project dirty until saved
 
-The system SHALL derive the project's dirty state structurally from two counters rather than from per-call-site flags: `CommandStack::mutation_count`, incremented by every successful apply, merge, undo and redo, and `AppState::style_revision`, incremented by every non-undoable style or visibility setter (`set_track_color`, `set_track_line_width`, `toggle_track_visible`, `toggle_waypoint_visible`). `project_dirty()` SHALL be true whenever the counter pair differs from the pair recorded at the last successful save, load or session restore. A failed save SHALL NOT clear the dirty state.
+The system SHALL derive the project's dirty state structurally from two counters rather than from per-call-site flags: `CommandStack::mutation_count`, incremented by every successful apply, merge, undo and redo, and `AppState::style_revision`, incremented by every non-undoable style or visibility setter — `set_track_color`, `set_track_line_width`, `toggle_track_visible`, `set_all_tracks_visible`, `show_only_track`, `toggle_waypoint_visible`, `set_all_waypoints_visible` and `show_only_waypoint`.
+
+A waypoint's colour and symbol are not in that list and must not be: they are undoable `ProjectCommand`s, so they reach the dirty state through `mutation_count` like any other edit. A setter that appears in both would count twice, which is harmless for a flag and misleading for anyone reading it. `project_dirty()` SHALL be true whenever the counter pair differs from the pair recorded at the last successful save, load or session restore. A failed save SHALL NOT clear the dirty state.
 
 #### Scenario: Undoable edit dirties a clean project
 

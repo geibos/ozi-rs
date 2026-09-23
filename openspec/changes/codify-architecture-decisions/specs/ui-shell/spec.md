@@ -21,7 +21,9 @@ The map canvas SHALL be rendered by MapLibre GL JS (major version 4). Map-specif
 
 ### Requirement: Icons come from Lucide via `@lucide/svelte`
 
-Iconography SHALL use the Lucide set imported from `@lucide/svelte`, the `iconLibrary` declared in `components.json`. Components SHALL NOT import the legacy `lucide-svelte` package and SHALL NOT use emoji or text glyphs as icons.
+Iconography SHALL use the Lucide set imported from `@lucide/svelte`, the `iconLibrary` declared in `components.json`. Components SHALL NOT import the legacy `lucide-svelte` package and SHALL NOT use emoji or text glyphs in place of an interface icon — a button, a menu entry, a status indicator.
+
+A waypoint's symbol is not an interface icon. The symbols a crew picks from — a flag, a pin, a cross — are the mark's own meaning, they travel with it to the next headquarters through `.wpt` and GPX, and they are drawn on the map rather than in the interface. They are glyphs by choice (`src/lib/waypoint-symbols.ts`), which is why this requirement says "in place of an interface icon" rather than "anywhere".
 
 #### Scenario: Registry declares Lucide
 
@@ -32,6 +34,12 @@ Iconography SHALL use the Lucide set imported from `@lucide/svelte`, the `iconLi
 
 - **WHEN** `src/` is searched for icon imports
 - **THEN** every icon import resolves to `@lucide/svelte` and no file imports from `lucide-svelte`
+
+#### Scenario: A waypoint's symbol is the mark's, not the interface's
+
+- **WHEN** a waypoint carries the `flag` symbol
+- **THEN** the map draws its glyph, and that is not a breach of this
+  requirement
 
 ### Requirement: Toasts and tooltips are hosted once in the root layout
 

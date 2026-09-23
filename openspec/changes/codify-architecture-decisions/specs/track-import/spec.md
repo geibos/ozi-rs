@@ -1,13 +1,15 @@
 ## ADDED Requirements
 
-### Requirement: Single import dialog accepts GPX, PLT and ZIP files
+### Requirement: Single import dialog accepts a day's files whatever they are
 
-The Tracks panel SHALL expose one "Import…" action that opens a native file dialog with a single filter covering the `gpx`, `plt` and `zip` extensions and allows selecting several files at once. The system SHALL import the selected files one after another, routing each by its extension (case-insensitive): `.plt` files go to the PLT importer, every other selected file goes to the GPX importer, which handles `.zip` itself. A failure in one file SHALL NOT stop the import of the remaining files; after the last file the system SHALL show one summary stating how many of the selected files were imported and naming the files that failed.
+The Tracks panel SHALL expose one "Import…" action that opens a native file dialog with a single filter covering the `gpx`, `plt`, `wpt` and `zip` extensions and allows selecting several files at once. The system SHALL import the selected files one after another, routing each by its extension (case-insensitive): `.plt` to the PLT importer, `.wpt` to the OziExplorer waypoint importer, and every other selected file to the GPX importer, which handles `.zip` itself. A failure in one file SHALL NOT stop the import of the remaining files; after the last file the system SHALL show one summary stating how many of the selected files were imported and naming the files that failed.
 
-#### Scenario: Mixed GPX, PLT and ZIP selection
+The routing itself is stated once, in "One dispatch behind every import surface": this requirement is about the dialog, not about a second copy of the rule.
 
-- **WHEN** the user selects `a.gpx`, `b.PLT` and `c.zip` in the Import dialog
-- **THEN** `a.gpx` and `c.zip` are imported through the GPX importer, `b.PLT` through the PLT importer, and one summary reports 3 of 3 files imported
+#### Scenario: Mixed GPX, PLT, WPT and ZIP selection
+
+- **WHEN** the user selects `a.gpx`, `b.PLT`, `c.zip` and `улики.wpt` in the Import dialog
+- **THEN** `a.gpx` and `c.zip` are imported through the GPX importer, `b.PLT` through the PLT importer, `улики.wpt` through the waypoint importer, and one summary reports 4 of 4 files imported
 
 #### Scenario: One broken file in a multi-file selection
 
