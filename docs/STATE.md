@@ -14,6 +14,14 @@ archived — `codify-architecture-decisions` and `revive-ui-cycle` both closed o
 against the source, the second after moving its unbuilt requirements out rather
 than archiving requirements the code does not meet.
 
+**Verified after the review fixes, 2026-09-23 at 20:36.** The desktop gate
+passed against a bundle built from the tree as it stands, and the stand was
+re-walked for everything the fixes touched: pressing Рисование then Измерение
+leaves only Измерение active; five clicks 90 ms apart make five points; a click
+abandoned mid-window makes none and reorders nothing; the grid draws with every
+label a sayable coordinate; the replay opens, moves its marker and says when the
+moment falls in a silence.
+
 **The desktop smoke gate is green** — both journeys, 2026-09-23 at 20:26,
 against a bundle built from the current tree. It went down at 19:41 the same
 evening and came back when the Accessibility grant was given again; the log
