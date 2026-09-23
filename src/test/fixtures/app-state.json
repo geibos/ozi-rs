@@ -58,6 +58,7 @@
   },
   "diagnostics": [
     {
+      "at": "",
       "level": "info",
       "message": "Load projects from maps.lizaalert.ru"
     }

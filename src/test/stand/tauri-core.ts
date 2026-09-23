@@ -138,6 +138,7 @@ const ACCEPTED_WITHOUT_DATA = new Set([
   "delete_waypoint",
   "cancel_drawing",
   "undo",
+  "add_report_note",
   "redo",
   "save_project",
   "set_bundles_root",
@@ -451,6 +452,10 @@ const LEAVES_THE_PROJECT_ALONE = new Set([
   // active raster is the ground, not the work on it.
   "read_raster_size",
   "calibrate_raster",
+  // Writing a report about the work is not a change to the work.
+  "save_report",
+  "add_report_note",
+  "reveal_reports",
   // Reading the catalogue, not the project. Missing it here was the first
   // thing this model got wrong: `load_projects` runs on every start, so the
   // stand opened with the dot already on and the indicator meant nothing.
@@ -657,6 +662,14 @@ const HANDLERS: StandAnswers = {
     );
     return null;
   },
+  // Capturing a moment for a report. The stand writes no files, so it answers
+  // the shape — a folder path and whether the screen was caught — which is
+  // what the interface reads.
+  save_report: () => ({
+    path: "/Users/оператор/Documents/ozi-rs-отчёты/2026-09-23_20-45-00",
+    screenshot_missing: false,
+  }),
+  reveal_reports: () => "/Users/оператор/Documents/ozi-rs-отчёты",
   get_waypoints: (args) => {
     if (projectEmptied) return [];
     const layerId = Number(args?.layerId);

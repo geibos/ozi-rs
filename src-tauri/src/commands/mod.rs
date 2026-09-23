@@ -1,3 +1,4 @@
+pub mod report;
 pub mod tiles;
 
 use crate::application::{
@@ -60,6 +61,8 @@ fn lock_app_state<'a>(
 pub struct DiagnosticDto {
     pub level: &'static str,
     pub message: String,
+    /// Local `HH:MM:SS`. See `DiagnosticEntry::at`.
+    pub at: String,
 }
 
 #[derive(serde::Serialize, specta::Type)]
@@ -341,6 +344,7 @@ pub fn app_state_dto(s: &crate::application::AppState) -> AppStateDto {
                 DiagnosticLevel::Error => "error",
             },
             message: d.message().to_owned(),
+            at: d.at().to_owned(),
         })
         .collect();
 

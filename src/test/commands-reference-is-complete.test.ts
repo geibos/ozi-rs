@@ -30,15 +30,21 @@ describe("the commands reference", () => {
   );
 
   /**
-   * The registry names commands as `commands::<name>` and, for the tile block,
-   * as `commands::tiles::<name>`; the module segment is not a command.
+   * The registry names commands as `commands::<name>`, and a command living in
+   * a submodule as `commands::<module>::<name>` — the tiles block, and since
+   * 2026-09-23 the report one. Only the last segment is a command name.
+   *
+   * The first version of this named `tiles` explicitly, so adding a second
+   * submodule made it report `report` as a missing command. Taking the last
+   * segment works for any number of them.
    */
   function registeredCommands(source: string): string[] {
     const names = new Set<string>();
     for (const match of source.matchAll(
-      /commands::(?:tiles::)?([a-z0-9_]+)/g,
+      /commands::((?:[a-z0-9_]+::)*[a-z0-9_]+)/g,
     )) {
-      if (match[1] !== "tiles") names.add(match[1]);
+      const segments = match[1].split("::");
+      names.add(segments[segments.length - 1]);
     }
     return [...names].sort();
   }

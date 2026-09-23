@@ -11,33 +11,33 @@ non-destructive and immediately visible.
 
 ## ProjectCommand Variants
 
-| Command | Description | Undoable |
-|---------|-------------|----------|
-| `AddMapLayer` | Add a new map layer | yes |
-| `AddMapLayerWithSource` | Add map layer with file path | yes |
-| `AddTrackLayer` | Add a new track layer | yes |
-| `AddWaypointLayer` | Add a new waypoint layer | yes |
-| `RemoveMapLayer` | Remove a map layer (stores full layer for undo) | yes |
-| `RemoveTrackLayer` | Remove a track layer (stores full layer for undo) | yes |
-| `RemoveWaypointLayer` | Remove a waypoint layer (stores full layer for undo) | yes |
-| `AddTrack` | Add a track to a layer | yes |
-| `RemoveTrack` | Remove a track (stores full track for undo) | yes |
-| `DeleteTrack` | Delete track by ID (resolves to RemoveTrack) | yes |
-| `RenameTrack` | Rename a track (stores old and new names) | yes |
-| `CreateEmptyTrack` | Create a new empty track with a name | yes |
-| `MoveTrackPoint` | Move a point to new coordinates (stores old position) | yes |
-| `DeleteTrackPoint` | Delete a point (stores removed index and point) | yes |
-| `InsertTrackPoint` | Insert a point at index in a segment | yes |
-| `SplitSegment` | Split segment at a point into two segments | yes |
-| `JoinSegments` | Join two adjacent segments into one | yes |
-| `SimplifyTrack` | Douglas-Peucker simplification (stores removed points) | yes |
-| `RestoreTrackPoints` | Reverse of SimplifyTrack — re-inserts removed points | yes |
-| `AddWaypoint` | Add a waypoint to a layer | yes |
-| `RemoveWaypoint` | Remove a waypoint (stores full waypoint for undo) | yes |
-| `DeleteWaypoint` | Delete waypoint by ID (resolves to RemoveWaypoint) | yes |
-| `MoveWaypoint` | Move waypoint to new coordinates | yes |
-| `RenameWaypoint` | Rename a waypoint (stores old and new names) | yes |
-| `SetWaypointSymbol` | Set or clear a waypoint symbol (stores old and new symbols) | yes |
+| Command                 | Description                                                 | Undoable |
+| ----------------------- | ----------------------------------------------------------- | -------- |
+| `AddMapLayer`           | Add a new map layer                                         | yes      |
+| `AddMapLayerWithSource` | Add map layer with file path                                | yes      |
+| `AddTrackLayer`         | Add a new track layer                                       | yes      |
+| `AddWaypointLayer`      | Add a new waypoint layer                                    | yes      |
+| `RemoveMapLayer`        | Remove a map layer (stores full layer for undo)             | yes      |
+| `RemoveTrackLayer`      | Remove a track layer (stores full layer for undo)           | yes      |
+| `RemoveWaypointLayer`   | Remove a waypoint layer (stores full layer for undo)        | yes      |
+| `AddTrack`              | Add a track to a layer                                      | yes      |
+| `RemoveTrack`           | Remove a track (stores full track for undo)                 | yes      |
+| `DeleteTrack`           | Delete track by ID (resolves to RemoveTrack)                | yes      |
+| `RenameTrack`           | Rename a track (stores old and new names)                   | yes      |
+| `CreateEmptyTrack`      | Create a new empty track with a name                        | yes      |
+| `MoveTrackPoint`        | Move a point to new coordinates (stores old position)       | yes      |
+| `DeleteTrackPoint`      | Delete a point (stores removed index and point)             | yes      |
+| `InsertTrackPoint`      | Insert a point at index in a segment                        | yes      |
+| `SplitSegment`          | Split segment at a point into two segments                  | yes      |
+| `JoinSegments`          | Join two adjacent segments into one                         | yes      |
+| `SimplifyTrack`         | Douglas-Peucker simplification (stores removed points)      | yes      |
+| `RestoreTrackPoints`    | Reverse of SimplifyTrack — re-inserts removed points        | yes      |
+| `AddWaypoint`           | Add a waypoint to a layer                                   | yes      |
+| `RemoveWaypoint`        | Remove a waypoint (stores full waypoint for undo)           | yes      |
+| `DeleteWaypoint`        | Delete waypoint by ID (resolves to RemoveWaypoint)          | yes      |
+| `MoveWaypoint`          | Move waypoint to new coordinates                            | yes      |
+| `RenameWaypoint`        | Rename a waypoint (stores old and new names)                | yes      |
+| `SetWaypointSymbol`     | Set or clear a waypoint symbol (stores old and new symbols) | yes      |
 
 ## Tauri IPC Commands
 
@@ -55,123 +55,126 @@ registered without a line on this page, so the gap cannot open again.
 
 ### Query Commands (read-only)
 
-| Command | Description |
-|---------|-------------|
-| `get_app_state` | Full app state snapshot for the frontend |
-| `get_tracks_geojson` | All tracks as GeoJSON FeatureCollection |
-| `get_track_detail` | Full track geometry (segments, points) |
-| `get_waypoints` | All waypoints in a layer |
-| `get_simplified_preview` | Preview of Douglas-Peucker without committing |
-| `get_track_export_default_path` | Suggested active-bundle `10-Tracks/<track>.<ext>` export path, or no suggestion if unavailable |
-| `list_tracks` | Every track in the project as a row: name, style, statistics, no geometry. What the Tracks tab reads |
-| `read_raster_size` | A picture's dimensions, read from its header without decoding it — what the calibration form needs to offer a bottom-right corner |
+| Command                         | Description                                                                                                                       |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `get_app_state`                 | Full app state snapshot for the frontend                                                                                          |
+| `get_tracks_geojson`            | All tracks as GeoJSON FeatureCollection                                                                                           |
+| `get_track_detail`              | Full track geometry (segments, points)                                                                                            |
+| `get_waypoints`                 | All waypoints in a layer                                                                                                          |
+| `get_simplified_preview`        | Preview of Douglas-Peucker without committing                                                                                     |
+| `get_track_export_default_path` | Suggested active-bundle `10-Tracks/<track>.<ext>` export path, or no suggestion if unavailable                                    |
+| `list_tracks`                   | Every track in the project as a row: name, style, statistics, no geometry. What the Tracks tab reads                              |
+| `read_raster_size`              | A picture's dimensions, read from its header without decoding it — what the calibration form needs to offer a bottom-right corner |
 
 ### Project / Bundle Management
 
-| Command | Description |
-|---------|-------------|
-| `load_projects` | Fetch LizaAlert project list (streaming) |
-| `load_project` | Open a LizaAlert project by slug |
-| `open_selected_map` | Activate a map package (downloads if needed) |
-| `open_local_bundle` | Open map bundle from a local directory |
-| `set_bundles_root` | Set root directory for map bundles |
-| `save_project` | Save project to `.ozp` file |
-| `load_project_file` | Load project from `.ozp` file |
-| `reveal_bundle` | Open active bundle directory in file explorer |
-| `reveal_path` | Open a file manager on any written file — what an export's «Показать» does |
-| `preview_project` | Fetch a bundle's map list without downloading anything |
-| `cancel_project_listing` | Stop the catalogue walk that is running |
-| `cancel_download` | Abort a bundle download; files already on disk stay, and the next attempt resumes |
-| `new_project` | Start a new search: an empty project, keeping the bundle and the active raster |
-| `calibrate_raster` | Write a `.map` for a picture that came without one, and open the pair |
+| Command                  | Description                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `load_projects`          | Fetch LizaAlert project list (streaming)                                                             |
+| `load_project`           | Open a LizaAlert project by slug                                                                     |
+| `open_selected_map`      | Activate a map package (downloads if needed)                                                         |
+| `open_local_bundle`      | Open map bundle from a local directory                                                               |
+| `set_bundles_root`       | Set root directory for map bundles                                                                   |
+| `save_project`           | Save project to `.ozp` file                                                                          |
+| `load_project_file`      | Load project from `.ozp` file                                                                        |
+| `reveal_bundle`          | Open active bundle directory in file explorer                                                        |
+| `reveal_path`            | Open a file manager on any written file — what an export's «Показать» does                           |
+| `save_report`            | Capture one moment — the screen, the diagnostics and the state — into a dated folder under Documents |
+| `add_report_note`        | Write the operator's line about what happened into a report already captured                         |
+| `reveal_reports`         | Open the folder the reports go into, so a day's worth is handed over at once                         |
+| `preview_project`        | Fetch a bundle's map list without downloading anything                                               |
+| `cancel_project_listing` | Stop the catalogue walk that is running                                                              |
+| `cancel_download`        | Abort a bundle download; files already on disk stay, and the next attempt resumes                    |
+| `new_project`            | Start a new search: an empty project, keeping the bundle and the active raster                       |
+| `calibrate_raster`       | Write a `.map` for a picture that came without one, and open the pair                                |
 
 ### Import / Export
 
-| Command | Description |
-|---------|-------------|
-| `import_gpx` | Import GPX file or ZIP archive |
-| `import_plt` | Import PLT file |
-| `import_wpt` | Import an OziExplorer waypoint file into a layer of its own |
-| `import_tracks_directory` | Walk a folder and its subfolders, importing every `.gpx` and `.plt` |
-| `export_gpx` | Export track layer to GPX |
-| `export_track_plt` | Export single track to PLT |
-| `export_wpt_waypoints` | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF) |
-| `get_wpt_export_default_path` | Suggest WPT export path (`<bundle>/<layer>.wpt`) |
-| `export_all_tracks_gpx` | Every track in the project into one GPX, returning how many were written |
-| `export_gpx_waypoints` | Export a waypoint layer to GPX — what phones and other groups' software read |
-| `get_waypoints_export_default_path` | Suggest a waypoint export path for a given format |
+| Command                             | Description                                                                  |
+| ----------------------------------- | ---------------------------------------------------------------------------- |
+| `import_gpx`                        | Import GPX file or ZIP archive                                               |
+| `import_plt`                        | Import PLT file                                                              |
+| `import_wpt`                        | Import an OziExplorer waypoint file into a layer of its own                  |
+| `import_tracks_directory`           | Walk a folder and its subfolders, importing every `.gpx` and `.plt`          |
+| `export_gpx`                        | Export track layer to GPX                                                    |
+| `export_track_plt`                  | Export single track to PLT                                                   |
+| `export_wpt_waypoints`              | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF)                 |
+| `get_wpt_export_default_path`       | Suggest WPT export path (`<bundle>/<layer>.wpt`)                             |
+| `export_all_tracks_gpx`             | Every track in the project into one GPX, returning how many were written     |
+| `export_gpx_waypoints`              | Export a waypoint layer to GPX — what phones and other groups' software read |
+| `get_waypoints_export_default_path` | Suggest a waypoint export path for a given format                            |
 
 ### Track Mutations (via CommandStack, undoable)
 
-| Command | Description |
-|---------|-------------|
-| `rename_track` | Rename a track |
-| `move_track_point` | Move a point by drag |
-| `delete_track_point` | Delete a point |
-| `insert_track_point` | Insert a point at index |
-| `split_segment` | Split segment at a point |
-| `join_segments` | Join two adjacent segments |
-| `delete_track` | Delete a track |
-| `create_empty_track` | Create empty track (for drawing mode) |
-| `simplify_track` | Apply Douglas-Peucker simplification |
-| `sort_track_points` | Sort a track's points by timestamp, as one undoable step |
-| `crop_track_to_extent` | Keep only the points inside the given map extent |
-| `crop_track_to_time` | Keep only the points inside the given time range |
-| `cancel_drawing` | Discard the draw in progress without leaving it on the redo stack |
-| `trim_track_at_point` | Cut everything before or after a chosen point, keeping that point |
+| Command                | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `rename_track`         | Rename a track                                                    |
+| `move_track_point`     | Move a point by drag                                              |
+| `delete_track_point`   | Delete a point                                                    |
+| `insert_track_point`   | Insert a point at index                                           |
+| `split_segment`        | Split segment at a point                                          |
+| `join_segments`        | Join two adjacent segments                                        |
+| `delete_track`         | Delete a track                                                    |
+| `create_empty_track`   | Create empty track (for drawing mode)                             |
+| `simplify_track`       | Apply Douglas-Peucker simplification                              |
+| `sort_track_points`    | Sort a track's points by timestamp, as one undoable step          |
+| `crop_track_to_extent` | Keep only the points inside the given map extent                  |
+| `crop_track_to_time`   | Keep only the points inside the given time range                  |
+| `cancel_drawing`       | Discard the draw in progress without leaving it on the redo stack |
+| `trim_track_at_point`  | Cut everything before or after a chosen point, keeping that point |
 
 ### Track Style (non-undoable, bypass CommandStack)
 
-| Command | Description |
-|---------|-------------|
-| `set_track_color` | Set track RGBA color |
-| `set_track_line_width` | Set track line width |
-| `toggle_track_visible` | Toggle track visibility |
+| Command                  | Description                          |
+| ------------------------ | ------------------------------------ |
+| `set_track_color`        | Set track RGBA color                 |
+| `set_track_line_width`   | Set track line width                 |
+| `toggle_track_visible`   | Toggle track visibility              |
 | `set_all_tracks_visible` | Show or hide every track in one step |
-| `show_only_track` | Show one track and hide the rest |
+| `show_only_track`        | Show one track and hide the rest     |
 
 ### Waypoint Mutations (via CommandStack, undoable)
 
-| Command | Description |
-|---------|-------------|
-| `add_waypoint` | Add waypoint at coordinates |
-| `move_waypoint` | Move waypoint to new coordinates |
-| `delete_waypoint` | Delete a waypoint |
-| `rename_waypoint` | Rename a waypoint |
-| `set_waypoint_symbol` | Set or clear waypoint symbol |
-| `set_waypoint_color` | Set or clear a mark's colour |
-| `set_waypoint_description` | Write the note beside a mark — what a crew is actually sent to |
-| `set_waypoint_attachments` | Replace the files that belong to a mark — paths beside the project, not bytes inside it |
-| `toggle_waypoint_visible` | Flip one waypoint's visibility (style, not an undoable edit) |
-| `set_all_waypoints_visible` | Show or hide every waypoint in one step |
-| `show_only_waypoint` | Show one waypoint and hide the rest |
+| Command                     | Description                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `add_waypoint`              | Add waypoint at coordinates                                                             |
+| `move_waypoint`             | Move waypoint to new coordinates                                                        |
+| `delete_waypoint`           | Delete a waypoint                                                                       |
+| `rename_waypoint`           | Rename a waypoint                                                                       |
+| `set_waypoint_symbol`       | Set or clear waypoint symbol                                                            |
+| `set_waypoint_color`        | Set or clear a mark's colour                                                            |
+| `set_waypoint_description`  | Write the note beside a mark — what a crew is actually sent to                          |
+| `set_waypoint_attachments`  | Replace the files that belong to a mark — paths beside the project, not bytes inside it |
+| `toggle_waypoint_visible`   | Flip one waypoint's visibility (style, not an undoable edit)                            |
+| `set_all_waypoints_visible` | Show or hide every waypoint in one step                                                 |
+| `show_only_waypoint`        | Show one waypoint and hide the rest                                                     |
 
 ### Layers (via CommandStack, undoable)
 
-| Command | Description |
-|---------|-------------|
-| `create_track_layer` | Add a track layer, answering its id |
-| `create_waypoint_layer` | Add a waypoint layer, answering its id |
-| `rename_track_layer` | Rename a track layer |
-| `rename_waypoint_layer` | Rename a waypoint layer |
-| `delete_track_layer` | Remove a track layer; undo brings it back with its tracks |
+| Command                 | Description                                                 |
+| ----------------------- | ----------------------------------------------------------- |
+| `create_track_layer`    | Add a track layer, answering its id                         |
+| `create_waypoint_layer` | Add a waypoint layer, answering its id                      |
+| `rename_track_layer`    | Rename a track layer                                        |
+| `rename_waypoint_layer` | Rename a waypoint layer                                     |
+| `delete_track_layer`    | Remove a track layer; undo brings it back with its tracks   |
 | `delete_waypoint_layer` | Remove a waypoint layer; undo brings it back with its marks |
 
 ### History
 
-| Command | Description |
-|---------|-------------|
-| `undo` | Undo last command |
-| `redo` | Redo last undone command |
+| Command | Description              |
+| ------- | ------------------------ |
+| `undo`  | Undo last command        |
+| `redo`  | Redo last undone command |
 
 ### Tile Serving (in `commands/tiles.rs`)
 
-| Command | Description |
-|---------|-------------|
-| `get_sqlite_tile` | Return tile bytes from MBTiles SQLite |
-| `get_ozi_tile` | Return raw OZF2 tile (ungeoreferenced) |
-| `get_ozi_tile_projected` | Return OZF2 tile reprojected to Web Mercator |
-| `get_ozi_metadata` | Return OZI map metadata (levels, bounds, calibration) |
+| Command                  | Description                                           |
+| ------------------------ | ----------------------------------------------------- |
+| `get_sqlite_tile`        | Return tile bytes from MBTiles SQLite                 |
+| `get_ozi_tile`           | Return raw OZF2 tile (ungeoreferenced)                |
+| `get_ozi_tile_projected` | Return OZF2 tile reprojected to Web Mercator          |
+| `get_ozi_metadata`       | Return OZI map metadata (levels, bounds, calibration) |
 
 ## Adding a New `ProjectCommand`
 
@@ -203,9 +206,9 @@ If the command is **non-undoable style only** (track color, line width, visibili
 
 ## Backend Events (backend → frontend)
 
-| Event | Payload | Purpose |
-|-------|---------|---------|
-| `state-changed` | `{}` | Frontend re-fetches app state |
-| `download-progress` | `{ package_name, downloaded_bytes, total_bytes? }` | Map download progress |
-| `projects-chunk` | `Vec<LizaProjectSummaryDto>` | Streaming project list |
-| `bundle-progress` | `{ message, phase, completed?, total? }` | Bundle extraction progress |
+| Event               | Payload                                            | Purpose                       |
+| ------------------- | -------------------------------------------------- | ----------------------------- |
+| `state-changed`     | `{}`                                               | Frontend re-fetches app state |
+| `download-progress` | `{ package_name, downloaded_bytes, total_bytes? }` | Map download progress         |
+| `projects-chunk`    | `Vec<LizaProjectSummaryDto>`                       | Streaming project list        |
+| `bundle-progress`   | `{ message, phase, completed?, total? }`           | Bundle extraction progress    |

@@ -129,11 +129,27 @@ pub enum DiagnosticLevel {
 pub struct DiagnosticEntry {
     level: DiagnosticLevel,
     message: String,
+    /// When it happened, local time, `HH:MM:SS`.
+    ///
+    /// A list of two hundred messages with no times is an order and nothing
+    /// else: a reader cannot tell whether the error was three seconds before
+    /// the screenshot or three hours. Added when the report folder was built,
+    /// because that is what makes a report readable by somebody who was not
+    /// there.
+    ///
+    /// The time rather than the date: a report covers one session, and the
+    /// folder's own name carries the day.
+    #[serde(default)]
+    at: String,
 }
 
 impl DiagnosticEntry {
     fn new(level: DiagnosticLevel, message: String) -> Self {
-        Self { level, message }
+        Self {
+            level,
+            message,
+            at: chrono::Local::now().format("%H:%M:%S").to_string(),
+        }
     }
 
     pub const fn level(&self) -> DiagnosticLevel {
@@ -142,6 +158,24 @@ impl DiagnosticEntry {
 
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    /// The line a session opens with, which happened at no particular moment.
+    ///
+    /// An empty time rather than the time the process started: the entry is
+    /// the initial status, not an event, and stamping it with `now()` made the
+    /// generated fixtures different on every run — they carry this line, so
+    /// `fixtures_are_up_to_date` could never pass again.
+    fn at_start(level: DiagnosticLevel, message: String) -> Self {
+        Self {
+            level,
+            message,
+            at: String::new(),
+        }
+    }
+
+    pub fn at(&self) -> &str {
+        &self.at
     }
 }
 
@@ -262,7 +296,7 @@ impl AppState {
                 selected_project_slug: None,
                 selected_project: None,
                 active_map: None,
-                diagnostics: VecDeque::from([DiagnosticEntry::new(
+                diagnostics: VecDeque::from([DiagnosticEntry::at_start(
                     DiagnosticLevel::Info,
                     "Load projects from maps.lizaalert.ru".to_owned(),
                 )]),

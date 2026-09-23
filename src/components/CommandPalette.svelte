@@ -28,6 +28,7 @@
   import { reportExported } from "$lib/actions/export-result";
   import { resolve } from "$app/paths";
   import { get } from "svelte/store";
+  import { captureMoment, showReportsFolder } from "$lib/actions/report";
   import * as Dialog from "$lib/components/ui/dialog";
   import * as Command from "$lib/components/ui/command";
   import {
@@ -620,6 +621,27 @@
                 ? $i18n("palette.graticuleOff")
                 : $i18n("palette.graticule")}</span
             >
+          </Command.Item>
+          <!-- A moment handed over as a folder, and the folder they go in. -->
+          <Command.Item
+            value="report:capture"
+            onSelect={() => {
+              close();
+              // After the palette has closed, or it photographs itself.
+              setTimeout(() => void captureMoment(), 150);
+            }}
+          >
+            <span class="flex-1">{$i18n("palette.saveReport")}</span>
+            <span class="text-muted-foreground text-[10px]">⇧⌘D</span>
+          </Command.Item>
+          <Command.Item
+            value="report:folder"
+            onSelect={() => {
+              void showReportsFolder();
+              close();
+            }}
+          >
+            <span class="flex-1">{$i18n("palette.revealReports")}</span>
           </Command.Item>
           <Command.Item value="setting:gps" onSelect={handleGpsSetting}>
             <span class="flex-1">{$i18n("palette.gps")}</span>

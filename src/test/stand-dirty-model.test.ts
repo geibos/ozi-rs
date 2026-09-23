@@ -54,6 +54,10 @@ const LEAVES_THE_PROJECT_ALONE = [
   "open_selected_map",
   "read_raster_size",
   "calibrate_raster",
+  // A report describes the work; it does not change it.
+  "save_report",
+  "add_report_note",
+  "reveal_reports",
   "set_bundles_root",
   // After these the project in hand is the project on disk.
   "save_project",

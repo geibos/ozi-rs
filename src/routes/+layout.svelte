@@ -32,6 +32,8 @@
   } from "../lib/network-reach";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
   import CloseGuard from "../components/CloseGuard.svelte";
+  import ReportNote from "../components/ReportNote.svelte";
+  import { captureMoment } from "$lib/actions/report";
   import { isEditableTarget } from "$lib/editable-target";
   import { t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
@@ -290,6 +292,14 @@
     if (!mod) return;
     const key = event.key.toLowerCase();
     const target = event.target as HTMLElement | null;
+    // Shift+Cmd/Ctrl+D captures the moment: the screen, the diagnostics and
+    // the state into a dated folder. A chord rather than only a palette entry
+    // because the palette covers the screen it is meant to photograph.
+    if (key === "d" && event.shiftKey) {
+      event.preventDefault();
+      void captureMoment();
+      return;
+    }
     if (key === "k") {
       if (target?.closest('[data-slot="dialog-content"]')) return;
       event.preventDefault();
@@ -336,6 +346,8 @@
   <Toaster richColors closeButton position="bottom-right" offset={toastEdge} />
   <!-- CJ-7: the question asked before a window with unsaved work closes. -->
   <CloseGuard />
+  <!-- The one line about what happened, after a moment was captured. -->
+  <ReportNote />
 </Tooltip.Provider>
 
 <style>

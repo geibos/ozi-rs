@@ -362,6 +362,29 @@ export async function setWaypointAttachments(
   );
 }
 
+/**
+ * A folder holding one moment: the screen, the diagnostics, the state.
+ *
+ * Between noticing something wrong and describing it later, almost everything
+ * useful is lost. See the Rust side.
+ */
+export async function saveReport(note: string | null = null): Promise<{
+  path: string;
+  screenshot_missing: boolean;
+}> {
+  return unwrap("save_report", commands.saveReport(note));
+}
+
+/** Add the sentence about what happened, after the moment was captured. */
+export async function addReportNote(path: string, note: string): Promise<void> {
+  await unwrap("add_report_note", commands.addReportNote(path, note));
+}
+
+/** Show the folder the reports go into, so a day's worth goes over at once. */
+export async function revealReports(): Promise<string> {
+  return unwrap("reveal_reports", commands.revealReports());
+}
+
 export async function newProject(): Promise<void> {
   await unwrap("new_project", commands.newProject());
 }

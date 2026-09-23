@@ -5,14 +5,35 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
-**One OpenSpec change is open, and nothing in it is visible to an operator.**
-`finish-the-rebuild` carries the three pieces of the development cycle that
-were never built: the screenshot matrix, the view-model layer, and a smoke
-journey for the six Customer Journeys that have none. Everything else is
-archived — `codify-architecture-decisions` and `revive-ui-cycle` both closed on
+**Two OpenSpec changes are open.** `a-folder-for-one-moment` is the newest —
+the owner asked on 2026-09-23 for a way to capture a moment while using the
+application, and it is built and green; its last task is the one an agent
+cannot tick, see below. `finish-the-rebuild` carries the three pieces of the
+development cycle that were never built: the screenshot matrix, the view-model
+layer, and a smoke journey for the six Customer Journeys that have none —
+nothing in it is visible to an operator. Everything else is archived — `codify-architecture-decisions` and `revive-ui-cycle` both closed on
 2026-09-23, the first after reading all thirteen of its capability deltas
 against the source, the second after moving its unbuilt requirements out rather
 than archiving requirements the code does not meet.
+
+**A moment can be captured into a folder** (`Shift+D`, or «Сохранить момент
+для отчёта» in the palette). It writes
+`~/Documents/ozi-rs-отчёты/<дата_время>/` holding `screenshot.png` of the
+window, `diagnostics.txt` (the session's messages with the time and level),
+`state.json` (the whole `AppStateDto`), `about.txt` (build, platform, moment)
+and, if the operator writes one, `note.txt`. Deliberately not behind a debug
+flag: the strangeness happens in the field, on a release build. The screenshot
+is taken first and the description asked after, so nothing covers the screen.
+
+What is proved and what is not: the folder, the four files, the note and the
+rectangle arithmetic are covered by tests — including that `screencapture -R`
+takes points and not pixels, checked from the shell on 2026-09-23 (a 400×300
+rectangle writes an 800×600 PNG at scale 2). What no test covers is the first
+run in the packaged application, where macOS asks for Screen Recording once.
+Refusing that grant costs the screenshot and nothing else: the report still
+appears, and the toast says the snapshot is missing and why. That single walk
+is task 1.8 of `a-folder-for-one-moment` and the reason the change is not yet
+archived.
 
 **Verified after the review fixes, 2026-09-23 at 20:36.** The desktop gate
 passed against a bundle built from the tree as it stands, and the stand was

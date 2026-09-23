@@ -612,6 +612,48 @@ async revealPath(path: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * Capture the moment.
+ * 
+ * Answers the folder. A screenshot that could not be taken does not fail the
+ * report: the diagnostics and the state are most of the value, and a report
+ * that refuses to exist because of a missing permission is the worst of both.
+ */
+async saveReport(note: string | null) : Promise<Result<ReportDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_report", { note }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Add a description to a report already written.
+ * 
+ * Two steps on purpose. The screen is captured the moment the operator asks,
+ * before a dialog can cover it or the state move on; the sentence about what
+ * happened comes after, when there is a second to write it. A report with no
+ * note is still worth having, so this is allowed to be skipped.
+ */
+async addReportNote(path: string, note: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("add_report_note", { path, note }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Show the reports folder, so a day's worth can be handed over at once.
+ */
+async revealReports() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("reveal_reports") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Replace the files that belong to a mark.
  * 
  * Paths, not bytes: a `.ozp` is JSON two headquarters send each other, and a
@@ -768,7 +810,11 @@ export type CalibrationPointDto = { pixel_x: number; pixel_y: number; lat: numbe
  * What a day's export wrote, so the interface can say it.
  */
 export type DayExportDto = { tracks: number; waypoints: number }
-export type DiagnosticDto = { level: string; message: string }
+export type DiagnosticDto = { level: string; message: string; 
+/**
+ * Local `HH:MM:SS`. See `DiagnosticEntry::at`.
+ */
+at: string }
 /**
  * Lat/lon bounding box for extent crops — the current map viewport.
  */
@@ -814,6 +860,15 @@ export type PointDetailDto = { id: number; lat: number; lon: number; elevation: 
  * The size of a picture, so the calibration form knows what it is working on.
  */
 export type RasterSizeDto = { width: number; height: number }
+export type ReportDto = { 
+/**
+ * The folder just written, so the interface can offer to show it.
+ */
+path: string; 
+/**
+ * True when the screen could not be photographed — see below.
+ */
+screenshot_missing: boolean }
 export type SegmentDetailDto = { id: number; points: PointDetailDto[] }
 export type SimplifiedPreviewDto = { original_count: number; simplified_count: number; segments: SimplifiedSegmentDto[] }
 export type SimplifiedSegmentDto = { id: number; original_count: number; simplified_count: number; kept_points: PointDetailDto[] }
