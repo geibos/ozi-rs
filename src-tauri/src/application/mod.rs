@@ -1955,43 +1955,60 @@ impl AppState {
             self.bundles_root = bundles_root;
         }
 
-        if let Some(project_path) = session.last_project_path {
-            if !project_path.exists() {
+        // The project and the map are independent things on disk, and what
+        // follows restores each on its own.
+        //
+        // This used to be one run of early returns: a `.ozp` that had been
+        // moved, renamed or deleted aborted the whole restore, so the crew
+        // lost the raster as well and met a blank screen with everything
+        // present on the disk underneath it. CJ-2 is a laptop switched on in a
+        // field camp that has to be showing a working map inside a minute; the
+        // map is the ground, the project is the work on it, and losing the
+        // work is no reason to lose the ground.
+        self.restore_session_project(session.last_project_path);
+        self.restore_session_active_map(session.active_map);
+    }
+
+    fn restore_session_project(&mut self, project_path: Option<PathBuf>) {
+        let Some(project_path) = project_path else {
+            return;
+        };
+        if !project_path.exists() {
+            self.update_status(
+                DiagnosticLevel::Error,
+                format!(
+                    "Session restore skipped missing project: {}",
+                    project_path.display()
+                ),
+            );
+            return;
+        }
+
+        match persistence::load_project(&project_path) {
+            Ok(project) => {
+                self.project = project;
+                self.project_path = Some(project_path.clone());
+                self.history = CommandStack::default();
+                self.mark_project_saved();
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Restored project: {}", project_path.display()),
+                );
+            }
+            Err(error) => {
                 self.update_status(
                     DiagnosticLevel::Error,
                     format!(
-                        "Session restore skipped missing project: {}",
+                        "Session restore skipped project {}: {error}",
                         project_path.display()
                     ),
                 );
-                return;
-            }
-
-            match persistence::load_project(&project_path) {
-                Ok(project) => {
-                    self.project = project;
-                    self.project_path = Some(project_path.clone());
-                    self.history = CommandStack::default();
-                    self.mark_project_saved();
-                    self.update_status(
-                        DiagnosticLevel::Info,
-                        format!("Restored project: {}", project_path.display()),
-                    );
-                }
-                Err(error) => {
-                    self.update_status(
-                        DiagnosticLevel::Error,
-                        format!(
-                            "Session restore skipped project {}: {error}",
-                            project_path.display()
-                        ),
-                    );
-                    return;
-                }
             }
         }
+    }
 
-        let Some(active_map) = session.active_map else {
+    fn restore_session_active_map(&mut self, active_map: Option<PersistedActiveMap>) {
+        let Some(active_map) = active_map else {
             return;
         };
         let Some(selection) = active_map_selection_from_persisted(active_map) else {
@@ -3559,6 +3576,104 @@ mod tests {
         let state = AppState::new_with_paths(Some(session_path), dir.join("bundles"));
 
         assert_eq!(state.project_file_path(), Some(project_path.as_path()));
+    }
+
+    /// CJ-2: the laptop is switched on in a field camp and has to be showing a
+    /// working map inside a minute.
+    ///
+    /// The project and the map are separate things on disk, and the session
+    /// restored them in one run of early returns: a `.ozp` that had been moved,
+    /// renamed or deleted aborted the whole restore, so the crew lost the
+    /// raster as well — a blank screen with everything present on the disk
+    /// underneath it. The map is the ground; the project is the work on it.
+    #[test]
+    fn a_missing_project_does_not_cost_the_map_as_well() {
+        let dir = temp_session_dir("restore-missing-project");
+        let map_path = dir.join("topo.sqlitedb");
+        std::fs::write(&map_path, b"not really a tile store").expect("write map");
+        let session_path = dir.join("session.json");
+
+        persistence::save_app_session(
+            &PersistedAppSession {
+                // Never written, so it does not exist: the crew moved it.
+                last_project_path: Some(dir.join("gone.ozp")),
+                bundles_root: None,
+                active_map: Some(persistence::PersistedActiveMap {
+                    kind: "sqlite".to_owned(),
+                    project_name: "2026-07-08 Lavrovo".to_owned(),
+                    package_name: "topo".to_owned(),
+                    remote_url: String::new(),
+                    local_path: map_path.clone(),
+                    center_lat: 59.95,
+                    center_lon: 31.6,
+                    base_zoom: 16,
+                }),
+            },
+            &session_path,
+        )
+        .expect("save session");
+
+        let state = AppState::new_with_paths(Some(session_path), dir.join("bundles"));
+
+        let said: Vec<&str> = state
+            .lizaalert
+            .diagnostics
+            .iter()
+            .map(|entry| entry.message.as_str())
+            .collect();
+        assert!(
+            said.iter().any(|m| m.contains("missing project")),
+            "the missing project SHALL be reported: {said:?}"
+        );
+        assert!(
+            said.iter().any(|m| m.to_lowercase().contains("active map")),
+            "the restore SHALL go on to the map rather than stop at the project: {said:?}"
+        );
+    }
+
+    /// The same, one step later: a project file that exists but cannot be read
+    /// — a truncated save, or one written by a newer build — must not take the
+    /// map down with it either.
+    #[test]
+    fn an_unreadable_project_does_not_cost_the_map_as_well() {
+        let dir = temp_session_dir("restore-unreadable-project");
+        let project_path = dir.join("broken.ozp");
+        std::fs::write(&project_path, b"{ this is not a project").expect("write project");
+        let map_path = dir.join("topo.sqlitedb");
+        std::fs::write(&map_path, b"not really a tile store").expect("write map");
+        let session_path = dir.join("session.json");
+
+        persistence::save_app_session(
+            &PersistedAppSession {
+                last_project_path: Some(project_path),
+                bundles_root: None,
+                active_map: Some(persistence::PersistedActiveMap {
+                    kind: "sqlite".to_owned(),
+                    project_name: "2026-07-08 Lavrovo".to_owned(),
+                    package_name: "topo".to_owned(),
+                    remote_url: String::new(),
+                    local_path: map_path,
+                    center_lat: 59.95,
+                    center_lon: 31.6,
+                    base_zoom: 16,
+                }),
+            },
+            &session_path,
+        )
+        .expect("save session");
+
+        let state = AppState::new_with_paths(Some(session_path), dir.join("bundles"));
+
+        let said: Vec<&str> = state
+            .lizaalert
+            .diagnostics
+            .iter()
+            .map(|entry| entry.message.as_str())
+            .collect();
+        assert!(
+            said.iter().any(|m| m.to_lowercase().contains("active map")),
+            "an unreadable project SHALL NOT stop the map being restored: {said:?}"
+        );
     }
 
     #[test]

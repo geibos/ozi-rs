@@ -48,6 +48,7 @@
     selectedMapInfo,
     selectedTrack,
     selectedWaypointId,
+    selectedTheme,
   } from "$lib/stores";
   import {
     exportGpx,
@@ -68,6 +69,7 @@
   // Aliased: the tracks loop below binds `t`, and a store read inside it
   // would resolve to the loop variable.
   import { t as i18n, toggleLocale } from "$lib/i18n";
+  import { applyTheme, type ThemeName } from "$lib/theme";
   import { save as saveDialog } from "@tauri-apps/plugin-dialog";
   import { appendRecentFile, getRecentFiles } from "$lib/recentFiles";
   import { getRecentProjects } from "$lib/recent-projects";
@@ -252,11 +254,33 @@
     close();
   }
 
-  function handleThemeSetting() {
+  /**
+   * The colour themes, as palette entries.
+   *
+   * `ui-shell` has required a theme selector all along and `ThemePicker.svelte`
+   * has existed all along, mounted nowhere: the workspace redesign took away
+   * the sidebar it lived in and left this entry raising a toast that said, in
+   * English, to use a picker in a sidebar that is not there. A setting the
+   * operator can reach is the requirement; the palette is where the other
+   * settings already are, and it is searchable, which a select in a corner is
+   * not.
+   */
+  const THEMES: { value: ThemeName; label: string }[] = [
+    { value: "native-auto", label: "Native — Auto" },
+    { value: "native-light", label: "Native — Light" },
+    { value: "native-dark", label: "Native — Dark" },
+    { value: "latte", label: "Catppuccin — Latte" },
+    { value: "frappe", label: "Catppuccin — Frappé" },
+    { value: "macchiato", label: "Catppuccin — Macchiato" },
+    { value: "mocha", label: "Catppuccin — Mocha" },
+  ];
+
+  function handleThemeChoice(theme: ThemeName) {
     close();
-    toast.message($i18n("palette.theme"), {
-      description: "Use the existing Theme Picker in the sidebar.",
-    });
+    // The store persists the choice; `applyTheme` puts it on the screen now
+    // rather than at the next launch.
+    selectedTheme.set(theme);
+    void applyTheme(theme);
   }
 
   function handleUnitsSetting() {
@@ -479,9 +503,19 @@
         {/if}
 
         <Command.Group heading={$i18n("palette.groupSettings")}>
-          <Command.Item value="setting:theme" onSelect={handleThemeSetting}>
-            <span class="flex-1">{$i18n("palette.theme")}</span>
-          </Command.Item>
+          {#each THEMES as theme (theme.value)}
+            <Command.Item
+              value={`setting:theme:${theme.value}`}
+              onSelect={() => handleThemeChoice(theme.value)}
+            >
+              <span class="flex-1">
+                {$i18n("palette.theme")} — {theme.label}
+              </span>
+              {#if $selectedTheme === theme.value}
+                <span aria-hidden="true">✓</span>
+              {/if}
+            </Command.Item>
+          {/each}
           <!-- The `palette.language` key renders the OTHER language (the
                toggle target), e.g. "Language: Русский" while English is
                active. -->
