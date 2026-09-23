@@ -28,14 +28,9 @@
   import * as Tooltip from "$lib/components/ui/tooltip";
   import {
     activeTrackLayerId,
-    addWaypointMode,
     appState,
     drawingModeActive,
     drawingPointCount,
-    drawingSegmentId,
-    drawingTrackId,
-    drawingTrackLayerId,
-    editModeActive,
     requestTrackFocus,
     requestAllDataFocus,
     selectedTrack,
@@ -43,13 +38,11 @@
     tracksGeometryVersion,
   } from "$lib/stores";
   import {
-    createEmptyTrack,
     deleteTrack,
     exportAllTracksGpx,
     exportGpx,
     exportTrackPlt,
     getSimplifiedPreview,
-    getTrackDetail,
     getTrackExportDefaultPath,
     listTracks,
     importTracksDirectory,
@@ -70,6 +63,7 @@
   } from "$lib/actions/import-paths";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
+  import { setInteractionMode } from "$lib/actions/modes";
   import UploadIcon from "@lucide/svelte/icons/upload";
   import Layers from "@lucide/svelte/icons/layers";
   import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
@@ -458,35 +452,12 @@
   }
 
   async function handleCreateTrackToggle() {
-    // Toggle drawing mode. On exit we ask MapView to finish via the
-    // existing `drawingFinishRequested` signal it already listens to,
-    // but the legacy Sidebar simply flipped `drawingModeActive` to false
-    // and the same wiring works here — MapView's effect drains the
-    // pending preview when the mode goes false.
-    if ($drawingModeActive) {
-      drawingModeActive.set(false);
-      return;
-    }
-
-    const layerId = $activeTrackLayerId;
-    if (layerId === null) return;
-
-    try {
-      editModeActive.set(false);
-      addWaypointMode.set(false);
-      const trackId = await createEmptyTrack(layerId, "New Track");
-      const detail = await getTrackDetail(layerId, trackId);
-      drawingTrackLayerId.set(layerId);
-      drawingTrackId.set(trackId);
-      drawingSegmentId.set(BigInt(detail.segments[0].id));
-      drawingPointCount.set(0);
-      drawingModeActive.set(true);
-    } catch (err) {
-      console.error("Failed to start track drawing mode", err);
-      toast.error($i18n("tracksTab.drawStartFailed"), {
-        description: String(err),
-      });
-    }
+    // The routine lives in `$lib/actions/modes`, with the mode chips above the
+    // map and the command palette: entering drawing mode creates a track in
+    // the active layer, finds its first segment and resets the counters, and a
+    // second copy of that here is how two surfaces come to disagree about what
+    // "draw" means.
+    await setInteractionMode("draw");
   }
 
   async function handleDelete(t: TrackFeature) {

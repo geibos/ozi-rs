@@ -38,8 +38,17 @@ describe("Library Tracks tab — import / create-track affordances", () => {
     expect(tracksSource).toContain("importPlt");
   });
 
-  it("calls createEmptyTrack to start drawing mode", () => {
-    expect(tracksSource).toContain("createEmptyTrack");
+  it("starts drawing mode through the shared action", () => {
+    // The routine moved to `$lib/actions/modes` on 2026-09-23 so the Tracks
+    // tab, the mode chips above the map and the command palette all enter
+    // drawing the same way. The tab asks for the mode; the action creates the
+    // track.
+    expect(tracksSource).toContain('setInteractionMode("draw")');
+    const modes = readFileSync(
+      join(__dirname, "../lib/actions/modes.ts"),
+      "utf-8",
+    );
+    expect(modes).toContain("createEmptyTrack");
   });
 
   it("references drawingModeActive for the drawing toggle", () => {

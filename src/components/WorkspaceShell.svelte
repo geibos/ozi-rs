@@ -32,6 +32,11 @@
     projectDirty,
   } from "$lib/stores";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
+  import {
+    setInteractionMode,
+    workspaceMode,
+    type InteractionMode,
+  } from "$lib/actions/modes";
   import { locale, progressText, t, toggleLocale } from "$lib/i18n";
 
   let {
@@ -103,23 +108,26 @@
 
   <div class="canvas-column">
     <div class="context-bar">
-      <div
-        class="mode-chips"
-        role="group"
-        aria-label="Mode (inert placeholder)"
-      >
-        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
-          >{$t("shell.modeView")}</button
-        >
-        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
-          >{$t("shell.modeDraw")}</button
-        >
-        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
-          >{$t("shell.modeEdit")}</button
-        >
-        <button type="button" class="chip" tabindex="-1" aria-disabled="true"
-          >{$t("shell.modeMeasure")}</button
-        >
+      <!--
+        The four modes, and the control that says which one you are in. These
+        were an inert placeholder from the redesign: four buttons carrying the
+        mode names, marked `aria-disabled`, doing nothing when pressed, above a
+        map where all four modes worked and were reachable from three other
+        places. Pressing the mode you are in leaves it.
+      -->
+      <div class="mode-chips" role="group" aria-label={$t("shell.mode")}>
+        {#each [["view", $t("shell.modeView")], ["draw", $t("shell.modeDraw")], ["edit", $t("shell.modeEdit")], ["measure", $t("shell.modeMeasure")]] as [mode, label] (mode)}
+          <button
+            type="button"
+            class="chip"
+            class:active={$workspaceMode === mode}
+            aria-pressed={$workspaceMode === mode}
+            data-testid="mode-{mode}"
+            onclick={() => void setInteractionMode(mode as InteractionMode)}
+          >
+            {label}
+          </button>
+        {/each}
         <span class="chips-divider" aria-hidden="true"></span>
       </div>
       <!--
@@ -391,6 +399,16 @@
     user-select: none;
     opacity: 0.55;
     transition: none;
+  }
+
+  /* The mode you are in. The chips were inert, so there was nothing to show. */
+  .chip.active {
+    background: var(--primary, #2563eb);
+    color: var(--primary-foreground, #fff);
+    border-color: transparent;
+  }
+  .chip:not(.active):hover {
+    background: var(--accent, rgba(127, 127, 127, 0.15));
   }
 
   .chip[aria-disabled="true"]:hover {

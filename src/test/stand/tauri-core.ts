@@ -554,10 +554,23 @@ const HANDLERS: StandAnswers = {
     projectEmptied
       ? []
       : [...withEditedCounts(tracksListFixture), ...importedTracks],
-  get_track_detail: (args) =>
-    args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
-      ? (editedDetail ?? trackDetailFixture)
-      : { id: Number(args?.trackId ?? 0), name: "", segments: [] },
+  get_track_detail: (args) => {
+    // A track this session created answers with what it was created as. It
+    // used to be served only for the fixture track's id, so a freshly drawn
+    // track came back with no segments — and drawing mode, which reads
+    // `segments[0].id` to know where the points go, could not be entered on
+    // the stand at all. Found wiring the mode chips, 2026-09-23.
+    if (editedDetail && Number(args?.trackId) === Number(editedDetail.id)) {
+      return editedDetail;
+    }
+    if (
+      args?.layerId === FIXTURE_TRACK_LAYER &&
+      args?.trackId === FIXTURE_TRACK
+    ) {
+      return editedDetail ?? trackDetailFixture;
+    }
+    return { id: Number(args?.trackId ?? 0), name: "", segments: [] };
+  },
   get_waypoints: (args) => {
     if (projectEmptied) return [];
     const layerId = Number(args?.layerId);
@@ -736,7 +749,18 @@ const HANDLERS: StandAnswers = {
   // stand exists to stop.
   create_empty_track: () => {
     nextStandTrackId += 1;
-    editedDetail = { id: nextStandTrackId, name: "New Track", segments: [] };
+    // With one empty segment, as `ProjectCommand::CreateEmptyTrack` makes it
+    // (`application/commands.rs`: the track is built and then given
+    // `TrackSegment::new(1)`). Answering with no segments at all meant drawing
+    // mode could never be entered on the stand — the caller reads
+    // `segments[0].id` to know where the points go — so the one journey the
+    // desktop smoke covers was the one this could not walk. Found wiring the
+    // mode chips, 2026-09-23.
+    editedDetail = {
+      id: nextStandTrackId,
+      name: "New Track",
+      segments: [{ id: 1, points: [] }],
+    };
     standEmit("state-changed", undefined);
     return nextStandTrackId;
   },

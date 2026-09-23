@@ -855,9 +855,16 @@
       await refreshWaypointMarkers();
     } catch (error) {
       reportEditFailure("map.addWaypointFailed", error);
-    } finally {
-      addWaypointMode.set(false);
     }
+    // The mode stays armed. It used to switch itself off after every mark,
+    // including after a failed one, so a headquarters cutting the next outing
+    // into tasks — ten marks: the base camp, the finds, the hazards — pressed
+    // the toolbar button ten times between them. OziExplorer keeps its
+    // waypoint tool selected until you pick another, and CJ-5 says "поставить
+    // вейпоинты", plural.
+    //
+    // Leaving is Esc, the mode chip, or starting to draw: all three already
+    // clear it. Panning does not, because a drag is not a click.
   }
 
   function clearDrawingPreview() {
