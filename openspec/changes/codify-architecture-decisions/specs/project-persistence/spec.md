@@ -26,12 +26,17 @@ The system SHALL write every `.ozp` project file and the app session file throug
 
 ### Requirement: `.ozp` content is pretty-printed JSON with a stable top-level shape
 
-The `.ozp` file SHALL be pretty-printed UTF-8 JSON whose top-level value is an object with the keys `id`, `name`, `map_layers`, `track_layers` and `waypoint_layers`. Identifier newtypes (`ProjectId`, `LayerId`, `TrackId`, `TrackSegmentId`, `TrackPointId`, `WaypointId`) SHALL serialize as bare JSON integers. Optional track-point fields (`elevation`, `timestamp`) SHALL be omitted when unset. Fields with defaults (`style` on a track, `visible` on a waypoint) SHALL be tolerated when absent on load, so files written before those fields existed remain readable.
+The `.ozp` file SHALL be pretty-printed UTF-8 JSON whose top-level value is an object with the keys `format_version`, `id`, `name`, `map_layers`, `track_layers` and `waypoint_layers`. `format_version` SHALL be read before anything else is parsed, so that a file written by a later build is refused with a version mismatch rather than half-loaded; a file written before the stamp existed SHALL read as version 0 and load. Identifier newtypes (`ProjectId`, `LayerId`, `TrackId`, `TrackSegmentId`, `TrackPointId`, `WaypointId`) SHALL serialize as bare JSON integers. Optional track-point fields (`elevation`, `timestamp`) SHALL be omitted when unset. Fields with defaults (`style` on a track, `visible` on a waypoint) SHALL be tolerated when absent on load, so files written before those fields existed remain readable.
 
 #### Scenario: Saved file is a JSON object with the expected keys
 
 - **WHEN** the user saves a project named `Untitled Project`
-- **THEN** the file parses as a JSON object, its `name` is `"Untitled Project"`, and it has the keys `id`, `name`, `map_layers`, `track_layers` and `waypoint_layers`
+- **THEN** the file parses as a JSON object, its `name` is `"Untitled Project"`, and it has the keys `format_version`, `id`, `name`, `map_layers`, `track_layers` and `waypoint_layers`
+
+#### Scenario: A file from a later build is refused, not half-loaded
+
+- **WHEN** a `.ozp` file states a `format_version` higher than this build supports
+- **THEN** the load fails naming both versions, and nothing of the file is taken into the session
 
 #### Scenario: Minimal hand-written file loads
 
