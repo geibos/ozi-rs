@@ -378,9 +378,10 @@ and the palette slice; these were not.
 ## What OziExplorer has and this does not
 
 Re-checked against `docs/reference/oziexplorer.md` on 2026-09-23, after the
-calibration and field-tool work. Everything the reference marks **[ЯДРО]** is
-now built except these four, none of which was ever agreed into scope — they
-are written down so the choice is the owner's rather than an omission.
+calibration and field-tool work. Four things the reference marks **[ЯДРО]**
+were missing; all four were built the same day, and each entry below says what
+it cost and where it differs from the original. Nothing the reference marks as
+core is missing now.
 
 - ~~**Сетка координат на карте.**~~ Built on 2026-09-23
   (`a-grid-to-read-sectors-off`): lat/lon lines on a step that follows the zoom
@@ -395,10 +396,11 @@ are written down so the choice is the owner's rather than an omission.
   (`where-were-they-at-half-past-two`): a slider over the track's own clock, a
   marker where the crew was, interpolated between recorded points, and a
   silence longer than five minutes marked as a guess rather than a fix.
-- **Вложения к точке.** A photo attached to a mark — the found item, the
-  footprint. This needs files inside the `.ozp`, which is a change to the
-  format rather than a feature on top of it, and the format is the thing two
-  headquarters exchange.
+- ~~**Вложения к точке.**~~ Built on 2026-09-23 (`a-photograph-of-the-find`),
+  and the entry above was wrong about the cost: the files are stored as paths
+  beside the project, not bytes inside it, so the `.ozp` stays the readable
+  JSON two headquarters exchange. Sending the work means sending the folder,
+  which is what a crew already does with a bundle.
 
 Deliberately not listed: Track Move (a track is a recording, not a drawing),
 Routes, Events, Point Sets, live GPS, printing, DEM relief, and the GIS import

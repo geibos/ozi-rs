@@ -11,6 +11,9 @@
   import EyeIcon from "@lucide/svelte/icons/eye";
   import { reportExported } from "$lib/actions/export-result";
   import { reportEditFailure } from "$lib/edit-failure";
+  import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+  import PaperclipIcon from "@lucide/svelte/icons/paperclip";
+  import { revealPath, setWaypointAttachments } from "$lib/api";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
   import MapPinIcon from "@lucide/svelte/icons/map-pin";
@@ -108,6 +111,44 @@
       descriptionDraft = current;
       descriptionDirty = false;
     }
+  }
+
+  /**
+   * The files that belong to this mark.
+   *
+   * A find is photographed from three sides, and the photographs are what the
+   * next shift actually looks at. They are stored as paths beside the project
+   * rather than inside it — see the Rust side — so attaching one is choosing a
+   * file that is already on this machine, not copying it anywhere.
+   */
+  const attachments = $derived(waypoint?.attachments ?? []);
+
+  async function replaceAttachments(next: string[]) {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    try {
+      await setWaypointAttachments(layerId, BigInt(wp.id), next);
+      await loadWaypoint(layerId, BigInt(wp.id));
+    } catch (error) {
+      reportEditFailure("inspector.attachmentsFailed", error);
+    }
+  }
+
+  async function handleAttach() {
+    const picked = await openFileDialog({ multiple: true });
+    if (!picked) return;
+    const chosen = Array.isArray(picked) ? picked : [picked];
+    await replaceAttachments([...attachments, ...(chosen as string[])]);
+  }
+
+  async function handleDetach(path: string) {
+    await replaceAttachments(attachments.filter((kept) => kept !== path));
+  }
+
+  function fileName(path: string): string {
+    const parts = path.split(/[\\/]/);
+    return parts[parts.length - 1] || path;
   }
 
   function handleDescriptionInput(event: Event) {
@@ -321,6 +362,63 @@
       data-testid="waypoint-description"
     />
   </div>
+
+  <!-- The files that belong to this mark: the photographs the next shift
+       actually looks at. Paths beside the project, not bytes inside it. -->
+  <section
+    class="bg-card border-border space-y-2 rounded-[var(--radius-card)] border p-4"
+    aria-label={$t("inspector.attachments")}
+  >
+    <h3
+      class="text-muted-foreground/80 flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase"
+    >
+      <PaperclipIcon class="size-3" strokeWidth={1.5} />
+      {$t("inspector.attachments")}
+    </h3>
+
+    {#if attachments.length > 0}
+      <ul class="space-y-1" data-testid="waypoint-attachments">
+        {#each attachments as path (path)}
+          <li class="flex items-center gap-1.5 text-xs">
+            <span class="flex-1 truncate" title={path}>{fileName(path)}</span>
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground text-[11px]"
+              onclick={() => void revealPath(path)}
+              aria-label={$t("inspector.attachmentShow")}
+            >
+              {$t("inspector.attachmentShow")}
+            </button>
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-destructive text-[11px]"
+              onclick={() => void handleDetach(path)}
+              aria-label={$t("inspector.attachmentRemove")}
+            >
+              {$t("inspector.attachmentRemove")}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="text-muted-foreground text-[11px]">
+        {$t("inspector.attachmentsNone")}
+      </p>
+    {/if}
+
+    <button
+      type="button"
+      class="border-border h-7 w-full rounded-sm border text-xs"
+      onclick={() => void handleAttach()}
+      disabled={!waypoint}
+      data-testid="waypoint-attach"
+    >
+      {$t("inspector.attachmentAdd")}
+    </button>
+    <p class="text-muted-foreground text-[10px]">
+      {$t("inspector.attachmentsHint")}
+    </p>
+  </section>
 
   <section
     class="bg-card border-border rounded-[var(--radius-card)] border p-4"

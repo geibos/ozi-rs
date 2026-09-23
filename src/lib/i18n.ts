@@ -119,6 +119,14 @@ const dictionaries = {
     "trackInspector.deleteFailed": "Failed to delete the track",
     "points.detailFailed": "Failed to load the track's points",
     "inspector.waypointDescription": "Note",
+    "inspector.attachments": "Files",
+    "inspector.attachmentsHint":
+      "Photographs and scans that belong to this mark. They live beside the project, so sending the work means sending the folder.",
+    "inspector.attachmentAdd": "Attach a file…",
+    "inspector.attachmentShow": "Show",
+    "inspector.attachmentRemove": "Detach",
+    "inspector.attachmentsNone": "Nothing attached",
+    "inspector.attachmentsFailed": "Could not change the attached files",
     "inspector.waypointDescriptionPlaceholder":
       "What this mark means — travels with it to the next headquarters",
     "inspector.waypointDescriptionFailed": "Could not save the note",
@@ -553,6 +561,14 @@ const dictionaries = {
     "trackInspector.deleteFailed": "Не удалось удалить трек",
     "points.detailFailed": "Не удалось загрузить точки трека",
     "inspector.waypointDescription": "Заметка",
+    "inspector.attachments": "Файлы",
+    "inspector.attachmentsHint":
+      "Фотографии и сканы, относящиеся к этой точке. Лежат рядом с проектом — передать работу значит передать папку.",
+    "inspector.attachmentAdd": "Прикрепить файл…",
+    "inspector.attachmentShow": "Показать",
+    "inspector.attachmentRemove": "Открепить",
+    "inspector.attachmentsNone": "Ничего не прикреплено",
+    "inspector.attachmentsFailed": "Не удалось изменить прикреплённые файлы",
     "inspector.waypointDescriptionPlaceholder":
       "Что это за отметка — уедет вместе с ней в соседний штаб",
     "inspector.waypointDescriptionFailed": "Не удалось сохранить заметку",
@@ -665,9 +681,9 @@ const dictionaries = {
     "inspector.showTrack": "Показать трек",
     "inspector.elevation": "Высота",
     "inspector.replay": "Где были",
-    "inspector.replayNone":
-      "В записи нет времён — проигрывать нечего",
-    "inspector.replayGap": "здесь связи не было — линия через пропуск это догадка",
+    "inspector.replayNone": "В записи нет времён — проигрывать нечего",
+    "inspector.replayGap":
+      "здесь связи не было — линия через пропуск это догадка",
     "inspector.replayPlay": "Пуск",
     "inspector.replayPause": "Пауза",
     "inspector.elevationNone": "В этой записи нет высоты",

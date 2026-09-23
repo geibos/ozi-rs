@@ -141,6 +141,7 @@ registered without a line on this page, so the gap cannot open again.
 | `set_waypoint_symbol` | Set or clear waypoint symbol |
 | `set_waypoint_color` | Set or clear a mark's colour |
 | `set_waypoint_description` | Write the note beside a mark — what a crew is actually sent to |
+| `set_waypoint_attachments` | Replace the files that belong to a mark — paths beside the project, not bytes inside it |
 | `toggle_waypoint_visible` | Flip one waypoint's visibility (style, not an undoable edit) |
 | `set_all_waypoints_visible` | Show or hide every waypoint in one step |
 | `show_only_waypoint` | Show one waypoint and hide the rest |

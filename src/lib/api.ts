@@ -341,6 +341,27 @@ export async function calibrateRaster(
   );
 }
 
+/**
+ * Replace the files that belong to a mark.
+ *
+ * Paths, not bytes — the photograph lives beside the project, and sending the
+ * work means sending the folder. See the Rust side for why.
+ */
+export async function setWaypointAttachments(
+  layerId: bigint,
+  waypointId: bigint,
+  attachments: string[],
+): Promise<void> {
+  await unwrap(
+    "set_waypoint_attachments",
+    commands.setWaypointAttachments(
+      toIdNumber(layerId),
+      toIdNumber(waypointId),
+      attachments,
+    ),
+  );
+}
+
 export async function newProject(): Promise<void> {
   await unwrap("new_project", commands.newProject());
 }

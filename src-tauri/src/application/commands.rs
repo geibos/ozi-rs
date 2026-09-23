@@ -131,6 +131,14 @@ pub enum ProjectCommand {
         old_color: Option<[u8; 4]>,
         new_color: Option<[u8; 4]>,
     },
+    /// The files that belong to a mark — a photograph of the find, a scan.
+    /// Replaced whole; see `Waypoint::set_attachments` for why.
+    SetWaypointAttachments {
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        old_attachments: Vec<String>,
+        new_attachments: Vec<String>,
+    },
     /// The note beside a mark: what a crew is actually sent to.
     SetWaypointDescription {
         layer_id: LayerId,
@@ -717,6 +725,19 @@ impl ProjectCommand {
                 )?;
                 Ok(())
             }
+            Self::SetWaypointAttachments {
+                layer_id,
+                waypoint_id,
+                new_attachments,
+                ..
+            } => {
+                project.set_waypoint_attachments_in_layer(
+                    *layer_id,
+                    *waypoint_id,
+                    new_attachments.clone(),
+                )?;
+                Ok(())
+            }
             Self::SetWaypointSymbol {
                 layer_id,
                 waypoint_id,
@@ -1163,6 +1184,17 @@ impl ProjectCommand {
                 waypoint_id: *waypoint_id,
                 old_description: new_description.clone(),
                 new_description: old_description.clone(),
+            },
+            Self::SetWaypointAttachments {
+                layer_id,
+                waypoint_id,
+                old_attachments,
+                new_attachments,
+            } => Self::SetWaypointAttachments {
+                layer_id: *layer_id,
+                waypoint_id: *waypoint_id,
+                old_attachments: new_attachments.clone(),
+                new_attachments: old_attachments.clone(),
             },
             Self::SetWaypointSymbol {
                 layer_id,

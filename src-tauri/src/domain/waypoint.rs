@@ -51,6 +51,25 @@ pub struct Waypoint {
     /// field existed reads as `None`.
     #[serde(default)]
     description: Option<String>,
+    /// Files that belong to this mark — a photograph of the find, a scan, a
+    /// voice note taken at the spot.
+    ///
+    /// Paths, not bytes. A `.ozp` is JSON that two headquarters send each
+    /// other, and a photograph inside it turns a readable text file into a
+    /// megabyte of base64 that no editor opens and no diff shows. The files
+    /// live beside the project, which is how everything else here works — a
+    /// `.map` beside its picture, a bundle in its folder — and sending the
+    /// work means sending the folder, which is what a crew already does.
+    ///
+    /// Relative to the project file when the file sits beside it, absolute
+    /// otherwise; the path is kept as the operator's own picker gave it, and
+    /// a path that no longer resolves is reported when it is opened rather
+    /// than silently dropped.
+    ///
+    /// OziExplorer carries one such link per waypoint. This carries a list,
+    /// because a find is photographed from three sides.
+    #[serde(default)]
+    attachments: Vec<String>,
 }
 
 fn default_true() -> bool {
@@ -68,6 +87,7 @@ impl Waypoint {
             visible: true,
             color: None,
             description: None,
+            attachments: Vec::new(),
         }
     }
 
@@ -96,6 +116,30 @@ impl Waypoint {
             }
         });
         std::mem::replace(&mut self.description, normalised)
+    }
+
+    pub fn attachments(&self) -> &[String] {
+        &self.attachments
+    }
+
+    /// Replace the whole list, answering what it was.
+    ///
+    /// Whole rather than add/remove: the undo delta needs the previous list
+    /// either way, and one command that says "these are the files now" cannot
+    /// get out of step with itself the way a pair can.
+    ///
+    /// Blank entries are dropped and duplicates are not added twice: the same
+    /// photograph attached twice is a mistake, not a decision.
+    pub fn set_attachments(&mut self, attachments: Vec<String>) -> Vec<String> {
+        let mut cleaned: Vec<String> = Vec::with_capacity(attachments.len());
+        for path in attachments {
+            let trimmed = path.trim();
+            if trimmed.is_empty() || cleaned.iter().any(|kept| kept == trimmed) {
+                continue;
+            }
+            cleaned.push(trimmed.to_owned());
+        }
+        std::mem::replace(&mut self.attachments, cleaned)
     }
 
     pub fn symbol(&self) -> Option<&str> {
@@ -218,6 +262,53 @@ mod tests {
             "missing `visible` field SHALL deserialize as `true` for backward compatibility"
         );
         assert_eq!(waypoint.name(), "Camp");
+    }
+
+    #[test]
+    fn waypoint_attachments_start_empty_and_round_trip() {
+        let mut waypoint = Waypoint::new(WaypointId::new(8), "улика", 53.9, 27.5);
+        assert!(waypoint.attachments().is_empty());
+
+        let previous = waypoint.set_attachments(vec![
+            "находки/куртка-1.jpg".to_owned(),
+            "находки/куртка-2.jpg".to_owned(),
+        ]);
+        assert!(
+            previous.is_empty(),
+            "the previous list is what undo restores"
+        );
+        assert_eq!(waypoint.attachments().len(), 2);
+
+        let json = serde_json::to_string(&waypoint).expect("serialize");
+        let restored: Waypoint = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.attachments(), waypoint.attachments());
+    }
+
+    #[test]
+    fn waypoint_attachments_drop_blanks_and_repeats() {
+        let mut waypoint = Waypoint::new(WaypointId::new(8), "улика", 53.9, 27.5);
+        waypoint.set_attachments(vec![
+            "  находки/куртка.jpg  ".to_owned(),
+            "".to_owned(),
+            "   ".to_owned(),
+            "находки/куртка.jpg".to_owned(),
+        ]);
+        // The same photograph attached twice is a mistake, not a decision.
+        assert_eq!(waypoint.attachments(), ["находки/куртка.jpg"]);
+    }
+
+    #[test]
+    fn waypoint_without_attachments_field_loads_with_none() {
+        // Every project saved before this field existed.
+        let legacy = r#"{
+            "id": 8,
+            "name": "улика",
+            "symbol": null,
+            "latitude": 53.9,
+            "longitude": 27.5
+        }"#;
+        let waypoint: Waypoint = serde_json::from_str(legacy).expect("legacy");
+        assert!(waypoint.attachments().is_empty());
     }
 
     #[test]

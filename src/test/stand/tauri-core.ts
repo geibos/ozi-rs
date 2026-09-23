@@ -64,6 +64,7 @@ const TRANSPARENT_PNG = Uint8Array.from([
  */
 const EMITS_STATE_CHANGED = new Set([
   "calibrate_raster",
+  "set_waypoint_attachments",
   "add_waypoint",
   "cancel_drawing",
   "create_empty_track",
@@ -347,6 +348,15 @@ function withEditedCounts<
   );
 }
 
+/**
+ * The files attached to a mark this session, keyed `layerId:waypointId`.
+ *
+ * Kept, rather than accepted and forgotten: a command answered "accepted" that
+ * changes nothing on screen is the lie this stand exists to stop, and the list
+ * of attachments is the whole of what the feature shows.
+ */
+const standAttachments = new Map<string, string[]>();
+
 /** Marks an import put into a layer of its own, keyed by that layer's id. */
 const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
 
@@ -444,6 +454,18 @@ function noteProjectMutation(command: string, args: Args | undefined): void {
     return;
   }
   if (standCommandChangesTheProject(command)) standProjectDirty = true;
+}
+
+/** The fixture's marks, carrying whatever this session attached to them. */
+function withStandAttachments(
+  layerId: number,
+  waypoints: WaypointDto[],
+): WaypointDto[] {
+  if (standAttachments.size === 0) return waypoints;
+  return waypoints.map((waypoint) => {
+    const attached = standAttachments.get(`${layerId}:${waypoint.id}`);
+    return attached ? { ...waypoint, attachments: attached } : waypoint;
+  });
 }
 
 function previewedAppState(): AppStateDto {
@@ -593,14 +615,24 @@ const HANDLERS: StandAnswers = {
     }
     return { id: Number(args?.trackId ?? 0), name: "", segments: [] };
   },
+  set_waypoint_attachments: (args) => {
+    const key = `${Number(args?.layerId)}:${Number(args?.waypointId)}`;
+    standAttachments.set(
+      key,
+      Array.isArray(args?.attachments) ? (args.attachments as string[]) : [],
+    );
+    return null;
+  },
   get_waypoints: (args) => {
     if (projectEmptied) return [];
     const layerId = Number(args?.layerId);
     const imported = importedWaypointsByLayer.get(layerId);
-    if (imported) return imported;
-    return layerId === FIXTURE_WAYPOINT_LAYER
-      ? [...waypointsFixture, ...placedWaypoints]
-      : [];
+    if (imported) return withStandAttachments(layerId, imported);
+    const base =
+      layerId === FIXTURE_WAYPOINT_LAYER
+        ? [...waypointsFixture, ...placedWaypoints]
+        : [];
+    return withStandAttachments(layerId, base);
   },
   // Placing a waypoint by bearing and distance was the one on-map tool that
   // could not be walked here: the stand had no answer for `add_waypoint`, so
@@ -614,6 +646,7 @@ const HANDLERS: StandAnswers = {
       lat: Number(args?.lat ?? 0),
       lon: Number(args?.lon ?? 0),
       symbol: null,
+      attachments: [],
       visible: true,
       color: null,
       description: null,
@@ -945,6 +978,7 @@ const HANDLERS: StandAnswers = {
         lat: 59.9536,
         lon: 31.6018,
         symbol: "18",
+        attachments: [],
         visible: true,
         color: null,
         // The note travels with the mark; a `.wpt` from another штаб carries
@@ -957,6 +991,7 @@ const HANDLERS: StandAnswers = {
         lat: 59.9571,
         lon: 31.6094,
         symbol: "18",
+        attachments: [],
         visible: true,
         color: null,
         description: "дальше болото, без сапог не ходить",

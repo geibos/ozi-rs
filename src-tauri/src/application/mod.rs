@@ -955,6 +955,41 @@ impl AppState {
             .map_err(|commands::CommandError::ProjectLayer(e)| e)
     }
 
+    /// Replace the files that belong to a mark, as one undoable step.
+    ///
+    /// Paths, not bytes — see `Waypoint::attachments`. The list is replaced
+    /// whole because the undo delta needs the previous one either way, and a
+    /// pair of add/remove commands can get out of step with itself.
+    pub fn apply_set_waypoint_attachments(
+        &mut self,
+        layer_id: LayerId,
+        waypoint_id: WaypointId,
+        new_attachments: Vec<String>,
+    ) -> Result<(), ProjectLayerError> {
+        let old_attachments = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|layer| layer.id() == layer_id)
+            .ok_or(ProjectLayerError::WaypointLayerUnavailable(layer_id))?
+            .waypoints()
+            .iter()
+            .find(|waypoint| waypoint.id() == waypoint_id)
+            .ok_or(ProjectLayerError::WaypointNotFound(layer_id, waypoint_id))?
+            .attachments()
+            .to_vec();
+
+        let cmd = commands::ProjectCommand::SetWaypointAttachments {
+            layer_id,
+            waypoint_id,
+            old_attachments,
+            new_attachments,
+        };
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|commands::CommandError::ProjectLayer(e)| e)
+    }
+
     pub fn apply_set_waypoint_color(
         &mut self,
         layer_id: LayerId,
@@ -2389,6 +2424,57 @@ mod tests {
     /// Loading a project (or restoring a session) starts clean: the user has
     /// not changed anything yet, so the close-guard must not fire.
     #[test]
+    /// A find is photographed from three sides, and undo puts the list back.
+    #[test]
+    fn waypoint_attachments_are_one_undoable_step() {
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        state
+            .apply_add_waypoint(layer_id, 53.9, 27.5, "улика".to_owned())
+            .expect("add waypoint");
+        let waypoint_id = state
+            .project_waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("layer")
+            .waypoints()
+            .last()
+            .expect("waypoint")
+            .id();
+
+        let files = vec![
+            "находки/куртка-1.jpg".to_owned(),
+            "находки/куртка-2.jpg".to_owned(),
+        ];
+        state
+            .apply_set_waypoint_attachments(layer_id, waypoint_id, files.clone())
+            .expect("attach");
+        assert_eq!(attachments_of(&state, layer_id, waypoint_id), files);
+
+        state.undo();
+        assert!(
+            attachments_of(&state, layer_id, waypoint_id).is_empty(),
+            "undo restores the list as it was, not as it might have been"
+        );
+
+        state.redo();
+        assert_eq!(attachments_of(&state, layer_id, waypoint_id), files);
+    }
+
+    fn attachments_of(state: &AppState, layer_id: LayerId, waypoint_id: WaypointId) -> Vec<String> {
+        state
+            .project_waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("layer")
+            .waypoints()
+            .iter()
+            .find(|w| w.id() == waypoint_id)
+            .expect("waypoint")
+            .attachments()
+            .to_vec()
+    }
+
     fn project_dirty_clears_on_load() {
         let dir = tempfile::tempdir().expect("tempdir");
         let save_path = dir.path().join("load.ozp");

@@ -48,7 +48,9 @@ export interface ReplayRange {
 export const GAP_MS = 5 * 60 * 1000;
 
 /** Every timed point of the track, in time order, across all its segments. */
-function timeline(segments: readonly SegmentLike[]): { at: number; point: LatLon }[] {
+function timeline(
+  segments: readonly SegmentLike[],
+): { at: number; point: LatLon }[] {
   const out: { at: number; point: LatLon }[] = [];
   for (const segment of segments) {
     for (const point of segment.points) {
@@ -70,7 +72,9 @@ function timeline(segments: readonly SegmentLike[]): { at: number; point: LatLon
  * `null` when fewer than two points carry a time: one moment is a reading, and
  * there is nothing to play back.
  */
-export function replayRange(segments: readonly SegmentLike[]): ReplayRange | null {
+export function replayRange(
+  segments: readonly SegmentLike[],
+): ReplayRange | null {
   const points = timeline(segments);
   if (points.length < 2) return null;
   return { fromMs: points[0].at, toMs: points[points.length - 1].at };

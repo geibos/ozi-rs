@@ -612,6 +612,22 @@ async revealPath(path: string) : Promise<Result<null, string>> {
 }
 },
 /**
+ * Replace the files that belong to a mark.
+ * 
+ * Paths, not bytes: a `.ozp` is JSON two headquarters send each other, and a
+ * photograph inside it turns a readable file into a megabyte of base64. The
+ * files live beside the project, and sending the work means sending the
+ * folder — which is what a crew already does with a bundle.
+ */
+async setWaypointAttachments(layerId: number, waypointId: number, attachments: string[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_waypoint_attachments", { layerId, waypointId, attachments }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Read a picture's dimensions without decoding it.
  * 
  * The calibration form asks for corners in pixels, and it cannot offer the
@@ -820,7 +836,12 @@ color: [number, number, number, number] | null;
 /**
  * The note beside the mark: what a crew is actually sent to.
  */
-description: string | null }
+description: string | null; 
+/**
+ * Files that belong to the mark — a photograph of the find, a scan.
+ * Paths beside the project, not bytes inside it.
+ */
+attachments: string[] }
 
 /** tauri-specta globals **/
 

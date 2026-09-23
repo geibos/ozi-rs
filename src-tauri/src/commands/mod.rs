@@ -1978,6 +1978,9 @@ pub struct WaypointDto {
     pub color: Option<[u8; 4]>,
     /// The note beside the mark: what a crew is actually sent to.
     pub description: Option<String>,
+    /// Files that belong to the mark — a photograph of the find, a scan.
+    /// Paths beside the project, not bytes inside it.
+    pub attachments: Vec<String>,
 }
 
 #[tauri::command]
@@ -2007,6 +2010,7 @@ pub fn waypoint_dtos(waypoints: &[crate::domain::Waypoint]) -> Vec<WaypointDto> 
             lon: w.longitude(),
             symbol: w.symbol().map(str::to_owned),
             description: w.description().map(str::to_owned),
+            attachments: w.attachments().to_vec(),
             visible: w.visible(),
             color: w.color(),
         })
@@ -2120,6 +2124,34 @@ pub fn reveal_path(path: String) -> Result<(), String> {
         return Err(format!("no such file: {}", path.display()));
     }
     crate::application::reveal_in_file_manager(&path);
+    Ok(())
+}
+
+/// Replace the files that belong to a mark.
+///
+/// Paths, not bytes: a `.ozp` is JSON two headquarters send each other, and a
+/// photograph inside it turns a readable file into a megabyte of base64. The
+/// files live beside the project, and sending the work means sending the
+/// folder — which is what a crew already does with a bundle.
+#[tauri::command]
+#[specta::specta]
+pub fn set_waypoint_attachments(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    waypoint_id: u64,
+    attachments: Vec<String>,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, WaypointId};
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state
+        .apply_set_waypoint_attachments(
+            LayerId::new(layer_id),
+            WaypointId::new(waypoint_id),
+            attachments,
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
     Ok(())
 }
 
