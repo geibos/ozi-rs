@@ -145,7 +145,26 @@ fn sanitise_text(input: &str, max_chars: usize) -> String {
         .chars()
         .take(max_chars)
         .map(|ch| match ch {
-            ',' | '\r' | '\n' => ' ',
+            // A comma is replaced, not escaped, and that is a deliberate
+            // departure from the original.
+            //
+            // OziExplorer reserves `chr(209)` for a comma inside a text field
+            // and turns it back on reading. `chr(209)` is a *byte*, and these
+            // files are Windows-1251: byte 209 there is `С`, a letter in every
+            // other Russian word. Writing it would put a comma into «СТАРТ»
+            // the moment the original read the file back, and reading it would
+            // do the same to a name we were handed. In a Western-European
+            // locale the byte is `Ñ` and the escape is safe; for the crews this
+            // tool serves it is not, so the escape is not used in either
+            // direction and a comma is simply spent.
+            //
+            // The cost is one character in a name. The alternative is a
+            // corrupted name, silently, in the direction that matters most —
+            // handing a file to the штаб next door.
+            ',' => ' ',
+            // A line break would end the record, and the format reserves
+            // nothing for one.
+            '\r' | '\n' => ' ',
             other => other,
         })
         .collect()

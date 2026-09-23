@@ -57,7 +57,7 @@ describe("Library Tracks tab — import / create-track affordances", () => {
   });
 
   it("offers gpx, plt AND zip in the unified file filter (backend unpacks zip archives of gpx)", () => {
-    expect(tracksSource).toContain('extensions: ["gpx", "plt", "zip"]');
+    expect(tracksSource).toContain('extensions: ["gpx", "plt", "wpt", "zip"]');
   });
 
   it("allows multi-select in the unified import dialog", () => {

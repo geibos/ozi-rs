@@ -158,6 +158,20 @@ async importPlt(path: string) : Promise<Result<string, string>> {
 }
 },
 /**
+ * Import an OziExplorer waypoint file (`.wpt`).
+ * 
+ * We have written this format since ADR-0022 and never read it, which is the
+ * wrong way round: the штаб next door runs the original and hands over `.wpt`.
+ */
+async importWpt(path: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_wpt", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * CJ-3: recursively import every GPX/PLT under a folder (per-date
  * subfolders included). Per-file failures are reported, not fatal.
  */

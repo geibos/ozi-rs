@@ -185,6 +185,16 @@ export async function importPlt(path: string): Promise<string> {
 }
 
 /**
+ * Import an OziExplorer waypoint file.
+ *
+ * The штаб next door runs the original and hands over `.wpt`. We have written
+ * that format since ADR-0022 and, until 2026-09-23, could not read it.
+ */
+export async function importWpt(path: string): Promise<string> {
+  return unwrap("import_wpt", commands.importWpt(path));
+}
+
+/**
  * Recursively import every GPX/PLT file under `path` (per-date subfolders
  * included). Returns a human-readable summary string — per-file failures
  * are folded into the summary, not thrown.

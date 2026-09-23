@@ -869,6 +869,16 @@ impl AppState {
         import::import_plt_file_into_project(&mut self.project, &mut self.history, &path)
     }
 
+    /// Import an OziExplorer waypoint file. See
+    /// `import::import_wpt_file_into_project` for why it lands in its own
+    /// layer.
+    pub fn import_wpt_file(
+        &mut self,
+        path: std::path::PathBuf,
+    ) -> Result<ArchiveImportReport, crate::infrastructure::import::WptImportError> {
+        import::import_wpt_file_into_project(&mut self.project, &mut self.history, &path)
+    }
+
     pub fn apply_set_waypoint_color(
         &mut self,
         layer_id: LayerId,

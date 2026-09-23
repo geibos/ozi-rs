@@ -4,6 +4,7 @@ pub mod ozi_georeference;
 pub mod ozi_map;
 pub mod ozi_raster;
 pub mod plt;
+pub mod wpt;
 
 pub use archive::{
     ArchiveEntryKind, SupportedArchiveEntryKind, UnsupportedArchiveEntryKind,
@@ -18,3 +19,4 @@ pub use ozi_map::{
 };
 pub use ozi_raster::{OziRasterTileSource, open_ozi_raster_tile_source};
 pub use plt::{PltImportError, import_plt_file};
+pub use wpt::{WptImportError, import_wpt_file};

@@ -229,6 +229,9 @@ let standTrackLayers: LayerSummaryDto[] | null = null;
 let standWaypointLayers: LayerSummaryDto[] | null = null;
 let nextStandLayerId = 900;
 
+/** Marks an import put into a layer of its own, keyed by that layer's id. */
+const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
+
 function previewedAppState(): AppStateDto {
   const fixture =
     requestedState() === "cold" ? coldStartFixture : appStateFixture;
@@ -336,10 +339,14 @@ const HANDLERS: StandAnswers = {
     args?.layerId === FIXTURE_TRACK_LAYER && args?.trackId === FIXTURE_TRACK
       ? trackDetailFixture
       : { id: Number(args?.trackId ?? 0), name: "", segments: [] },
-  get_waypoints: (args) =>
-    args?.layerId === FIXTURE_WAYPOINT_LAYER
+  get_waypoints: (args) => {
+    const layerId = Number(args?.layerId);
+    const imported = importedWaypointsByLayer.get(layerId);
+    if (imported) return imported;
+    return layerId === FIXTURE_WAYPOINT_LAYER
       ? [...waypointsFixture, ...placedWaypoints]
-      : [],
+      : [];
+  },
   // Placing a waypoint by bearing and distance was the one on-map tool that
   // could not be walked here: the stand had no answer for `add_waypoint`, so
   // the tool ended in the failure toast every time. It failed loudly, which is
@@ -457,6 +464,45 @@ const HANDLERS: StandAnswers = {
     return null;
   },
   cancel_download: () => true,
+  // OziExplorer's own waypoint format, from the штаб next door. It has to
+  // change the screen, not just answer a summary: an import that renders
+  // nowhere is the failure this whole stand exists to stop.
+  import_wpt: () => {
+    // A layer of its own, exactly as `import_wpt_file_into_project` does.
+    // Pushing the marks into the fixture's layer instead looked right in the
+    // list and drew nothing on the map: the marker reconciler gates on a
+    // fingerprint taken over the *layer set*, which an import into an
+    // existing layer does not move. A stand that gets the shape wrong tells
+    // the same lie as a stand that answers nothing.
+    nextStandLayerId += 1;
+    const layerId = nextStandLayerId;
+    standWaypointLayers = [
+      ...(standWaypointLayers ?? appStateFixture.waypoint_layers),
+      { id: layerId, name: "ШТАБ.wpt" },
+    ];
+    importedWaypointsByLayer.set(layerId, [
+      {
+        id: 950,
+        name: "ШТАБ-2",
+        lat: 59.9536,
+        lon: 31.6018,
+        symbol: "18",
+        visible: true,
+        color: null,
+      },
+      {
+        id: 951,
+        name: "Рубеж",
+        lat: 59.9571,
+        lon: 31.6094,
+        symbol: "18",
+        visible: true,
+        color: null,
+      },
+    ]);
+    standEmit("state-changed", undefined);
+    return "Imported 2 waypoints in 1 layers";
+  },
 
   // ── Layer management ───────────────────────────────────────────────────
   create_track_layer: (args) => {

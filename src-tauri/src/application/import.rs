@@ -2,6 +2,7 @@
 
 use crate::application::{CommandError, CommandStack, ProjectCommand};
 use crate::domain::{LayerId, Project};
+use crate::infrastructure::import::WptImportError;
 use crate::infrastructure::import::{
     ArchivedGpxImport, ArchivedGpxImportError, PltImportError, import_gpx_entries_from_archive,
     import_gpx_file, import_plt_file,
@@ -130,6 +131,49 @@ pub fn import_plt_file_into_project(
         .apply(project, &ProjectCommand::add_track(layer_id, import.track))
         .ok();
     report.imported_tracks += 1;
+    report.imported_entries += 1;
+
+    Ok(report)
+}
+
+/// Import an OziExplorer waypoint file into a layer of its own.
+///
+/// A neighbouring headquarters running the original hands over a `.wpt`. Until
+/// now the only way to take it was to find something that converts it to GPX
+/// first, which is not a thing a coordinator does at four in the morning.
+///
+/// A layer per file, named after it, like every other import: the marks a
+/// second штаб sends are theirs, and mixing them into ours would make them
+/// impossible to hand back or hide.
+pub fn import_wpt_file_into_project(
+    project: &mut Project,
+    history: &mut CommandStack,
+    path: &Path,
+) -> Result<ArchiveImportReport, WptImportError> {
+    let import = crate::infrastructure::import::import_wpt_file(path)?;
+    let mut report = ArchiveImportReport::new();
+
+    let waypoints = import.waypoints().to_vec();
+    if waypoints.is_empty() {
+        return Ok(report);
+    }
+
+    let layer_id = next_layer_id(project);
+    let layer_name = source_file_label(import.source_path());
+    history
+        .apply(
+            project,
+            &ProjectCommand::add_waypoint_layer(layer_id, layer_name),
+        )
+        .ok();
+    report.imported_waypoint_layers += 1;
+
+    for waypoint in waypoints {
+        history
+            .apply(project, &ProjectCommand::add_waypoint(layer_id, waypoint))
+            .ok();
+        report.imported_waypoints += 1;
+    }
     report.imported_entries += 1;
 
     Ok(report)

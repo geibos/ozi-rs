@@ -52,6 +52,7 @@
     listTracks,
     importGpx,
     importPlt,
+    importWpt,
     importTracksDirectory,
     renameTrack,
     createTrackLayer,
@@ -334,7 +335,7 @@
         filters: [
           {
             name: $i18n("tracksTab.importFilterName"),
-            extensions: ["gpx", "plt", "zip"],
+            extensions: ["gpx", "plt", "wpt", "zip"],
           },
         ],
       });
@@ -347,8 +348,12 @@
       const failed: string[] = [];
       for (const path of paths) {
         try {
-          if (path.toLowerCase().endsWith(".plt")) {
+          const lower = path.toLowerCase();
+          if (lower.endsWith(".plt")) {
             await importPlt(path);
+          } else if (lower.endsWith(".wpt")) {
+            // OziExplorer's own waypoint format, from the штаб next door.
+            await importWpt(path);
           } else {
             await importGpx(path);
           }

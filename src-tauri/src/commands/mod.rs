@@ -1004,6 +1004,28 @@ pub fn import_plt(
     ))
 }
 
+/// Import an OziExplorer waypoint file (`.wpt`).
+///
+/// We have written this format since ADR-0022 and never read it, which is the
+/// wrong way round: the штаб next door runs the original and hands over `.wpt`.
+#[tauri::command]
+#[specta::specta]
+pub fn import_wpt(
+    path: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let result = lock_app_state(state.inner())?
+        .import_wpt_file(PathBuf::from(path))
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("state-changed", ());
+    Ok(format!(
+        "Imported {} waypoints in {} layers",
+        result.imported_waypoints(),
+        result.imported_waypoint_layers()
+    ))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn export_gpx(
