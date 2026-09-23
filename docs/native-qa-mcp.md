@@ -115,6 +115,37 @@ session starts. Neither says "permission".
    than the one running the tools — most often the terminal was granted while
    the agent runs inside an editor, or the other way round.
 
+#### The one line in the log that names it
+
+When a session fails with
+
+```
+'GET /status' cannot be proxied to Mac2 Driver server because its process
+is not running (probably crashed)
+```
+
+that message is about the proxy and says nothing about why. Search the Appium
+log for the line above it:
+
+```
+Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+Code=1000 "Timed out while enabling automation mode."
+```
+
+**That is the Accessibility grant**, and it is the only place the log says so.
+`WebDriverAgentRunner-Runner` needs it to enable automation mode; without it
+the runner sits there until Xcode gives up, and every layer above reports
+something else — a crashed process, a rejected session, an HTTP 500.
+
+Observed on 2026-09-23: the gate ran green at 16:24 and failed this way at
+19:41 on the same machine with no configuration changed in between, which is
+what a grant timing out or being revoked by an OS update looks like. Restarting
+the Appium server does not help; the grant has to be given again and the host
+process restarted (steps 1–3 above).
+
+Two failures in a row are the end of the attempt, not the start of a third:
+`CLAUDE.md` says to hand back the diagnosis. This is the diagnosis.
+
 The grant is per host process and does not transfer between machines, between
 terminal applications, or across a major OS upgrade.
 
