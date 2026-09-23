@@ -614,6 +614,87 @@ mod picture_map_tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// The pyramid, through the path a tile request actually takes.
+    ///
+    /// `halve` has its own unit tests and the wiring test above reads one tile
+    /// of level 0. Neither says that level 2 of a real picture, opened through
+    /// a `.map`, is the right size and full of the right pixels — and the
+    /// halving was rewritten on 2026-09-23 to stop the build peaking at four
+    /// times its memory limit, so that is new code on the path every tile of a
+    /// calibrated picture goes through.
+    #[test]
+    fn every_level_of_a_real_picture_hands_out_the_right_tiles() {
+        let dir = temp_dir("pyramid");
+        // 2000×1200 halves until the short side is no bigger than one tile:
+        // 1200 → 600 → 300 → 150, so four levels.
+        write_picture(&dir, "sheet.png", 2000, 1200);
+        let map_path = write_map(&dir, "sheet.png");
+        let contents = std::fs::read_to_string(&map_path).expect("read map");
+        let metadata = parse_ozi_map_metadata(&map_path, &contents).expect("parse map");
+        let source = open_ozi_raster_tile_source(&metadata).expect("open");
+
+        let sizes: Vec<(u32, u32)> = source
+            .levels()
+            .iter()
+            .map(|level| (level.width(), level.height()))
+            .collect();
+        assert_eq!(
+            sizes,
+            vec![(2000, 1200), (1000, 600), (500, 300), (250, 150)]
+        );
+
+        for level in source.levels() {
+            let index = level.level_index();
+            let columns = level.width().div_ceil(256);
+            let rows = level.height().div_ceil(256);
+
+            // The contract, uniformly: a tile is 256 square except at the
+            // right and bottom edges, where it is exactly what is left. Stated
+            // this way rather than "a middle tile is whole", which is only
+            // true of levels more than two tiles across — the coarse ones are
+            // the whole map in one tile and have no middle.
+            for y in 0..rows {
+                for x in 0..columns {
+                    let tile = source
+                        .decode_rgba_tile(index, x, y)
+                        .unwrap_or_else(|e| panic!("level {index} tile {x},{y}: {e:?}"));
+                    let expected_width = 256.min(level.width() - x * 256);
+                    let expected_height = 256.min(level.height() - y * 256);
+                    assert_eq!(
+                        (tile.width(), tile.height()),
+                        (expected_width, expected_height),
+                        "level {index} tile {x},{y}"
+                    );
+                    assert_eq!(
+                        tile.rgba_pixels().len() as u32,
+                        expected_width * expected_height * 4,
+                        "level {index} tile {x},{y} pixel count"
+                    );
+                }
+            }
+
+            // And past the grid there is nothing.
+            assert!(
+                source.decode_rgba_tile(index, columns, 0).is_err(),
+                "level {index} answered a tile past its right edge"
+            );
+            assert!(
+                source.decode_rgba_tile(index, 0, rows).is_err(),
+                "level {index} answered a tile past its bottom edge"
+            );
+        }
+
+        // Halving averages: the picture's red channel is `x % 256`, so a
+        // pixel of level 1 is the mean of two neighbouring columns. At the
+        // very left that is (0 + 1) / 2 = 0.
+        let level1 = source.decode_rgba_tile(1, 0, 0).expect("level 1 tile 0,0");
+        assert_eq!(level1.rgba_pixels()[0], 0);
+        // Ten pixels in: columns 20 and 21, mean 20.
+        assert_eq!(level1.rgba_pixels()[10 * 4], 20);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_map_naming_a_picture_that_is_not_there_says_so() {
         let dir = temp_dir("missing");
