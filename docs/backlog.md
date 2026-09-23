@@ -405,3 +405,17 @@ core is missing now.
 Deliberately not listed: Track Move (a track is a recording, not a drawing),
 Routes, Events, Point Sets, live GPS, printing, DEM relief, and the GIS import
 formats — all recorded as non-goals in `product-scope`.
+
+## Attachments do not travel yet
+
+`a-photograph-of-the-find` (2026-09-23) stores a file's path as the picker gave
+it — absolute. So a photograph attached on one machine is not found on another,
+and the feature works where the photographs are taken and looked at rather than
+between two headquarters. The interface says so rather than promising
+otherwise, after a reviewer pointed out that the first wording did.
+
+Making them travel means storing a path relative to the `.ozp` when the file is
+under its folder, and resolving it back on the way out — which is the Rust side
+knowing where the project lives, and `reveal_path` taking a project-relative
+path. Worth doing before the first real exchange of a project with photographs
+in it.

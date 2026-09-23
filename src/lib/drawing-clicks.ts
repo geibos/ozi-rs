@@ -50,19 +50,44 @@ export function pendingClicks<T>({
 }: PendingClicksOptions<T>): PendingClicks<T> {
   let timers: number[] = [];
   let chain: Promise<void> = Promise.resolve();
+  /**
+   * Which draw these clicks belong to.
+   *
+   * Clearing the timers is not enough to cancel a click. A timer that has
+   * already fired has left the list and put its commit on the chain, where it
+   * waits behind whatever is running — and `cancel()` could not reach it. Two
+   * ways that bit, both found by a reviewer on 2026-09-23:
+   *
+   * - A double-click that arrived while a commit was in flight still added the
+   *   click before it.
+   * - Leaving drawing mode between a click and its commit reordered the track:
+   *   the mode's exit clears the preview, and the waiting commit then used the
+   *   emptied preview's length as its insertion index, so a route drawn A, B
+   *   and then abandoned mid-click came back as C, A, B. That is a changed
+   *   route, not a late one.
+   *
+   * A commit checks the generation it was made in. Cancelling bumps it, and
+   * everything from before is dropped wherever it had got to.
+   */
+  let generation = 0;
 
   return {
     hold(payload: T) {
+      const madeIn = generation;
       const id = setTimer(() => {
         timers = timers.filter((other) => other !== id);
+        if (madeIn !== generation) return;
         // Chained: the commit is told which index to insert at, and two in
         // flight would read the same one and write over each other.
-        chain = chain.then(() => commit(payload)).catch(() => {});
+        chain = chain
+          .then(() => (madeIn === generation ? commit(payload) : undefined))
+          .catch(() => {});
       }, windowMs);
       timers.push(id);
     },
 
     cancel() {
+      generation += 1;
       for (const id of timers) clearTimer(id);
       timers = [];
     },

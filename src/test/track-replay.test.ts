@@ -101,6 +101,47 @@ describe("positionAt", () => {
     expect(positionAt([walk], at("2026-07-08T14:00:30Z"))!.inGap).toBe(false);
   });
 
+  it("treats a segment boundary as a gap, however short", () => {
+    // Two segments mean the recorder stopped and started. The line between
+    // them is not a route the crew walked, and a position read off it is a
+    // guess — even when the pause was a minute. Found by a reviewer,
+    // 2026-09-23.
+    const first = {
+      points: [
+        { lat: 59.9, lon: 30.3, timestamp: "2026-07-08T14:00:00Z" },
+        { lat: 59.9, lon: 30.31, timestamp: "2026-07-08T14:01:00Z" },
+      ],
+    };
+    const second = {
+      points: [
+        { lat: 59.9, lon: 30.4, timestamp: "2026-07-08T14:02:00Z" },
+        { lat: 59.9, lon: 30.41, timestamp: "2026-07-08T14:03:00Z" },
+      ],
+    };
+    expect(
+      positionAt([first, second], at("2026-07-08T14:01:30Z"))!.inGap,
+      "between the segments",
+    ).toBe(true);
+    expect(
+      positionAt([first, second], at("2026-07-08T14:00:30Z"))!.inGap,
+      "inside the first segment",
+    ).toBe(false);
+  });
+
+  it("goes the short way round the antimeridian", () => {
+    // Chukotka. Interpolating 179.9 → −179.9 through zero puts the crew on the
+    // other side of the world. Found by a reviewer, 2026-09-23.
+    const crossing = {
+      points: [
+        { lat: 64.5, lon: 179.9, timestamp: "2026-07-08T14:00:00Z" },
+        { lat: 64.5, lon: -179.9, timestamp: "2026-07-08T14:01:00Z" },
+      ],
+    };
+    const where = positionAt([crossing], at("2026-07-08T14:00:30Z"))!;
+    expect(Math.abs(where.lon)).toBeGreaterThan(179.9);
+    expect(Math.abs(where.lon)).toBeLessThanOrEqual(180);
+  });
+
   it("reads a recording that arrived out of order", () => {
     // Untidy recordings are why "sort points by time" exists as an edit; the
     // replay must not need it run first.

@@ -57,7 +57,7 @@ describe("importPaths", () => {
       "gpx:/searches/all.zip",
     ]);
     expect(outcome.imported).toBe(4);
-    expect(outcome.failed).toEqual([]);
+    expect(outcome.failed.map((f) => f.name)).toEqual([]);
   });
 
   it("treats anything without a known extension as a folder", async () => {
@@ -80,7 +80,7 @@ describe("importPaths", () => {
 
     // Nine files of a day that worked matter more than the one that did not.
     expect(outcome.imported).toBe(1);
-    expect(outcome.failed).toEqual(["broken.plt"]);
+    expect(outcome.failed.map((f) => f.name)).toEqual(["broken.plt"]);
     expect(calls).toContain("gpx:/searches/day4.gpx");
   });
 
@@ -92,7 +92,26 @@ describe("importPaths", () => {
       "/Volumes/Внешний диск/поиски/2026-07-08/ЛИСА15.gpx",
     ]);
 
-    expect(outcome.failed).toEqual(["ЛИСА15.gpx"]);
+    expect(outcome.failed.map((f) => f.name)).toEqual(["ЛИСА15.gpx"]);
+  });
+
+  it("carries what the backend said, so the operator knows what to do next", async () => {
+    // "20260708_Ветер2.plt did not import" does not tell a coordinator whether
+    // to go back to the crew for another export or whether the application is
+    // broken, and at four in the morning they will assume the second.
+    const api = await import("$lib/api");
+    vi.mocked(api.importPlt).mockRejectedValueOnce(
+      "не удалось разобрать файл: неожиданный конец данных на строке 412",
+    );
+
+    const outcome = await importPaths(["/searches/Ветер2.plt"]);
+
+    expect(outcome.failed).toEqual([
+      {
+        name: "Ветер2.plt",
+        reason: "не удалось разобрать файл: неожиданный конец данных на строке 412",
+      },
+    ]);
   });
 });
 

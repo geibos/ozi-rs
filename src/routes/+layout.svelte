@@ -5,7 +5,7 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { getCurrentWebview } from "@tauri-apps/api/webview";
-  import { importPaths } from "$lib/actions/import-paths";
+  import { describeFailures, importPaths } from "$lib/actions/import-paths";
   import {
     appendProjectsChunk,
     beginCatalogueRefresh,
@@ -199,7 +199,7 @@
               // Nine files of a day that worked matter more than the one that
               // did not, so this is a success with a caveat.
               toast.warning(summary, {
-                description: outcome.failed.join(", "),
+                description: describeFailures(outcome.failed),
               });
             }
           },

@@ -2421,9 +2421,6 @@ mod tests {
         assert!(state.project_dirty(), "failed save must keep dirty");
     }
 
-    /// Loading a project (or restoring a session) starts clean: the user has
-    /// not changed anything yet, so the close-guard must not fire.
-    #[test]
     /// A find is photographed from three sides, and undo puts the list back.
     #[test]
     fn waypoint_attachments_are_one_undoable_step() {
@@ -2475,6 +2472,9 @@ mod tests {
             .to_vec()
     }
 
+    /// Loading a project (or restoring a session) starts clean: the user has
+    /// not changed anything yet, so the close-guard must not fire.
+    #[test]
     fn project_dirty_clears_on_load() {
         let dir = tempfile::tempdir().expect("tempdir");
         let save_path = dir.path().join("load.ozp");

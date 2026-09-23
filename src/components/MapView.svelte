@@ -1531,6 +1531,12 @@
     void $drawingTrackId;
     if (!map) return;
 
+    // Entering or leaving, the clicks still waiting belong to the draw that
+    // is over. Without this, leaving mid-click let a commit land against the
+    // emptied preview and reorder the route — A, B and an abandoned C came
+    // back as C, A, B. Found by a reviewer, 2026-09-23.
+    drawingClicks.cancel();
+
     if (active) {
       map.dragPan.disable();
       map.doubleClickZoom.disable();

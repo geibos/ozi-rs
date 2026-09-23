@@ -124,6 +124,65 @@ describe("holding a click on the map", () => {
     expect(committed).toEqual([7]);
   });
 
+  it("cancels a click whose timer fired but whose commit has not run", async () => {
+    // Clearing the timers is not enough: a timer that has already fired has
+    // left the list and put its commit on the chain behind whatever is
+    // running. A double-click arriving then still added the click before it,
+    // and leaving drawing mode mid-click reordered the whole route — the
+    // commit used the emptied preview's length as its index, so A, B and an
+    // abandoned C came back as C, A, B. Found by a reviewer, 2026-09-23.
+    const clock = fakeClock();
+    const committed: string[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const clicks = pendingClicks<string>({
+      commit: async (name) => {
+        if (name === "a") {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+        }
+        committed.push(name);
+      },
+      setTimer: clock.setTimer,
+      clearTimer: clock.clearTimer,
+    });
+
+    clicks.hold("a");
+    clicks.hold("b");
+    clock.advance(DOUBLE_CLICK_WINDOW_MS); // both timers fire; "a" blocks
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    clicks.cancel();
+    releaseFirst?.();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // "a" was already running and finishes; "b" was waiting on the chain and
+    // must not land.
+    expect(committed).toEqual(["a"]);
+  });
+
+  it("takes clicks again after a cancel", async () => {
+    // The generation must not lock the holder: a cancelled draw is followed by
+    // the next one.
+    const clock = fakeClock();
+    const committed: number[] = [];
+    const clicks = pendingClicks<number>({
+      commit: async (n) => {
+        committed.push(n);
+      },
+      setTimer: clock.setTimer,
+      clearTimer: clock.clearTimer,
+    });
+
+    clicks.hold(1);
+    clicks.cancel();
+    clicks.hold(2);
+    clock.advance(DOUBLE_CLICK_WINDOW_MS);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(committed).toEqual([2]);
+  });
+
   it("survives a commit that fails without stopping the ones after it", async () => {
     // One point that the backend refuses must not silence the rest of the
     // route: the operator is still drawing.

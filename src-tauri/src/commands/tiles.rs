@@ -4,26 +4,33 @@ use crate::infrastructure::import::{
 };
 use rusqlite::OptionalExtension;
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::ipc::Response;
 
-#[derive(Clone)]
+/// The parsed `.map`, its georeference and its opened raster.
+///
+/// Handed out behind an `Arc` and never cloned. It used to be cloned on every
+/// tile request, which cost nothing while the only raster was OZF2 — that
+/// reader holds a file handle and some metadata. A picture raster holds the
+/// whole decoded pyramid, so the same clone became up to 640 MB copied per
+/// tile, and a request that falls outside the map paid it before the bounds
+/// were even checked. Found by a reviewer, 2026-09-23.
 struct CachedOziMapContext {
     metadata: OziMapMetadata,
     georeference: crate::infrastructure::import::OziGeoreference,
     source: OziRasterTileSource,
 }
 
-fn ozi_cache() -> &'static Mutex<HashMap<String, CachedOziMapContext>> {
-    static CACHE: OnceLock<Mutex<HashMap<String, CachedOziMapContext>>> = OnceLock::new();
+fn ozi_cache() -> &'static Mutex<HashMap<String, Arc<CachedOziMapContext>>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Arc<CachedOziMapContext>>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn load_ozi_context(map_path: &str) -> Result<CachedOziMapContext, String> {
+fn load_ozi_context(map_path: &str) -> Result<Arc<CachedOziMapContext>, String> {
     if let Ok(cache) = ozi_cache().lock()
         && let Some(cached) = cache.get(map_path)
     {
-        return Ok(cached.clone());
+        return Ok(Arc::clone(cached));
     }
 
     let path = std::path::PathBuf::from(map_path);
@@ -32,14 +39,14 @@ fn load_ozi_context(map_path: &str) -> Result<CachedOziMapContext, String> {
     let georeference = parse_ozi_georeference(metadata.calibration_points())
         .ok_or_else(|| "failed to parse georeference".to_owned())?;
     let source = open_ozi_raster_tile_source(&metadata).map_err(|e| e.to_string())?;
-    let context = CachedOziMapContext {
+    let context = Arc::new(CachedOziMapContext {
         metadata,
         georeference,
         source,
-    };
+    });
 
     if let Ok(mut cache) = ozi_cache().lock() {
-        cache.insert(map_path.to_owned(), context.clone());
+        cache.insert(map_path.to_owned(), Arc::clone(&context));
     }
 
     Ok(context)

@@ -182,6 +182,40 @@ function requestedFailure(): string | null {
   return FAILURE;
 }
 
+/**
+ * Commands the URL asked to fail, from `?fail=`.
+ *
+ * `catalogue` and `download` are kept as their own words because they name a
+ * flow rather than a command; anything else is read as a comma-separated list
+ * of command names.
+ */
+function failingCommands(): Set<string> {
+  const asked = requestedFailure();
+  if (asked === null || asked === "catalogue" || asked === "download") {
+    return new Set();
+  }
+  return new Set(
+    asked
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean),
+  );
+}
+
+/** What the backend says when that command fails, in its own words. */
+function standFailureFor(command: string): string {
+  if (command.startsWith("import_")) {
+    return "не удалось разобрать файл: неожиданный конец данных на строке 412";
+  }
+  if (command.startsWith("export_") || command === "save_project") {
+    return "не удалось записать файл: нет места на диске";
+  }
+  if (command === "load_project_file") {
+    return "не удалось прочитать проект: файл записан более новой версией (3), эта понимает 1";
+  }
+  return `команда ${command} не выполнена`;
+}
+
 /** The last path component, which is what an import summary names. */
 function standFileLabel(path: unknown, fallback: string): string {
   if (typeof path !== "string" || path === "") return fallback;
@@ -784,7 +818,13 @@ const HANDLERS: StandAnswers = {
     // never left for the workspace. Found walking CJ-8, 2026-09-23.
     if (typeof args?.path === "string") standOpenedProjectPath = args.path;
     standProjectDirty = false;
-    standWorkspaceOpened = true;
+    // Deliberately NOT an active map. `load_project_from` clears it — a `.ozp`
+    // from another headquarters may be for ground this machine has never
+    // downloaded — and pretending otherwise here is what hid the workspace
+    // bouncing straight back to the launcher when a colleague's project was
+    // opened. A stand that makes a broken path look whole is worse than one
+    // that cannot walk it.
+    standWorkspaceOpened = false;
     standEmit("state-changed", undefined);
     return null;
   },
@@ -1082,6 +1122,16 @@ if (typeof window !== "undefined") {
 export async function invoke<T>(command: string, args?: Args): Promise<T> {
   standCalls.push({ command, args });
   noteProjectMutation(command, args);
+
+  // `?fail=import_plt,save_project` makes those commands reject, the way the
+  // backend does when a file will not parse or a disk is full. The failure
+  // paths are where field software actually hurts — a file that did not
+  // import and said nothing costs a crew's day — and until this the stand
+  // could only play two of them, so the screens for the rest had never been
+  // looked at.
+  if (failingCommands().has(command)) {
+    throw standFailureFor(command);
+  }
 
   if (
     requestedFailure() === "catalogue" &&

@@ -22,10 +22,25 @@ import {
 /** Extensions the file surfaces accept, lower-case and without the dot. */
 export const IMPORTABLE_EXTENSIONS = ["gpx", "plt", "wpt", "zip"] as const;
 
+export interface ImportFailure {
+  /** The file's own name, which is what a toast has room for. */
+  name: string;
+  /** What the backend said, as it said it. */
+  reason: string;
+}
+
 export interface ImportOutcome {
   imported: number;
-  /** Base names of the files that failed, for the toast. */
-  failed: string[];
+  /**
+   * The files that would not come in, each with what the backend said.
+   *
+   * The name alone was not enough. A coordinator told "20260708_Ветер2.plt did
+   * not import" cannot tell whether to go back to the crew for another export
+   * or whether the application is broken, and at four in the morning they will
+   * assume the second. The reason is one line and it decides what they do
+   * next.
+   */
+  failed: ImportFailure[];
   /** True when at least one path was a folder, so the summary can say so. */
   usedFolderImport: boolean;
 }
@@ -39,6 +54,21 @@ function baseName(path: string): string {
 export function isImportablePath(path: string): boolean {
   const lower = path.toLowerCase();
   return IMPORTABLE_EXTENSIONS.some((ext) => lower.endsWith(`.${ext}`));
+}
+
+/**
+ * The failures as a coordinator reads them: name, then reason.
+ *
+ * Three at most. A folder where everything failed is a folder with the wrong
+ * files in it, and twenty lines of the same message says that no better than
+ * three do.
+ */
+export function describeFailures(failures: readonly ImportFailure[]): string {
+  const shown = failures
+    .slice(0, 3)
+    .map(({ name, reason }) => `${name} — ${reason}`);
+  if (failures.length > 3) shown.push(`…и ещё ${failures.length - 3}`);
+  return shown.join("\n");
 }
 
 /**
@@ -77,7 +107,7 @@ export async function importPaths(paths: string[]): Promise<ImportOutcome> {
       outcome.imported += 1;
     } catch (error) {
       console.error("Failed to import", path, error);
-      outcome.failed.push(baseName(path));
+      outcome.failed.push({ name: baseName(path), reason: String(error) });
     }
   }
 

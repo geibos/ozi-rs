@@ -47,23 +47,47 @@ export interface ReplayRange {
  */
 export const GAP_MS = 5 * 60 * 1000;
 
+interface TimelineEntry {
+  at: number;
+  point: LatLon;
+  /** Which segment of the track this point came from. */
+  segment: number;
+}
+
 /** Every timed point of the track, in time order, across all its segments. */
-function timeline(
-  segments: readonly SegmentLike[],
-): { at: number; point: LatLon }[] {
-  const out: { at: number; point: LatLon }[] = [];
-  for (const segment of segments) {
+function timeline(segments: readonly SegmentLike[]): TimelineEntry[] {
+  const out: TimelineEntry[] = [];
+  segments.forEach((segment, index) => {
     for (const point of segment.points) {
       if (point.timestamp === null) continue;
       const at = Date.parse(point.timestamp);
       if (!Number.isFinite(at)) continue;
-      out.push({ at, point: { lat: point.lat, lon: point.lon } });
+      out.push({ at, point: { lat: point.lat, lon: point.lon }, segment: index });
     }
-  }
+  });
   // Sorted, because a recording is not always in order — which is exactly why
   // "sort points by time" exists as an edit.
   out.sort((a, b) => a.at - b.at);
   return out;
+}
+
+/**
+ * Longitudes that run the short way round, so an interpolation between
+ * `179.9°` and `−179.9°` goes across the antimeridian rather than across the
+ * whole world through zero.
+ *
+ * Found by a reviewer on 2026-09-23. Chukotka is the case in the field.
+ */
+function shortestLonPair(from: number, to: number): [number, number] {
+  const delta = to - from;
+  if (delta > 180) return [from, to - 360];
+  if (delta < -180) return [from, to + 360];
+  return [from, to];
+}
+
+/** Back into −180…180 after an interpolation that crossed the line. */
+function normaliseLon(lon: number): number {
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
 }
 
 /**
@@ -116,12 +140,18 @@ export function positionAt(
   const after = points[index + 1];
   const span = after.at - before.at;
   const through = span === 0 ? 0 : (atMs - before.at) / span;
+  const [fromLon, toLon] = shortestLonPair(before.point.lon, after.point.lon);
 
   return {
     lat: before.point.lat + (after.point.lat - before.point.lat) * through,
-    lon: before.point.lon + (after.point.lon - before.point.lon) * through,
+    lon: normaliseLon(fromLon + (toLon - fromLon) * through),
     atMs,
-    inGap: span > GAP_MS,
+    // A silence, or a segment boundary. Crossing from one segment to the next
+    // means the recorder stopped and started, however short the pause looked:
+    // the line between them is not a route the crew walked, and a position
+    // read off it is a guess. Before this, two segments a minute apart
+    // reported a fix. Found by a reviewer, 2026-09-23.
+    inGap: span > GAP_MS || before.segment !== after.segment,
   };
 }
 

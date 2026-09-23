@@ -59,6 +59,7 @@
   } from "$lib/api";
   import {
     IMPORTABLE_EXTENSIONS,
+    describeFailures,
     importPaths,
   } from "$lib/actions/import-paths";
   import { open } from "@tauri-apps/plugin-dialog";
@@ -371,10 +372,7 @@
         toast.success(summary);
       } else {
         toast.error(summary, {
-          description: $i18n("tracksTab.importFailedFiles").replace(
-            "{files}",
-            failed.join(", "),
-          ),
+          description: describeFailures(failed),
         });
       }
     } catch (err) {

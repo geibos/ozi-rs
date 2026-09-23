@@ -89,7 +89,10 @@ struct Level {
 ///
 /// It does not keep the path it came from: the tile source above it owns that,
 /// and two copies of a path are two chances to answer with the wrong one.
-#[derive(Debug, Clone)]
+///
+/// Not `Clone`: this is hundreds of megabytes, and the one place that used to
+/// clone it did so on every tile request.
+#[derive(Debug)]
 pub struct DirectImageRaster {
     levels: Vec<Level>,
 }

@@ -384,7 +384,10 @@
             <button
               type="button"
               class="text-muted-foreground hover:text-foreground text-[11px]"
-              onclick={() => void revealPath(path)}
+              onclick={() =>
+                void revealPath(path).catch((error) =>
+                  reportEditFailure("inspector.attachmentShowFailed", error),
+                )}
               aria-label={$t("inspector.attachmentShow")}
             >
               {$t("inspector.attachmentShow")}

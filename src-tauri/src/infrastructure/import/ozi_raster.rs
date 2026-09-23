@@ -185,13 +185,16 @@ impl DecodedOziRasterTile {
 /// `.map` is what a headquarters is handed — a scan, a screenshot, a
 /// photograph — and OziExplorer opens both without distinction, so nothing
 /// above this level should have to know which it got.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum RasterBackend {
     Ozf2(OziRaster),
     Picture(Box<DirectImageRaster>),
 }
 
-#[derive(Debug, Clone)]
+/// Not `Clone`, deliberately: a picture raster holds its whole decoded
+/// pyramid, and cloning it per tile request cost up to 640 MB a tile before a
+/// reviewer found it on 2026-09-23. Callers share it behind an `Arc`.
+#[derive(Debug)]
 pub struct OziRasterTileSource {
     source_path: PathBuf,
     levels: Vec<OziRasterLevelMetadata>,

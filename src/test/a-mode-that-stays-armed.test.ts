@@ -17,7 +17,11 @@ import { join } from "path";
  * because a drag is not a click.
  *
  * This is the pattern, checked: the handler that adds a mark must not turn the
- * mode off, and the three ways out must stay.
+ * mode off, and the three ways out must stay. It reads the source, so it does
+ * not prove that a click places a mark — delete the handler's body and it
+ * still passes, as a reviewer showed on 2026-09-23. What it proves is that the
+ * defect cannot come back the way it arrived, which is the job these guards
+ * do; the behaviour itself is walked on the stand.
  */
 const mapView = readFileSync(
   join(__dirname, "../components/MapView.svelte"),

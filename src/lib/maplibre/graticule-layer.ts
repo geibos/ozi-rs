@@ -43,6 +43,16 @@ function firstExistingLayer(
  */
 export function attachGraticule(map: maplibregl.Map): GraticuleHandle {
   const labels: maplibregl.Marker[] = [];
+  /**
+   * The lines drawn last time, as a string.
+   *
+   * `refresh` runs on `idle`, and `setData` makes the map render, which makes
+   * it go idle again — so an untouched map redrew the grid and rebuilt every
+   * label for ever, at no benefit and a steady cost in battery on a field
+   * laptop. Found by a reviewer, 2026-09-23. Comparing what would be drawn is
+   * cheaper than drawing it.
+   */
+  let drawn = "";
 
   const clearLabels = () => {
     for (const marker of labels) marker.remove();
@@ -67,10 +77,16 @@ export function attachGraticule(map: maplibregl.Map): GraticuleHandle {
       east: bounds.getEast(),
     });
 
-    const data = graticuleGeoJson(lines);
+    const signature = lines
+      .map((line) => `${line.kind}${line.degrees}`)
+      .join("|");
     const source = map.getSource(SOURCE_ID) as
       | maplibregl.GeoJSONSource
       | undefined;
+    if (source && signature === drawn) return;
+    drawn = signature;
+
+    const data = graticuleGeoJson(lines);
     if (source) {
       source.setData(data);
     } else {
@@ -105,6 +121,7 @@ export function attachGraticule(map: maplibregl.Map): GraticuleHandle {
       map.off("moveend", refresh);
       map.off("idle", refresh);
       clearLabels();
+      drawn = "";
       if (map.getLayer(LINE_LAYER_ID)) map.removeLayer(LINE_LAYER_ID);
       if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
     },
