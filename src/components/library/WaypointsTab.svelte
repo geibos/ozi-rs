@@ -15,7 +15,7 @@
   import { get } from "svelte/store";
   import { locale, t } from "$lib/i18n";
   import { layerDisplayName } from "$lib/layer-names";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { Button, buttonVariants } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import * as Select from "$lib/components/ui/select";
@@ -29,6 +29,7 @@
     selectedWaypointId,
   } from "$lib/stores";
   import MapPinIcon from "@lucide/svelte/icons/map-pin";
+  import Layers from "@lucide/svelte/icons/layers";
   import SearchIcon from "@lucide/svelte/icons/search";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
@@ -49,6 +50,9 @@
     setWaypointSymbol,
     showOnlyWaypoint,
     toggleWaypointVisible,
+    createWaypointLayer,
+    renameWaypointLayer,
+    deleteWaypointLayer,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
@@ -75,6 +79,75 @@
   const waypointLayerSelectValue = $derived(
     $activeWaypointLayerId !== null ? $activeWaypointLayerId.toString() : "",
   );
+
+  const activeWaypointLayerName = $derived.by(() => {
+    const id = $activeWaypointLayerId;
+    if (id === null) return null;
+    const layer = waypointLayers.find((l) => BigInt(l.id) === id);
+    return layer ? layerDisplayName(layer.name, $locale) : null;
+  });
+
+  /** See the Tracks tab: an inline card, not a modal, in a narrow rail. */
+  let layerEdit = $state<{ mode: "create" | "rename"; name: string } | null>(
+    null,
+  );
+
+  function beginNewLayer() {
+    layerEdit = {
+      mode: "create",
+      name: get(t)("layers.defaultWaypointName"),
+    };
+  }
+
+  function beginRenameLayer() {
+    const current = activeWaypointLayerName;
+    if (current === null) return;
+    layerEdit = { mode: "rename", name: current };
+  }
+
+  async function commitLayerEdit() {
+    const edit = layerEdit;
+    if (!edit) return;
+    const name = edit.name.trim();
+    if (name.length === 0) return;
+    layerEdit = null;
+    try {
+      if (edit.mode === "create") {
+        const id = await createWaypointLayer(name);
+        activeWaypointLayerId.set(id);
+      } else {
+        const id = $activeWaypointLayerId;
+        if (id === null) return;
+        await renameWaypointLayer(id, name);
+      }
+      await appState.refresh();
+    } catch (error) {
+      toast.error(
+        get(t)(
+          edit.mode === "create"
+            ? "layers.createFailed"
+            : "layers.renameFailed",
+        ),
+        { description: String(error) },
+      );
+    }
+  }
+
+  async function handleDeleteLayer() {
+    const id = $activeWaypointLayerId;
+    if (id === null) return;
+    const next = waypointLayers.find((layer) => BigInt(layer.id) !== id);
+    try {
+      await deleteWaypointLayer(id);
+      activeWaypointLayerId.set(next ? BigInt(next.id) : null);
+      await appState.refresh();
+      toast.success(get(t)("layers.deleted"));
+    } catch (error) {
+      toast.error(get(t)("layers.deleteFailed"), {
+        description: String(error),
+      });
+    }
+  }
 
   $effect(() => {
     // Re-load when the app state changes (layer count, or refresh signal)
@@ -262,6 +335,37 @@
           </Select.Content>
         </Select.Root>
 
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+            aria-label={$t("layers.menu")}
+            title={$t("layers.menu")}
+            disabled={$drawingModeActive}
+            data-testid="waypoint-layer-menu"
+          >
+            <Layers class="size-4" aria-hidden="true" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="start">
+            <DropdownMenu.Item onSelect={beginNewLayer}>
+              {$t("layers.new")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={beginRenameLayer}
+              disabled={$activeWaypointLayerId === null}
+            >
+              {$t("layers.rename")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item
+              onSelect={handleDeleteLayer}
+              disabled={$activeWaypointLayerId === null}
+              variant="destructive"
+            >
+              {$t("layers.delete")}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+
         <Tooltip.Root>
           <Tooltip.Trigger
             class={buttonVariants({
@@ -288,6 +392,55 @@
           </Tooltip.Content>
         </Tooltip.Root>
       </div>
+
+      {#if layerEdit}
+        <div
+          class="bg-card text-card-foreground border-border mt-1.5 flex flex-col gap-1.5 rounded-md border p-2"
+          data-testid="waypoint-layer-edit"
+        >
+          <div class="text-xs font-semibold">
+            {$t(
+              layerEdit.mode === "create"
+                ? "layers.newTitle"
+                : "layers.renameTitle",
+            )}
+          </div>
+          <Input
+            bind:value={layerEdit.name}
+            placeholder={$t("layers.namePlaceholder")}
+            aria-label={$t("layers.namePlaceholder")}
+            class="h-7 text-xs"
+            onkeydown={(e: KeyboardEvent) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void commitLayerEdit();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                layerEdit = null;
+              }
+            }}
+          />
+          <div class="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={() => (layerEdit = null)}
+            >
+              {$t("layers.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              onclick={commitLayerEdit}
+              disabled={layerEdit.name.trim().length === 0}
+              data-testid="waypoint-layer-edit-commit"
+            >
+              {$t(
+                layerEdit.mode === "create" ? "layers.create" : "layers.save",
+              )}
+            </Button>
+          </div>
+        </div>
+      {/if}
     {/if}
 
     {#if rows.length > 0}

@@ -157,6 +157,27 @@ pub enum ProjectCommand {
     RemoveWaypointLayer {
         layer: WaypointLayer,
     },
+    /// Put a layer back exactly as it was, contents included.
+    ///
+    /// This is what a removal reverses to. Reversing it to `AddTrackLayer`
+    /// rebuilt the layer from its id and name alone, so undoing the removal of
+    /// a day's work handed back an empty layer.
+    RestoreTrackLayer {
+        layer: TrackLayer,
+    },
+    RestoreWaypointLayer {
+        layer: WaypointLayer,
+    },
+    RenameTrackLayer {
+        layer_id: LayerId,
+        old_name: String,
+        new_name: String,
+    },
+    RenameWaypointLayer {
+        layer_id: LayerId,
+        old_name: String,
+        new_name: String,
+    },
     RemoveTrack {
         layer_id: LayerId,
         track: Track,
@@ -764,6 +785,30 @@ impl ProjectCommand {
                 project.remove_waypoint_layer(layer.id());
                 Ok(())
             }
+            Self::RestoreTrackLayer { layer } => {
+                project.add_track_layer(layer.clone());
+                Ok(())
+            }
+            Self::RestoreWaypointLayer { layer } => {
+                project.add_waypoint_layer(layer.clone());
+                Ok(())
+            }
+            Self::RenameTrackLayer {
+                layer_id, new_name, ..
+            } => {
+                if let Ok(layer) = project.track_layer_mut(layer_id.value()) {
+                    layer.set_name(new_name.clone());
+                }
+                Ok(())
+            }
+            Self::RenameWaypointLayer {
+                layer_id, new_name, ..
+            } => {
+                if let Ok(layer) = project.waypoint_layer_mut(layer_id.value()) {
+                    layer.set_name(new_name.clone());
+                }
+                Ok(())
+            }
             Self::RemoveTrack { layer_id, track } => {
                 project.remove_track_from_layer(*layer_id, track.id())?;
                 Ok(())
@@ -1172,13 +1217,39 @@ impl ProjectCommand {
                     }
                 }
             }
-            Self::RemoveTrackLayer { layer } => Self::AddTrackLayer {
-                id: layer.id(),
-                name: layer.name().to_owned(),
+            // Not `AddTrackLayer`: that rebuilds the layer from its id and
+            // name, so undoing the removal of a day's recordings handed back an
+            // empty layer and lost the tracks. External review of the command
+            // set, 2026-09-23.
+            Self::RemoveTrackLayer { layer } => Self::RestoreTrackLayer {
+                layer: layer.clone(),
             },
-            Self::RemoveWaypointLayer { layer } => Self::AddWaypointLayer {
-                id: layer.id(),
-                name: layer.name().to_owned(),
+            Self::RemoveWaypointLayer { layer } => Self::RestoreWaypointLayer {
+                layer: layer.clone(),
+            },
+            Self::RestoreTrackLayer { layer } => Self::RemoveTrackLayer {
+                layer: layer.clone(),
+            },
+            Self::RestoreWaypointLayer { layer } => Self::RemoveWaypointLayer {
+                layer: layer.clone(),
+            },
+            Self::RenameTrackLayer {
+                layer_id,
+                old_name,
+                new_name,
+            } => Self::RenameTrackLayer {
+                layer_id: *layer_id,
+                old_name: new_name.clone(),
+                new_name: old_name.clone(),
+            },
+            Self::RenameWaypointLayer {
+                layer_id,
+                old_name,
+                new_name,
+            } => Self::RenameWaypointLayer {
+                layer_id: *layer_id,
+                old_name: new_name.clone(),
+                new_name: old_name.clone(),
             },
             Self::RemoveTrack { layer_id, track } => Self::AddTrack {
                 layer_id: *layer_id,
@@ -1866,6 +1937,155 @@ mod tests {
     /// actions. Merging on "same entity" alone made it one undo step, so a
     /// Ctrl+Z after the second drag went back past the first — a correction
     /// the operator had already accepted. External review, 2026-09-22.
+    /// Removing a layer carries the whole layer in the command, and reversing
+    /// it used to build `AddTrackLayer { id, name }` — an *empty* layer. A day
+    /// of forty crews' recordings would have come back as a name. Nothing
+    /// could reach the command from the interface, which is the only reason
+    /// this is a fix and not an incident.
+    #[test]
+    fn a_removed_track_layer_comes_back_with_its_tracks() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(40);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Day three"),
+            )
+            .unwrap();
+        for n in 0..3u64 {
+            let mut track = Track::new(TrackId::new(n + 1), format!("ЛИСА{n}"));
+            let mut segment = TrackSegment::new(TrackSegmentId::new(n + 1));
+            segment.add_point(TrackPoint::new(TrackPointId::new(n + 1), 53.9, 27.5));
+            track.add_segment(segment);
+            history
+                .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+                .unwrap();
+        }
+
+        let live = project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("the layer")
+            .clone();
+        assert_eq!(live.tracks().len(), 3);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::RemoveTrackLayer { layer: live },
+            )
+            .unwrap();
+        assert!(
+            !project.track_layers().iter().any(|l| l.id() == layer_id),
+            "the layer SHALL be gone once removed"
+        );
+
+        assert!(history.undo(&mut project));
+        let back = project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("the layer SHALL come back");
+        assert_eq!(
+            back.tracks().len(),
+            3,
+            "undoing a layer removal SHALL bring its tracks back, not a name"
+        );
+        assert_eq!(back.name(), "Day three");
+        assert_eq!(back.tracks()[1].name(), "ЛИСА1");
+    }
+
+    /// The import names a layer after the path it came from
+    /// (`Imported tracks: /Volumes/…/day3.gpx`). Renaming it is the first
+    /// thing anybody does, and it has to come back like any other edit.
+    #[test]
+    fn renaming_a_layer_is_undoable() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(42);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Imported tracks: /tmp/day3.gpx"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::RenameTrackLayer {
+                    layer_id,
+                    old_name: "Imported tracks: /tmp/day3.gpx".to_owned(),
+                    new_name: "День 3".to_owned(),
+                },
+            )
+            .unwrap();
+
+        let name_of = |p: &Project| {
+            p.track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .map(|l| l.name().to_owned())
+                .expect("the layer")
+        };
+        assert_eq!(name_of(&project), "День 3");
+
+        assert!(history.undo(&mut project));
+        assert_eq!(name_of(&project), "Imported tracks: /tmp/day3.gpx");
+
+        assert!(history.redo(&mut project));
+        assert_eq!(name_of(&project), "День 3");
+    }
+
+    /// The same for the marks: a waypoint layer is where the ШТАБ lives.
+    #[test]
+    fn a_removed_waypoint_layer_comes_back_with_its_marks() {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(41);
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint_layer(layer_id, "Marks"),
+            )
+            .unwrap();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_waypoint(
+                    layer_id,
+                    Waypoint::new(WaypointId::new(7), "ШТАБ", 53.9, 27.5),
+                ),
+            )
+            .unwrap();
+
+        let live = project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("the layer")
+            .clone();
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::RemoveWaypointLayer { layer: live },
+            )
+            .unwrap();
+        assert!(history.undo(&mut project));
+
+        let back = project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("the layer SHALL come back");
+        assert_eq!(back.waypoints().len(), 1);
+        assert_eq!(back.waypoints()[0].name(), "ШТАБ");
+    }
+
     #[test]
     fn two_drags_of_the_same_waypoint_are_two_undo_steps() {
         let mut project = Project::untitled();

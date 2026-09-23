@@ -1055,6 +1055,119 @@ impl AppState {
         );
     }
 
+    // ── Layer management ─────────────────────────────────────────────────
+
+    /// Create an empty track layer and answer with its identifier.
+    ///
+    /// The caller needs the id to make the layer active, and reading it back
+    /// out of the state means matching on a name the operator chose — two
+    /// layers may share one.
+    pub fn create_track_layer(&mut self, name: String) -> Result<u64, String> {
+        let id = import::next_layer_id(&self.project);
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::add_track_layer(id, name),
+            )
+            .map_err(|commands::CommandError::ProjectLayer(e)| format!("{e}"))?;
+        Ok(id.value())
+    }
+
+    pub fn create_waypoint_layer(&mut self, name: String) -> Result<u64, String> {
+        let id = import::next_layer_id(&self.project);
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::add_waypoint_layer(id, name),
+            )
+            .map_err(|commands::CommandError::ProjectLayer(e)| format!("{e}"))?;
+        Ok(id.value())
+    }
+
+    pub fn rename_track_layer(
+        &mut self,
+        layer_id: LayerId,
+        new_name: String,
+    ) -> Result<(), String> {
+        let old_name = self
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .map(|l| l.name().to_owned())
+            .ok_or_else(|| format!("track layer {} not found", layer_id.value()))?;
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::RenameTrackLayer {
+                    layer_id,
+                    old_name,
+                    new_name,
+                },
+            )
+            .map_err(|commands::CommandError::ProjectLayer(e)| format!("{e}"))
+    }
+
+    pub fn rename_waypoint_layer(
+        &mut self,
+        layer_id: LayerId,
+        new_name: String,
+    ) -> Result<(), String> {
+        let old_name = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .map(|l| l.name().to_owned())
+            .ok_or_else(|| format!("waypoint layer {} not found", layer_id.value()))?;
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::RenameWaypointLayer {
+                    layer_id,
+                    old_name,
+                    new_name,
+                },
+            )
+            .map_err(|commands::CommandError::ProjectLayer(e)| format!("{e}"))
+    }
+
+    /// Remove a track layer with everything in it.
+    ///
+    /// The command carries the whole layer, which is what makes the removal
+    /// undoable: `RemoveTrackLayer` reverses to `RestoreTrackLayer`.
+    pub fn delete_track_layer(&mut self, layer_id: LayerId) -> Result<(), String> {
+        let layer = self
+            .project
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .cloned()
+            .ok_or_else(|| format!("track layer {} not found", layer_id.value()))?;
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::RemoveTrackLayer { layer },
+            )
+            .map_err(|commands::CommandError::ProjectLayer(e)| format!("{e}"))
+    }
+
+    pub fn delete_waypoint_layer(&mut self, layer_id: LayerId) -> Result<(), String> {
+        let layer = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .cloned()
+            .ok_or_else(|| format!("waypoint layer {} not found", layer_id.value()))?;
+        self.history
+            .apply(
+                &mut self.project,
+                &commands::ProjectCommand::RemoveWaypointLayer { layer },
+            )
+            .map_err(|commands::CommandError::ProjectLayer(e)| format!("{e}"))
+    }
+
     /// Move a track point.
     ///
     /// `None` for the gesture: the frontend sends one command per completed
@@ -2978,6 +3091,68 @@ mod tests {
             }
             _ => panic!("a map already on disk SHALL open without a download"),
         }
+    }
+
+    /// The path an operator actually takes: delete the layer the import made,
+    /// then think better of it. The command is built from the live layer, so
+    /// this is what proves the tracks travel with it.
+    #[test]
+    fn deleting_a_layer_and_undoing_brings_its_tracks_back() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+        let mut state = AppState::new();
+        let layer_id = state
+            .create_track_layer("Imported tracks: /tmp/day3.gpx".to_owned())
+            .expect("create");
+        let layer_id = LayerId::new(layer_id);
+
+        for n in 0..4u64 {
+            let mut track = Track::new(TrackId::new(n + 1), format!("ЛИСА{n}"));
+            let mut segment = TrackSegment::new(TrackSegmentId::new(n + 1));
+            segment.add_point(TrackPoint::new(TrackPointId::new(n + 1), 53.9, 27.5));
+            track.add_segment(segment);
+            state
+                .project_mut()
+                .add_track_to_layer(layer_id, track)
+                .expect("add track");
+        }
+
+        state.delete_track_layer(layer_id).expect("delete");
+        assert!(!state.track_layers().iter().any(|l| l.id() == layer_id));
+
+        state.undo();
+        let back = state
+            .track_layers()
+            .iter()
+            .find(|l| l.id() == layer_id)
+            .expect("the layer SHALL come back");
+        assert_eq!(
+            back.tracks().len(),
+            4,
+            "a day's tracks SHALL travel back with their layer"
+        );
+    }
+
+    /// Renaming what the import called a path is the first thing anybody does.
+    #[test]
+    fn renaming_a_layer_through_the_application_is_undoable() {
+        let mut state = AppState::new();
+        let id = LayerId::new(
+            state
+                .create_track_layer("Imported tracks: /tmp/a.gpx".to_owned())
+                .unwrap(),
+        );
+
+        state.rename_track_layer(id, "День 3".to_owned()).unwrap();
+        let name_now = |s: &AppState| {
+            s.track_layers()
+                .iter()
+                .find(|l| l.id() == id)
+                .map(|l| l.name().to_owned())
+                .unwrap()
+        };
+        assert_eq!(name_now(&state), "День 3");
+        state.undo();
+        assert_eq!(name_now(&state), "Imported tracks: /tmp/a.gpx");
     }
 
     /// `bigmap.ozf2` ends with `map.ozf2`. Matching the ready file against a

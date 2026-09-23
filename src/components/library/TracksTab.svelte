@@ -54,6 +54,9 @@
     importPlt,
     importTracksDirectory,
     renameTrack,
+    createTrackLayer,
+    renameTrackLayer,
+    deleteTrackLayer,
     setAllTracksVisible,
     setTrackColor,
     showOnlyTrack,
@@ -64,6 +67,7 @@
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import UploadIcon from "@lucide/svelte/icons/upload";
+  import Layers from "@lucide/svelte/icons/layers";
   import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
   import DownloadIcon from "@lucide/svelte/icons/download";
   import LocateIcon from "@lucide/svelte/icons/locate";
@@ -206,6 +210,76 @@
 
   async function handleRename(t: TrackFeature, newName: string) {
     await renameTrack(t.layerId, t.trackId, newName);
+  }
+
+  /**
+   * The layer name being typed, and what will happen when it is confirmed.
+   *
+   * An inline card rather than a modal, matching the simplify control a few
+   * lines down: the library rail is narrow and a dialog over it hides the very
+   * list the operator is naming a layer against.
+   */
+  let layerEdit = $state<{ mode: "create" | "rename"; name: string } | null>(
+    null,
+  );
+
+  function beginNewLayer() {
+    layerEdit = { mode: "create", name: get(i18n)("layers.defaultTrackName") };
+  }
+
+  function beginRenameLayer() {
+    const current = activeTrackLayerName;
+    if (current === null) return;
+    layerEdit = { mode: "rename", name: current };
+  }
+
+  async function commitLayerEdit() {
+    const edit = layerEdit;
+    if (!edit) return;
+    const name = edit.name.trim();
+    if (name.length === 0) return;
+    layerEdit = null;
+    try {
+      if (edit.mode === "create") {
+        // The command answers with the id so the new layer can be made active
+        // without reading the state back and matching on a name two layers
+        // may share.
+        const id = await createTrackLayer(name);
+        activeTrackLayerId.set(id);
+      } else {
+        const id = $activeTrackLayerId;
+        if (id === null) return;
+        await renameTrackLayer(id, name);
+      }
+      await appState.refresh();
+    } catch (error) {
+      toast.error(
+        get(i18n)(
+          edit.mode === "create"
+            ? "layers.createFailed"
+            : "layers.renameFailed",
+        ),
+        { description: String(error) },
+      );
+    }
+  }
+
+  async function handleDeleteLayer() {
+    const id = $activeTrackLayerId;
+    if (id === null) return;
+    // Which layer the operator lands on afterwards is decided before the
+    // delete, while the list still holds the one being removed.
+    const next = trackLayers.find((layer) => BigInt(layer.id) !== id);
+    try {
+      await deleteTrackLayer(id);
+      activeTrackLayerId.set(next ? BigInt(next.id) : null);
+      await appState.refresh();
+      toast.success(get(i18n)("layers.deleted"));
+    } catch (error) {
+      toast.error(get(i18n)("layers.deleteFailed"), {
+        description: String(error),
+      });
+    }
   }
 
   function handleSelectRow(t: TrackFeature) {
@@ -511,6 +585,37 @@
           </Select.Content>
         </Select.Root>
 
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+            aria-label={$i18n("layers.menu")}
+            title={$i18n("layers.menu")}
+            disabled={$drawingModeActive}
+            data-testid="track-layer-menu"
+          >
+            <Layers class="size-4" aria-hidden="true" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="start">
+            <DropdownMenu.Item onSelect={beginNewLayer}>
+              {$i18n("layers.new")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={beginRenameLayer}
+              disabled={$activeTrackLayerId === null}
+            >
+              {$i18n("layers.rename")}
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item
+              onSelect={handleDeleteLayer}
+              disabled={$activeTrackLayerId === null}
+              variant="destructive"
+            >
+              {$i18n("layers.delete")}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+
         <Tooltip.Root>
           <Tooltip.Trigger
             class={buttonVariants({
@@ -550,6 +655,57 @@
           </Tooltip.Content>
         </Tooltip.Root>
       </div>
+
+      {#if layerEdit}
+        <!-- Inline rather than a modal: the rail is narrow, and a dialog over
+             it hides the list the operator is naming the layer against. -->
+        <div
+          class="bg-card text-card-foreground border-border mt-1.5 flex flex-col gap-1.5 rounded-md border p-2"
+          data-testid="track-layer-edit"
+        >
+          <div class="text-xs font-semibold">
+            {$i18n(
+              layerEdit.mode === "create"
+                ? "layers.newTitle"
+                : "layers.renameTitle",
+            )}
+          </div>
+          <Input
+            bind:value={layerEdit.name}
+            placeholder={$i18n("layers.namePlaceholder")}
+            aria-label={$i18n("layers.namePlaceholder")}
+            class="h-7 text-xs"
+            onkeydown={(e: KeyboardEvent) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void commitLayerEdit();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                layerEdit = null;
+              }
+            }}
+          />
+          <div class="flex justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onclick={() => (layerEdit = null)}
+            >
+              {$i18n("layers.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              onclick={commitLayerEdit}
+              disabled={layerEdit.name.trim().length === 0}
+              data-testid="track-layer-edit-commit"
+            >
+              {$i18n(
+                layerEdit.mode === "create" ? "layers.create" : "layers.save",
+              )}
+            </Button>
+          </div>
+        </div>
+      {/if}
 
       <div class="mt-1.5 flex items-center gap-1">
         <Button

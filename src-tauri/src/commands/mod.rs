@@ -1170,6 +1170,97 @@ pub fn redo(state: State<SharedState>, app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ── Layer management ──────────────────────────────────────────────────────────
+//
+// A day of recordings arrives as files and every file becomes a layer named
+// after its path. The domain has had these commands since the first commit;
+// until now nothing exposed them, so the operator could toggle a layer's
+// tracks and nothing else.
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_track_layer(
+    name: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<u64, String> {
+    let mut app_state = lock_app_state(state.inner())?;
+    let id = app_state.create_track_layer(name)?;
+    let _ = app.emit("state-changed", ());
+    Ok(id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn create_waypoint_layer(
+    name: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<u64, String> {
+    let mut app_state = lock_app_state(state.inner())?;
+    let id = app_state.create_waypoint_layer(name)?;
+    let _ = app.emit("state-changed", ());
+    Ok(id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn rename_track_layer(
+    layer_id: u64,
+    new_name: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state.rename_track_layer(LayerId::new(layer_id), new_name)?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn rename_waypoint_layer(
+    layer_id: u64,
+    new_name: String,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state.rename_waypoint_layer(LayerId::new(layer_id), new_name)?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn delete_track_layer(
+    layer_id: u64,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state.delete_track_layer(LayerId::new(layer_id))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn delete_waypoint_layer(
+    layer_id: u64,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::domain::LayerId;
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state.delete_waypoint_layer(LayerId::new(layer_id))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 // ── Track mutations ───────────────────────────────────────────────────────────
 
 #[tauri::command]

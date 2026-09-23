@@ -290,6 +290,64 @@ export async function renameTrack(
   );
 }
 
+/**
+ * Layer management.
+ *
+ * A day of recordings arrives as files and every file becomes a layer named
+ * after its path. Creating answers with the new id so the caller can make the
+ * layer active without reading the whole state back and matching on a name
+ * two layers may share.
+ */
+export async function createTrackLayer(name: string): Promise<bigint> {
+  const id = await unwrap(
+    "create_track_layer",
+    commands.createTrackLayer(name),
+  );
+  return BigInt(id);
+}
+
+export async function createWaypointLayer(name: string): Promise<bigint> {
+  const id = await unwrap(
+    "create_waypoint_layer",
+    commands.createWaypointLayer(name),
+  );
+  return BigInt(id);
+}
+
+export async function renameTrackLayer(
+  layerId: bigint,
+  newName: string,
+): Promise<void> {
+  await unwrap(
+    "rename_track_layer",
+    commands.renameTrackLayer(toIdNumber(layerId), newName),
+  );
+}
+
+export async function renameWaypointLayer(
+  layerId: bigint,
+  newName: string,
+): Promise<void> {
+  await unwrap(
+    "rename_waypoint_layer",
+    commands.renameWaypointLayer(toIdNumber(layerId), newName),
+  );
+}
+
+export async function deleteTrackLayer(layerId: bigint): Promise<void> {
+  await unwrap(
+    "delete_track_layer",
+    commands.deleteTrackLayer(toIdNumber(layerId)),
+  );
+}
+
+export async function deleteWaypointLayer(layerId: bigint): Promise<void> {
+  await unwrap(
+    "delete_waypoint_layer",
+    commands.deleteWaypointLayer(toIdNumber(layerId)),
+  );
+}
+
 export async function setTrackColor(
   layerId: bigint,
   trackId: bigint,

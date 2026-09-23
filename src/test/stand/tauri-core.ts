@@ -18,6 +18,7 @@ import type {
   AppStateDto,
   commands,
   JsonValue,
+  LayerSummaryDto,
   TrackSummaryDto,
   WaypointDto,
 } from "$lib/bindings";
@@ -217,15 +218,43 @@ let previewedSlug: string | null = null;
 /** Waypoints this stand session has placed, appended to the fixture's. */
 const placedWaypoints: WaypointDto[] = [];
 
+/**
+ * The layer lists as this stand session has edited them.
+ *
+ * Layer management is the one thing an operator does to what the import made,
+ * and until 2026-09-23 no command existed for it at all. `null` means the
+ * session has not touched them and the fixture's lists stand.
+ */
+let standTrackLayers: LayerSummaryDto[] | null = null;
+let standWaypointLayers: LayerSummaryDto[] | null = null;
+let nextStandLayerId = 900;
+
 function previewedAppState(): AppStateDto {
   const fixture =
     requestedState() === "cold" ? coldStartFixture : appStateFixture;
   // The imported rows belong in the state too, not only in `list_tracks`:
   // MapView redraws off a fingerprint taken from `AppStateDto.tracks`, so an
   // import that left this alone appeared in the list and never on the map.
-  const base: AppStateDto = importedTracks.length
+  let base: AppStateDto = importedTracks.length
     ? { ...fixture, tracks: [...fixture.tracks, ...importedTracks] }
     : fixture;
+  if (standTrackLayers || standWaypointLayers) {
+    const trackLayers = standTrackLayers ?? base.track_layers;
+    const waypointLayers = standWaypointLayers ?? base.waypoint_layers;
+    base = {
+      ...base,
+      track_layers: trackLayers,
+      waypoint_layers: waypointLayers,
+      track_layer_count: trackLayers.length,
+      waypoint_layer_count: waypointLayers.length,
+      // A removed layer takes its rows with it, or the list would go on
+      // showing tracks whose layer is gone — which is exactly the lie the
+      // stand exists to catch.
+      tracks: base.tracks.filter((row) =>
+        trackLayers.some((layer) => layer.id === row.layer_id),
+      ),
+    };
+  }
   const project = base.current_project;
   if (previewedSlug === null || !project) return base;
   // The whole project, with its slug moved: the loader matches on the slug, so
@@ -428,6 +457,61 @@ const HANDLERS: StandAnswers = {
     return null;
   },
   cancel_download: () => true,
+
+  // ── Layer management ───────────────────────────────────────────────────
+  create_track_layer: (args) => {
+    nextStandLayerId += 1;
+    standTrackLayers = [
+      ...(standTrackLayers ?? appStateFixture.track_layers),
+      { id: nextStandLayerId, name: String(args?.name ?? "Layer") },
+    ];
+    standEmit("state-changed", undefined);
+    return nextStandLayerId;
+  },
+  create_waypoint_layer: (args) => {
+    nextStandLayerId += 1;
+    standWaypointLayers = [
+      ...(standWaypointLayers ?? appStateFixture.waypoint_layers),
+      { id: nextStandLayerId, name: String(args?.name ?? "Layer") },
+    ];
+    standEmit("state-changed", undefined);
+    return nextStandLayerId;
+  },
+  rename_track_layer: (args) => {
+    standTrackLayers = (standTrackLayers ?? appStateFixture.track_layers).map(
+      (layer) =>
+        layer.id === Number(args?.layerId)
+          ? { ...layer, name: String(args?.newName ?? layer.name) }
+          : layer,
+    );
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  rename_waypoint_layer: (args) => {
+    standWaypointLayers = (
+      standWaypointLayers ?? appStateFixture.waypoint_layers
+    ).map((layer) =>
+      layer.id === Number(args?.layerId)
+        ? { ...layer, name: String(args?.newName ?? layer.name) }
+        : layer,
+    );
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  delete_track_layer: (args) => {
+    standTrackLayers = (
+      standTrackLayers ?? appStateFixture.track_layers
+    ).filter((layer) => layer.id !== Number(args?.layerId));
+    standEmit("state-changed", undefined);
+    return null;
+  },
+  delete_waypoint_layer: (args) => {
+    standWaypointLayers = (
+      standWaypointLayers ?? appStateFixture.waypoint_layers
+    ).filter((layer) => layer.id !== Number(args?.layerId));
+    standEmit("state-changed", undefined);
+    return null;
+  },
 };
 
 /** Commands the stand answered, in order — a screen's IPC transcript. */

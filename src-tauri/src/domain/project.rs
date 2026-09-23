@@ -218,6 +218,10 @@ impl TrackLayer {
         &self.name
     }
 
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
     pub fn tracks(&self) -> &[Track] {
         &self.tracks
     }
@@ -290,6 +294,10 @@ impl WaypointLayer {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
     }
 
     pub fn waypoints(&self) -> &[Waypoint] {
@@ -813,7 +821,7 @@ impl Project {
         ))
     }
 
-    fn waypoint_layer_mut(
+    pub fn waypoint_layer_mut(
         &mut self,
         layer_id: u64,
     ) -> Result<&mut WaypointLayer, ProjectLayerError> {
