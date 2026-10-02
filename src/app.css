@@ -51,10 +51,12 @@
 
 /* --- Geist (variable) -------------------------------------------------------
  * The variable woff2 files are vendored into `static/fonts/` from the `geist`
- * npm package. SvelteKit serves the `static/` tree at the URL root, so
- * `/fonts/Geist-Variable.woff2` resolves both in dev and in the built bundle.
- * The package itself only exposes `next/font` loaders through its `exports`
- * field, which we cannot use in a Tauri (non-Next.js) app. */
+ * npm package (1.7.1), with its SIL OFL text beside them. SvelteKit serves the
+ * `static/` tree at the URL root, so `/fonts/Geist-Variable.woff2` resolves
+ * both in dev and in the built bundle. The package itself only exposes
+ * `next/font` loaders, which a Tauri app cannot use, and it depends on Next.js
+ * — whose critical advisory of 2026-10-01 failed the audit gate for a framework
+ * this application does not run — so it is no longer a dependency. */
 @font-face {
   font-family: "Geist";
   src: url("/fonts/Geist-Variable.woff2") format("woff2-variations");

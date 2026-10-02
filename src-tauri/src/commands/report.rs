@@ -156,6 +156,11 @@ fn diagnostics_text(snapshot: &AppStateDto) -> String {
 ///
 /// Checked rather than assumed, 2026-09-23: `screencapture -x -o
 /// -R100,100,400,300` writes an 800×600 PNG on a display whose scale is 2.
+///
+/// Only macOS photographs the window; the tests check the arithmetic on every
+/// platform, and anywhere else an unused function fails the strict clippy
+/// gate — which is what kept CI red on Linux from 2026-09-23.
+#[cfg(any(target_os = "macos", test))]
 fn capture_rect(x: f64, y: f64, width: f64, height: f64, scale: f64) -> String {
     let scale = if scale > 0.0 { scale } else { 1.0 };
     format!(

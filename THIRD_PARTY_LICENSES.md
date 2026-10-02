@@ -27,7 +27,8 @@ source in `node_modules/<package>/LICENSE` (or equivalent) after `npm install`.
 | [`zod`](https://zod.dev) | MIT | Schema validation |
 | [`csstype`](https://github.com/frenic/csstype) | MIT | CSS property types (transitive but listed here because we install it explicitly to satisfy bits-ui's type declarations) |
 | [`@tanstack/svelte-virtual`](https://tanstack.com/virtual) | MIT | Svelte 5 port of TanStack Virtual; bounds the project-list DOM cost to the viewport |
-| [`geist`](https://vercel.com/font) | SIL OFL 1.1 (font binaries) / MIT (package) | Geist sans + Geist Mono (variable woff2). Wired via `@font-face` in `src/app.css`; the package's `next/font` loader entry points are unused. |
+| [Geist](https://vercel.com/font) | SIL OFL 1.1 | Geist sans + Geist Mono (variable woff2), vendored in `static/fonts/` from the `geist` package 1.7.1 with the licence text beside them (`static/fonts/OFL.txt`). Wired via `@font-face` in `src/app.css`. The npm package is not a dependency: it only carries `next/font` loaders, and it pulls in Next.js. |
+| [Noto Sans](https://notofonts.github.io) | SIL OFL 1.1 | Noto Sans Bold as SDF glyph ranges for map labels (Latin, Cyrillic, punctuation, `№`), built by [`openmaptiles/fonts`](https://github.com/openmaptiles/fonts) v2.0; vendored in `static/glyphs/` with the licence text (`static/glyphs/OFL.txt`). |
 
 ## Existing dependencies acknowledged (not introduced by this change)
 
