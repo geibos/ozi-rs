@@ -14,8 +14,9 @@
 - [x] 1.3 `just shots`, and `just ci` gains it (compare is the default).
 - [x] 1.4 Commit the baseline of the current interface as the recorded "before" —
       60 shots, 3.5 MB; two fresh runs compared 60/60 on 2026-10-02.
-- [ ] 1.5 CI runs the fixtures and the matrix, uploading the images and diffs;
-      documented in `docs/ci.md`.
+- [x] 1.5 CI runs the fixtures and the matrix, uploading the images and diffs;
+      documented in `docs/ci.md`. First run on `057fdd5`: the baseline written
+      on a Mac matched on the Linux runner, all eight jobs green.
 
 ## 2. The view-model layer
 
