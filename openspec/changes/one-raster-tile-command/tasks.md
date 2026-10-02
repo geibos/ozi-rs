@@ -7,4 +7,4 @@
 ## 2. Gates
 
 - [x] 2.1 `just ci` green (2026-10-02: 423 Rust, 718 vitest)
-- [ ] 2.2 `just smoke` green on a bundle built from this tree, and an OZF2 map drawn in it
+- [ ] 2.2 `just smoke` green on a bundle built from this tree, and an OZF2 map drawn in it — 2026-10-02: on a bundle built from `fe06e6a`, `smoke_cj5_draw_track` and `smoke_report_capture_moment` green; `smoke_cj3_layer_management` failed twice on a machine in use (its tab click landed on an inactive window) and was not run a third time. Owed: one run with nobody at the keyboard. The OZF2 half is done: the packaged app drew `2026-09-21_Kruglinskiy_Satell_z17_ozf.map` through `get_ozi_tile_projected`.

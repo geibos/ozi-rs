@@ -35,6 +35,39 @@ each:
   and uploading results, which stand on this.
 - **Commit and push after every green slice**, for this run.
 
+**Desktop verification, 2026-10-02 at 10:30–10:40**, against a bundle built
+from `fe06e6a` (and GitHub CI green on that commit, after nine red days — see
+below):
+
+- `smoke_cj5_draw_track` and `smoke_report_capture_moment` green.
+- `smoke_cj3_layer_management` failed twice and was not run a third time, per
+  the two-attempts rule: the first time the Mac2 driver died at session start,
+  the second time its click on the Tracks tab landed on an inactive window and
+  the tab never opened. The machine was in use at the time (input idle 0 s),
+  which is the known way a Mac2 click goes astray. Owed: one run with nobody
+  at the keyboard.
+- MapLibre 6's worker runs in the packaged application. Proved without
+  touching the interface: a throwaway build (not committed) waited for the
+  `tracks` GeoJSON source to report itself loaded — which needs the worker to
+  answer — and wrote a report folder saying so. It said `worker-ok` with the
+  restored project's 26 tracks in the state; the folder was removed and the
+  bundle rebuilt from the tree.
+- `just build` failed at the DMG step (`bundle_dmg.sh`) in two builds of
+  three, after the `.app` was already written — and a failed recipe never
+  reached `sign-dev`, so the smoke would have run an unsigned bundle. The
+  debug build makes the `.app` only now (`--bundles app`); release DMGs come
+  from CI. Why `bundle_dmg.sh` fails here was not looked into.
+- The FTP passwords' credential store, for real: `cargo test --lib
+  system_credential_store -- --ignored` files, reads back and deletes a
+  password under «ozi-rs FTP» in the login keychain through `SystemSecrets`.
+  Green. Not done: saving through the form in the packaged application.
+
+**GitHub CI was red from 2026-09-23 to 2026-10-02** while `just ci` passed
+locally, because the local gate runs on macOS: clippy on Linux failed on
+`capture_rect`, used only on macOS. Since 2026-10-01 the npm audit gate also
+failed, on a Next.js advisory reaching us through the `geist` font package.
+Both fixed in `fe06e6a`; the Geist fonts stay vendored in `static/fonts/`.
+
 **Track names run along the route** (`names-along-the-route`, 2026-10-02).
 Noto Sans Bold SDF glyphs ship in `static/glyphs/` (OFL, ~510 KB) and reach the
 map through a `glyphs://` protocol that answers every range, an unshipped one

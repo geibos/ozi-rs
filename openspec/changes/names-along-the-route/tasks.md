@@ -15,4 +15,4 @@
 
 - [x] 3.1 `just ci` green (2026-10-02: 407 Rust, 678 vitest)
 - [x] 3.2 Walked on the stand 2026-10-02: the name runs beside the line and repeats as the map zooms in; the first look had it on the line, where the line showed through between the letters and `_` read as `•`, so it is offset now. The stand project has one visible track, so the collision between names is covered by the unit tests, not the picture. `docs/progress/2026-10-02-names-along-the-route/`
-- [ ] 3.3 `just smoke` green on a bundle built from this tree
+- [ ] 3.3 `just smoke` green on a bundle built from this tree — 2026-10-02: on a bundle built from `fe06e6a`, `smoke_cj5_draw_track` and `smoke_report_capture_moment` green; `smoke_cj3_layer_management` failed twice on a machine in use (its tab click landed on an inactive window) and was not run a third time. Owed: one run with nobody at the keyboard.

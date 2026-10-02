@@ -20,5 +20,5 @@
 
 - [x] 4.1 `just ci` green (2026-10-02: 423 Rust, 718 vitest; clippy --all-targets clean; cargo audit: no new advisories)
 - [x] 4.2 Walked on the stand 2026-10-02: a bundle account and a result endpoint added; `ftp://contour1.example.org/` saved as the server name with port 2121 and folder `/incoming`; the check reported «Вход выполнен, папка /» for the one with a password and «Для этой учётной записи не сохранён пароль» for the one without. `docs/progress/2026-10-02-ftp-accounts/`
-- [ ] 4.3 The real keychain: an account saved in the packaged application, its password visible in Keychain Access and not in the file
-- [ ] 4.4 `just smoke` green on a bundle built from this tree
+- [ ] 4.3 The real keychain: an account saved in the packaged application, its password visible in Keychain Access and not in the file — 2026-10-02: half done. The real login keychain round trip through `SystemSecrets` is green from a test binary (`cargo test --lib system_credential_store -- --ignored`); saving through the form in the packaged application was not attempted, the machine being in use.
+- [ ] 4.4 `just smoke` green on a bundle built from this tree — 2026-10-02: on a bundle built from `fe06e6a`, `smoke_cj5_draw_track` and `smoke_report_capture_moment` green; `smoke_cj3_layer_management` failed twice on a machine in use (its tab click landed on an inactive window) and was not run a third time. Owed: one run with nobody at the keyboard.

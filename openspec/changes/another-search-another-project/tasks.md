@@ -15,4 +15,4 @@
 
 - [x] 3.1 `just ci` green (2026-10-02: 407 Rust, 694 vitest)
 - [x] 3.2 Walked on the stand 2026-10-02: Lavrovo project, Sagra chosen, its map opened. Saved project: no question, tracks gone, toast «Новый проект для поиска «2026 07 14 Sagra»». After an edit: the question in the next-search wording; «Отмена» stayed in the catalogue with nothing opened; «Продолжить без сохранения» opened the map over an empty Tracks tab. The stand first had to be made to tell searches apart — it moved the previewed slug and kept the fixture's name — and the dialog had to be widened: at 312px its three answers ran past its background. `docs/progress/2026-10-02-another-search/`
-- [ ] 3.3 `just smoke` green on a bundle built from this tree
+- [ ] 3.3 `just smoke` green on a bundle built from this tree — 2026-10-02: on a bundle built from `fe06e6a`, `smoke_cj5_draw_track` and `smoke_report_capture_moment` green; `smoke_cj3_layer_management` failed twice on a machine in use (its tab click landed on an inactive window) and was not run a third time. Owed: one run with nobody at the keyboard.

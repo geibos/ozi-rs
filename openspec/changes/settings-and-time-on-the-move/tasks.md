@@ -19,4 +19,4 @@
 
 - [x] 4.1 `just ci` green (2026-10-02: 407 Rust, 714 vitest)
 - [x] 4.2 Walked on the stand 2026-10-02: the gear opens the screen with theme, language and the three thresholds; Esc closes it and ⌘, opens it again; the inspector shows «Длительность 5ч 1мин», «В движении 3мин», «Набор / сброс +0 м / −0 м» for the fixture, and the climb went to «+3 м» when the threshold was set to 1 m, persisted as `ozi:motion-settings`. `docs/progress/2026-10-02-settings-and-time-on-the-move/`
-- [ ] 4.3 `just smoke` green on a bundle built from this tree
+- [ ] 4.3 `just smoke` green on a bundle built from this tree — 2026-10-02: on a bundle built from `fe06e6a`, `smoke_cj5_draw_track` and `smoke_report_capture_moment` green; `smoke_cj3_layer_management` failed twice on a machine in use (its tab click landed on an inactive window) and was not run a third time. Owed: one run with nobody at the keyboard.

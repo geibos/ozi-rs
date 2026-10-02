@@ -788,6 +788,26 @@ mod tests {
         ));
     }
 
+    /// The real credential store, which a plain `cargo test` does not touch:
+    /// `cargo test --lib system_credential_store -- --ignored`. On macOS this
+    /// files, reads back and deletes a password under «ozi-rs FTP» in the
+    /// login keychain — the path the application takes, from a test binary.
+    #[test]
+    #[ignore = "writes to the real credential store"]
+    fn system_credential_store_round_trip() {
+        let id = format!("test-{}", uuid::Uuid::new_v4());
+        let secrets = SystemSecrets;
+        secrets.set(&id, "пароль-проверка").unwrap();
+        assert_eq!(
+            secrets.get(&id).unwrap().as_deref(),
+            Some("пароль-проверка")
+        );
+        secrets.delete(&id).unwrap();
+        assert_eq!(secrets.get(&id).unwrap(), None);
+        // Deleting what is not there is not an error.
+        secrets.delete(&id).unwrap();
+    }
+
     #[test]
     fn errors_carry_the_key_the_frontend_translates() {
         assert_eq!(

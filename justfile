@@ -63,9 +63,12 @@ smoke filter="":
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 
-# Build the full Tauri app (debug)
+# Build the full Tauri app (debug). The `.app` only: the debug bundle feeds the
+# smoke gate and local runs, and the DMG step failed two builds in three on
+# 2026-10-02 after the `.app` was already written — failing the recipe before
+# `sign-dev`, so the smoke ran an unsigned bundle. Release DMGs come from CI.
 build:
-    npm run tauri build -- --debug
+    npm run tauri build -- --debug --bundles app
     @just sign-dev
 
 # Sign a built artifact with the local development identity, when one exists.
