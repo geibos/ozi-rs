@@ -1,0 +1,21 @@
+/**
+ * Whether the workspace is worth opening — the one rule both routes go by.
+ *
+ * A map with no project is a crew looking at the ground before the work
+ * arrives. A project with no map is a `.ozp` from another headquarters, for
+ * ground this machine may never have downloaded: tracks on the OpenStreetMap
+ * backdrop are a workspace too. Neither is not.
+ *
+ * Until 2026-10-02 only the workspace route knew the second half. The
+ * launcher's start-up redirect forwarded on a map alone, so a project restored
+ * without one opened in the catalogue with the work hidden behind it.
+ */
+import type { AppStateDto } from "$lib/bindings";
+
+export function worthOpeningWorkspace(
+  state: Pick<AppStateDto, "active_map" | "project_path"> | null,
+): boolean {
+  return (
+    state !== null && (state.active_map !== null || state.project_path !== null)
+  );
+}

@@ -3,7 +3,8 @@
   import { get } from "svelte/store";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
-  import { activeMap, bundleLoaderOpen, projectPath } from "../../lib/stores";
+  import { appState, bundleLoaderOpen } from "../../lib/stores";
+  import { worthOpeningWorkspace } from "$lib/workspace-route";
   import WorkspaceShell from "../../components/WorkspaceShell.svelte";
   import LibraryRail from "../../components/LibraryRail.svelte";
   import InspectorRail from "../../components/InspectorRail.svelte";
@@ -23,27 +24,35 @@
    *
    * Tracks on the OpenStreetMap backdrop are a workspace. A map with no
    * project is one too — that is a crew looking at the ground before the work
-   * arrives. Neither is not.
+   * arrives. Neither is not. The rule is `worthOpeningWorkspace`, shared with
+   * the launcher's start-up redirect, which until 2026-10-02 knew only half of
+   * it.
+   *
+   * Decided once the state has arrived. On start it is empty for a moment, and
+   * deciding on that sent every start to the launcher — which forwarded back
+   * only when there was a map. The screenshot matrix found it.
    */
-  const worthOpening = () => get(activeMap) !== null || get(projectPath) !== null;
-
   onMount(() => {
-    if (!worthOpening()) {
-      goto(resolve("/"));
-      return;
-    }
+    let cancelled = false;
+    let stop = () => {};
 
-    // And back to the loader if both go while the workspace stays mounted —
-    // closing the project, or clearing the map.
-    const stopMap = activeMap.subscribe(() => {
-      if (!worthOpening()) goto(resolve("/"));
-    });
-    const stopProject = projectPath.subscribe(() => {
-      if (!worthOpening()) goto(resolve("/"));
-    });
+    (async () => {
+      if (get(appState) === null) await appState.refresh();
+      if (cancelled) return;
+      if (!worthOpeningWorkspace(get(appState))) {
+        goto(resolve("/"));
+        return;
+      }
+      // And back to the loader if both go while the workspace stays mounted —
+      // closing the project, or clearing the map.
+      stop = appState.subscribe((state) => {
+        if (state !== null && !worthOpeningWorkspace(state)) goto(resolve("/"));
+      });
+    })();
+
     return () => {
-      stopMap();
-      stopProject();
+      cancelled = true;
+      stop();
     };
   });
 </script>

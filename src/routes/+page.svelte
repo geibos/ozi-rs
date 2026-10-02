@@ -13,7 +13,6 @@
   import { resolve } from "$app/paths";
   import {
     activeDownloadId,
-    activeMap,
     appState,
     bundleProgress,
     bundleBusy,
@@ -24,6 +23,7 @@
     projectsLoading,
   } from "../lib/stores";
   import { cancelDownload } from "../lib/api";
+  import { worthOpeningWorkspace } from "$lib/workspace-route";
   import { locale, progressText, t } from "../lib/i18n";
   import { formatBytes } from "$lib/format-bytes";
   import BundleLoader from "../components/BundleLoader.svelte";
@@ -57,7 +57,9 @@
     (async () => {
       await appState.refresh();
       if (cancelled) return;
-      if (get(activeMap)) {
+      // The same rule the workspace route keeps: a project restored without a
+      // map is a workspace too (`worthOpeningWorkspace`).
+      if (worthOpeningWorkspace(get(appState))) {
         goto(resolve("/project"));
       }
     })();
