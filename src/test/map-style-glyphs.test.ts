@@ -21,14 +21,19 @@ const mapViewSource = readFileSync(
  * `map.getGlyphs()` falsy, so `initTracksLayer` skips the symbol layer and the
  * line tiles cleanly.
  *
- * The app is offline-first and bundles no SDF glyph PBFs. Until it does, the
- * map style MUST NOT point `glyphs` at a remote URL. Re-enabling on-map labels
- * is a follow-up that bundles local glyphs and sets this deliberately.
+ * The app is offline-first. Since 2026-10-01 it ships its own SDF glyphs and
+ * the style points at them through the `glyphs://` protocol, which answers
+ * every range — an unshipped one with an empty set — so a glyph request can
+ * no longer hold a tile up. A remote URL would bring the July failure back.
  */
 describe("map style glyphs", () => {
   it("does not declare a remote glyphs URL that would poison track tiling", () => {
     // No remote font endpoint of any kind in the map style.
     expect(mapViewSource).not.toMatch(/glyphs:\s*["']https?:\/\//);
     expect(mapViewSource).not.toContain("demotiles.maplibre.org");
+  });
+
+  it("points glyphs at the application's own protocol", () => {
+    expect(mapViewSource).toMatch(/glyphs:\s*GLYPHS_URL/);
   });
 });

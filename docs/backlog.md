@@ -16,11 +16,11 @@ failed`), so it needs credentials. Owner decision (2026-09-21): credentials
   settings form (host, user, password), keychain storage, an FTP listing
   adapter behind the same interface the HTTP one implements, and a preference
   for which source to use.
-- **Transparent no-data areas on OZI rasters.** A LizaAlert satellite sheet is
+- ~~Transparent no-data areas on OZI rasters.~~ **Declined by the owner on
+  2026-10-01: rasters are drawn as they are.** A LizaAlert satellite sheet is
   cropped to the search area and the rest is filled solid black in the source
-  file, so it hides the OSM basemap underneath. OziExplorer offers colour-keyed
-  transparency for this; ozi-rs passes the pixels through unchanged. Would need
-  a per-map setting, since black is legitimate image data elsewhere.
+  file, so it hides the OSM basemap underneath; OziExplorer offers colour-keyed
+  transparency for this. Kept here so the question is not asked again.
 - ~~Shorter names for import-created track layers.~~ Already done, confirmed on
   2026-09-21: every layer-creating import path — single `.plt`, archived GPX
   tracks and archived GPX waypoints — names the layer through
@@ -199,16 +199,12 @@ defect unless it says so. Reports: `docs/reviews/2026-09-22/`.
   by the wire's snake_case name; the tile commands' `ArrayBuffer` is the one
   stated exception. It found four loose answers on the way in.
 
-- **On-map track labels wait on bundled glyphs, and now they are worth it.**
-  `tracks-layer.ts` adds its label layer only when the style has glyphs, which
-  a raster basemap does not: the basemap's own names are baked into the tiles.
-  With a day's twenty routes drawn in twenty colours, the missing half is which
-  colour is whose without going back to the list. The cost is real and is why
-  it has not been done: SDF glyph PBFs for at least Cyrillic and Latin ranges,
-  generated with fontnik or similar, checked into the repository as binary
-  assets, with a font whose licence allows it — and `style.glyphs` pointing at
-  them so it works with no network, which is the whole point. That is a repo-
-  size decision as much as a code one.
+- ~~On-map track labels wait on bundled glyphs.~~ Done on 2026-10-02 in
+  `names-along-the-route`, after the owner decided on 2026-10-01 to bundle
+  open-source glyphs: Noto Sans Bold under the OFL, about 510 KB of ranges in
+  `static/glyphs/`, served by a `glyphs://` protocol that answers an unshipped
+  range with an empty set. The names are a symbol layer along the line now,
+  and the DOM labels are gone.
 
 - **A grid child can grow its own column.** `.canvas-column` had
   `grid-template-rows` and no `grid-template-columns`, so the implicit column

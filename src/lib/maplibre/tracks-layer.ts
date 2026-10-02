@@ -1,9 +1,14 @@
 import type maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap } from "maplibre-gl";
+import { LABEL_FONT } from "./glyphs-protocol";
 
 const TRACKS_SOURCE = "tracks";
 const TRACKS_LAYER = "tracks-lines";
+/** One feature per named track, built by `trackLabelFeatures`. */
+const TRACK_LABELS_SOURCE = "track-labels";
 const TRACKS_LAYER_LABELS = "tracks-labels";
+/** Below this the whole district is on screen and names are a smear. */
+const LABEL_MIN_ZOOM = 10;
 /** The casing drawn under the selected track. */
 export const TRACKS_LAYER_SELECTED = "tracks-line-selected";
 
@@ -21,10 +26,7 @@ export function initTracksLayer(map: MapLibreMap) {
   });
 
   // Under the coloured line, not over it: the selected track has to stand out
-  // from the other eleven while keeping the colour that says whose it is. A
-  // day of recordings carries no names on the map — on-map labels need SDF
-  // glyphs nobody has bundled — so this is how a row in the list and a route
-  // on the map are connected.
+  // from the other eleven while keeping the colour that says whose it is.
   map.addLayer({
     id: TRACKS_LAYER_SELECTED,
     type: "line",
@@ -54,42 +56,62 @@ export function initTracksLayer(map: MapLibreMap) {
     },
   });
 
-  // The on-map name labels are a SYMBOL layer, which MapLibre refuses to add
-  // unless the style declares a `glyphs` URL — otherwise `addLayer` THROWS
-  // "use of text-field requires a style glyphs property". The app's style has
-  // no glyphs (no SDF fonts are bundled yet), so adding this unconditionally
-  // aborted `initTracksLayer` and the track line never got wired up — tracks
-  // were invisible while their point markers (DOM) still showed. Add the
-  // label layer only when glyphs exist, and never let its failure take the
-  // line down with it.
+  // The names are a SYMBOL layer, which MapLibre refuses to add unless the
+  // style declares a `glyphs` URL — `addLayer` THROWS "use of text-field
+  // requires a style glyphs property". The style has carried the shipped
+  // glyphs since 2026-10-01, but a style without them must still get its
+  // lines: in July this throw aborted `initTracksLayer` and every track was
+  // invisible while its point markers showed.
   //
-  // Since 2026-09-23 the names on the map do not come from here at all: they
-  // are DOM markers, placed and decluttered by `$lib/track-labels`, which
-  // needs no glyphs and therefore no font licence and no megabytes in the
-  // repository. This layer stays because it costs nothing when there are no
-  // glyphs and would be the better renderer if any are ever bundled — a
-  // symbol layer collides and fades text the way a map should.
+  // Their own source, not the lines': the label geometry is simplified harder
+  // (`tolerance`), because text follows a smoothed line far better than a GPS
+  // trace that zigzags a metre either way, and the drawn line must not lose
+  // a point for the sake of the text.
   if (!map.getGlyphs?.()) return;
   try {
+    map.addSource(TRACK_LABELS_SOURCE, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+      tolerance: 2,
+    });
     map.addLayer({
       id: TRACKS_LAYER_LABELS,
       type: "symbol",
-      source: TRACKS_SOURCE,
-      filter: ["==", ["get", "visible"], true],
+      source: TRACK_LABELS_SOURCE,
+      minzoom: LABEL_MIN_ZOOM,
       layout: {
-        "symbol-placement": "line-center",
+        // Along the line and repeated, so whatever stretch of a long route is
+        // on screen carries its name — one name at the middle is off screen
+        // as soon as the operator zooms in on one end.
+        "symbol-placement": "line",
+        "symbol-spacing": 320,
+        "symbol-sort-key": ["get", "sort_key"],
         "text-field": ["get", "name"],
-        "text-size": 11,
-        "text-font": ["Open Sans Regular"],
+        "text-font": [LABEL_FONT],
+        "text-size": 12,
+        "text-letter-spacing": 0.02,
+        "text-max-angle": 35,
+        "text-keep-upright": true,
+        // Beside the line rather than on it. Laid over the line, the text
+        // hides the stretch it names, and the line shows through between the
+        // letters — `_` read as `•` on the first look at the stand.
+        "text-offset": [0, -0.9],
+        "text-padding": 4,
       },
       paint: {
         "text-color": ["get", "color"],
-        "text-halo-color": "rgba(0,0,0,0.6)",
-        "text-halo-width": 1.5,
+        // A white halo, not a dark one. The names are drawn in the track's
+        // own colour — saturated red, blue, teal — over a topographic map
+        // that is mostly pale green and grey. A dark halo under a saturated
+        // hue turns it muddy; white separates the letters from the map the
+        // way a printed map does.
+        "text-halo-color": "rgba(255,255,255,0.95)",
+        "text-halo-width": 1.6,
+        "text-halo-blur": 0.4,
       },
     });
   } catch (error) {
-    console.warn("track labels unavailable (no glyphs):", error);
+    console.warn("track labels unavailable:", error);
   }
 }
 
@@ -103,6 +125,17 @@ export function updateTracksLayer(
   if (source) {
     source.setData(geojson);
   }
+}
+
+/** Hand the symbol layer the names to write; see `trackLabelFeatures`. */
+export function updateTrackLabels(
+  map: MapLibreMap,
+  labels: GeoJSON.FeatureCollection,
+) {
+  const source = map.getSource(TRACK_LABELS_SOURCE) as
+    | maplibregl.GeoJSONSource
+    | undefined;
+  source?.setData(labels);
 }
 
 /**

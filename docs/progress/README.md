@@ -10,6 +10,32 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-10-02 — names along the route
+
+Before: [one name per track, a DOM marker at the middle](2026-09-23-track-names/name-on-the-track.png).
+After:
+
+![the name written twice along the route](2026-10-02-names-along-the-route/after-along-the-line.png)
+
+The owner decided on 2026-10-01 to bundle open-source glyphs, so the map now
+writes track names itself: Noto Sans Bold (SIL OFL 1.1), half a megabyte of
+Latin, Cyrillic, punctuation and `№`, served through a `glyphs://` protocol
+that answers every range — an unshipped one with an empty set, so a stray
+character can never hold a tile up the way the remote glyphs URL did in July.
+
+The name runs beside the line and repeats along it, so the stretch on screen
+carries it however far the operator has zoomed in; the single DOM label sat at
+the middle of the route and left the ends unnamed. The first look at the stand
+put the text on the line itself, and the red line showing through between the
+letters turned `_` into `•`. It sits beside the line now.
+
+The stand's project has one visible track, so the collision between two names
+is not in this picture: who keeps the room — the selected track, then the one
+walked furthest — is pinned by unit tests, and the collision itself is
+MapLibre's.
+
+---
+
 ## 2026-09-22 — verification, and fifty-five changes archived
 
 ![the map-ready announcement](2026-09-22-verification/map-ready-announcement.png)

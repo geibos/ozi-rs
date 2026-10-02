@@ -51,6 +51,71 @@ describe("initTracksLayer", () => {
 });
 
 /**
+ * Names along the line, since the glyphs ship with the application.
+ *
+ * One name at the middle of a route is off screen as soon as the operator
+ * zooms in on one end of it; written along the line and repeated, whatever
+ * stretch is on screen carries it.
+ */
+describe("the names on the map", () => {
+  function recordingMap() {
+    const layers: Array<Record<string, unknown>> = [];
+    const sources: Record<string, { setData: ReturnType<typeof vi.fn> }> = {};
+    return {
+      layers,
+      sources,
+      addSource: (id: string) => {
+        sources[id] = { setData: vi.fn() };
+      },
+      getSource: (id: string) => sources[id],
+      getGlyphs: () => "glyphs://{fontstack}/{range}.pbf",
+      addLayer: (layer: Record<string, unknown>) => layers.push(layer),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  }
+
+  it("writes them along the line, repeated, in the font that ships", async () => {
+    const { initTracksLayer: init } = await import(
+      "../lib/maplibre/tracks-layer"
+    );
+    const { LABEL_FONT } = await import("../lib/maplibre/glyphs-protocol");
+    const map = recordingMap();
+    init(map);
+    const labels = map.layers.find(
+      (l: Record<string, unknown>) => l.id === "tracks-labels",
+    );
+    expect(labels).toBeDefined();
+    const layout = labels.layout as Record<string, unknown>;
+    expect(layout["symbol-placement"]).toBe("line");
+    expect(layout["text-font"]).toEqual([LABEL_FONT]);
+    expect(layout["symbol-sort-key"]).toEqual(["get", "sort_key"]);
+    // Below this a whole district is on screen and names are a smear.
+    expect(labels.minzoom).toBe(10);
+  });
+
+  it("feeds them from their own source, not from the lines'", async () => {
+    const { initTracksLayer: init, updateTrackLabels } = await import(
+      "../lib/maplibre/tracks-layer"
+    );
+    const map = recordingMap();
+    init(map);
+    const labels = map.layers.find(
+      (l: Record<string, unknown>) => l.id === "tracks-labels",
+    );
+    expect(labels.source).not.toBe("tracks");
+
+    const data: GeoJSON.FeatureCollection = {
+      type: "FeatureCollection",
+      features: [],
+    };
+    updateTrackLabels(map, data);
+    expect(map.sources[labels.source as string].setData).toHaveBeenCalledWith(
+      data,
+    );
+  });
+});
+
+/**
  * Twelve crews' routes drawn in twelve colours still leave the question "which
  * line is ЛИСА15" — the map carries no names, because on-map labels need SDF
  * glyphs nobody has bundled yet (see `docs/backlog.md`).

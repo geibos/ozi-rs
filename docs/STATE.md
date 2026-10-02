@@ -5,6 +5,36 @@ what an agent or a returning human needs to pick the work up.
 
 ## Where we are
 
+**2026-10-01: the owner answered the questions this page was waiting on**, and
+the run that followed works through them. The decisions, with what became of
+each:
+
+- **Bundle open-source glyphs** — done: `names-along-the-route` (below).
+- **A project is one search.** «Новый поиск» already existed (2026-09-23,
+  `a-new-search`). Still to do: choosing a *different* search in the catalogue
+  while a project is open starts a new project, asking about unsaved work the
+  way the close guard does.
+- **Moving time and ascent/descent**: a stop is moving less than 25 m in two
+  minutes, a climb counts only past 5 m of rise; both thresholds are settings.
+  Not done yet.
+- **No transparent no-data on OZI rasters** — rasters are drawn as they are.
+  Recorded in `docs/backlog.md`.
+- **The theme picker's place is ours to choose**: a Settings screen, which the
+  FTP accounts and the thresholds need anyway; the palette keeps its entries.
+- **FTP: credentials and hosts.** Bundles come from one account; results go to
+  up to four endpoints, each with its own account. Passwords in the keychain.
+- **Commit and push after every green slice**, for this run.
+
+**Track names run along the route** (`names-along-the-route`, 2026-10-02).
+Noto Sans Bold SDF glyphs ship in `static/glyphs/` (OFL, ~510 KB) and reach the
+map through a `glyphs://` protocol that answers every range, an unshipped one
+with an empty set — so a stray character cannot hold a tile up, which is how a
+remote glyphs URL took the lines off the map in July. The names are a symbol
+layer beside the line, repeated along it, so a long route is named on whatever
+stretch is on screen; the single DOM label at the middle and its hand-written
+declutter are gone. Walked on the stand; the desktop smoke is owed at the end
+of the run.
+
 **One OpenSpec change is open.** `a-folder-for-one-moment` was archived on
 2026-09-23, the day the owner asked for it, after the walk in the packaged
 application found and closed a real defect in it. `finish-the-rebuild` carries the three pieces of the
@@ -313,56 +343,19 @@ the owner decisions listed below. None of it is visible to an operator.
 
 ### Blocked on the owner
 
-1. **Review and archive `codify-architecture-decisions`.** Fifty-five of the
-   fifty-seven changes were archived on 2026-09-22; this one is left because
-   its task 3.1 is the owner reading the proposal, the coverage table, the
-   three new capabilities and their Purpose texts before 63 requirements enter
-   the baseline. Its task 2.3 — walking each of those 63 against its cited
-   evidence — is unfinished, and an agent can do it.
+Answered on 2026-10-01 — see the top of this page. Two remain:
 
-   The batch confirmed why that reading matters. The four "ADDED against a
-   baseline that says the opposite" cases the backlog warned about had been
-   fixed to MODIFIED except one, and it was in this change: it codified
-   `.part` naming as replacing the extension, which is the exact data-loss
-   defect fixed the same day. The wording is corrected now, but
-   `openspec validate --strict` never saw it — it checks a change's shape, not
-   whether it disagrees with the baseline or with the code.
-
-2. **Decisions the code is waiting on**, each with its reasoning in
-   `docs/backlog.md`:
-   - the stop threshold for moving time, and the same question for ascent and
-     descent — one decision covers both;
-   - whether OZI rasters should key their no-data black to transparent, and per
-     map or globally;
-   - the catalogue's row and badge sizes;
-   - where the theme picker goes, since `ui-shell` requires one and
-     `ThemePicker.svelte` is imported by nothing;
-   - whether a WPT name should carry `&#NNNN;` or `?` for a character cp1251
-     cannot hold — needs someone with OziExplorer in front of them;
-   - **is there such a thing as a new project?** Nothing creates an empty one,
-     so a crew finishing one search and starting another keeps adding to the
-     same project. Whether that is wrong depends on whether a project is a
-     search or a machine's working set;
-   - **bundled map glyphs**, which is the price of putting track names on the
-     map: SDF PBFs for Cyrillic and Latin, checked in as binary assets, with a
-     licence that allows it. A repository-size decision as much as a code one,
-     and with a day's routes now drawn in twelve colours it is the largest
-     remaining readability gap.
-3. **FTP**, when the owner is ready: credentials from a settings form into the
-   macOS keychain, an FTP listing adapter behind the interface the HTTP one
-   implements, and a source preference. Track upload stands on the GPX and PLT
-   round trips, both pinned, and on the day's export, which now carries the
-   waypoints with the tracks.
+- the catalogue's row and badge sizes;
+- whether a WPT name should carry `&#NNNN;` or `?` for a character cp1251
+  cannot hold — needs someone with OziExplorer in front of them.
 
 ### An agent can still do these
 
-4. **Walk the forty-five changes carrying an unchecked "smoke green" task.**
-   The gate runs again, so the box can be ticked — but ticking it honestly
-   means running the journey each change touched, not the one core journey.
-   `smoke_core_workflow` covers CJ-4's editing spine and nothing else; the
-   import, the bundle download, the export and the session restore have no
-   packaged-app coverage at all. That gap is the reason two of today's three
-   smoke runs failed on wording: nothing else was exercising those labels.
+4. **Packaged-app coverage beyond CJ-4.** The forty-five changes that carried
+   an unchecked "smoke green" task are archived, but the gap they pointed at
+   is not closed: `smoke_core_workflow` covers CJ-4's editing spine and
+   nothing else; the import, the bundle download, the export and the session
+   restore have no packaged-app coverage at all. `finish-the-rebuild` group 3.
 
 5. **MapLibre 4 → 6**, which clears the waived critical advisory. The gate is
    back, so the reason to defer it is now only its size: the map is the
