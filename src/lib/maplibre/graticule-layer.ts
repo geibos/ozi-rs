@@ -9,7 +9,7 @@
  * The grid sits under everything a coordinator draws: it is the paper, not the
  * work.
  */
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import { graticule, graticuleGeoJson, type GridLine } from "$lib/graticule";
 
 const SOURCE_ID = "graticule";

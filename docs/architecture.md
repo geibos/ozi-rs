@@ -4,10 +4,10 @@
 
 ## Overview
 
-The system is organized around a small, explicit core that keeps domain rules independent from UI concerns. The UI is a Tauri 2 desktop app with a Svelte 5 frontend and MapLibre GL 4 for map rendering.
+The system is organized around a small, explicit core that keeps domain rules independent from UI concerns. The UI is a Tauri 2 desktop app with a Svelte 5 frontend and MapLibre GL 6 for map rendering.
 
 ```
-UI (Svelte 5 + MapLibre GL 4)
+UI (Svelte 5 + MapLibre GL 6)
   ↕ Tauri IPC (invoke / events)
 Commands layer  ── Tauri #[command] handlers, thin wrappers
 Application     ── AppState, ProjectCommand enum, delta-based undo/redo
@@ -71,7 +71,7 @@ Constraints:
 ### UI (Svelte + MapLibre)
 
 Owns:
-- Map rendering via MapLibre GL 4 with custom tile protocols
+- Map rendering via MapLibre GL 6 with custom tile protocols
 - Svelte 5 components: `WorkspaceShell` with Library rail (Maps/Tracks/Waypoints tabs) and Inspector rail, Cmd-K command palette, bundle loader, pickers
 - Interaction modes: drawing, editing, waypoint placement
 - Svelte stores for reactive state management

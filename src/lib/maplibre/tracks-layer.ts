@@ -1,4 +1,4 @@
-import type maplibregl from "maplibre-gl";
+import type * as maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { LABEL_FONT } from "./glyphs-protocol";
 

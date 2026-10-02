@@ -9,7 +9,7 @@
 | Desktop shell | Tauri 2 |
 | UI framework | Svelte 5 + SvelteKit (`adapter-static`) |
 | UI kit | shadcn-svelte primitives (`src/lib/components/ui/`) over bits-ui |
-| Map rendering | MapLibre GL 4 |
+| Map rendering | MapLibre GL 6 |
 | Theming | Catppuccin palette + semantic-token layer; Tailwind 4 utilities |
 | Toasts / tooltips | `svelte-sonner`, bits-ui Tooltip — both hosted globally in `routes/+layout.svelte` |
 | Build | Vite 6 |

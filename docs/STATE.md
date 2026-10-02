@@ -367,16 +367,15 @@ Answered on 2026-10-01 — see the top of this page. Two remain:
    nothing else; the import, the bundle download, the export and the session
    restore have no packaged-app coverage at all. `finish-the-rebuild` group 3.
 
-5. **MapLibre 4 → 6**, which clears the waived critical advisory. The gate is
-   back, so the reason to defer it is now only its size: the map is the
-   product, MapLibre 5 and 6 change the style spec and the marker API, and the
-   stand stubs its tiles. The advisory covers `<=6.4.0`, so 6.4.1 is the first
-   release without it — `npm audit` names 6.10.0 because that is the latest,
-   not the earliest fix — and there is no 4.x or 5.x backport either way.
-   `package.json` asks for `^4`; `package-lock.json` resolves 4.7.1. The
-   waiver's premise is enforced by `src/test/maplibre-waiver.test.ts`, which
-   since 2026-09-22 also covers `attribution`, the sink the advisory is
-   actually about.
+5. ~~MapLibre 4 → 6.~~ Done on 2026-10-02: 6.11.2, the waiver gone with the
+   advisory. Two things the upgrade needed that the changelog does not say
+   in so many words: 6.x has no default export (`import * as maplibregl`),
+   and it finds its worker from its own `import.meta.url`, which after
+   bundling is a chunk and in the packaged app is `tauri://` — so the worker
+   is bundled by Vite (`?worker&url`, `worker.format: "es"`) and handed over
+   with `setWorkerUrl` (`src/lib/maplibre/worker.ts`). Walked on the stand;
+   the packaged app is the open question — whether WKWebView starts a module
+   worker from `tauri://` — and the desktop smoke answers it.
 6. ~~`get_ozi_tile` is dead IPC surface.~~ Removed on 2026-10-02
    (`one-raster-tile-command`); the tile requirement names the two tile
    commands that exist.
@@ -484,9 +483,8 @@ test-without-building` reports `** TEST BUILD SUCCEEDED **` and WebDriverAgent
   `cargo run -p ozi-rs-mcp --`, as `opencode.json` already did). Until
   2026-09-21 it ran a binary compiled in May, so July's fixes never reached
   agent sessions. The change takes effect in the next session.
-- **MapLibre carries a critical advisory** (`GHSA-jrc7-96c5-q579`) whose fix is
-  two major versions ahead. Waived with a reason in
-  `scripts/npm-audit-gate.mjs`; the upgrade needs its own slice.
+- ~~MapLibre carries a critical advisory.~~ Upgraded to 6.11.2 on
+  2026-10-02; the waiver is gone.
 - ~~Human-facing docs still lie in places.~~ Fixed on 2026-09-21 (task 2.6 of
   `codify-architecture-decisions`), each claim checked against the code first.
 - ~~`ThemePicker.svelte` is imported nowhere.~~ On the settings screen since

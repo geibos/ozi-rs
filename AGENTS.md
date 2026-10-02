@@ -23,7 +23,7 @@ For maximum context in every new session:
 
 **ozi-rs** is a Tauri 2 desktop application for [LizaAlert](https://lizaalert.org) search-and-rescue volunteers — an offline-first map editor replacing OziExplorer. We don't need all OziExplorer features, only those actually used by SAR volunteers.
 
-**Stack:** Rust backend (Tauri 2) + Svelte 5 + MapLibre GL 4 frontend.
+**Stack:** Rust backend (Tauri 2) + Svelte 5 + MapLibre GL 6 frontend.
 
 ## Behavioral changes via OpenSpec
 
@@ -70,7 +70,7 @@ GitHub Actions runs the same `just` recipes on every PR / push to `main`. See `d
 Four strict layers (details in `docs/architecture.md`):
 
 ```
-UI (Svelte 5 + MapLibre GL 4)
+UI (Svelte 5 + MapLibre GL 6)
   ↕ Tauri IPC (invoke / events)
 Commands layer  ── Tauri #[command] handlers, thin wrappers only
 Application     ── AppState, ProjectCommand enum, delta-based undo/redo

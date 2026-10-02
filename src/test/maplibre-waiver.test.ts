@@ -29,8 +29,9 @@ import { join } from "path";
  * than leaving a critical advisory waived on grounds that have quietly stopped
  * being true.
  *
- * When the upgrade past 6.4.0 lands, this test can go — or better, stay,
- * because the sink is a bad idea regardless of who has patched it.
+ * The upgrade past 6.4.0 landed on 2026-10-02 (6.11.2) and the waiver went
+ * with it. This test stays, because the sink is a bad idea regardless of who
+ * has patched it.
  */
 const ROOTS = ["src"];
 

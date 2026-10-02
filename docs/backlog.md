@@ -267,10 +267,7 @@ defect unless it says so. Reports: `docs/reviews/2026-09-22/`.
   track the map cannot draw. The map's features are shaped for drawing. A list
   wants its own command, typed, carrying only what a row shows.
 
-- **MapLibre 4 → 6.** Carries a critical advisory (`GHSA-jrc7-96c5-q579`) whose
-  fix is two majors ahead. The affected sink is not called here (popups use
-  `setText`, no `innerHTML`), so it is waived in `scripts/npm-audit-gate.mjs`.
-  The upgrade needs its own slice with visual verification.
+- ~~MapLibre 4 → 6.~~ Done on 2026-10-02 (6.11.2); see `docs/STATE.md`.
 - ~~Retries and timeouts on bundle downloads.~~ Done: timeouts in slice 0.3,
   retries on 2026-09-21 in `one-flaky-file-is-not-the-bundle` — three attempts
   per file, never for a cancellation, and the retry is reported. The retry resumes with a

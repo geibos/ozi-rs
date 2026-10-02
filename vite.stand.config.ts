@@ -22,6 +22,10 @@ const stand = (name: string) =>
 
 export default defineConfig({
   plugins: [tailwindcss(), sveltekit()],
+  // MapLibre 6's worker is an ES module that imports a shared chunk
+  // (`src/lib/maplibre/worker.ts`). Served or bundled as a classic worker it
+  // dies on its first `import`.
+  worker: { format: "es" },
   clearScreen: false,
   resolve: {
     alias: [

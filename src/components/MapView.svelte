@@ -7,7 +7,7 @@
   // follow-up change.
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import maplibregl from "maplibre-gl";
+  import * as maplibregl from "maplibre-gl";
   import "maplibre-gl/dist/maplibre-gl.css";
   import {
     appState,
@@ -73,6 +73,7 @@
     GLYPHS_URL,
     registerGlyphsProtocol,
   } from "../lib/maplibre/glyphs-protocol";
+  import { configureMapLibreWorker } from "../lib/maplibre/worker";
   import { createLatestRun } from "$lib/latest-run";
   import { mayReachNetworkNow } from "$lib/network-reach";
   import { reportEditFailure } from "$lib/edit-failure";
@@ -1019,6 +1020,7 @@
   }
 
   onMount(() => {
+    configureMapLibreWorker();
     registerSqliteProtocol();
     registerOziProtocol();
     registerGlyphsProtocol();

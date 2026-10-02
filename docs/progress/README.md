@@ -10,6 +10,19 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-10-02 — MapLibre 6
+
+![the same map, drawn by MapLibre 6.11.2](2026-10-02-maplibre-6/same-map-on-6.png)
+
+Nothing to see, which is the point: the line, the names along it, the markers
+and the grid as they were on 4.7.1. The upgrade clears the critical advisory
+(`GHSA-jrc7-96c5-q579`) that had been waived since September. The first look
+at the stand was a console error and no map: 6.x finds its worker from its own
+`import.meta.url`, and served or bundled that points nowhere — so the worker is
+bundled by Vite and handed to MapLibre with `setWorkerUrl`.
+
+---
+
 ## 2026-10-02 — FTP accounts
 
 ![the FTP section of the settings screen](2026-10-02-ftp-accounts/ftp-accounts.png)

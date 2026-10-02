@@ -22,34 +22,16 @@ import { execFileSync } from "node:child_process";
 
 const FAIL_LEVELS = new Set(["high", "critical"]);
 
-const ALLOWED = [
-  {
-    id: "GHSA-jrc7-96c5-q579",
-    package: "maplibre-gl",
-    reason:
-      "XSS sanitizer bypass in DOM.sanitize(), reachable through setHTML(), " +
-      "markers built from HTML strings and custom attribution HTML. ozi-rs " +
-      "renders popups with Popup.setText() and sets marker content with " +
-      "textContent, so the affected sink is never called. Re-checked against " +
-      "the code on 2026-09-22, after a day of map changes (waypoint glyphs " +
-      "and colours, the measuring layer): still true, and now enforced by " +
-      "src/test/maplibre-waiver.test.ts, which fails on setHTML, innerHTML " +
-      "or customAttribution anywhere in src/ — a waiver whose premise is only " +
-      "a promise decays the first time someone writes the call without " +
-      "reading this file. " +
-      "Fix availability, checked 2026-09-22 with `npm audit --json`: the " +
-      "advisory covers <=6.4.0, so the first version without it is 6.4.1; " +
-      "`fixAvailable` names 6.10.0 because that is the latest, not because " +
-      "it is the earliest fix. Either way there is no 4.x or 5.x backport. " +
-      "package.json asks for `^4` and package-lock.json resolves it to " +
-      "4.7.1, and no 4.x release carries the fix, so the only route out is " +
-      "a two-major upgrade — its own slice, with visual verification, " +
-      "because MapLibre 5 and 6 change the style spec and the marker API.",
-    recheck:
-      "When the MapLibre 6 upgrade slice lands. The code-side premise no " +
-      "longer needs a human recheck: the test above fails instead.",
-  },
-];
+/**
+ * Advisories waived, each with the reason and when to look again.
+ *
+ * Empty since 2026-10-02: the one waiver, GHSA-jrc7-96c5-q579 in maplibre-gl,
+ * went with the upgrade to MapLibre 6.11 (the advisory covers <=6.4.0). The
+ * premise it rested on — no `setHTML`, no HTML attribution — is still
+ * enforced by src/test/maplibre-waiver.test.ts, because the sink is a bad
+ * idea whoever has patched it.
+ */
+const ALLOWED = [];
 
 function runAudit() {
   try {
