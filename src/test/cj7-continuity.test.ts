@@ -98,8 +98,13 @@ describe("CJ-7 window close guard (+layout.svelte)", () => {
 
   it("does not quit when the save did not land", () => {
     // Quitting after a failed save, or after a save-as the operator cancelled,
-    // loses the work just as surely as quitting without saving.
-    expect(layoutSource).toContain("if (get(projectDirty)) return;");
+    // loses the work just as surely as quitting without saving. `quickSave`
+    // answers whether the file was written (behaviour pinned in
+    // `another-search-another-project.test.ts`); reading `projectDirty` back
+    // instead raced the `state-changed` refresh.
+    expect(layoutSource).toContain(
+      'if (choice === "save" && !(await quickSave())) return;',
+    );
   });
 
   it("has the capability grants the guard needs at runtime", () => {
@@ -173,9 +178,7 @@ describe("CJ-7 shared project actions (src/lib/actions/project.ts)", () => {
     expect(actionsSource).toContain("get(projectPath)");
     expect(actionsSource).toContain("await saveProject(path);");
     // The dialog is confined to the never-saved fallback (saveAs).
-    expect(actionsSource).toMatch(
-      /if \(path === null\) \{\s*await saveAs\(\);/,
-    );
+    expect(actionsSource).toMatch(/if \(path === null\) return saveAs\(\);/);
   });
 
   it("toasts localized success and failure messages", () => {

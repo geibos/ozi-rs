@@ -103,6 +103,11 @@ const dictionaries = {
     "closeGuard.saveAndQuit": "Save and quit",
     "closeGuard.quit": "Quit without saving",
     "closeGuard.cancel": "Cancel",
+    "closeGuard.newSearchMessage":
+      "The project has unsaved changes. Save them before opening another search?",
+    "closeGuard.saveAndContinue": "Save and continue",
+    "closeGuard.continueWithoutSaving": "Continue without saving",
+    "newSearch.started": "New project for «{name}»",
     "trackInspector.simplify": "Simplify",
     "trackInspector.sortByTime": "Sort points by time",
     "trackInspector.sortDone": "Points sorted by time",
@@ -560,6 +565,11 @@ const dictionaries = {
     "closeGuard.saveAndQuit": "Сохранить и выйти",
     "closeGuard.quit": "Выйти без сохранения",
     "closeGuard.cancel": "Отмена",
+    "closeGuard.newSearchMessage":
+      "В проекте есть несохранённые изменения. Сохранить их, прежде чем открыть другой поиск?",
+    "closeGuard.saveAndContinue": "Сохранить и продолжить",
+    "closeGuard.continueWithoutSaving": "Продолжить без сохранения",
+    "newSearch.started": "Новый проект для поиска «{name}»",
     "trackInspector.simplify": "Упростить",
     "trackInspector.sortByTime": "Сортировать точки по времени",
     "trackInspector.sortDone": "Точки отсортированы по времени",

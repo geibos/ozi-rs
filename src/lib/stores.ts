@@ -196,10 +196,22 @@ let closeGuardResolve: ((choice: CloseGuardChoice) => void) | null = null;
 
 export type CloseGuardChoice = "save" | "discard" | "stay";
 
-export function askBeforeClosing(): Promise<CloseGuardChoice> {
+/**
+ * What the unsaved work is being left for: the window closing, or the next
+ * search opening from the catalogue. The three answers are the same; the
+ * words on them are not, and «Выйти» on a dialog that is not quitting would
+ * be a lie at the one moment the operator is reading carefully.
+ */
+export type CloseGuardPurpose = "close" | "newSearch";
+export const closeGuardPurpose = writable<CloseGuardPurpose>("close");
+
+export function askBeforeClosing(
+  purpose: CloseGuardPurpose = "close",
+): Promise<CloseGuardChoice> {
   // A second request while one is open answers the first with "stay": two
   // dialogs over one window is worse than one question asked again.
   if (closeGuardResolve) closeGuardResolve("stay");
+  closeGuardPurpose.set(purpose);
   closeGuardOpen.set(true);
   return new Promise<CloseGuardChoice>((resolve) => {
     closeGuardResolve = resolve;

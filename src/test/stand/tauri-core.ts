@@ -316,6 +316,15 @@ function importOneLayer(label: string, trackCount: number): string {
 
 let previewedSlug: string | null = null;
 
+/**
+ * The map this session opened, as the backend's `active_map` would carry it.
+ *
+ * `open_selected_map` used to leave the fixture's active map in place, so the
+ * stand said the ground was Lavrovo whatever search a map was opened from —
+ * and a project that makes way for the next search reads exactly that.
+ */
+let standActiveMap: AppStateDto["active_map"] = null;
+
 /** Waypoints this stand session has placed, appended to the fixture's. */
 const placedWaypoints: WaypointDto[] = [];
 
@@ -548,6 +557,7 @@ function previewedAppState(): AppStateDto {
       ),
     };
   }
+  if (standActiveMap !== null) base = { ...base, active_map: standActiveMap };
   if (previewedSlug === null) return base;
   // The whole project, with its slug moved: the loader matches on the slug, so
   // a partial object here would have been a project with nothing in it.
@@ -559,9 +569,16 @@ function previewedAppState(): AppStateDto {
   // screen the journey is about. Found walking CJ-1, 2026-09-23.
   const project = base.current_project ?? appStateFixture.current_project;
   if (!project) return base;
+  // The name moves with the slug. The backend's `selected_project` is the
+  // previewed search itself, and a stand that kept the fixture's name said
+  // every search was Lavrovo — which hid whether choosing another search did
+  // anything at all. Found on 2026-10-02.
+  const name =
+    catalogueFixture.find((entry) => entry.slug === previewedSlug)?.name ??
+    project.name;
   return {
     ...base,
-    current_project: { ...project, slug: previewedSlug },
+    current_project: { ...project, slug: previewedSlug, name },
   };
 }
 
@@ -776,6 +793,15 @@ const HANDLERS: StandAnswers = {
       // start could not reach the map at all. Found walking a whole session
       // end to end, 2026-09-23.
       standWorkspaceOpened = true;
+      const fixtureMap = appStateFixture.active_map;
+      const search = previewedAppState().current_project;
+      if (fixtureMap && search) {
+        standActiveMap = {
+          ...fixtureMap,
+          project_name: search.name,
+          package_name: mapName,
+        };
+      }
       standEmit("state-changed", undefined);
       return "";
     }

@@ -11,9 +11,11 @@ each:
 
 - **Bundle open-source glyphs** — done: `names-along-the-route` (below).
 - **A project is one search.** «Новый поиск» already existed (2026-09-23,
-  `a-new-search`). Still to do: choosing a *different* search in the catalogue
-  while a project is open starts a new project, asking about unsaved work the
-  way the close guard does.
+  `a-new-search`). Done on 2026-10-02 (`another-search-another-project`):
+  opening a map of another search over a project with work in it starts a new
+  project; unsaved work gets the close guard's three answers first, saved work
+  needs none. The close guard's dialog was 312px wide and its Russian answers
+  ran past it — widened.
 - **Moving time and ascent/descent**: a stop is moving less than 25 m in two
   minutes, a climb counts only past 5 m of rise; both thresholds are settings.
   Not done yet.

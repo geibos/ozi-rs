@@ -10,6 +10,27 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-10-02 — another search, another project
+
+![the question before the next search opens](2026-10-02-another-search/asks-about-unsaved-work.png)
+![the next search's map over an empty project](2026-10-02-another-search/after-new-project.png)
+
+A project is one search (owner, 2026-10-01), and the catalogue is where a crew
+moves to the next one. Opening a map of another search over a project that
+holds the previous one's work now starts a new project first, and the toast
+names the search: «Новый проект для поиска «2026 07 14 Sagra»». Saved work is
+not asked about — the file holds it; unsaved work gets the close guard's three
+answers, worded for this question. «Отмена» opens nothing.
+
+Two things were wrong before this could be looked at. The stand said every
+search was Lavrovo: it moved the previewed slug and kept the fixture's name, so
+"is this another search" could not be answered on it at all. And the close
+guard's dialog was 312px wide — the root font is 13px — so three Russian
+answers ran past its own background, text and all. It had been doing that on
+every quit.
+
+---
+
 ## 2026-10-02 — names along the route
 
 Before: [one name per track, a DOM marker at the middle](2026-09-23-track-names/name-on-the-track.png).

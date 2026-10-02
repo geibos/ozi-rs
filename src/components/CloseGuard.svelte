@@ -17,7 +17,16 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { buttonVariants } from "$lib/components/ui/button";
   import { t } from "$lib/i18n";
-  import { closeGuardOpen, resolveCloseGuard } from "$lib/stores";
+  import {
+    closeGuardOpen,
+    closeGuardPurpose,
+    resolveCloseGuard,
+  } from "$lib/stores";
+
+  // The same three answers for leaving the window and for leaving a search
+  // for the next one; the words have to say which, or "Выйти без сохранения"
+  // would stand on a dialog that does not quit anything.
+  const leavingSearch = $derived($closeGuardPurpose === "newSearch");
 
   let busy = $state(false);
 
@@ -37,26 +46,33 @@
     if (!open && $closeGuardOpen) void answer("stay");
   }}
 >
-  <Dialog.Content data-testid="close-guard">
+  <!-- Wider than the stock `max-w-sm`, and the buttons allowed to wrap. The
+       root font is 13px, so `sm` is 312px here; three Russian answers need
+       about 444, and with `nowrap` buttons the grid grew past its own
+       background, text and all. Seen on the stand on 2026-10-02 with the
+       next-search wording, whose labels are the longest. -->
+  <Dialog.Content data-testid="close-guard" class="sm:max-w-xl">
     <Dialog.Header>
       <Dialog.Title>{$t("closeGuard.title")}</Dialog.Title>
-      <Dialog.Description>{$t("closeGuard.message")}</Dialog.Description>
+      <Dialog.Description>
+        {$t(leavingSearch ? "closeGuard.newSearchMessage" : "closeGuard.message")}
+      </Dialog.Description>
     </Dialog.Header>
-    <Dialog.Footer>
+    <Dialog.Footer class="sm:flex-wrap">
       <button
         class={buttonVariants({ variant: "default" })}
         data-testid="close-guard-save"
         disabled={busy}
         onclick={() => void answer("save")}
       >
-        {$t("closeGuard.saveAndQuit")}
+        {$t(leavingSearch ? "closeGuard.saveAndContinue" : "closeGuard.saveAndQuit")}
       </button>
       <button
         class={buttonVariants({ variant: "destructive" })}
         data-testid="close-guard-discard"
         onclick={() => void answer("discard")}
       >
-        {$t("closeGuard.quit")}
+        {$t(leavingSearch ? "closeGuard.continueWithoutSaving" : "closeGuard.quit")}
       </button>
       <button
         class={buttonVariants({ variant: "outline" })}

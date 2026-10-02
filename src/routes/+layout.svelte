@@ -233,19 +233,11 @@
             // not be on offer at all.
             const choice = await askBeforeClosing();
             if (choice === "stay") return;
-            if (choice === "save") {
-              try {
-                await quickSave();
-              } catch {
-                // `quickSave` has already said what went wrong. The window
-                // stays open: quitting after a failed save is the one outcome
-                // nobody asked for.
-                return;
-              }
-              // A save-as the operator cancelled leaves the work unsaved, and
-              // quitting then would lose it just as surely.
-              if (get(projectDirty)) return;
-            }
+            // `quickSave` answers whether the file was written; it has already
+            // said what went wrong if it was not. The window stays open after
+            // a failed or cancelled save: quitting then is the one outcome
+            // nobody asked for.
+            if (choice === "save" && !(await quickSave())) return;
             await getCurrentWindow().destroy();
           },
         );

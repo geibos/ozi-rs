@@ -19,10 +19,12 @@ import {
   activeTrackLayerId,
   activeWaypointLayerId,
   appState,
+  askBeforeClosing,
   projectDirty,
   projectPath,
   requestAllDataFocus,
 } from "$lib/stores";
+import { holdsWork, opensAnotherSearch } from "$lib/search-switch";
 import {
   PROJECT_OPEN_EXTENSIONS,
   PROJECT_SAVE_EXTENSION,
@@ -45,34 +47,40 @@ const PROJECT_OPEN_FILTER = {
  * Save without a dialog when the project already has a path on disk
  * (`projectPath` from AppStateDto); fall back to a save dialog for a
  * never-saved project.
+ *
+ * Answers whether the file was written. A caller about to throw the work away
+ * — the close guard, the next search — must not do it after a save that
+ * failed or a dialog the operator cancelled, and reading `projectDirty` back
+ * to find out races the `state-changed` refresh.
  */
-export async function quickSave(): Promise<void> {
+export async function quickSave(): Promise<boolean> {
   const path = get(projectPath);
-  if (path === null) {
-    await saveAs();
-    return;
-  }
+  if (path === null) return saveAs();
   const translate = get(t);
   try {
     await saveProject(path);
     rememberProject(path);
     toast.success(translate("toast.saved"));
+    return true;
   } catch (error) {
     toast.error(translate("toast.saveFailed"), { description: String(error) });
+    return false;
   }
 }
 
-/** Always ask for a destination, then save. */
-export async function saveAs(): Promise<void> {
+/** Always ask for a destination, then save. Answers whether it saved. */
+export async function saveAs(): Promise<boolean> {
   const translate = get(t);
   try {
     const path = await saveDialog({ filters: [PROJECT_FILE_FILTER] });
-    if (!path) return; // user cancelled — not an error
+    if (!path) return false; // user cancelled — not an error
     await saveProject(path);
     rememberProject(path);
     toast.success(translate("toast.saved"));
+    return true;
   } catch (error) {
     toast.error(translate("toast.saveFailed"), { description: String(error) });
+    return false;
   }
 }
 
@@ -157,20 +165,63 @@ export async function startNewProject(): Promise<void> {
       });
       if (!go) return;
     }
-    await newProject();
-    // The old ids point at layers that no longer exist. Reading the new
-    // project's defaults back is what keeps drawing and waypoint placement
-    // pointed at something.
-    await appState.refresh();
-    const state = get(appState);
-    activeTrackLayerId.set(
-      state?.track_layers?.[0] ? BigInt(state.track_layers[0].id) : null,
-    );
-    activeWaypointLayerId.set(
-      state?.waypoint_layers?.[0] ? BigInt(state.waypoint_layers[0].id) : null,
-    );
+    await emptyTheProject();
     toast.success(translate("newProject.done"));
   } catch (error) {
     toast.error(translate("newProject.failed"), { description: String(error) });
   }
+}
+
+/** `new_project`, and the frontend's layer pointers moved onto its layers. */
+async function emptyTheProject(): Promise<void> {
+  await newProject();
+  // The old ids point at layers that no longer exist. Reading the new
+  // project's defaults back is what keeps drawing and waypoint placement
+  // pointed at something.
+  await appState.refresh();
+  const state = get(appState);
+  activeTrackLayerId.set(
+    state?.track_layers?.[0] ? BigInt(state.track_layers[0].id) : null,
+  );
+  activeWaypointLayerId.set(
+    state?.waypoint_layers?.[0] ? BigInt(state.waypoint_layers[0].id) : null,
+  );
+}
+
+/**
+ * Before a map of the chosen search opens: if it is another search's and the
+ * project holds the previous one's work, start a new project for it.
+ *
+ * A project is one search (owner, 2026-10-01), and the catalogue is where a
+ * crew moves to the next one — not the palette. Without this the previous
+ * search's routes were drawn over a district they have nothing to do with,
+ * and the next save wrote two operations into one file.
+ *
+ * Unsaved work is asked about with the close guard's three answers. Work
+ * already on disk is not: the file holds it.
+ *
+ * @returns whether the caller may go on and open the map. `false` means the
+ *   operator stayed — or a save they asked for did not happen, which is the
+ *   same thing for their work.
+ */
+export async function makeWayForSearch(): Promise<boolean> {
+  const state = get(appState);
+  const chosen = state?.current_project?.name ?? null;
+  if (!opensAnotherSearch(state?.active_map?.project_name, chosen)) return true;
+  if (!holdsWork(state)) return true;
+
+  const translate = get(t);
+  if (state?.project_dirty) {
+    const choice = await askBeforeClosing("newSearch");
+    if (choice === "stay") return false;
+    if (choice === "save" && !(await quickSave())) return false;
+  }
+  try {
+    await emptyTheProject();
+  } catch (error) {
+    toast.error(translate("newProject.failed"), { description: String(error) });
+    return false;
+  }
+  toast.success(translate("newSearch.started").replace("{name}", chosen ?? ""));
+  return true;
 }

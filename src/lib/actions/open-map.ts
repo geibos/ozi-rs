@@ -14,15 +14,22 @@
  */
 import { openSelectedMap } from "$lib/api";
 import { resetBundleDownloadState } from "$lib/stores";
+import { makeWayForSearch } from "$lib/actions/project";
 
 /**
- * @returns `true` when the map is open now, `false` when a download started
- *   and the map will open once it lands. Failures are thrown, because what to
- *   say about them differs per surface.
+ * It is also the one door every catalogue map comes through, which makes it
+ * the place where opening another search's map starts that search's project
+ * (`makeWayForSearch`).
+ *
+ * @returns `true` when the map is open now, `false` when it is not: a
+ *   download started and the map will open once it lands, or the operator
+ *   chose to stay with the unsaved work of the search on screen. Failures are
+ *   thrown, because what to say about them differs per surface.
  */
 export async function openMapShowingDownload(
   mapName: string,
 ): Promise<boolean> {
+  if (!(await makeWayForSearch())) return false;
   const downloadId = await openSelectedMap(mapName);
   if (downloadId) {
     // Also clears the previous download's rows, so the panel shows this one.
