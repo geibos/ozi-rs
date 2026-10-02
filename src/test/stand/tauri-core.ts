@@ -179,6 +179,51 @@ const FAILURE: string | null =
     ? null
     : new URLSearchParams(location.search).get("fail");
 
+/** The page's query, read once like `?fail=`. */
+const PARAMS =
+  typeof location === "undefined"
+    ? new URLSearchParams()
+    : new URLSearchParams(location.search);
+
+/**
+ * `?hold=load_projects,list_tracks`: those commands never answer.
+ *
+ * The loading state is a screen too — what the operator looks at while the
+ * catalogue walks a slow link — and a stand that answered everything at once
+ * could not show it. Used by the screenshot matrix (`screens.ts`).
+ */
+const HELD = new Set(
+  (PARAMS.get("hold") ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean),
+);
+
+/**
+ * `?catalogue=N`: a catalogue of N searches instead of the fixture's three.
+ *
+ * `0` is the empty state; thousands is the overflow one, which the real
+ * catalogue is — thirteen thousand searches — and which the list virtualises.
+ */
+const CATALOGUE_SIZE: number | null = PARAMS.has("catalogue")
+  ? Math.max(0, Number(PARAMS.get("catalogue")) || 0)
+  : null;
+
+function standCatalogue(): typeof catalogueFixture {
+  if (CATALOGUE_SIZE === null) return catalogueFixture;
+  return Array.from({ length: CATALOGUE_SIZE }, (_, i) => {
+    // Dates walk back a day at a time from the fixture's newest search, so the
+    // list reads like the real one rather than like a counter.
+    const day = new Date(Date.UTC(2026, 8, 28) - i * 86_400_000);
+    const iso = day.toISOString().slice(0, 10);
+    return {
+      cached: i % 7 === 0,
+      name: `${iso.replaceAll("-", " ")} Поиск ${i + 1}`,
+      slug: `${iso}_search-${i + 1}`,
+    };
+  });
+}
+
 // Read once, at load: the app navigates between its own routes and would
 // otherwise lose the flag the moment it did.
 function requestedFailure(): string | null {
@@ -447,7 +492,7 @@ const importedWaypointsByLayer = new Map<number, WaypointDto[]>();
  * none. Without this the stand answered `new_project` and went on serving the
  * fixture's tracks, so the screen said one thing and the toast another.
  */
-let projectEmptied = false;
+let projectEmptied = PARAMS.get("state") === "empty";
 
 /**
  * True once this session has done something that gives the operator a
@@ -599,6 +644,20 @@ function previewedAppState(): AppStateDto {
     };
   }
   if (standActiveMap !== null) base = { ...base, active_map: standActiveMap };
+  // `?maps=none`: a saved project opened with no map — the Maps tab's empty
+  // state, which a stand with a fixture map always on could not show. The
+  // file has to be there: without a map or a project the workspace route
+  // sends the operator back to the catalogue.
+  if (PARAMS.get("maps") === "none") {
+    base = {
+      ...base,
+      project_path: base.project_path ?? "/Users/оператор/Documents/поиск.ozp",
+      active_map: null,
+      current_project: base.current_project
+        ? { ...base.current_project, maps: [] }
+        : null,
+    };
+  }
   if (previewedSlug === null) return base;
   // The whole project, with its slug moved: the loader matches on the slug, so
   // a partial object here would have been a project with nothing in it.
@@ -615,7 +674,7 @@ function previewedAppState(): AppStateDto {
   // every search was Lavrovo — which hid whether choosing another search did
   // anything at all. Found on 2026-10-02.
   const name =
-    catalogueFixture.find((entry) => entry.slug === previewedSlug)?.name ??
+    standCatalogue().find((entry) => entry.slug === previewedSlug)?.name ??
     project.name;
   return {
     ...base,
@@ -957,10 +1016,10 @@ const HANDLERS: StandAnswers = {
   // interface prunes on a complete walk, and a stand that skipped the
   // boundaries would never exercise that.
   load_projects: () => {
-    standEmit("projects-chunk", catalogueFixture);
+    standEmit("projects-chunk", standCatalogue());
     queueMicrotask(() => {
       standEmit("catalogue-refresh-started", undefined);
-      standEmit("projects-chunk", catalogueFixture);
+      standEmit("projects-chunk", standCatalogue());
       standEmit("catalogue-refresh-finished", { complete: true });
       standEmit("state-changed", undefined);
     });
@@ -1254,6 +1313,10 @@ export async function invoke<T>(command: string, args?: Args): Promise<T> {
   // looked at.
   if (failingCommands().has(command)) {
     throw standFailureFor(command);
+  }
+
+  if (HELD.has(command)) {
+    return new Promise<T>(() => {});
   }
 
   if (

@@ -1,12 +1,12 @@
 ## ADDED Requirements
 ### Requirement: CI verifies fixtures and the screenshot baseline
 
-The CI workflow SHALL add a job that regenerates fixtures with `just fixtures`, fails if the result differs from the committed fixtures, runs the fixture conformance test, and runs `just shots --compare` against the committed baseline, uploading the rendered matrix and any diff images as a workflow artifact. The job SHALL run on pull requests and on `main`.
+CI SHALL fail when the committed frontend fixtures differ from what the Rust core generates — the `fixtures_are_up_to_date` test in the Rust suite of "Lint & test" — and SHALL run a job that renders the screenshot matrix in the same container image as `just shots` and compares it with the committed baseline under `src/test/stand/baseline/`, uploading the rendered matrix and any diff images as a workflow artifact whether it passes or fails. The jobs SHALL run on pull requests and on `main`.
 
 #### Scenario: Stale fixtures fail CI
 
-- **WHEN** a PR changes a DTO without regenerating fixtures
-- **THEN** the fixtures job fails with a diff of the changed fixture file
+- **WHEN** a change alters a DTO without regenerating fixtures
+- **THEN** the Rust tests fail on `fixtures_are_up_to_date` with a diff of the changed fixture file
 
 #### Scenario: Matrix is inspectable
 

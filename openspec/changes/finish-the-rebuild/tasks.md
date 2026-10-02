@@ -2,15 +2,18 @@
 
 ## 1. The screenshot matrix
 
-- [ ] 1.1 `src/test/stand/screens.ts`: a registry of screens — bundle loader,
-      workspace, library tabs, both inspectors, command palette — each
-      declaring its fixture and transport for the five states.
-- [ ] 1.2 `src/test/stand/shots.ts`: render screen × state × locale × theme at a
+- [x] 1.1 `src/test/stand/screens.ts`: a registry of screens — the launcher,
+      the three library tabs, the track inspector, the palette and settings —
+      each declaring the states that apply to it and how the stand reaches
+      them (new stand flags: `?state=empty`, `?maps=none`, `?hold=`,
+      `?catalogue=N`). The waypoint inspector is not registered yet.
+- [x] 1.2 `src/test/stand/shots.ts`: render screen × state × locale × theme at a
       fixed viewport with bundled fonts and animations off; `--compare` against
       the baseline with a per-pixel tolerance and diff images; `--update`
       rewrites it; `--slice` writes into `docs/progress/<date>-<slice>/`.
-- [ ] 1.3 `just shots`, and `just ci` gains `just shots --compare`.
-- [ ] 1.4 Commit the baseline of the current interface as the recorded "before".
+- [x] 1.3 `just shots`, and `just ci` gains it (compare is the default).
+- [x] 1.4 Commit the baseline of the current interface as the recorded "before" —
+      60 shots, 3.5 MB; two fresh runs compared 60/60 on 2026-10-02.
 - [ ] 1.5 CI runs the fixtures and the matrix, uploading the images and diffs;
       documented in `docs/ci.md`.
 

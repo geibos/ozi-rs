@@ -90,6 +90,26 @@ jobs:
       - name: Frontend tests (Vitest)
         run: just test-ui
 
+  screenshot-matrix:
+    name: Screenshot matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same image `just shots` uses locally, so the baseline committed
+      # from a Mac compares pixel for pixel here (`scripts/shots.sh`).
+      - name: Render the matrix and compare it with the baseline
+        run: scripts/shots.sh --compare
+
+      - name: Upload the shots and any diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-matrix
+          path: target/shots
+          if-no-files-found: ignore
+
   openspec-validate:
     name: OpenSpec validate
     runs-on: ubuntu-latest

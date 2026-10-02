@@ -147,7 +147,7 @@ fmt-check:
     cargo fmt --all --manifest-path src-tauri/Cargo.toml -- --check
 
 # Run all CI-equivalent gates locally (fmt + clippy + check + lint + test)
-ci: fmt-check clippy check lint test
+ci: fmt-check clippy check lint test shots
 
 # Run local release warning hygiene gate
 check-release-warnings:
@@ -177,6 +177,15 @@ test-ui:
 # that.
 stand:
     npm exec -- vite --config vite.stand.config.ts
+
+# The screenshot matrix: every registered screen state in both languages and
+# both themes, rendered inside the Playwright image (Docker) so the pixels are
+# the same here and in CI. No arguments compares with the committed baseline;
+# `--update` rewrites it (in a commit of its own), `--screen <id>` narrows it,
+# `--slice <name>` writes into docs/progress/<date>-<name>/. Shots and diffs
+# land in target/shots/.
+shots *args:
+    scripts/shots.sh {{args}}
 
 # Regenerate the frontend test fixtures from the Rust core.
 #

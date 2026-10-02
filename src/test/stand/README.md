@@ -56,6 +56,27 @@ waypoints listed each of them twice in the rail, which read as an app defect
 until the call transcript showed two calls with different ids — the same class
 of lie the hand-written mocks told.
 
+## More states
+
+```
+http://localhost:5273/project?state=empty        an empty project, the map kept
+http://localhost:5273/project?maps=none          a saved project with no map
+http://localhost:5273/?state=cold&catalogue=0     an empty catalogue
+http://localhost:5273/?state=cold&catalogue=13000 the catalogue at its real size
+http://localhost:5273/?state=cold&hold=load_projects   the catalogue never answers
+```
+
+`?hold=` takes a comma-separated list of commands that never answer — the
+loading state of whatever waits on them.
+
+## The screenshot matrix
+
+`just shots` photographs every state `screens.ts` registers, in both
+languages and both themes, inside the Playwright image, and compares the
+result with `baseline/`. See `docs/ci.md` for why the image and what a
+failure looks like. Register a new screen state there rather than describing
+it here.
+
 ## Failure states
 
 ```

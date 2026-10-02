@@ -1,31 +1,17 @@
 ## ADDED Requirements
 ### Requirement: Screenshot matrix renders every registered screen state
 
-The repository SHALL provide `just shots`, which drives the stand with Playwright and captures one screenshot per entry of a screen registry (`src/test/stand/screens.ts`) crossed with state (`empty`, `loading`, `loaded`, `error`, `overflow`), locale (`ru`, `en`) and theme (`light`, `dark`). Screenshots SHALL be deterministic: fixed viewport, bundled fonts, animations disabled. Output SHALL go to `docs/progress/<date>-<slice>/` when a slice name is given and to a temporary directory otherwise.
+The repository SHALL provide `just shots`, which drives the stand with Playwright and captures one screenshot per entry of a screen registry (`src/test/stand/screens.ts`) crossed with each state the entry declares (out of `empty`, `loading`, `loaded`, `error`, `overflow`), locale (`ru`, `en`) and theme (`light`, `dark`). Screenshots SHALL be deterministic: a fixed viewport, the application's own fonts, animations disabled, a fixed clock, every request leaving the stand refused, and rendering inside a pinned Playwright container image so that the same pixels come out on a developer's machine and in CI. Output SHALL go to `docs/progress/<date>-<slice>/` when a slice name is given and to `target/shots/` otherwise.
 
 #### Scenario: Full matrix for one screen
 
 - **WHEN** `just shots --screen library-tracks` runs
-- **THEN** twenty PNG files are produced (5 states × 2 locales × 2 themes) and each file name encodes screen, state, locale and theme
+- **THEN** one PNG per declared state, locale and theme is produced — twelve for the three states the Tracks tab declares — and each file name encodes screen, state, locale and theme
 
-#### Scenario: Registry entry without a fixture state fails
+#### Scenario: A declared state that does not come up fails
 
-- **WHEN** a screen registry entry declares the `overflow` state but no fixture provides it
-- **THEN** `just shots` exits non-zero naming the screen and the missing state
-
-### Requirement: Screenshot baseline comparison detects visual regressions
-
-`just shots --compare` SHALL compare the freshly rendered matrix against the committed baseline under `src/test/stand/baseline/` with a per-pixel tolerance and SHALL exit non-zero on any difference, writing diff images next to the report. `just shots --update` SHALL rewrite the baseline and SHALL be run only in a dedicated commit.
-
-#### Scenario: Unintended change is caught
-
-- **WHEN** a change alters the Library row height and `just shots --compare` runs
-- **THEN** the command exits non-zero, lists the affected screenshots and writes diff images
-
-#### Scenario: Intended change is accepted explicitly
-
-- **WHEN** the developer runs `just shots --update` and commits the baseline
-- **THEN** the next `just shots --compare` passes
+- **WHEN** a registry entry declares a state whose screen does not reach its ready element
+- **THEN** `just shots` exits non-zero naming the screen, the state, the locale and the theme
 
 ### Requirement: Every Customer Journey has an Appium smoke scenario
 

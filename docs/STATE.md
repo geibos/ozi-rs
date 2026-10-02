@@ -68,6 +68,17 @@ locally, because the local gate runs on macOS: clippy on Linux failed on
 failed, on a Next.js advisory reaching us through the `geist` font package.
 Both fixed in `fe06e6a`; the Geist fonts stay vendored in `static/fonts/`.
 
+**The screenshot matrix exists** (`finish-the-rebuild` group 1, 2026-10-02).
+`just shots` photographs fourteen screen states — the launcher in all five
+states, the library tabs, the track inspector, the palette, settings — in
+both languages and both themes, inside the Playwright Docker image so a Mac
+and the CI runner produce the same pixels, and compares them with the 60
+committed baseline shots in `src/test/stand/baseline/`. It is part of
+`just ci` and a CI job of its own. Two fresh runs matched 60/60. Accepting a
+deliberate change is `just shots --update` in a commit of its own. It found a
+defect on its first day: a project restored without a map opened in the
+catalogue (`a-project-is-a-workspace`).
+
 **Track names run along the route** (`names-along-the-route`, 2026-10-02).
 Noto Sans Bold SDF glyphs ship in `static/glyphs/` (OFL, ~510 KB) and reach the
 map through a `glyphs://` protocol that answers every range, an unshipped one

@@ -93,6 +93,25 @@ After the workflows land on `main`, configure branch protection in **Settings �
 
 These are configured in the GitHub UI, not in this repository — they cannot be checked in.
 
+### 6. `screenshot-matrix` (ubuntu-latest)
+
+Renders every registered screen state (`src/test/stand/screens.ts`) in both
+languages and both themes and compares it with the committed baseline under
+`src/test/stand/baseline/` — `scripts/shots.sh --compare`, the same command
+`just shots` runs locally. Both run inside the pinned
+`mcr.microsoft.com/playwright:v1.63.0-noble` image, with the stand served
+inside the container, so a baseline written on a Mac matches on the runner
+pixel for pixel: font rendering differs between the two hosts and not inside
+the image. The rendered PNGs and any diff images are uploaded as the
+`screenshot-matrix` artifact whether the job passes or fails.
+
+A deliberate change to the interface is accepted with `just shots --update`,
+committed on its own so the diff of the baseline is the whole review of what
+changed. A failure names the shot and writes the diff to
+`target/shots/diff/`. Per shot, 0.05 % of pixels may differ — WebGL in a
+software rasteriser is allowed to wobble on a curve; a row height or a missing
+label is far more.
+
 ## Local equivalents
 
 You can reproduce CI gates locally with `just`:
@@ -102,6 +121,7 @@ just clippy        # cargo clippy -- -D warnings
 just check         # cargo check + svelte-check
 just lint          # ESLint
 just test          # cargo test + Vitest
+just shots         # the screenshot matrix (Docker), compared with the baseline
 just ci            # all of the above (shortcut)
 ```
 

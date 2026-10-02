@@ -4,9 +4,10 @@ One entry per merged slice, newest first. Each entry links before/after
 screenshots so the state of the interface can be read in one page instead of
 being reconstructed from commits.
 
-Screenshots come from the screenshot matrix (`just shots`) once that lands;
-until then they are cropped captures of the real window taken through the
-native QA harness (`docs/native-qa-mcp.md`).
+Since 2026-10-02 the screenshot matrix (`just shots --slice <name>`) writes a
+slice's shots straight into its folder here; earlier entries are stand
+captures or cropped captures of the real window taken through the native QA
+harness (`docs/native-qa-mcp.md`).
 
 ---
 

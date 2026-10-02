@@ -58,6 +58,7 @@ All common tasks are in `justfile` (requires `just`). Run `just` to list recipes
 | Run all CI gates locally | `just ci` |
 | Debug app bundle (for E2E) | `just build` |
 | E2E smoke gate (GUI-seizing) | `just smoke` |
+| Screenshot matrix (Docker, compare / `--update`) | `just shots` |
 
 Clippy is strict: `cargo clippy -- -D warnings`. All warnings must be fixed, not suppressed.
 
