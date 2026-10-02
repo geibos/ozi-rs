@@ -58,6 +58,11 @@ const LEAVES_THE_PROJECT_ALONE = [
   "save_report",
   "add_report_note",
   "reveal_reports",
+  // FTP accounts belong to the machine, not to the search.
+  "list_ftp_accounts",
+  "save_ftp_account",
+  "delete_ftp_account",
+  "check_ftp_account",
   "set_bundles_root",
   // After these the project in hand is the project on disk.
   "save_project",

@@ -12,6 +12,7 @@
   import * as Sheet from "$lib/components/ui/sheet";
   import { Input } from "$lib/components/ui/input";
   import ThemePicker from "./ThemePicker.svelte";
+  import FtpAccounts from "./FtpAccounts.svelte";
   import { locale, setLocale, t, type Locale } from "$lib/i18n";
   import { motionSettings, setMotionSetting } from "$lib/settings";
   import { settingsOpen } from "$lib/stores";
@@ -142,6 +143,8 @@
           </p>
         </div>
       </section>
+
+      <FtpAccounts />
     </div>
   </Sheet.Content>
 </Sheet.Root>

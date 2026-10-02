@@ -2,6 +2,9 @@ import {
   commands,
   type DayExportDto,
   type ExtentDto,
+  type FtpAccountDto,
+  type FtpAccountInput,
+  type FtpCheckDto,
   type ImportReportDto,
   type Result,
   type TrackSummaryDto,
@@ -387,6 +390,30 @@ export async function revealReports(): Promise<string> {
 
 export async function newProject(): Promise<void> {
   await unwrap("new_project", commands.newProject());
+}
+
+/**
+ * FTP accounts (`infrastructure/ftp.rs`). A password goes in with a save and
+ * never comes back out: an account says only whether one is stored.
+ */
+export async function listFtpAccounts(): Promise<FtpAccountDto[]> {
+  return unwrap("list_ftp_accounts", commands.listFtpAccounts());
+}
+
+/** `password: null` keeps the stored password. */
+export async function saveFtpAccount(
+  account: FtpAccountInput,
+  password: string | null,
+): Promise<FtpAccountDto> {
+  return unwrap("save_ftp_account", commands.saveFtpAccount(account, password));
+}
+
+export async function deleteFtpAccount(id: string): Promise<void> {
+  await unwrap("delete_ftp_account", commands.deleteFtpAccount(id));
+}
+
+export async function checkFtpAccount(id: string): Promise<FtpCheckDto> {
+  return unwrap("check_ftp_account", commands.checkFtpAccount(id));
 }
 
 /**

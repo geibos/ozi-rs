@@ -57,6 +57,13 @@ specta = { version = "=2.0.0-rc.22", features = ["serde_json"] }
 specta-typescript = "=0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
 
+# FTP accounts (owner, 2026-10-01): passwords in the operating system's
+# credential store — Keychain on macOS, Credential Manager on Windows — and
+# never in a file; the control connection for checking an account. Plain FTP
+# only: TLS waits until a server that offers it is in front of us.
+keyring = "4.2"
+suppaftp = "12.1"
+
 [dev-dependencies]
 wiremock = "0.6"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time", "test-util"] }

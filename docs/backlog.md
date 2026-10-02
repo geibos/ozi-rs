@@ -6,7 +6,9 @@ decision.
 
 ## Product
 
-- **FTP as a second source for the catalogue.** `maps.lizaalert.ru` runs an FTP
+- **FTP as a second source for the catalogue.** Accounts and passwords done
+  on 2026-10-02 (`ftp-accounts`); the listing adapter and the source
+  preference are what is left. The original note: `maps.lizaalert.ru` runs an FTP
   service ("220 DB Based FTP ready") that would give a machine-readable listing
   instead of scraped HTML — which is exactly what broke in September when the
   site changed its markup. Anonymous login is refused (`530 Authentication

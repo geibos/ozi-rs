@@ -17,6 +17,8 @@ import { standEmit } from "./tauri-event";
 import type {
   AppStateDto,
   commands,
+  FtpAccountDto,
+  FtpAccountInput,
   JsonValue,
   LayerSummaryDto,
   TrackSummaryDto,
@@ -317,6 +319,40 @@ function importOneLayer(label: string, trackCount: number): string {
 let previewedSlug: string | null = null;
 
 /**
+ * The FTP accounts this session saved. A password is kept as the flag the
+ * backend answers with and nothing more — the stand has no keychain, and a
+ * password echoed back would be a lie about the real application.
+ */
+let standFtpAccounts: FtpAccountDto[] = [];
+let nextStandFtpId = 0;
+
+/**
+ * The refusals the backend makes on a save (`infrastructure/ftp.rs`), so the
+ * form's error handling can be looked at here.
+ */
+function standFtpRefusal(input: FtpAccountInput): string | null {
+  if (input.name.trim() === "") return "ftp.error.missingName";
+  if (input.host.trim() === "") return "ftp.error.missingHost";
+  if (
+    /[/:@\s]/.test(
+      input.host
+        .trim()
+        .replace(/^ftp:\/\//i, "")
+        .replace(/\/$/, ""),
+    )
+  )
+    return "ftp.error.hostNotAName";
+  if (input.login.trim() === "") return "ftp.error.missingLogin";
+  if (input.port === 0) return "ftp.error.badPort";
+  if (
+    input.role === "bundles" &&
+    standFtpAccounts.some((a) => a.role === "bundles" && a.id !== input.id)
+  )
+    return "ftp.error.secondBundleAccount";
+  return null;
+}
+
+/**
  * The map this session opened, as the backend's `active_map` would carry it.
  *
  * `open_selected_map` used to leave the fixture's active map in place, so the
@@ -465,6 +501,11 @@ const LEAVES_THE_PROJECT_ALONE = new Set([
   "save_report",
   "add_report_note",
   "reveal_reports",
+  // FTP accounts belong to the machine, not to the search.
+  "list_ftp_accounts",
+  "save_ftp_account",
+  "delete_ftp_account",
+  "check_ftp_account",
   // Reading the catalogue, not the project. Missing it here was the first
   // thing this model got wrong: `load_projects` runs on every start, so the
   // stand opened with the dot already on and the indicator meant nothing.
@@ -687,6 +728,51 @@ const HANDLERS: StandAnswers = {
     screenshot_missing: false,
   }),
   reveal_reports: () => "/Users/оператор/Documents/ozi-rs-отчёты",
+  list_ftp_accounts: () => standFtpAccounts,
+  save_ftp_account: (args) => {
+    const input = args?.account as FtpAccountInput;
+    const password = (args?.password as string | null) ?? null;
+    const refusal = standFtpRefusal(input);
+    if (refusal) throw refusal;
+    const existing = standFtpAccounts.find((a) => a.id === input.id);
+    nextStandFtpId += 1;
+    const saved: FtpAccountDto = {
+      id: input.id ?? `stand-ftp-${nextStandFtpId}`,
+      role: input.role,
+      name: input.name.trim(),
+      host: input.host
+        .trim()
+        .replace(/^ftp:\/\//i, "")
+        .replace(/\/$/, ""),
+      port: input.port,
+      login: input.login.trim(),
+      folder: input.folder.trim() === "" ? "/" : input.folder.trim(),
+      has_password:
+        (password !== null && password !== "") || !!existing?.has_password,
+    };
+    standFtpAccounts = existing
+      ? standFtpAccounts.map((a) => (a.id === saved.id ? saved : a))
+      : [...standFtpAccounts, saved];
+    return saved;
+  },
+  delete_ftp_account: (args) => {
+    const id = String(args?.id ?? "");
+    if (!standFtpAccounts.some((a) => a.id === id))
+      throw "ftp.error.unknownAccount";
+    standFtpAccounts = standFtpAccounts.filter((a) => a.id !== id);
+    return null;
+  },
+  // No network on the stand: an account with a password "logs in", one
+  // without says so — the two answers the screen has to render differently.
+  check_ftp_account: (args) => {
+    const account = standFtpAccounts.find(
+      (a) => a.id === String(args?.id ?? ""),
+    );
+    if (!account) throw "ftp.error.unknownAccount";
+    return account.has_password
+      ? { outcome: "ok", detail: "220 stand FTP ready", folder: account.folder }
+      : { outcome: "no_password", detail: null, folder: null };
+  },
   get_waypoints: (args) => {
     if (projectEmptied) return [];
     const layerId = Number(args?.layerId);

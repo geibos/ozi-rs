@@ -87,6 +87,10 @@ registered without a line on this page, so the gap cannot open again.
 | `cancel_download`        | Abort a bundle download; files already on disk stay, and the next attempt resumes                    |
 | `new_project`            | Start a new search: an empty project, keeping the bundle and the active raster                       |
 | `calibrate_raster`       | Write a `.map` for a picture that came without one, and open the pair                                |
+| `list_ftp_accounts`      | The FTP accounts — bundles and result endpoints — each with whether a password is stored             |
+| `save_ftp_account`       | Create or update an FTP account; the password goes to the system credential store, `null` keeps it   |
+| `delete_ftp_account`     | Remove an FTP account and its stored password                                                        |
+| `check_ftp_account`      | Connect, log in and change to the account's folder; says which step failed                           |
 
 ### Import / Export
 

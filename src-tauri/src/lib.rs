@@ -7,7 +7,7 @@ mod domain;
 mod fixtures;
 mod infrastructure;
 
-use commands::{DownloadRegistry, SharedDownloads, SharedState};
+use commands::{DownloadRegistry, SharedDownloads, SharedState, ftp::SharedFtpAccounts};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -38,6 +38,21 @@ fn build_app_state(app: &tauri::AppHandle) -> application::AppState {
     };
 
     application::AppState::new_with_paths(session_path, bundles_root)
+}
+
+/// The FTP accounts file sits beside the session; the passwords go to the
+/// operating system's credential store (`infrastructure::ftp`).
+fn open_ftp_accounts(app: &tauri::AppHandle) -> infrastructure::ftp::FtpAccounts {
+    let path = match app.path().app_data_dir() {
+        Ok(dir) => dir.join("ftp-accounts.json"),
+        Err(error) => {
+            tracing::warn!(
+                "app data dir unavailable, FTP accounts kept beside the binary: {error}"
+            );
+            PathBuf::from("ftp-accounts.json")
+        }
+    };
+    infrastructure::ftp::FtpAccounts::open(path, Box::new(infrastructure::ftp::SystemSecrets))
 }
 
 /// Releases before the path-resolver switch stored the session under a
@@ -142,6 +157,10 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::get_wpt_export_default_path,
         commands::create_empty_track,
         commands::tiles::get_ozi_metadata,
+        commands::ftp::list_ftp_accounts,
+        commands::ftp::save_ftp_account,
+        commands::ftp::delete_ftp_account,
+        commands::ftp::check_ftp_account,
     ])
 }
 
@@ -162,6 +181,8 @@ pub fn run() {
         .setup(|app| {
             let state: SharedState = Arc::new(Mutex::new(build_app_state(app.handle())));
             app.manage(state);
+            let ftp: SharedFtpAccounts = Arc::new(open_ftp_accounts(app.handle()));
+            app.manage(ftp);
             Ok(())
         })
         .manage(downloads)

@@ -28,6 +28,11 @@ each:
   ⌘, — theme, language and the statistics thresholds.
 - **FTP: credentials and hosts.** Bundles come from one account; results go to
   up to four endpoints, each with its own account. Passwords in the keychain.
+  Done on 2026-10-02 (`ftp-accounts`): the FTP section of the settings screen
+  holds one bundle account and any number of result endpoints, the passwords
+  go to Keychain / Credential Manager under «ozi-rs FTP», and each account can
+  be checked (connect, log in, change folder). Not yet: the FTP bundle listing
+  and uploading results, which stand on this.
 - **Commit and push after every green slice**, for this run.
 
 **Track names run along the route** (`names-along-the-route`, 2026-10-02).

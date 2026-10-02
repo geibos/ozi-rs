@@ -767,6 +767,48 @@ async getOziMetadata(mapPath: string) : Promise<Result<JsonValue, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listFtpAccounts() : Promise<Result<FtpAccountDto[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_ftp_accounts") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Create or update an account. `password: null` keeps the stored one.
+ */
+async saveFtpAccount(account: FtpAccountInput, password: string | null) : Promise<Result<FtpAccountDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_ftp_account", { account, password }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteFtpAccount(id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_ftp_account", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Connect, log in and change to the account's folder.
+ * 
+ * cancel-safe: yes — the only `.await` is on a `spawn_blocking` join handle;
+ * dropping it leaves the blocking check to finish on its own thread, which
+ * writes nothing and closes its connection when it returns.
+ */
+async checkFtpAccount(id: string) : Promise<Result<FtpCheckDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("check_ftp_account", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -819,6 +861,41 @@ at: string }
  * Lat/lon bounding box for extent crops — the current map viewport.
  */
 export type ExtentDto = { min_lat: number; min_lon: number; max_lat: number; max_lon: number }
+export type FtpAccountDto = { id: string; role: FtpRole; name: string; host: string; port: number; login: string; folder: string; 
+/**
+ * Whether the credential store holds a password for this account. The
+ * password itself never leaves the backend.
+ */
+has_password: boolean }
+/**
+ * An account as the form sends it. `id: null` creates one.
+ */
+export type FtpAccountInput = { id: string | null; role: FtpRole; name: string; host: string; port: number; login: string; folder: string }
+export type FtpCheckDto = { outcome: FtpCheckOutcome; 
+/**
+ * The server's own reply, or the system's reason for not reaching it.
+ */
+detail: string | null; 
+/**
+ * The folder the server says the account is in, after a success.
+ */
+folder: string | null }
+/**
+ * Which step of a check failed, if one did.
+ */
+export type FtpCheckOutcome = "ok" | "unreachable" | "login_refused" | "no_folder" | "no_password" | "failed"
+/**
+ * What an account is for.
+ */
+export type FtpRole = 
+/**
+ * Downloading bundles. At most one account has this role.
+ */
+"bundles" | 
+/**
+ * Uploading results. Any number, one per contour.
+ */
+"results"
 /**
  * What a folder import did, for the interface to put into words.
  * 

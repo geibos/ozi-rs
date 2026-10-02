@@ -10,6 +10,26 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-10-02 — FTP accounts
+
+![the FTP section of the settings screen](2026-10-02-ftp-accounts/ftp-accounts.png)
+
+Bundles come from one FTP account; results go back to several contours, each
+under an account of its own (owner, 2026-10-01). The settings screen holds
+both: one bundle account, any number of result endpoints, each with a name,
+server, port, login and folder. The password goes to the operating system's
+credential store — Keychain on macOS, Credential Manager on Windows — under
+«ozi-rs FTP», and never to a file; an account says only whether one is stored,
+and an empty password field on an edit keeps it.
+
+Each account can be checked: connect, log in, change to its folder, and the
+answer names the step that failed with the server's own words beside it. On
+the stand, which has no network, an account with a password «logs in» and one
+without says so. A pasted `ftp://contour1.example.org/` was saved as the
+server name, with the port and the folder from their own fields.
+
+---
+
 ## 2026-10-02 — settings, and time on the move
 
 ![the settings screen](2026-10-02-settings-and-time-on-the-move/settings.png)

@@ -112,7 +112,7 @@ impl std::error::Error for PersistenceError {
 /// are fsynced, and the temp file is renamed over the target. A failed
 /// save therefore never truncates or corrupts an existing file at `path`
 /// (same pattern as `download_to_path_async` in `infrastructure/lizaalert.rs`).
-fn write_atomic(path: &Path, contents: &str) -> Result<(), PersistenceError> {
+pub(crate) fn write_atomic(path: &Path, contents: &str) -> Result<(), PersistenceError> {
     fn write_and_rename(tmp_path: &Path, target: &Path, contents: &str) -> std::io::Result<()> {
         use std::io::Write;
         let mut file = std::fs::File::create(tmp_path)?;
