@@ -18,11 +18,14 @@ each:
   ran past it — widened.
 - **Moving time and ascent/descent**: a stop is moving less than 25 m in two
   minutes, a climb counts only past 5 m of rise; both thresholds are settings.
-  Not done yet.
+  Done on 2026-10-02 (`settings-and-time-on-the-move`), shown in the track
+  inspector.
 - **No transparent no-data on OZI rasters** — rasters are drawn as they are.
   Recorded in `docs/backlog.md`.
 - **The theme picker's place is ours to choose**: a Settings screen, which the
   FTP accounts and the thresholds need anyway; the palette keeps its entries.
+  Done on 2026-10-02: the gear in the top bar, «Настройки…» in the palette,
+  ⌘, — theme, language and the statistics thresholds.
 - **FTP: credentials and hosts.** Bundles come from one account; results go to
   up to four endpoints, each with its own account. Passwords in the keychain.
 - **Commit and push after every green slice**, for this run.
@@ -481,11 +484,8 @@ test-without-building` reports `** TEST BUILD SUCCEEDED **` and WebDriverAgent
   `scripts/npm-audit-gate.mjs`; the upgrade needs its own slice.
 - ~~Human-facing docs still lie in places.~~ Fixed on 2026-09-21 (task 2.6 of
   `codify-architecture-decisions`), each claim checked against the code first.
-- **`ThemePicker.svelte` is imported nowhere**, while `ui-shell` carries
-  requirements for a theme selector and its persistence. Where the control
-  belongs is a design call, so it is listed rather than placed. Noted in the
-  `codify-architecture-decisions` Findings since 2026-09-19; confirmed still
-  true on 2026-09-21.
+- ~~`ThemePicker.svelte` is imported nowhere.~~ On the settings screen since
+  2026-10-02.
 
 Localization is done for the shell, the rails, the three library tabs, all four
 inspectors, the Maps tab, the command palette, bundle progress (which travels

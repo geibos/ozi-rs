@@ -1,4 +1,13 @@
 <script lang="ts">
+  /**
+   * The theme selector, as the settings screen shows it.
+   *
+   * Mounted nowhere from the workspace redesign until 2026-10-02, while
+   * `ui-shell` required it to be reachable "from settings" and there were no
+   * settings. The operating system's light/dark switch is followed by the
+   * listener the root layout installs (`installAutoThemeListener`), not here:
+   * this component exists only while the settings screen is open.
+   */
   import * as Select from "$lib/components/ui/select";
   import { t } from "$lib/i18n";
   import { catppuccinPackEnabled, selectedTheme } from "$lib/stores";
@@ -27,56 +36,39 @@
   );
 
   const selectedLabel = $derived(
-    themes.find((t) => t.value === $selectedTheme)?.label ?? "Theme",
+    themes.find((entry) => entry.value === $selectedTheme)?.label ??
+      $selectedTheme,
   );
 
   $effect(() => {
     void applyTheme($selectedTheme as ThemeName);
   });
-
-  $effect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      const v = $selectedTheme;
-      if (v === "auto" || v === "native-auto") void applyTheme(v as ThemeName);
-    };
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  });
 </script>
 
-<div class="theme-picker">
+<div class="flex flex-col gap-2">
   <Select.Root type="single" bind:value={$selectedTheme}>
-    <Select.Trigger aria-label={$t("shell.colourTheme")} size="sm">
+    <Select.Trigger
+      aria-label={$t("shell.colourTheme")}
+      size="sm"
+      class="w-full"
+      data-testid="settings-theme"
+    >
       {selectedLabel}
     </Select.Trigger>
     <Select.Content>
-      {#each themes as t (t.value)}
-        <Select.Item value={t.value} label={t.label}>{t.label}</Select.Item>
+      {#each themes as entry (entry.value)}
+        <Select.Item value={entry.value} label={entry.label}
+          >{entry.label}</Select.Item
+        >
       {/each}
     </Select.Content>
   </Select.Root>
 
-  <label class="pack-toggle" title={$t("theme.catppuccinPackHint")}>
+  <label
+    class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs select-none"
+    title={$t("theme.catppuccinPackHint")}
+  >
     <input type="checkbox" bind:checked={$catppuccinPackEnabled} />
     <span>{$t("theme.catppuccinPack")}</span>
   </label>
 </div>
-
-<style>
-  .theme-picker {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .pack-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: hsl(var(--muted-foreground));
-    cursor: pointer;
-    user-select: none;
-  }
-</style>

@@ -167,9 +167,9 @@ carries a line each saying what stands in the way.
 Regressions from the 2026-05-26 workspace redesign, re-checked 2026-09-22:
 
 - ~~Split/join segment UI~~ — the Track Inspector's segments table calls both.
-- ~~Theme picker~~ — the themes are in the command palette
-  (`CommandPalette.svelte`), which is where a setting changed twice a year
-  belongs. `ThemePicker.svelte` stayed unimported and was dropped.
+- ~~Theme picker~~ — on the settings screen since 2026-10-02
+  (`Settings.svelte`, opened from the gear in the top bar, the palette and
+  ⌘,); the palette keeps one entry per theme.
 - ~~Undo/redo keyboard shortcuts~~ — the layout binds Cmd/Ctrl+Z and
   Shift for redo (`handleGlobalKeydown`, `src/routes/+layout.svelte`).
 

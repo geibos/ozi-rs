@@ -39,6 +39,7 @@
     bundleLoaderOpen,
     bundleLoaderPreselect,
     commandPaletteOpen,
+    settingsOpen,
     measuringActive,
     graticuleVisible,
     setMeasuring,
@@ -287,6 +288,11 @@
     void applyTheme(theme);
   }
 
+  function handleOpenSettings() {
+    close();
+    settingsOpen.set(true);
+  }
+
   function handleUnitsSetting() {
     close();
     toast.message(`${$i18n("palette.units")} — ${$i18n("palette.comingSoon")}`);
@@ -513,6 +519,10 @@
         {/if}
 
         <Command.Group heading={$i18n("palette.groupSettings")}>
+          <Command.Item value="setting:open" onSelect={handleOpenSettings}>
+            <span class="flex-1">{$i18n("palette.settings")}</span>
+            <span class="text-muted-foreground text-[10px]">⌘,</span>
+          </Command.Item>
           {#each THEMES as theme (theme.value)}
             <Command.Item
               value={`setting:theme:${theme.value}`}

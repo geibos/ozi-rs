@@ -160,7 +160,7 @@ Track names must follow `YYYYMMDD_Callsign` (e.g. `20240601_Иванов`). The 
 - **State**: Svelte stores in `src/lib/stores.ts`
 - **API calls**: typed wrappers in `src/lib/api.ts` (never call `invoke` directly)
 - **Theming**: Native + Catppuccin themes via CSS custom properties; applied by `src/lib/theme.ts`, persisted in `localStorage["theme"]` (default `native-auto`)
-- **Theme options**: Native — Auto (default), Catppuccin Auto / Latte / Frappé / Macchiato / Mocha. Note: `ThemePicker.svelte` is currently not mounted anywhere — theme switching has no UI entry point (see `docs/feature-status.md`)
+- **Theme options**: Native — Auto (default), Catppuccin Auto / Latte / Frappé / Macchiato / Mocha. `ThemePicker.svelte` is on the settings screen (`Settings.svelte`: the gear in the top bar, the palette, ⌘,), and the palette keeps one entry per theme
 - **Interaction modes**: drawing (track creation), editing (point drag), waypoint placement, simplification preview
 
 Details: `docs/frontend-architecture.md`.

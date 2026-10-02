@@ -33,7 +33,7 @@ ozi-rs/
 │   │                       # + InspectorRail + Sheet-hosted BundleLoader.
 │   ├── components/         # Feature components: WorkspaceShell, LibraryRail,
 │   │   │                   # InspectorRail, CommandPalette, MapView, BundleLoader,
-│   │   │                   # Console, SymbolPicker, ThemePicker (unmounted).
+│   │   │                   # Console, SymbolPicker, ThemePicker (on Settings).
 │   │   ├── library/        # MapsTab, TracksTab, WaypointsTab, LibraryRow.
 │   │   └── inspector/      # MapInspector, TrackInspector, TrackSegmentsTable,
 │   │                       # WaypointInspector.

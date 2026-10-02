@@ -10,6 +10,29 @@ native QA harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-10-02 — settings, and time on the move
+
+![the settings screen](2026-10-02-settings-and-time-on-the-move/settings.png)
+![the inspector with time on the move and the climb](2026-10-02-settings-and-time-on-the-move/inspector-on-the-move.png)
+
+A track's statistics had one time, the span from first point to last, which
+counts every rest stop and every night. The inspector now shows the time on
+the move and the ascent and descent beside it, with the owner's thresholds
+(2026-10-01): a stop is less than 25 m in two minutes, a rise or fall counts
+from 5 m. A threshold per fix would count a standing navigator's wandering
+position as walking, so the stop is judged over a window; the climb is
+counted between turning points, so noise inside the threshold stays out and
+the last metres below a summit are not lost.
+
+Both are settings, which needed a settings screen: the gear in the top bar,
+«Настройки…» in the palette, ⌘,. It also holds the theme — `ThemePicker`,
+mounted nowhere since the workspace redesign — and the language. Changing a
+threshold recomputes the inspector at once; on the stand the climb went from
+«+0 м» to «+3 м» when the threshold went from 5 m to 1 m, which is what the
+fixture's one-metre steps should give.
+
+---
+
 ## 2026-10-02 — another search, another project
 
 ![the question before the next search opens](2026-10-02-another-search/asks-about-unsaved-work.png)

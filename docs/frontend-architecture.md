@@ -46,7 +46,7 @@ by a rail-based workspace shell. The current tree:
 | `BundleLoader.svelte` | Project list + map list, download progress, cached badges, bundles-root picker. Rendered by the `/` route on cold start and inside a `Sheet` overlay on `/project` (driven by `bundleLoaderOpen`) |
 | `MapView.svelte` | Main map canvas. MapLibre init, track/waypoint rendering, drawing mode, drag editing, FPS counter (F3), context menus. `:global()` rules retained for `.track-point-marker` / `.waypoint-marker` because MapLibre creates those DOM elements outside this template |
 | `SymbolPicker.svelte` | `Popover` grid of domain emoji symbols — the `SYMBOLS` array stays as-is |
-| `ThemePicker.svelte` | Theme selector (Native — Auto, Catppuccin Auto / Latte / Frappé / Macchiato / Mocha). **Currently not mounted anywhere** — the workspace redesign removed its host; theme switching is not reachable from the UI |
+| `ThemePicker.svelte` | Theme selector (Native — Auto, Catppuccin Auto / Latte / Frappé / Macchiato / Mocha). Mounted on the settings screen (`Settings.svelte`) since 2026-10-02 |
 | `Console.svelte` | Backtick-toggled diagnostics overlay |
 
 The `<Toaster />` host and a single `Tooltip.Provider` live in
@@ -167,7 +167,7 @@ Two coexisting CSS custom-property layers are written to the root element on eve
 
 Semantic values come from two mapping tables — `SEMANTIC_MAP_LIGHT` for Latte and `SEMANTIC_MAP_DARK` for Frappé / Macchiato / Mocha — so surface semantics stay correct in both light and dark modes (e.g. `--popover` resolves to `base` in light and `surface0` in dark). The root element also carries the `dark` class whenever the resolved flavour is not Latte so Tailwind's `dark:` variant utilities apply.
 
-Themes: Native — Auto (fresh-install default) plus the Catppuccin pack — Auto (follows OS), Latte, Frappé, Macchiato, Mocha. Auto modes listen to `prefers-color-scheme: dark` and re-apply both layers on every change. Selection is persisted to `localStorage["theme"]`. Note: `ThemePicker.svelte` is currently not mounted anywhere, so the theme cannot be changed from the UI (see `docs/feature-status.md`).
+Themes: Native — Auto (fresh-install default) plus the Catppuccin pack — Auto (follows OS), Latte, Frappé, Macchiato, Mocha. Auto modes listen to `prefers-color-scheme: dark` and re-apply both layers on every change. Selection is persisted to `localStorage["theme"]`. The selector is on the settings screen (`Settings.svelte`); the command palette also lists every theme.
 
 Migrated panels almost exclusively read the **semantic layer** through Tailwind utility classes (`bg-popover`, `text-card-foreground`, `border-border`, …). Direct `--ctp-*` reads survive only where load-bearing for MapLibre marker DOM (see the `:global()` rules in `MapView.svelte`) and where palette colour is needed without a semantic analogue (the FPS counter overlay uses `text-emerald-400` against `bg-black/55`, which is Quake-style convention and intentionally outside theme).
 

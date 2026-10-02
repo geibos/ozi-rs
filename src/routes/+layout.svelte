@@ -18,6 +18,7 @@
     currentProject,
     downloadPopupHeight,
     finishDownload,
+    settingsOpen,
     askBeforeClosing,
     projectDirty,
     projectsLoading,
@@ -32,6 +33,7 @@
   } from "../lib/network-reach";
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
   import CloseGuard from "../components/CloseGuard.svelte";
+  import Settings from "../components/Settings.svelte";
   import ReportNote from "../components/ReportNote.svelte";
   import { captureMoment } from "$lib/actions/report";
   import { isEditableTarget } from "$lib/editable-target";
@@ -275,6 +277,7 @@
    *   - Cmd/Ctrl+S       — quick-save (no dialog when the project path is
    *     known).
    *   - Cmd/Ctrl+Z       — undo; with Shift — redo.
+   *   - Cmd/Ctrl+,       — settings, as every Mac application has them.
    * `preventDefault` keeps the WebView from treating the chords as text
    * shortcuts. Save/undo/redo are backend no-ops without an active project,
    * so the chords are wired globally rather than per-route.
@@ -296,6 +299,11 @@
       if (target?.closest('[data-slot="dialog-content"]')) return;
       event.preventDefault();
       commandPaletteOpen.update((open) => !open);
+      return;
+    }
+    if (key === ",") {
+      event.preventDefault();
+      settingsOpen.set(true);
       return;
     }
     if (isEditableTarget(event.target)) return;
@@ -338,6 +346,7 @@
   <Toaster richColors closeButton position="bottom-right" offset={toastEdge} />
   <!-- CJ-7: the question asked before a window with unsaved work closes. -->
   <CloseGuard />
+  <Settings />
   <!-- The one line about what happened, after a moment was captured. -->
   <ReportNote />
 </Tooltip.Provider>

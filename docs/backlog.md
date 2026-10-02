@@ -25,12 +25,16 @@ failed`), so it needs credentials. Owner decision (2026-09-21): credentials
   2026-09-21: every layer-creating import path — single `.plt`, archived GPX
   tracks and archived GPX waypoints — names the layer through
   `source_file_label`, which keeps the file name and drops the path.
-- **Ascent and descent as track statistics.** The elevation profile landed on
+- ~~Ascent and descent as track statistics.~~ Done on 2026-10-02 in
+  `settings-and-time-on-the-move`, with the owner's 5 m threshold as a setting.
+  The original note: The elevation profile landed on
   2026-09-22 without them on purpose: summing every rise in a GPS recording
   sums its own noise, so a naive total reads high by a wide margin. It needs a
   threshold below which a change is not a climb — the same shape of decision as
   the moving-time threshold below, and best answered together with it.
-- **Moving time as a track statistic.** `duration_seconds` is the span between
+- ~~Moving time as a track statistic.~~ Done on 2026-10-02 in
+  `settings-and-time-on-the-move`: a stop is less than 25 m in two minutes, a
+  setting. The original note: `duration_seconds` is the span between
   the first and last point, which reads oddly for multi-day recordings even now
   that it is formatted in days. Moving time needs a stop threshold the owner has
   not chosen.
@@ -213,11 +217,8 @@ defect unless it says so. Reports: `docs/reviews/2026-09-22/`.
   declare `minmax(0, 1fr)`; `min-width: 0` on the container is not enough,
   because it constrains the container, not the track.
 
-- **The theme picker is unreachable.** `ThemePicker.svelte` is imported by
-  nothing, and `ui-shell` requires a selector with five options and persistence
-  across sessions. Both stores behind it work; only the placement is missing,
-  and that is a design call — the toolbar, the palette, or a settings sheet
-  that does not exist yet.
+- ~~The theme picker is unreachable.~~ On the settings screen since
+  2026-10-02 (`settings-and-time-on-the-move`); the owner left its place to us.
 
 - ~~A GPX round trip loses the track's colour.~~ Done on 2026-09-22 in
   `the-colour-comes-back`: the second pass over the document exists, matching

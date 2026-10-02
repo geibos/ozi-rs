@@ -858,6 +858,9 @@ export const inspectorOpen = writable(false);
  */
 export const commandPaletteOpen = writable(false);
 
+/** The settings screen (`Settings.svelte`), mounted once in the root layout. */
+export const settingsOpen = writable(false);
+
 /**
  * "Map info" affordance state for the Library Maps tab → Map Inspector
  * wiring. When non-null, the Inspector renders `MapInspector` for the

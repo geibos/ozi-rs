@@ -25,9 +25,11 @@
   import UndoIcon from "@lucide/svelte/icons/undo-2";
   import RedoIcon from "@lucide/svelte/icons/redo-2";
   import SaveIcon from "@lucide/svelte/icons/save";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
   import {
     bundleProgress,
     commandPaletteOpen,
+    settingsOpen,
     inspectorOpen,
     projectDirty,
   } from "$lib/stores";
@@ -188,6 +190,16 @@
           <span>{$t("shell.save")}</span>
         </button>
         <span class="chips-divider" aria-hidden="true"></span>
+        <button
+          type="button"
+          class="bar-btn"
+          aria-label={$t("shell.settings")}
+          title={`${$t("shell.settings")} (⌘,)`}
+          data-testid="open-settings"
+          onclick={() => settingsOpen.set(true)}
+        >
+          <SettingsIcon class="size-3.5" />
+        </button>
         <button
           type="button"
           class="cmdk-trigger"

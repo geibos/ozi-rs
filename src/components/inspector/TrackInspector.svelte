@@ -67,6 +67,8 @@
   } from "$lib/track-stats";
   import type { TrackDetail, TrackSummary } from "$lib/types";
   import TrackSegmentsTable from "./TrackSegmentsTable.svelte";
+  import { ascentDescent, movingSeconds } from "$lib/track-motion";
+  import { motionSettings } from "$lib/settings";
 
   let trackDetail = $state<TrackDetail | null>(null);
   // Built from the detail the card above already loads — no second
@@ -74,6 +76,21 @@
   const elevation = $derived(
     trackDetail ? elevationProfile(trackDetail.segments) : null,
   );
+
+  // The span from first point to last counts every rest stop and every night;
+  // these are what a coordinator asks for. Thresholds from Settings
+  // (owner, 2026-10-01), so changing one there recomputes them here.
+  const moving = $derived(
+    trackDetail ? movingSeconds(trackDetail.segments, $motionSettings) : null,
+  );
+  const climb = $derived(
+    trackDetail ? ascentDescent(trackDetail.segments, $motionSettings) : null,
+  );
+
+  /** `+320 м / −310 м`, the unit kept on the line with its number. */
+  function climbText(up: number, down: number, unit: string): string {
+    return `+${up}\u00a0${unit} / −${down}\u00a0${unit}`;
+  }
 
   /**
    * Playing the recording back.
@@ -479,6 +496,31 @@
             ? formatDurationSeconds(summary!.duration_seconds!, $locale)
             : "—"}
         </dd>
+        {#if moving !== null}
+          <dt class="text-muted-foreground">{$t("inspector.moving")}</dt>
+          <dd
+            class="min-w-0 truncate font-mono"
+            data-testid="inspector-moving"
+            title={$t("inspector.movingTooltip")
+              .replace("{d}", String($motionSettings.stopDistanceM))
+              .replace("{w}", String($motionSettings.stopWindowS / 60))}
+          >
+            {formatDurationSeconds(moving, $locale)}
+          </dd>
+        {/if}
+        {#if climb !== null}
+          <dt class="text-muted-foreground">{$t("inspector.climb")}</dt>
+          <dd
+            class="min-w-0 truncate font-mono"
+            data-testid="inspector-climb"
+            title={$t("inspector.climbTooltip").replace(
+              "{t}",
+              String($motionSettings.climbThresholdM),
+            )}
+          >
+            {climbText(climb.ascentM, climb.descentM, $t("settings.metres"))}
+          </dd>
+        {/if}
         <dt class="text-muted-foreground">{$t("inspector.points")}</dt>
         <dd class="min-w-0 truncate font-mono">
           {formatPointCount(summary!.point_count, $locale)}
