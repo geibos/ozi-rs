@@ -101,30 +101,6 @@ pub fn get_sqlite_tile(
 
 // ── OZI raster tile delivery ──────────────────────────────────────────────────
 
-/// Return a PNG-encoded tile from an OZF2 file given the `.map` metadata path,
-/// zoom level index, and tile grid coordinates.
-#[tauri::command]
-#[specta::specta]
-pub fn get_ozi_tile(
-    map_path: String,
-    level: usize,
-    tile_x: u32,
-    tile_y: u32,
-) -> Result<Response, String> {
-    let path = std::path::PathBuf::from(&map_path);
-    let contents = read_ozi_map_text(&path).map_err(|e| e.to_string())?;
-    let metadata = parse_ozi_map_metadata(&path, &contents).map_err(|e| e.to_string())?;
-    let source = open_ozi_raster_tile_source(&metadata).map_err(|e| e.to_string())?;
-
-    let tile = source
-        .decode_rgba_tile(level, tile_x, tile_y)
-        .map_err(|e| e.to_string())?;
-
-    let png_bytes = encode_rgba_to_png(tile.rgba_pixels(), tile.width(), tile.height())?;
-
-    Ok(Response::new(png_bytes))
-}
-
 /// Return tile grid metadata for an OZF2 map (levels, dimensions, georeference coefficients).
 #[tauri::command]
 #[specta::specta]

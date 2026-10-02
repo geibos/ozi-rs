@@ -193,11 +193,10 @@ pub fn run() {
             let typed = specta_builder().invoke_handler();
             let tiles: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
                 commands::tiles::get_sqlite_tile,
-                commands::tiles::get_ozi_tile,
                 commands::tiles::get_ozi_tile_projected,
             ];
             move |invoke: tauri::ipc::Invoke<tauri::Wry>| match invoke.message.command() {
-                "get_sqlite_tile" | "get_ozi_tile" | "get_ozi_tile_projected" => tiles(invoke),
+                "get_sqlite_tile" | "get_ozi_tile_projected" => tiles(invoke),
                 _ => typed(invoke),
             }
         })

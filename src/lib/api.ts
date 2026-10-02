@@ -28,7 +28,7 @@ import type {
 // semantics. User-facing `toast.error("Failed to …")` calls at call sites
 // continue to render.
 //
-// The three raw-byte tile commands at the bottom keep the untyped
+// The two raw-byte tile commands at the bottom keep the untyped
 // `invokeIpc` path — they are intentionally not in the generated bindings.
 
 /**
@@ -613,16 +613,6 @@ export async function getSqliteTile(
   y: number,
 ): Promise<ArrayBuffer> {
   return invokeIpc("get_sqlite_tile", { path, baseZoom, z, x, y });
-}
-
-/** Return PNG-encoded tile bytes from OZF2 file. Used by ozi-protocol.ts. */
-export async function getOziTile(
-  mapPath: string,
-  level: number,
-  tileX: number,
-  tileY: number,
-): Promise<ArrayBuffer> {
-  return invokeIpc("get_ozi_tile", { mapPath, level, tileX, tileY });
 }
 
 /** Return a 256×256 PNG for Web Mercator tile (tx, ty, tz) reprojected from OZF2. */

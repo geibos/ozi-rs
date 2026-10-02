@@ -176,7 +176,6 @@ registered without a line on this page, so the gap cannot open again.
 | Command                  | Description                                           |
 | ------------------------ | ----------------------------------------------------- |
 | `get_sqlite_tile`        | Return tile bytes from MBTiles SQLite                 |
-| `get_ozi_tile`           | Return raw OZF2 tile (ungeoreferenced)                |
 | `get_ozi_tile_projected` | Return OZF2 tile reprojected to Web Mercator          |
 | `get_ozi_metadata`       | Return OZI map metadata (levels, bounds, calibration) |
 

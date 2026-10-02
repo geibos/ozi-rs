@@ -134,7 +134,8 @@ defect unless it says so. Reports: `docs/reviews/2026-09-22/`.
   atomic save protects the last saved version, not the work after it. Needs a
   decision on recovery before it is worth designing.
 
-- **`get_ozi_tile` is dead IPC surface** — see `docs/STATE.md`.
+- ~~`get_ozi_tile` is dead IPC surface.~~ Removed on 2026-10-02
+  (`one-raster-tile-command`).
 
 - **ADR-0020 asks for waypoint export to PLT, which cannot mean what it says.**
   PLT is OziExplorer's track format — a track header and track rows, no
@@ -165,7 +166,8 @@ defect unless it says so. Reports: `docs/reviews/2026-09-22/`.
   look wrong in a waypoint list. Pinned by a test in `export/wpt.rs`. Note that
   cp1251 does carry `і`, `ї`, `є`, `ґ` and `ў`, so Ukrainian and Belarusian
   names are unaffected — it takes an emoji or a Latin-Extended character.
-- **`get_ozi_tile` is registered but nothing calls it.** The map renders OZF2
+- ~~`get_ozi_tile` is registered but nothing calls it.~~ Removed on
+  2026-10-02 (`one-raster-tile-command`). The original note: the map renders OZF2
   through `get_ozi_tile_projected`, via the `ozi://` protocol. Dead IPC
   surface, not a missing feature: it costs a generated binding and a line in
   the registry.

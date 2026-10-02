@@ -10,8 +10,8 @@
  *   - `src/lib/api.ts` — every typed wrapper delegates to the generated
  *     tauri-specta bindings (`src/lib/bindings.ts`) and calls
  *     `reportIpcError` before rethrowing when the `Result` unwrap fails.
- *   - `invokeIpc` below — kept ONLY for the three raw-byte tile commands
- *     (`get_sqlite_tile`, `get_ozi_tile`, `get_ozi_tile_projected`) that are
+ *   - `invokeIpc` below — kept ONLY for the two raw-byte tile commands
+ *     (`get_sqlite_tile`, `get_ozi_tile_projected`) that are
  *     intentionally not in the generated bindings.
  *
  * Design notes (from `fix-redesign-functional-bugs`):
@@ -129,7 +129,7 @@ function toIpcSafeValue(value: unknown): unknown {
  * dev IPC-error toast. Call sites do not need to change their `try/catch`
  * blocks — the wrapper rethrows after surfacing.
  *
- * Only the three raw-byte tile commands (`get_sqlite_tile`, `get_ozi_tile`,
+ * Only the two raw-byte tile commands (`get_sqlite_tile`,
  * `get_ozi_tile_projected`) still route through here — they return raw
  * bytes and are intentionally excluded from the generated bindings. All
  * other commands go through `commands.*` in `src/lib/bindings.ts`.

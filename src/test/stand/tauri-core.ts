@@ -663,7 +663,6 @@ type StandAnswers = {
   ) => Answer<K>;
 } & {
   get_sqlite_tile: (args: Args) => ArrayBuffer;
-  get_ozi_tile: (args: Args) => ArrayBuffer;
 };
 
 const HANDLERS: StandAnswers = {
@@ -862,7 +861,6 @@ const HANDLERS: StandAnswers = {
   // shows the basemap instead of a wall of error toasts — cartographic
   // fidelity is out of scope here and says so in the README.
   get_sqlite_tile: () => TRANSPARENT_PNG,
-  get_ozi_tile: () => TRANSPARENT_PNG,
   // A map already on disk opens with no download id; one that is not starts a
   // download and returns its id, which is what the caller needs in order to
   // show the panel and offer a cancel.

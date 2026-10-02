@@ -377,9 +377,9 @@ Answered on 2026-10-01 — see the top of this page. Two remain:
    waiver's premise is enforced by `src/test/maplibre-waiver.test.ts`, which
    since 2026-09-22 also covers `attribution`, the sink the advisory is
    actually about.
-6. **`get_ozi_tile` is dead IPC surface** — registered, generated into the
-   bindings, called by nothing; the map renders OZF2 through the `ozi://`
-   protocol. Removing it costs a binding and a registry line.
+6. ~~`get_ozi_tile` is dead IPC surface.~~ Removed on 2026-10-02
+   (`one-raster-tile-command`); the tile requirement names the two tile
+   commands that exist.
 7. **The legacy element defaults in `app.css`** are now all inside
    `@layer base`, so none of them overrides a component. Deleting them outright
    still needs a pass over the raw `<input>`/`<button>` sites that lean on
