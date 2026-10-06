@@ -414,6 +414,18 @@ async splitSegment(layerId: number, trackId: number, segmentId: number, pointId:
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Remove a point and split its segment between its neighbours, as one undo
+ * step: «Удалить и разделить» on an outlier at a gap.
+ */
+async cutOutTrackPoint(layerId: number, trackId: number, segmentId: number, pointId: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cut_out_track_point", { layerId, trackId, segmentId, pointId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async joinSegments(layerId: number, trackId: number, segmentIdA: number, segmentIdB: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("join_segments", { layerId, trackId, segmentIdA, segmentIdB }) };

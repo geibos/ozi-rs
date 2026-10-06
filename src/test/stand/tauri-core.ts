@@ -74,6 +74,7 @@ const EMITS_STATE_CHANGED = new Set([
   "create_waypoint_layer",
   "crop_track_to_extent",
   "crop_track_to_time",
+  "cut_out_track_point",
   "delete_track",
   "delete_track_layer",
   "delete_track_point",
@@ -449,6 +450,38 @@ function detailForEditing(): TrackDetailLike {
   ) as TrackDetailLike;
   return editedDetail;
 }
+
+/**
+ * `?track=dirty`: the fixture track replaced by one that needs cleaning, so
+ * the jumps-and-outliers list has something on it. Sixty points 12 m and
+ * 4 s apart, going east-north-east from the fixture's start; point 20 sits
+ * 350 m to the side and comes back (an outlier), and before point 41 the
+ * recording skips 900 m (a jump). The map's line is still the fixture's —
+ * the stand's geometry does not follow edits.
+ */
+function dirtyTrackDetail(): TrackDetailLike {
+  const mPerDegLat = 111_195;
+  const mPerDegLon = mPerDegLat * Math.cos((59.95 * Math.PI) / 180);
+  const start = Date.parse("2026-10-06T09:00:00+00:00");
+  const points = Array.from({ length: 60 }, (_, i) => {
+    const along = i * 12 + (i >= 40 ? 900 : 0);
+    const aside = i === 19 ? 350 : 0;
+    return {
+      id: i + 1,
+      lat: 59.95243 + (along * 0.4 + aside) / mPerDegLat,
+      lon: 31.59681 + (along * 0.9) / mPerDegLon,
+      elevation: 30,
+      timestamp: new Date(start + i * 4000).toISOString(),
+    };
+  });
+  return {
+    id: trackDetailFixture.id,
+    name: trackDetailFixture.name,
+    segments: [{ id: 1, points }],
+  };
+}
+
+if (PARAMS.get("track") === "dirty") editedDetail = dirtyTrackDetail();
 
 /**
  * The fixture track's row, with its point count taken from the edited detail.
@@ -1106,6 +1139,25 @@ const HANDLERS: StandAnswers = {
     standEmit("state-changed", undefined);
     return null;
   },
+  cut_out_track_point: (args) => {
+    const detail = detailForEditing();
+    const index = detail.segments.findIndex(
+      (s) => s.id === Number(args?.segmentId),
+    );
+    const segment = detail.segments[index];
+    const at =
+      segment?.points.findIndex((p) => p.id === Number(args?.pointId)) ?? -1;
+    if (!segment || at <= 0 || at >= segment.points.length - 1) {
+      throw `invalid segment operation on segment ${Number(args?.segmentId)} in track ${Number(args?.trackId)} in layer ${Number(args?.layerId)}: only a point between two others can be cut out`;
+    }
+    const tail = segment.points.splice(at).slice(1);
+    detail.segments.splice(index + 1, 0, {
+      id: Math.max(...detail.segments.map((s) => s.id)) + 1,
+      points: tail,
+    });
+    standEmit("state-changed", undefined);
+    return null;
+  },
   split_segment: (args) => {
     const detail = detailForEditing();
     const index = detail.segments.findIndex(
@@ -1113,7 +1165,15 @@ const HANDLERS: StandAnswers = {
     );
     if (index >= 0) {
       const segment = detail.segments[index];
-      const at = Math.max(1, Math.floor(segment.points.length / 2));
+      // At the chosen point when there is one, as the command does; the
+      // middle was a placeholder from before anything chose a point.
+      const chosen = segment.points.findIndex(
+        (p) => p.id === Number(args?.pointId),
+      );
+      const at =
+        chosen >= 0
+          ? chosen + 1
+          : Math.max(1, Math.floor(segment.points.length / 2));
       const tail = segment.points.splice(at);
       detail.segments.splice(index + 1, 0, {
         id: Math.max(...detail.segments.map((s) => s.id)) + 1,

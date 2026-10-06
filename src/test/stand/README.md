@@ -40,7 +40,7 @@ needs the smoke gate.
 answer throws, with the command name and where to add it — a screen that
 renders because a mock quietly returned `undefined` is the failure this whole
 exercise exists to stop. The answers are typed against the generated bindings,
-so an answer of the wrong *shape* fails `just check` rather than the screen —
+so an answer of the wrong _shape_ fails `just check` rather than the screen —
 that had happened twice before the types went in. Dialogs answer "cancelled" (the branch a screen must
 handle anyway) unless a session asks otherwise —
 `standAnswerDialogsWith("/tmp/day.gpx")` from `tauri-dialog.ts` makes the
@@ -61,6 +61,7 @@ of lie the hand-written mocks told.
 ```
 http://localhost:5273/project?state=empty        an empty project, the map kept
 http://localhost:5273/project?maps=none          a saved project with no map
+http://localhost:5273/project?track=dirty        the track with an outlier and a jump
 http://localhost:5273/?state=cold&catalogue=0     an empty catalogue
 http://localhost:5273/?state=cold&catalogue=13000 the catalogue at its real size
 http://localhost:5273/?state=cold&hold=load_projects   the catalogue never answers

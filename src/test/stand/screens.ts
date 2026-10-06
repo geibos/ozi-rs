@@ -10,7 +10,8 @@
  * launcher, `?state=empty` an empty project, `?fail=catalogue` an unreachable
  * catalogue, `?hold=<commands>` leaves those commands unanswered (loading),
  * `?catalogue=N` serves N searches (0 empty, thousands overflow), `?maps=none`
- * a saved project open with no map.
+ * a saved project open with no map, `?track=dirty` the fixture track with an
+ * outlier and a jump in it.
  */
 
 export const SHOT_STATES = [
@@ -31,7 +32,13 @@ export type ShotTheme = (typeof SHOT_THEMES)[number];
 export type ShotStep =
   | { click: string }
   | { press: string }
-  | { waitFor: string };
+  | { waitFor: string }
+  /**
+   * Wait until the whole screen holds still — the map included. A click that
+   * moves the map, made while the map is still taking up its opening view,
+   * loses to it in some runs and not in others.
+   */
+  | { settle: true };
 
 export interface ShotSetup {
   /** Path and query on the stand. */
@@ -157,6 +164,25 @@ export const SCREENS: ScreenEntry[] = [
           },
         ],
         ready: '[data-testid="inspector-show-on-map"]',
+      },
+    },
+  },
+  {
+    id: "track-jumps",
+    title: "A track that needs cleaning, its outlier chosen in the list",
+    states: {
+      loaded: {
+        url: "/project?track=dirty",
+        steps: [
+          { click: TRACKS_TAB },
+          {
+            click:
+              '[data-testid="tracks-tab-list"] [data-testid="track-stats"]',
+          },
+          { settle: true },
+          { click: '[data-testid="track-jump"][data-kind="outlier"]' },
+        ],
+        ready: '[data-testid="jump-cut-out"]',
       },
     },
   },

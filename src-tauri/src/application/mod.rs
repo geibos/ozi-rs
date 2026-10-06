@@ -1456,6 +1456,48 @@ impl AppState {
             })
     }
 
+    /// Cut a point out of the middle of a segment, splitting the segment
+    /// between its neighbours, as one undo step. Pre-generates the new
+    /// segment's id the way `apply_split_segment` does.
+    pub fn apply_cut_out_track_point(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+    ) -> Result<(), ProjectLayerError> {
+        let new_segment_id = {
+            let max_id = self
+                .project
+                .track_layers()
+                .iter()
+                .find(|l| l.id() == layer_id)
+                .and_then(|l| l.tracks().iter().find(|t| t.id() == track_id))
+                .map(|t| {
+                    t.segments()
+                        .iter()
+                        .map(|s| s.id().value())
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
+            TrackSegmentId::new(max_id + 1)
+        };
+
+        let cmd = commands::ProjectCommand::cut_out_track_point(
+            layer_id,
+            track_id,
+            segment_id,
+            point_id,
+            new_segment_id,
+        );
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|e| match e {
+                commands::CommandError::ProjectLayer(pe) => pe,
+            })
+    }
+
     /// Join two track segments.
     pub fn apply_join_segments(
         &mut self,

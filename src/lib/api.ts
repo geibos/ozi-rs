@@ -697,6 +697,27 @@ export async function splitSegment(
   );
 }
 
+/**
+ * Delete a point and split its segment between the points on either side —
+ * «Удалить и разделить», one undo step.
+ */
+export async function cutOutTrackPoint(
+  layerId: bigint,
+  trackId: bigint,
+  segmentId: bigint,
+  pointId: bigint,
+): Promise<void> {
+  await unwrap(
+    "cut_out_track_point",
+    commands.cutOutTrackPoint(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      toIdNumber(segmentId),
+      toIdNumber(pointId),
+    ),
+  );
+}
+
 export async function joinSegments(
   layerId: bigint,
   trackId: bigint,

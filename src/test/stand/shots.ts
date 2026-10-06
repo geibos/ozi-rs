@@ -84,11 +84,36 @@ function outputDir(options: Options): string {
   return join(ROOT, "target/shots");
 }
 
+/**
+ * Wait until the element has been in the same place for a while.
+ *
+ * Playwright's click waits for an element to be stable, and when it is not —
+ * the inspector re-renders as the track's detail arrives — it retries, and a
+ * retry scrolls the target into view with a different alignment. Clicking an
+ * entry in the inspector that way scrolled the whole inspector column in about
+ * one shot in two (2026-10-06). An operator clicks something that is standing
+ * still; so does the matrix.
+ */
+async function stillThere(page: Page, selector: string): Promise<void> {
+  const target = page.locator(selector).first();
+  await target.waitFor();
+  let previous: string | null = null;
+  for (let attempt = 0; attempt < 25; attempt += 1) {
+    const box = JSON.stringify(await target.boundingBox());
+    if (box === previous) return;
+    previous = box;
+    await page.waitForTimeout(200);
+  }
+}
+
 async function bringUp(page: Page, setup: ShotSetup): Promise<void> {
   await page.goto(STAND + setup.url, { waitUntil: "load" });
   for (const step of setup.steps ?? []) {
-    if ("click" in step) await page.locator(step.click).first().click();
-    else if ("press" in step) await page.keyboard.press(step.press);
+    if ("click" in step) {
+      await stillThere(page, step.click);
+      await page.locator(step.click).first().click();
+    } else if ("press" in step) await page.keyboard.press(step.press);
+    else if ("settle" in step) await stableShot(page, "body");
     else await page.locator(step.waitFor).first().waitFor();
   }
   await page.locator(setup.ready).first().waitFor({ timeout: 15_000 });

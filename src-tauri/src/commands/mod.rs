@@ -1616,6 +1616,32 @@ pub fn split_segment(
     Ok(())
 }
 
+/// Remove a point and split its segment between its neighbours, as one undo
+/// step: «Удалить и разделить» on an outlier at a gap.
+#[tauri::command]
+#[specta::specta]
+pub fn cut_out_track_point(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    segment_id: u64,
+    point_id: u64,
+) -> Result<(), String> {
+    use crate::domain::{LayerId, TrackId, TrackPointId, TrackSegmentId};
+    let mut app_state = lock_app_state(state.inner())?;
+    app_state
+        .apply_cut_out_track_point(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            TrackSegmentId::new(segment_id),
+            TrackPointId::new(point_id),
+        )
+        .map_err(|e| format!("{e}"))?;
+    let _ = app.emit("state-changed", ());
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn join_segments(

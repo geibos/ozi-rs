@@ -31,9 +31,12 @@
     segmentHeader,
   } from "$lib/track-points";
   import { joinSegments, splitSegment, trimTrackAtPoint } from "$lib/api";
+  import { formatLeg, legsOf, type Leg } from "$lib/track-jumps";
+  import TrackJumps from "./TrackJumps.svelte";
   import { reportEditFailure } from "$lib/edit-failure";
   import { locale, t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
+  import { tick } from "svelte";
   import type { SegmentDetail, TrackDetail } from "$lib/types";
 
   // `$state<T>(...)`, not an annotated `let`: with the annotation TypeScript
@@ -175,6 +178,63 @@
     ),
   );
 
+  /**
+   * The leg into each point — distance and speed from the one before, the
+   * Dist and KPH an operator reads to find an outlier. Per segment: the first
+   * point of a segment has no leg.
+   */
+  const legById = $derived(
+    new Map<number, Leg | null>(
+      (trackDetail?.segments ?? []).flatMap((s) => {
+        const legs = legsOf(s.points);
+        return s.points.map((p, i) => [p.id, legs[i]] as const);
+      }),
+    ),
+  );
+
+  /**
+   * Bring the selected point's row into view, in the middle. Choosing an
+   * outlier in the list above is choosing it to read its neighbours' legs, and
+   * those are in this table — wherever the table happened to be scrolled. A
+   * row already in full view stays where it is: clicking one should not move
+   * the table under the cursor.
+   */
+  let tableBody = $state<HTMLElement | null>(null);
+  $effect(() => {
+    const id = $selectedPointId;
+    const body = tableBody;
+    if (id === null || !body || !trackDetail) return;
+    // A point past the first thousand of its segment is behind "show more";
+    // the list above reaches it, so the table has to as well.
+    for (const segment of trackDetail.segments) {
+      if (expandedSegments[segment.id]) continue;
+      const paged = pageSegmentPoints(segment, false);
+      if (
+        paged.hiddenCount > 0 &&
+        segment.points.some((p) => BigInt(p.id) === id) &&
+        !paged.visible.some((p) => BigInt(p.id) === id)
+      ) {
+        expandedSegments[segment.id] = true;
+      }
+    }
+    // Centred, and in this table only: the legs on both sides of the point
+    // should show, and `scrollIntoView` would scroll the inspector column too.
+    void tick().then(() => {
+      const viewport = body.querySelector<HTMLElement>(
+        '[data-slot="scroll-area-viewport"]',
+      );
+      const row = body.querySelector<HTMLElement>(
+        `[data-point-id="${String(id)}"]`,
+      );
+      if (!viewport || !row) return;
+      const rowBox = row.getBoundingClientRect();
+      const viewBox = viewport.getBoundingClientRect();
+      if (rowBox.top >= viewBox.top && rowBox.bottom <= viewBox.bottom) return;
+      viewport.scrollTop +=
+        rowBox.top - viewBox.top - (viewport.clientHeight - rowBox.height) / 2;
+    });
+  });
+
   const currentPointIndex = $derived(
     $selectedPointId === null
       ? -1
@@ -272,7 +332,12 @@
       {$t("inspector.noSegments")}
     </div>
   {:else}
-    <ScrollArea class="max-h-72 flex-1">
+    <TrackJumps
+      detail={trackDetail}
+      layerId={$selectedTrack.layerId}
+      trackId={$selectedTrack.trackId}
+    />
+    <ScrollArea class="max-h-72 flex-1" bind:ref={tableBody}>
       {#each trackDetail.segments as segment, segIdx (segment.id)}
         {@const paged = pageSegmentPoints(
           segment,
@@ -305,6 +370,7 @@
                   ? "selected"
                   : undefined}
                 class="cursor-pointer text-[11px]"
+                data-point-id={point.id}
                 onclick={() => handlePointClick(point.id)}
               >
                 <Table.Cell class="text-border w-4 px-2 py-1">•</Table.Cell>
@@ -315,6 +381,14 @@
                       class="text-muted-foreground font-mono text-[10px] leading-tight"
                     >
                       {formatPointTimestamp(point, $locale)}
+                    </div>
+                  {/if}
+                  {#if legById.get(point.id)}
+                    <div
+                      class="text-muted-foreground font-mono text-[10px] leading-tight"
+                      data-testid="point-leg"
+                    >
+                      {formatLeg(legById.get(point.id)!, $locale)}
                     </div>
                   {/if}
                 </Table.Cell>

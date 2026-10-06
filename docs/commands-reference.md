@@ -11,33 +11,35 @@ non-destructive and immediately visible.
 
 ## ProjectCommand Variants
 
-| Command                 | Description                                                 | Undoable |
-| ----------------------- | ----------------------------------------------------------- | -------- |
-| `AddMapLayer`           | Add a new map layer                                         | yes      |
-| `AddMapLayerWithSource` | Add map layer with file path                                | yes      |
-| `AddTrackLayer`         | Add a new track layer                                       | yes      |
-| `AddWaypointLayer`      | Add a new waypoint layer                                    | yes      |
-| `RemoveMapLayer`        | Remove a map layer (stores full layer for undo)             | yes      |
-| `RemoveTrackLayer`      | Remove a track layer (stores full layer for undo)           | yes      |
-| `RemoveWaypointLayer`   | Remove a waypoint layer (stores full layer for undo)        | yes      |
-| `AddTrack`              | Add a track to a layer                                      | yes      |
-| `RemoveTrack`           | Remove a track (stores full track for undo)                 | yes      |
-| `DeleteTrack`           | Delete track by ID (resolves to RemoveTrack)                | yes      |
-| `RenameTrack`           | Rename a track (stores old and new names)                   | yes      |
-| `CreateEmptyTrack`      | Create a new empty track with a name                        | yes      |
-| `MoveTrackPoint`        | Move a point to new coordinates (stores old position)       | yes      |
-| `DeleteTrackPoint`      | Delete a point (stores removed index and point)             | yes      |
-| `InsertTrackPoint`      | Insert a point at index in a segment                        | yes      |
-| `SplitSegment`          | Split segment at a point into two segments                  | yes      |
-| `JoinSegments`          | Join two adjacent segments into one                         | yes      |
-| `SimplifyTrack`         | Douglas-Peucker simplification (stores removed points)      | yes      |
-| `RestoreTrackPoints`    | Reverse of SimplifyTrack — re-inserts removed points        | yes      |
-| `AddWaypoint`           | Add a waypoint to a layer                                   | yes      |
-| `RemoveWaypoint`        | Remove a waypoint (stores full waypoint for undo)           | yes      |
-| `DeleteWaypoint`        | Delete waypoint by ID (resolves to RemoveWaypoint)          | yes      |
-| `MoveWaypoint`          | Move waypoint to new coordinates                            | yes      |
-| `RenameWaypoint`        | Rename a waypoint (stores old and new names)                | yes      |
-| `SetWaypointSymbol`     | Set or clear a waypoint symbol (stores old and new symbols) | yes      |
+| Command                   | Description                                                 | Undoable |
+| ------------------------- | ----------------------------------------------------------- | -------- |
+| `AddMapLayer`             | Add a new map layer                                         | yes      |
+| `AddMapLayerWithSource`   | Add map layer with file path                                | yes      |
+| `AddTrackLayer`           | Add a new track layer                                       | yes      |
+| `AddWaypointLayer`        | Add a new waypoint layer                                    | yes      |
+| `RemoveMapLayer`          | Remove a map layer (stores full layer for undo)             | yes      |
+| `RemoveTrackLayer`        | Remove a track layer (stores full layer for undo)           | yes      |
+| `RemoveWaypointLayer`     | Remove a waypoint layer (stores full layer for undo)        | yes      |
+| `AddTrack`                | Add a track to a layer                                      | yes      |
+| `RemoveTrack`             | Remove a track (stores full track for undo)                 | yes      |
+| `DeleteTrack`             | Delete track by ID (resolves to RemoveTrack)                | yes      |
+| `RenameTrack`             | Rename a track (stores old and new names)                   | yes      |
+| `CreateEmptyTrack`        | Create a new empty track with a name                        | yes      |
+| `MoveTrackPoint`          | Move a point to new coordinates (stores old position)       | yes      |
+| `DeleteTrackPoint`        | Delete a point (stores removed index and point)             | yes      |
+| `InsertTrackPoint`        | Insert a point at index in a segment                        | yes      |
+| `SplitSegment`            | Split segment at a point into two segments                  | yes      |
+| `JoinSegments`            | Join two adjacent segments into one                         | yes      |
+| `CutOutTrackPoint`        | Remove a middle point and split between its neighbours      | yes      |
+| `RestoreCutOutTrackPoint` | Reverse of CutOutTrackPoint — join and put the point back   | yes      |
+| `SimplifyTrack`           | Douglas-Peucker simplification (stores removed points)      | yes      |
+| `RestoreTrackPoints`      | Reverse of SimplifyTrack — re-inserts removed points        | yes      |
+| `AddWaypoint`             | Add a waypoint to a layer                                   | yes      |
+| `RemoveWaypoint`          | Remove a waypoint (stores full waypoint for undo)           | yes      |
+| `DeleteWaypoint`          | Delete waypoint by ID (resolves to RemoveWaypoint)          | yes      |
+| `MoveWaypoint`            | Move waypoint to new coordinates                            | yes      |
+| `RenameWaypoint`          | Rename a waypoint (stores old and new names)                | yes      |
+| `SetWaypointSymbol`       | Set or clear a waypoint symbol (stores old and new symbols) | yes      |
 
 ## Tauri IPC Commands
 
@@ -117,6 +119,7 @@ registered without a line on this page, so the gap cannot open again.
 | `delete_track_point`   | Delete a point                                                    |
 | `insert_track_point`   | Insert a point at index                                           |
 | `split_segment`        | Split segment at a point                                          |
+| `cut_out_track_point`  | Delete a middle point and split the segment there, one undo step  |
 | `join_segments`        | Join two adjacent segments                                        |
 | `delete_track`         | Delete a track                                                    |
 | `create_empty_track`   | Create empty track (for drawing mode)                             |

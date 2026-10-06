@@ -124,6 +124,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::delete_track_point,
         commands::insert_track_point,
         commands::split_segment,
+        commands::cut_out_track_point,
         commands::join_segments,
         commands::delete_track,
         commands::add_waypoint,

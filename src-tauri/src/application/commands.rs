@@ -90,6 +90,27 @@ pub enum ProjectCommand {
         segment_id_a: TrackSegmentId,
         segment_id_b: TrackSegmentId,
     },
+    /// Remove a point from the middle of a segment and split the segment
+    /// between its neighbours — an outlier at a gap, cut out in one step, as
+    /// an operator cleaning a track in OziExplorer does in two (field notes,
+    /// 2026-10-06). The left part keeps `segment_id`; the right part is
+    /// `new_segment_id`. Reverse is `RestoreCutOutTrackPoint`.
+    CutOutTrackPoint {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        new_segment_id: TrackSegmentId,
+    },
+    /// Join `segment_id` and `new_segment_id` and put `point` back between
+    /// them. Reverse is `CutOutTrackPoint`.
+    RestoreCutOutTrackPoint {
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        new_segment_id: TrackSegmentId,
+        point: TrackPoint,
+    },
     /// CJ-4: set an explicit per-segment point order (sort-by-time is the
     /// main producer). Symmetric: its reverse is another ReorderTrackPoints
     /// carrying the pre-apply order, so undo/redo are exact inverses.
@@ -381,6 +402,22 @@ impl ProjectCommand {
         }
     }
 
+    pub fn cut_out_track_point(
+        layer_id: LayerId,
+        track_id: TrackId,
+        segment_id: TrackSegmentId,
+        point_id: TrackPointId,
+        new_segment_id: TrackSegmentId,
+    ) -> Self {
+        Self::CutOutTrackPoint {
+            layer_id,
+            track_id,
+            segment_id,
+            point_id,
+            new_segment_id,
+        }
+    }
+
     pub fn join_segments(
         layer_id: LayerId,
         track_id: TrackId,
@@ -621,6 +658,90 @@ impl ProjectCommand {
                     track_id.value(),
                     segment_id_a.value(),
                     segment_id_b.value(),
+                )?;
+                Ok(())
+            }
+            Self::CutOutTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                new_segment_id,
+            } => {
+                let track = project.track_mut(layer_id.value(), track_id.value())?;
+                let segment = track.segment_mut(*segment_id).ok_or(
+                    ProjectLayerError::MissingTrackSegment {
+                        layer_id: layer_id.value(),
+                        track_id: track_id.value(),
+                        segment_id: segment_id.value(),
+                    },
+                )?;
+                let index = segment
+                    .points()
+                    .iter()
+                    .position(|p| p.id() == *point_id)
+                    .ok_or(ProjectLayerError::MissingTrackPoint {
+                        layer_id: layer_id.value(),
+                        track_id: track_id.value(),
+                        segment_id: segment_id.value(),
+                        point_id: point_id.value(),
+                    })?;
+                // Checked before anything moves: a refused cut leaves the
+                // track as it was.
+                if index == 0 || index + 1 == segment.points().len() {
+                    return Err(CommandError::ProjectLayer(
+                        ProjectLayerError::InvalidSegmentOperation {
+                            layer_id: layer_id.value(),
+                            track_id: track_id.value(),
+                            segment_id: segment_id.value(),
+                            reason: "only a point between two others can be cut out",
+                        },
+                    ));
+                }
+                let previous = segment.points()[index - 1].id();
+                segment
+                    .remove_point(point_id.value())
+                    .map_err(CommandError::ProjectLayer)?;
+                let right = segment
+                    .split_at_point(previous.value(), *new_segment_id)
+                    .map_err(CommandError::ProjectLayer)?;
+                let insert_index = track
+                    .segments()
+                    .iter()
+                    .position(|s| s.id() == *segment_id)
+                    .map_or(track.segments().len(), |idx| idx + 1);
+                track.insert_segment_at(insert_index, right);
+                Ok(())
+            }
+            Self::RestoreCutOutTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                new_segment_id,
+                point,
+            } => {
+                let left_len = project
+                    .track_mut(layer_id.value(), track_id.value())?
+                    .segment_mut(*segment_id)
+                    .ok_or(ProjectLayerError::MissingTrackSegment {
+                        layer_id: layer_id.value(),
+                        track_id: track_id.value(),
+                        segment_id: segment_id.value(),
+                    })?
+                    .points()
+                    .len();
+                project.join_segments_in_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id.value(),
+                    new_segment_id.value(),
+                )?;
+                project.insert_point_in_layer(
+                    layer_id.value(),
+                    track_id.value(),
+                    segment_id.value(),
+                    left_len,
+                    point.clone(),
                 )?;
                 Ok(())
             }
@@ -1092,6 +1213,43 @@ impl ProjectCommand {
                 track_id: *track_id,
                 segment_id_a: *segment_id,
                 segment_id_b: *new_segment_id,
+            },
+            Self::CutOutTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                point_id,
+                new_segment_id,
+            } => {
+                let point = project
+                    .track_layers()
+                    .iter()
+                    .find(|layer| layer.id() == *layer_id)
+                    .and_then(|layer| layer.tracks().iter().find(|t| t.id() == *track_id))
+                    .and_then(|track| track.segments().iter().find(|s| s.id() == *segment_id))
+                    .and_then(|segment| segment.points().iter().find(|p| p.id() == *point_id))
+                    .cloned()
+                    .unwrap_or_else(|| TrackPoint::new(*point_id, 0.0, 0.0));
+                Self::RestoreCutOutTrackPoint {
+                    layer_id: *layer_id,
+                    track_id: *track_id,
+                    segment_id: *segment_id,
+                    new_segment_id: *new_segment_id,
+                    point,
+                }
+            }
+            Self::RestoreCutOutTrackPoint {
+                layer_id,
+                track_id,
+                segment_id,
+                new_segment_id,
+                point,
+            } => Self::CutOutTrackPoint {
+                layer_id: *layer_id,
+                track_id: *track_id,
+                segment_id: *segment_id,
+                point_id: point.id(),
+                new_segment_id: *new_segment_id,
             },
             Self::JoinSegments {
                 layer_id,
@@ -2929,6 +3087,125 @@ mod tests {
             .map(|p| p.id().value())
             .collect();
         assert_eq!(ids, vec![10, 11, 12]);
+    }
+
+    /// A project with one track whose single segment holds points 10..=13.
+    fn project_with_four_points() -> (Project, CommandStack, LayerId, TrackId, TrackSegmentId) {
+        let mut project = Project::untitled();
+        let mut history = CommandStack::default();
+        let layer_id = LayerId::new(20);
+        let track_id = TrackId::new(1);
+        let segment_id = TrackSegmentId::new(2);
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::add_track_layer(layer_id, "Tracks"),
+            )
+            .unwrap();
+        let mut track = Track::new(track_id, "Veter1");
+        let mut segment = TrackSegment::new(segment_id);
+        for (i, id) in (10..=13).enumerate() {
+            let offset = i as f64 * 0.001;
+            segment.add_point(TrackPoint::new(
+                TrackPointId::new(id),
+                59.9 + offset,
+                30.3 + offset,
+            ));
+        }
+        track.add_segment(segment);
+        history
+            .apply(&mut project, &ProjectCommand::add_track(layer_id, track))
+            .unwrap();
+        (project, history, layer_id, track_id, segment_id)
+    }
+
+    fn segment_point_ids(project: &Project) -> Vec<(u64, Vec<u64>)> {
+        project.track_layers()[1].tracks()[0]
+            .segments()
+            .iter()
+            .map(|s| {
+                (
+                    s.id().value(),
+                    s.points().iter().map(|p| p.id().value()).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn cut_out_track_point_removes_it_and_splits_between_its_neighbours() {
+        let (mut project, mut history, layer_id, track_id, segment_id) = project_with_four_points();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::cut_out_track_point(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(11),
+                    TrackSegmentId::new(3),
+                ),
+            )
+            .unwrap();
+
+        assert_eq!(
+            segment_point_ids(&project),
+            vec![(2, vec![10]), (3, vec![12, 13])]
+        );
+    }
+
+    #[test]
+    fn cut_out_track_point_is_one_undo_step_and_redoes() {
+        let (mut project, mut history, layer_id, track_id, segment_id) = project_with_four_points();
+        let before = project.clone();
+        let depth = history.undo_depth();
+
+        history
+            .apply(
+                &mut project,
+                &ProjectCommand::cut_out_track_point(
+                    layer_id,
+                    track_id,
+                    segment_id,
+                    TrackPointId::new(12),
+                    TrackSegmentId::new(3),
+                ),
+            )
+            .unwrap();
+        assert_eq!(history.undo_depth(), depth + 1);
+        let after = project.clone();
+
+        assert!(history.undo(&mut project));
+        assert_eq!(project, before);
+        assert!(history.redo(&mut project));
+        assert_eq!(project, after);
+    }
+
+    #[test]
+    fn cut_out_track_point_refuses_the_ends_of_a_segment() {
+        let (mut project, mut history, layer_id, track_id, segment_id) = project_with_four_points();
+        let before = project.clone();
+
+        for end in [10, 13] {
+            let error = history
+                .apply(
+                    &mut project,
+                    &ProjectCommand::cut_out_track_point(
+                        layer_id,
+                        track_id,
+                        segment_id,
+                        TrackPointId::new(end),
+                        TrackSegmentId::new(3),
+                    ),
+                )
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                CommandError::ProjectLayer(ProjectLayerError::InvalidSegmentOperation { .. })
+            ));
+        }
+        assert_eq!(project, before);
     }
 
     #[test]

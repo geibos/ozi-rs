@@ -58,7 +58,7 @@ below):
   debug build makes the `.app` only now (`--bundles app`); release DMGs come
   from CI. Why `bundle_dmg.sh` fails here was not looked into.
 - The FTP passwords' credential store, for real: `cargo test --lib
-  system_credential_store -- --ignored` files, reads back and deletes a
+system_credential_store -- --ignored` files, reads back and deletes a
   password under «ozi-rs FTP» in the login keychain through `SystemSecrets`.
   Green. Not done: saving through the form in the packaged application.
 
@@ -76,17 +76,36 @@ nobody could explain, is Douglas–Peucker at about 2 m: ours keeps 6671 points
 where Ozi kept 6672 and agrees on 97–98 % of them. The panel opens at 2 m and
 says so. Two defects fixed on the way: the perpendicular distance in raw
 degrees (17 % long at latitude 60) and the track menu staying open over the
-panel. Next from the same recording: a list of jumps (distance and speed to
-the neighbour, as the wiki finds outliers), «удалить и разделить», name
-fix-up by the standard's transliteration, colour by group type.
+panel.
+
+**Скачки и выбросы** (`jumps-and-outliers`, 2026-10-06), the next thing from
+the same recording. The points table shows under each point the distance and
+speed from the previous one — Ozi's Dist and KPH, which the wiki reads to find
+an outlier. Above the table the inspector lists the track's jumps (a leg of
+100 m and ten median steps) and outliers (a point the track goes out to and
+comes straight back from); choosing one selects it, centres the map and the
+table on it. A jump offers «Разделить здесь», an outlier «Удалить вершину» and
+«Удалить и разделить» — the last a new command, `CutOutTrackPoint`, one undo
+step. Thresholds measured on the owner's own cleaning of the eleven tracks:
+26 of his 32 breaks (one more was already a GPX break) and 15 of his 20
+deleted points are on the list, 112 entries over the eleven tracks, 59 of them
+places he edited. The stand serves such a track with `?track=dirty`. Next from
+the recording: name fix-up by the standard's transliteration, colour by group
+type, each track to its own PLT in one go, a 20 000-point track.
 
 **The screenshot matrix exists** (`finish-the-rebuild` group 1, 2026-10-02).
-`just shots` photographs fourteen screen states — the launcher in all five
-states, the library tabs, the track inspector, the palette, settings — in
-both languages and both themes, inside the Playwright Docker image so a Mac
-and the CI runner produce the same pixels, and compares them with the 60
-committed baseline shots in `src/test/stand/baseline/`. It is part of
-`just ci` and a CI job of its own. Two fresh runs matched 60/60. Accepting a
+`just shots` photographs fifteen screen states — the launcher in all five
+states, the library tabs, the track inspector clean and with jumps to clean,
+the palette, settings — in both languages and both themes, inside the
+Playwright Docker image so a Mac and the CI runner produce the same pixels,
+and compares them with the 64 committed baseline shots in
+`src/test/stand/baseline/`. It is part of `just ci` and a CI job of its own.
+Two fresh runs matched 60/60 on 2026-10-02; on 2026-10-06 one of two runs
+matched 64/64 and the other failed `library-tracks__error__en__light` (5736
+pixels; its diff was overwritten before it was looked at), and an earlier run
+that day timed out on `settings__loaded__ru__dark` («did not hold still») —
+neither screen had changed, so the matrix has an intermittent miss somewhere
+that is not yet understood. Accepting a
 deliberate change is `just shots --update` in a commit of its own. It found a
 defect on its first day: a project restored without a map opened in the
 catalogue (`a-project-is-a-workspace`).
@@ -494,8 +513,8 @@ afternoon.
   cause, visible for the first time because `appium:showServerLogs` is now on
   (`tools/ozi-rs-mcp/src/appium.rs`):
 
-        Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
-        Code=1000 "Timed out while enabling automation mode."
+            Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+            Code=1000 "Timed out while enabling automation mode."
 
   **What this means.** Enabling automation mode is macOS asking for the
   Accessibility grant that lets a test runner drive the interface. It times out
