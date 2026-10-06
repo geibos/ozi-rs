@@ -123,6 +123,9 @@ const dictionaries = {
     "tracksTab.delete": "Delete",
     "tracksTab.simplifyTitle": "Simplify the track",
     "tracksTab.tolerance": "Tolerance: {tolerance} m",
+    "tracksTab.ozi4Hint":
+      "{tolerance} m is what OziExplorer's track filter does at index 4, the index the standard prescribes",
+    "tracksTab.ozi4Reset": "Index 4",
     "tracksTab.simplifyOriginal": "Was:",
     "tracksTab.simplifyResult": "→ becomes:",
     "tracksTab.cancel": "Cancel",
@@ -662,6 +665,9 @@ const dictionaries = {
     "tracksTab.delete": "Удалить",
     "tracksTab.simplifyTitle": "Упрощение трека",
     "tracksTab.tolerance": "Допуск: {tolerance} м",
+    "tracksTab.ozi4Hint":
+      "{tolerance} м — как фильтр трека OziExplorer с индексом 4, который требует стандарт",
+    "tracksTab.ozi4Reset": "Индекс 4",
     "tracksTab.simplifyOriginal": "Было:",
     "tracksTab.simplifyResult": "→ станет:",
     "tracksTab.cancel": "Отмена",

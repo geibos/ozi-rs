@@ -68,6 +68,18 @@ locally, because the local gate runs on macOS: clippy on Linux failed on
 failed, on a Next.js advisory reaching us through the `geist` font package.
 Both fixed in `fe06e6a`; the Geist fonts stay vendored in `static/fonts/`.
 
+**«Упростить» = фильтр Ozi с индексом 4** (`filter-like-ozi-index-4`,
+2026-10-06). The owner recorded processing a real search in OziExplorer
+(`docs/field-notes/2026-10-06-track-processing-in-ozi.md`) and gave eleven
+original/filtered track pairs. Index 4, which the standard prescribes and
+nobody could explain, is Douglas–Peucker at about 2 m: ours keeps 6671 points
+where Ozi kept 6672 and agrees on 97–98 % of them. The panel opens at 2 m and
+says so. Two defects fixed on the way: the perpendicular distance in raw
+degrees (17 % long at latitude 60) and the track menu staying open over the
+panel. Next from the same recording: a list of jumps (distance and speed to
+the neighbour, as the wiki finds outliers), «удалить и разделить», name
+fix-up by the standard's transliteration, colour by group type.
+
 **The screenshot matrix exists** (`finish-the-rebuild` group 1, 2026-10-02).
 `just shots` photographs fourteen screen states — the launcher in all five
 states, the library tabs, the track inspector, the palette, settings — in

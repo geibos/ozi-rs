@@ -887,7 +887,9 @@ export const simplifyState = writable<{
   active: false,
   layerId: BigInt(0),
   trackId: BigInt(0),
-  toleranceM: 10,
+  // OziExplorer's filter at index 4 — see `$lib/simplify`. A literal here
+  // rather than the import: `$lib/simplify` imports this module.
+  toleranceM: 2,
   preview: null,
 });
 /**

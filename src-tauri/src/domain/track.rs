@@ -476,8 +476,9 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 
 /// Perpendicular haversine distance (km) from point P to the line segment AB.
 ///
-/// Uses a flat-Earth approximation to find the projection parameter `t`, then
-/// computes the haversine distance from P to the projected point on AB.
+/// Finds the projection parameter `t` on a local plane (longitude scaled by
+/// the cosine of the latitude), then computes the haversine distance from P to
+/// the projected point on AB.
 fn perpendicular_distance_km(
     p_lat: f64,
     p_lon: f64,
@@ -486,8 +487,14 @@ fn perpendicular_distance_km(
     b_lat: f64,
     b_lon: f64,
 ) -> f64 {
+    // Longitude scaled by the cosine of the latitude, so that a degree east
+    // and a degree north are the same length on the plane where the foot of
+    // the perpendicular is found. In raw degrees it lands in the wrong place
+    // on any diagonal segment: at latitude 60 the distance came out 17 %
+    // long, and simplification kept points its tolerance said could go.
+    let k = ((a_lat + b_lat) / 2.0).to_radians().cos();
     let dlat = b_lat - a_lat;
-    let dlon = b_lon - a_lon;
+    let dlon = (b_lon - a_lon) * k;
     let len_sq = dlat * dlat + dlon * dlon;
 
     if len_sq == 0.0 {
@@ -495,12 +502,11 @@ fn perpendicular_distance_km(
         return haversine_km(a_lat, a_lon, p_lat, p_lon);
     }
 
-    // Project P onto the line AB using flat-Earth (lat/lon as Euclidean).
-    let t = ((p_lat - a_lat) * dlat + (p_lon - a_lon) * dlon) / len_sq;
+    let t = ((p_lat - a_lat) * dlat + (p_lon - a_lon) * k * dlon) / len_sq;
     let t = t.clamp(0.0, 1.0);
 
-    let q_lat = a_lat + t * dlat;
-    let q_lon = a_lon + t * dlon;
+    let q_lat = a_lat + t * (b_lat - a_lat);
+    let q_lon = a_lon + t * (b_lon - a_lon);
 
     haversine_km(p_lat, p_lon, q_lat, q_lon)
 }
@@ -593,6 +599,110 @@ mod tests {
         Track, TrackId, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId,
         simplify_track_points, simplify_track_points_m,
     };
+
+    /// How close `simplify_track_points_m` comes to OziExplorer's track filter
+    /// at "index 4", the setting the detachment's standard prescribes.
+    ///
+    /// Reads pairs exported from real searches — the original points and the
+    /// indices Ozi kept — from `OZI_FILTER_PAIRS` (a JSON file kept out of the
+    /// repository, since it is a real search's tracks):
+    /// `OZI_FILTER_PAIRS=… cargo test --lib ozi_filter_agreement -- --ignored --nocapture`.
+    /// A kept point counts as matched when the other side kept one within two
+    /// positions or three metres of it: on a dense phone track neighbouring
+    /// points are interchangeable, and identity alone undercounts.
+    #[test]
+    #[ignore = "needs OZI_FILTER_PAIRS, exported from a real search"]
+    fn ozi_filter_agreement() {
+        let path = std::env::var("OZI_FILTER_PAIRS").expect("OZI_FILTER_PAIRS");
+        let pairs: Vec<serde_json::Value> =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let tolerance_m: f64 = std::env::var("OZI_FILTER_TOLERANCE_M")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2.0);
+        let near = |a: &[usize], b: &[usize], pts: &[TrackPoint]| -> f64 {
+            let hit = a
+                .iter()
+                .filter(|&&i| {
+                    b.iter().any(|&j| {
+                        i.abs_diff(j) <= 2
+                            || super::haversine_km(
+                                pts[i].latitude(),
+                                pts[i].longitude(),
+                                pts[j].latitude(),
+                                pts[j].longitude(),
+                            ) * 1000.0
+                                <= 3.0
+                    })
+                })
+                .count();
+            hit as f64 / a.len() as f64
+        };
+        let (mut precision, mut recall, mut ours, mut ozis) = (0.0, 0.0, 0usize, 0usize);
+        for pair in &pairs {
+            let pts: Vec<TrackPoint> = pair["points"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    TrackPoint::new(
+                        TrackPointId::new(i as u64),
+                        p[0].as_f64().unwrap(),
+                        p[1].as_f64().unwrap(),
+                    )
+                })
+                .collect();
+            let ozi: Vec<usize> = pair["kept"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect();
+            let kept = simplify_track_points_m(&pts, tolerance_m);
+            precision += near(&kept, &ozi, &pts);
+            recall += near(&ozi, &kept, &pts);
+            ours += kept.len();
+            ozis += ozi.len();
+        }
+        let n = pairs.len() as f64;
+        println!(
+            "tolerance {tolerance_m} m over {} runs: precision {:.3}, recall {:.3}, kept {ours} vs Ozi {ozis}",
+            pairs.len(),
+            precision / n,
+            recall / n
+        );
+    }
+
+    /// The foot of the perpendicular is found in metres, not in raw degrees.
+    ///
+    /// At latitude 60 a degree of longitude is half a degree of latitude.
+    /// Projecting in raw degrees put the foot in the wrong place on a diagonal
+    /// segment and overstated the distance, so simplification kept points the
+    /// tolerance said could go — five per cent more than OziExplorer keeps on
+    /// the same tracks (2026-10-06).
+    #[test]
+    fn perpendicular_distance_is_measured_in_metres_at_high_latitude() {
+        // A diagonal from (60, 30) to (60.01, 30.02): 1.11 km north, 1.11 km
+        // east. The point sits on the perpendicular through its midpoint,
+        // 100 m off the line.
+        let lat0: f64 = 60.005;
+        let k = lat0.to_radians().cos();
+        let (a_lat, a_lon, b_lat, b_lon) = (60.0, 30.0, 60.01, 30.0 + 0.01 / k);
+        let mid_lat = (a_lat + b_lat) / 2.0;
+        let mid_lon = (a_lon + b_lon) / 2.0;
+        let off_m: f64 = 100.0;
+        let metres_per_deg = 6_371_000.0_f64.to_radians();
+        let step = off_m / std::f64::consts::SQRT_2 / metres_per_deg;
+        let p_lat = mid_lat + step;
+        let p_lon = mid_lon - step / k;
+        let d_m =
+            super::perpendicular_distance_km(p_lat, p_lon, a_lat, a_lon, b_lat, b_lon) * 1000.0;
+        assert!(
+            (d_m - off_m).abs() < 1.0,
+            "measured {d_m:.1} m, expected 100 m"
+        );
+    }
 
     #[test]
     fn track_segments_keep_inserted_points_in_order() {

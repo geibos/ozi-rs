@@ -11,6 +11,24 @@ harness (`docs/native-qa-mcp.md`).
 
 ---
 
+## 2026-10-06 — «Упростить» как фильтр Ozi с индексом 4
+
+![the panel opens at 2 m and says why](2026-10-06-filter-like-ozi/opens-at-index-4.png)
+![after the slider moved, the index-4 button](2026-10-06-filter-like-ozi/back-to-index-4.png)
+
+The standard has every foot patrol's track filtered in OziExplorer "by index
+4", and nobody could say what that was. Measured on eleven tracks from a real
+search, it is Douglas–Peucker at about 2 m: our implementation keeps 6671
+points where Ozi kept 6672 and picks the same ones 97–98 % of the time. The
+panel now opens at 2 m, says so, and has a button back to it.
+
+The measurement found two defects. The perpendicular distance was found in
+raw degrees, 17 % long at latitude 60, so simplification kept more than its
+tolerance allowed. And the track menu stayed open after «Упростить…», over the
+panel's own buttons.
+
+---
+
 ## 2026-10-02 — MapLibre 6
 
 ![the same map, drawn by MapLibre 6.11.2](2026-10-02-maplibre-6/same-map-on-6.png)

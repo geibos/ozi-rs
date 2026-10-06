@@ -58,6 +58,11 @@
     toggleTrackVisible,
   } from "$lib/api";
   import {
+    OZI_INDEX_4_TOLERANCE_M,
+    openSimplify as openSimplifyPanel,
+    resetToOziIndex4,
+  } from "$lib/simplify";
+  import {
     IMPORTABLE_EXTENSIONS,
     describeFailures,
     importPaths,
@@ -475,13 +480,7 @@
   }
 
   function openSimplify(t: TrackFeature) {
-    simplifyState.set({
-      active: true,
-      layerId: t.layerId,
-      trackId: t.trackId,
-      toleranceM: 10,
-      preview: null,
-    });
+    openSimplifyPanel(t.layerId, t.trackId);
     simplifyLivePreview = true;
     // The preview is not asked for here. See the effect below: asking from
     // each opener is how the Track Inspector's Simplify came to open a slider
@@ -951,12 +950,11 @@
                 />
               </Popover.Content>
             </Popover.Root>
-            <DropdownMenu.Item
-              onSelect={(e: Event) => {
-                e.preventDefault();
-                openSimplify(t);
-              }}
-            >
+            <!-- The menu closes on select. It used to be kept open — left over
+                 from when Simplify was a popover inside the menu — and once the
+                 panel became a card under the row, the open menu sat on top of
+                 the panel's own buttons. Found walking the panel, 2026-10-06. -->
+            <DropdownMenu.Item onSelect={() => openSimplify(t)}>
               {$i18n("tracksTab.simplify")}
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
@@ -983,6 +981,25 @@
                 String($simplifyState.toleranceM),
               )}
             </Label>
+            <div
+              class="text-muted-foreground flex items-center justify-between gap-2 text-[11px] leading-snug"
+            >
+              <span data-testid="simplify-ozi-hint"
+                >{$i18n("tracksTab.ozi4Hint").replace(
+                  "{tolerance}",
+                  String(OZI_INDEX_4_TOLERANCE_M),
+                )}</span
+              >
+              {#if $simplifyState.toleranceM !== OZI_INDEX_4_TOLERANCE_M}
+                <Button
+                  variant="outline"
+                  size="xs"
+                  data-testid="simplify-ozi-reset"
+                  onclick={resetToOziIndex4}
+                  >{$i18n("tracksTab.ozi4Reset")}</Button
+                >
+              {/if}
+            </div>
             <Slider
               type="single"
               min={1}

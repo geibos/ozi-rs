@@ -131,18 +131,31 @@ async function warmUp(browser: Browser): Promise<void> {
  * the first baseline nearly took one.
  */
 async function stableShot(page: Page, ready: string): Promise<Buffer> {
+  // Three agreeing frames 600 ms apart, not two 400 ms apart: the map's
+  // flight to its data can pause between two frames, and the first baseline
+  // run after the matrix landed photographed one such pause (2026-10-06).
+  const needed = 3;
   let previous: Buffer | null = null;
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  let agreeing = 1;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const shot = await page.screenshot({
       animations: "disabled",
       caret: "hide",
       timeout: 60_000,
     });
     if (previous && diffPixels(previous, shot, null) === 0) {
-      if (await page.locator(ready).first().isVisible()) return shot;
+      agreeing += 1;
+      if (
+        agreeing >= needed &&
+        (await page.locator(ready).first().isVisible())
+      ) {
+        return shot;
+      }
+    } else {
+      agreeing = 1;
     }
     previous = shot;
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600);
   }
   throw new Error("the screen did not hold still");
 }
@@ -187,7 +200,10 @@ async function shoot(
     await context.addInitScript(
       ({ locale, theme }) => {
         localStorage.setItem("ozi:locale", locale);
-        localStorage.setItem("theme", theme === "light" ? "native-light" : "native-dark");
+        localStorage.setItem(
+          "theme",
+          theme === "light" ? "native-light" : "native-dark",
+        );
         localStorage.setItem("catppuccinPackEnabled", "0");
       },
       { locale, theme },
@@ -217,7 +233,9 @@ async function shoot(
 
 async function main(): Promise<number> {
   const options = parseArgs(process.argv.slice(2));
-  const screens = SCREENS.filter((s) => !options.screen || s.id === options.screen);
+  const screens = SCREENS.filter(
+    (s) => !options.screen || s.id === options.screen,
+  );
   if (screens.length === 0) {
     console.error(`no screen named ${options.screen}`);
     return 2;
@@ -244,12 +262,21 @@ async function main(): Promise<number> {
           for (const theme of SHOT_THEMES) {
             const name = shotName(screen.id, state, locale, theme);
             try {
-              const png = await shoot(browser, screen, state, setup, locale, theme);
+              const png = await shoot(
+                browser,
+                screen,
+                state,
+                setup,
+                locale,
+                theme,
+              );
               writeFileSync(join(out, name), png);
               produced.push(name);
               console.log(`shot ${name}`);
             } catch (error) {
-              failures.push(String(error instanceof Error ? error.message : error));
+              failures.push(
+                String(error instanceof Error ? error.message : error),
+              );
             }
           }
         }
@@ -268,13 +295,16 @@ async function main(): Promise<number> {
         }
       }
     }
-    for (const name of produced) copyFileSync(join(out, name), join(BASELINE, name));
+    for (const name of produced)
+      copyFileSync(join(out, name), join(BASELINE, name));
     console.log(`baseline updated: ${produced.length} shots`);
   } else if (options.mode === "compare") {
     for (const name of produced) {
       const baseline = join(BASELINE, name);
       if (!existsSync(baseline)) {
-        failures.push(`${name}: no baseline — a new screen state needs \`just shots --update\``);
+        failures.push(
+          `${name}: no baseline — a new screen state needs \`just shots --update\``,
+        );
         continue;
       }
       const count = diffPixels(
@@ -292,7 +322,9 @@ async function main(): Promise<number> {
     if (!options.screen && existsSync(BASELINE)) {
       for (const name of readdirSync(BASELINE)) {
         if (name.endsWith(".png") && !produced.includes(name)) {
-          failures.push(`${name}: in the baseline, no longer rendered — remove it with \`just shots --update\``);
+          failures.push(
+            `${name}: in the baseline, no longer rendered — remove it with \`just shots --update\``,
+          );
         }
       }
     }

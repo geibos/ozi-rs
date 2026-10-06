@@ -24,11 +24,7 @@
   import FileOutputIcon from "@lucide/svelte/icons/file-output";
   import LineChartIcon from "@lucide/svelte/icons/line-chart";
   import { elevationProfile, profilePath } from "$lib/elevation-profile";
-  import {
-    formatMoment,
-    positionAt,
-    replayRange,
-  } from "$lib/track-replay";
+  import { formatMoment, positionAt, replayRange } from "$lib/track-replay";
   import { replayPosition } from "$lib/stores";
   import LocateIcon from "@lucide/svelte/icons/locate";
   import SlidersHorizontalIcon from "@lucide/svelte/icons/sliders-horizontal";
@@ -41,7 +37,6 @@
     mapViewportBounds,
     requestTrackFocus,
     selectedTrack,
-    simplifyState,
     tracksGeometryVersion,
   } from "$lib/stores";
   import {
@@ -67,6 +62,7 @@
   } from "$lib/track-stats";
   import type { TrackDetail, TrackSummary } from "$lib/types";
   import TrackSegmentsTable from "./TrackSegmentsTable.svelte";
+  import { openSimplify } from "$lib/simplify";
   import { ascentDescent, movingSeconds } from "$lib/track-motion";
   import { motionSettings } from "$lib/settings";
 
@@ -99,7 +95,9 @@
    * by scrolling a few thousand rows looking for a timestamp. OziExplorer has
    * Track Replay for it, and a coordinator who has used it misses it here.
    */
-  const replay = $derived(trackDetail ? replayRange(trackDetail.segments) : null);
+  const replay = $derived(
+    trackDetail ? replayRange(trackDetail.segments) : null,
+  );
   let replayAtMs = $state<number | null>(null);
   let playing = $state(false);
   let playTimer: number | null = null;
@@ -291,13 +289,7 @@
   function handleSimplify() {
     const sel = $selectedTrack;
     if (!sel) return;
-    simplifyState.set({
-      active: true,
-      layerId: sel.layerId,
-      trackId: sel.trackId,
-      toleranceM: 10,
-      preview: null,
-    });
+    openSimplify(sel.layerId, sel.trackId);
   }
 
   /** "Show on map" — MapView consumes the request and fits the bounds. */
