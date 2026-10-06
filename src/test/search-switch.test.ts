@@ -39,9 +39,9 @@ describe("holdsWork", () => {
   });
 
   it("counts a track", () => {
-    expect(
-      holdsWork({ ...empty, tracks: [{} as never] as never[] }),
-    ).toBe(true);
+    expect(holdsWork({ ...empty, tracks: [{} as never] as never[] })).toBe(
+      true,
+    );
   });
 
   it("counts unsaved changes, which is where a mark-only project shows", () => {
@@ -49,8 +49,8 @@ describe("holdsWork", () => {
   });
 
   it("counts a project with a file on disk, whatever is in it", () => {
-    expect(holdsWork({ ...empty, project_path: "/Users/crew/lavrovo.ozp" })).toBe(
-      true,
-    );
+    expect(
+      holdsWork({ ...empty, project_path: "/Users/crew/lavrovo.ozp" }),
+    ).toBe(true);
   });
 });

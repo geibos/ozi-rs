@@ -45,7 +45,8 @@ describe("the settings screen", () => {
 
   it("shows the thresholds in force, the window in minutes", () => {
     expect(
-      (screen.getByLabelText("Расстояние стоянки, м") as HTMLInputElement).value,
+      (screen.getByLabelText("Расстояние стоянки, м") as HTMLInputElement)
+        .value,
     ).toBe("25");
     expect(
       (screen.getByLabelText("Окно стоянки, мин") as HTMLInputElement).value,
@@ -67,7 +68,9 @@ describe("the settings screen", () => {
   });
 
   it("keeps the old value while the field is empty, and shows it again on leaving", async () => {
-    const field = screen.getByLabelText("Порог перепада, м") as HTMLInputElement;
+    const field = screen.getByLabelText(
+      "Порог перепада, м",
+    ) as HTMLInputElement;
     await fireEvent.input(field, { target: { value: "" } });
     expect(get(motionSettings).climbThresholdM).toBe(5);
     await fireEvent.blur(field);

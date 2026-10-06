@@ -75,9 +75,8 @@ describe("the names on the map", () => {
   }
 
   it("writes them along the line, repeated, in the font that ships", async () => {
-    const { initTracksLayer: init } = await import(
-      "../lib/maplibre/tracks-layer"
-    );
+    const { initTracksLayer: init } =
+      await import("../lib/maplibre/tracks-layer");
     const { LABEL_FONT } = await import("../lib/maplibre/glyphs-protocol");
     const map = recordingMap();
     init(map);
@@ -94,9 +93,8 @@ describe("the names on the map", () => {
   });
 
   it("feeds them from their own source, not from the lines'", async () => {
-    const { initTracksLayer: init, updateTrackLabels } = await import(
-      "../lib/maplibre/tracks-layer"
-    );
+    const { initTracksLayer: init, updateTrackLabels } =
+      await import("../lib/maplibre/tracks-layer");
     const map = recordingMap();
     init(map);
     const labels = map.layers.find(
@@ -144,9 +142,8 @@ describe("highlighting the selected track", () => {
   }
 
   it("adds the highlight beneath the coloured line, so the colour stays true", async () => {
-    const { TRACKS_LAYER_SELECTED, initTracksLayer: init } = await import(
-      "../lib/maplibre/tracks-layer"
-    );
+    const { TRACKS_LAYER_SELECTED, initTracksLayer: init } =
+      await import("../lib/maplibre/tracks-layer");
     const map = fakeMapWithFilters();
     init(map);
     expect(map.layers).toContain(TRACKS_LAYER_SELECTED);
@@ -156,8 +153,11 @@ describe("highlighting the selected track", () => {
   });
 
   it("matches exactly one track, by layer and by track", async () => {
-    const { TRACKS_LAYER_SELECTED, highlightTrack, initTracksLayer: init } =
-      await import("../lib/maplibre/tracks-layer");
+    const {
+      TRACKS_LAYER_SELECTED,
+      highlightTrack,
+      initTracksLayer: init,
+    } = await import("../lib/maplibre/tracks-layer");
     const map = fakeMapWithFilters();
     init(map);
 
@@ -170,8 +170,11 @@ describe("highlighting the selected track", () => {
   });
 
   it("matches nothing when nothing is selected", async () => {
-    const { TRACKS_LAYER_SELECTED, highlightTrack, initTracksLayer: init } =
-      await import("../lib/maplibre/tracks-layer");
+    const {
+      TRACKS_LAYER_SELECTED,
+      highlightTrack,
+      initTracksLayer: init,
+    } = await import("../lib/maplibre/tracks-layer");
     const map = fakeMapWithFilters();
     init(map);
 
@@ -190,6 +193,8 @@ describe("highlighting the selected track", () => {
     const map = fakeMapWithFilters();
     // No init: a style reload can leave the map without the layer for a
     // moment, and a highlight arriving then must not throw at the operator.
-    expect(() => highlightTrack(map, { layerId: 1n, trackId: 1n })).not.toThrow();
+    expect(() =>
+      highlightTrack(map, { layerId: 1n, trackId: 1n }),
+    ).not.toThrow();
   });
 });

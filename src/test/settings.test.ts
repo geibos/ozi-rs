@@ -52,7 +52,11 @@ describe("motion settings", () => {
   it("keeps the good values from a store that has some bad ones", async () => {
     localStorage.setItem(
       "ozi:motion-settings",
-      JSON.stringify({ stopDistanceM: 30, stopWindowS: -1, climbThresholdM: "x" }),
+      JSON.stringify({
+        stopDistanceM: 30,
+        stopWindowS: -1,
+        climbThresholdM: "x",
+      }),
     );
     const { motionSettings } = await freshModule();
     expect(get(motionSettings)).toEqual({

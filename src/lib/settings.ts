@@ -20,7 +20,9 @@ function load(): MotionSettings {
     if (typeof localStorage === "undefined") return DEFAULT_MOTION_SETTINGS;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_MOTION_SETTINGS;
-    const stored = JSON.parse(raw) as Partial<Record<keyof MotionSettings, unknown>>;
+    const stored = JSON.parse(raw) as Partial<
+      Record<keyof MotionSettings, unknown>
+    >;
     // Value by value: one field written by an older build, or edited by hand,
     // must not cost the operator the other two.
     const out = { ...DEFAULT_MOTION_SETTINGS };

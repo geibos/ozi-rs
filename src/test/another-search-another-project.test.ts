@@ -92,7 +92,9 @@ function state(overrides: Partial<AppStateDto> = {}): AppStateDto {
   } as AppStateDto;
 }
 
-const A_TRACK = [{ layer_id: 1, track_id: 1 }] as unknown as AppStateDto["tracks"];
+const A_TRACK = [
+  { layer_id: 1, track_id: 1 },
+] as unknown as AppStateDto["tracks"];
 
 async function given(s: AppStateDto) {
   backend.state = s;
@@ -131,7 +133,9 @@ describe("opening another search's map", () => {
 
     expect(ask).not.toHaveBeenCalled();
     expect(backend.newProject).toHaveBeenCalledOnce();
-    expect(backend.openSelectedMap).toHaveBeenCalledWith("Kirishi_Topo.sqlitedb");
+    expect(backend.openSelectedMap).toHaveBeenCalledWith(
+      "Kirishi_Topo.sqlitedb",
+    );
     expect(backend.newProject.mock.invocationCallOrder[0]).toBeLessThan(
       backend.openSelectedMap.mock.invocationCallOrder[0],
     );

@@ -151,7 +151,10 @@ export const SCREENS: ScreenEntry[] = [
         url: "/project",
         steps: [
           { click: TRACKS_TAB },
-          { click: '[data-testid="tracks-tab-list"] [data-testid="track-stats"]' },
+          {
+            click:
+              '[data-testid="tracks-tab-list"] [data-testid="track-stats"]',
+          },
         ],
         ready: '[data-testid="inspector-show-on-map"]',
       },
@@ -163,7 +166,10 @@ export const SCREENS: ScreenEntry[] = [
     states: {
       loaded: {
         url: "/project",
-        steps: [{ waitFor: '[data-testid="maps-open-project"]' }, { press: "Meta+k" }],
+        steps: [
+          { waitFor: '[data-testid="maps-open-project"]' },
+          { press: "Meta+k" },
+        ],
         ready: '[data-slot="dialog-content"]',
       },
     },
@@ -174,7 +180,10 @@ export const SCREENS: ScreenEntry[] = [
     states: {
       loaded: {
         url: "/project",
-        steps: [{ waitFor: '[data-testid="maps-open-project"]' }, { press: "Meta+Comma" }],
+        steps: [
+          { waitFor: '[data-testid="maps-open-project"]' },
+          { press: "Meta+Comma" },
+        ],
         ready: '[data-testid="settings-stop-distance"]',
       },
     },

@@ -68,7 +68,11 @@ describe("movingSeconds", () => {
     const rest = leg(30 * 60, 20 * 60, 0, { jitterM: 7, fromM: walk1.endM });
     const walk2 = leg(50 * 60, 30 * 60, 3, { fromM: rest.endM });
     const segment = {
-      points: [...walk1.points, ...rest.points.slice(1), ...walk2.points.slice(1)],
+      points: [
+        ...walk1.points,
+        ...rest.points.slice(1),
+        ...walk2.points.slice(1),
+      ],
     };
     const moving = minutes(movingSeconds([segment], DEFAULT_MOTION_SETTINGS))!;
     // The two-minute window blurs each edge of the stop by up to two minutes.
