@@ -160,10 +160,9 @@
         <li
           role="option"
           aria-selected={chosen}
-          aria-label={`${label(s)}, ${$t("jumps.point").replace(
-            "{i}",
-            String(ordinal.get(s.pointId) ?? ""),
-          )}`}
+          aria-label={$t("jumps.entry")
+            .replace("{kind}", label(s))
+            .replace("{i}", String(ordinal.get(s.pointId) ?? ""))}
           class="hover:bg-muted/60 cursor-pointer px-3 py-1 text-[11px] {chosen
             ? 'bg-muted'
             : ''}"
