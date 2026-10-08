@@ -705,7 +705,23 @@ const FILTER_ALL: [&str; 2] = ["Фильтр 4 — видимым", "Filter 4 �
 const SAVE_PLTS: [&str; 2] = ["Сохранить в 10-Tracks", "Save to 10-Tracks"];
 const ENTER: char = '\u{E007}';
 const OUTLIER: [&str; 2] = ["Выброс", "Outlier"];
+const WITHOUT_MAP: [&str; 2] = [
+    "Работать без карты (OpenStreetMap)",
+    "Work without a map (OpenStreetMap)",
+];
 const CUT_OUT: [&str; 2] = ["Удалить и разделить", "Delete and split"];
+
+/// Click an element by its text — a static text carries it in `value`, not
+/// in `label` or `title`, which is all `click_any_label` looks at.
+fn click_text(server: &str, sid: &str, texts: &[&str]) -> bool {
+    for text in texts {
+        let selector = format!("//*[@value=\"{text}\" or @title=\"{text}\" or @label=\"{text}\"]");
+        if appium_click_with_session_id(server, sid, Some(&selector)).ok {
+            return true;
+        }
+    }
+    false
+}
 
 /// Type into whatever has the focus, one key at a time — the open panel's
 /// "Go to folder" field has no selector worth relying on.
@@ -787,9 +803,25 @@ fn smoke_real_track_processed_by_the_standard() {
     let server = guard.server_url.as_str();
     let sid = guard.session_id.as_str();
 
-    poll_source_until(server, sid, Duration::from_secs(30), "workspace", |s| {
-        contains_any(s, &TRACKS_TAB)
-    });
+    // A scratch session has no search open: the launcher, and «Работать без
+    // карты» into the workspace — the way a search with no map ordered starts.
+    let first = poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(30),
+        "launcher or workspace",
+        |s| contains_any(s, &TRACKS_TAB) || contains_any(s, &WITHOUT_MAP),
+    );
+    if !contains_any(&first, &TRACKS_TAB) {
+        assert!(
+            click_any_label(server, sid, &WITHOUT_MAP),
+            "no «Работать без карты»"
+        );
+        poll_source_until(server, sid, Duration::from_secs(20), "workspace", |s| {
+            contains_any(s, &TRACKS_TAB)
+        });
+        println!("ok: into the workspace without a map");
+    }
     assert!(click_any_label(server, sid, &TRACKS_TAB), "no Tracks tab");
     let source_before =
         poll_source_until(server, sid, Duration::from_secs(10), "import button", |s| {
@@ -816,7 +848,7 @@ fn smoke_real_track_processed_by_the_standard() {
     // The jumps list on a real track: Лиса 2 has outliers the owner deleted
     // by hand. Choose the first and cut it out, which splits the track.
     assert!(
-        click_any_label(server, sid, &["20261006Лиса2"]),
+        click_text(server, sid, &["20261006Лиса2"]),
         "could not select the track row"
     );
     poll_source_until(
@@ -827,7 +859,7 @@ fn smoke_real_track_processed_by_the_standard() {
         |s| contains_any(s, &OUTLIER),
     );
     assert!(
-        click_any_label(server, sid, &OUTLIER),
+        click_text(server, sid, &OUTLIER),
         "could not choose the outlier"
     );
     poll_source_until(

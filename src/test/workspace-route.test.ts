@@ -13,17 +13,30 @@ const MAP = {
 
 describe("worthOpeningWorkspace", () => {
   it("opens for a map with no project — the ground before the work", () => {
-    expect(worthOpeningWorkspace({ active_map: MAP, project_path: null })).toBe(true);
+    expect(worthOpeningWorkspace({ active_map: MAP, project_path: null })).toBe(
+      true,
+    );
   });
 
   it("opens for a project with no map — a colleague's .ozp", () => {
     expect(
-      worthOpeningWorkspace({ active_map: null, project_path: "/crew/поиск.ozp" }),
+      worthOpeningWorkspace({
+        active_map: null,
+        project_path: "/crew/поиск.ozp",
+      }),
     ).toBe(true);
   });
 
   it("stays on the loader with neither", () => {
-    expect(worthOpeningWorkspace({ active_map: null, project_path: null })).toBe(false);
+    expect(
+      worthOpeningWorkspace({ active_map: null, project_path: null }),
+    ).toBe(false);
+  });
+
+  it("opens with neither when the operator asked to work without a map", () => {
+    expect(
+      worthOpeningWorkspace({ active_map: null, project_path: null }, true),
+    ).toBe(true);
   });
 
   it("decides nothing before the state has arrived", () => {

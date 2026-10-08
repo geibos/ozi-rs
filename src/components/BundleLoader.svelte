@@ -41,6 +41,7 @@
     projects,
     projectsLoading,
     resetBundleDownloadState,
+    workspaceWithoutMap,
   } from "../lib/stores";
   import {
     cancelDownload,
@@ -677,6 +678,19 @@
       {/if}
       <button onclick={handleOpenLocalBundle} class="footer-btn">
         {$t("loader.openLocalBundle")}
+      </button>
+      <!-- A search with no map ordered is still processed: tracks on
+           OpenStreetMap, as the owner did the forest search of 2026-10-08.
+           Until this the launcher had no way in without a bundle or a file. -->
+      <button
+        onclick={() => {
+          workspaceWithoutMap.set(true);
+          goToWorkspace();
+        }}
+        class="footer-btn"
+        data-testid="loader-without-map"
+      >
+        {$t("loader.withoutMap")}
       </button>
       <button onclick={handleSetBundlesRoot} class="footer-btn muted">
         {$t("loader.setBundlesRoot")}

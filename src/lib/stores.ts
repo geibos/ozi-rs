@@ -860,6 +860,12 @@ export const commandPaletteOpen = writable(false);
 
 /** The settings screen (`Settings.svelte`), mounted once in the root layout. */
 export const settingsOpen = writable(false);
+/**
+ * The operator chose «Работать без карты» on the launcher: the workspace
+ * opens on OpenStreetMap with no bundle and no project file yet. For this run
+ * of the application only.
+ */
+export const workspaceWithoutMap = writable(false);
 /** The «Отправить на сервер» dialog. */
 export const resultsUploadOpen = writable(false);
 

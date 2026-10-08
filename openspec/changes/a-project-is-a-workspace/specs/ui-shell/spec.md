@@ -25,3 +25,21 @@ Both routes SHALL decide by the same rule: the workspace is worth opening when a
 
 - **WHEN** the user closes the current project and the store reports neither an active map nor a project file while the URL is `/project`
 - **THEN** the project route invokes `goto('/')` and the bundle loader is shown
+
+## ADDED Requirements
+
+### Requirement: The workspace can be opened without a map
+
+The launcher SHALL offer to work without a map: the workspace opens on the
+OpenStreetMap backdrop with no bundle and no project file, and SHALL stay
+open for the rest of that run of the application. A search with no map
+ordered is still processed — the owner did the forest search of 2026-10-08
+on OSM alone — and until this the launcher had no way into the workspace
+without a bundle, a project file or a picture.
+
+#### Scenario: A search with no map
+
+- **WHEN** the operator chooses «Работать без карты» on the launcher with no
+  map and no project open
+- **THEN** the workspace opens on OpenStreetMap and tracks can be imported
+  into it

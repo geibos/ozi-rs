@@ -3,7 +3,11 @@
   import { get } from "svelte/store";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
-  import { appState, bundleLoaderOpen } from "../../lib/stores";
+  import {
+    appState,
+    bundleLoaderOpen,
+    workspaceWithoutMap,
+  } from "../../lib/stores";
   import { worthOpeningWorkspace } from "$lib/workspace-route";
   import WorkspaceShell from "../../components/WorkspaceShell.svelte";
   import LibraryRail from "../../components/LibraryRail.svelte";
@@ -39,14 +43,19 @@
     (async () => {
       if (get(appState) === null) await appState.refresh();
       if (cancelled) return;
-      if (!worthOpeningWorkspace(get(appState))) {
+      if (!worthOpeningWorkspace(get(appState), get(workspaceWithoutMap))) {
         goto(resolve("/"));
         return;
       }
       // And back to the loader if both go while the workspace stays mounted —
       // closing the project, or clearing the map.
       stop = appState.subscribe((state) => {
-        if (state !== null && !worthOpeningWorkspace(state)) goto(resolve("/"));
+        if (
+          state !== null &&
+          !worthOpeningWorkspace(state, get(workspaceWithoutMap))
+        ) {
+          goto(resolve("/"));
+        }
       });
     })();
 

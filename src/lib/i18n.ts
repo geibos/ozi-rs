@@ -647,6 +647,7 @@ const dictionaries = {
     "loader.openLocalBundle": "Open local bundle…",
     "loader.setBundlesRoot": "Set bundles root…",
     "loader.calibratePicture": "Calibrate a picture…",
+    "loader.withoutMap": "Work without a map (OpenStreetMap)",
     "calibrate.lead":
       "A picture with no .map: give its two opposite corners and it becomes a map.",
     "calibrate.pick": "Choose a picture…",
@@ -1304,6 +1305,7 @@ const dictionaries = {
     "loader.openLocalBundle": "Открыть локальный бандл…",
     "loader.setBundlesRoot": "Папка для бандлов…",
     "loader.calibratePicture": "Привязать картинку…",
+    "loader.withoutMap": "Работать без карты (OpenStreetMap)",
     "calibrate.lead":
       "Картинка без .map: укажите два противоположных угла — и она станет картой.",
     "calibrate.pick": "Выбрать картинку…",

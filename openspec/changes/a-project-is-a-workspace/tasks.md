@@ -8,3 +8,10 @@
 
 - [x] 2.1 `just ci` green (2026-10-02: 423 Rust, 722 vitest, 60 shots)
 - [x] 2.2 The screenshot matrix photographs the Maps tab's empty state, which needs a project with no map to stay in the workspace — `library-maps__empty__*`, 2026-10-02; walked on the stand too: `/project?maps=none` stays in the workspace, `/project` too, `/?state=cold` stays on the catalogue
+
+## 4. Without a map (2026-10-08)
+
+- [x] 4.1 «Работать без карты» on the launcher; the route rule takes the
+      choice; unit test; walked on the stand (`/?state=cold` → `/project`
+      with the Tracks tab). Found by the real-track smoke journey, which
+      started on a scratch session and had no way into the workspace
