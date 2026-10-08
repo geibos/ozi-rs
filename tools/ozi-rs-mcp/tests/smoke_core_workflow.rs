@@ -704,6 +704,8 @@ const RENAME_ALL: [&str; 2] = ["Имена по стандарту", "Names by t
 const FILTER_ALL: [&str; 2] = ["Фильтр 4 — видимым", "Filter 4 — visible"];
 const SAVE_PLTS: [&str; 2] = ["Сохранить в 10-Tracks", "Save to 10-Tracks"];
 const ENTER: char = '\u{E007}';
+const OUTLIER: [&str; 2] = ["Выброс", "Outlier"];
+const CUT_OUT: [&str; 2] = ["Удалить и разделить", "Delete and split"];
 
 /// Type into whatever has the focus, one key at a time — the open panel's
 /// "Go to folder" field has no selector worth relying on.
@@ -811,6 +813,43 @@ fn smoke_real_track_processed_by_the_standard() {
     );
     println!("ok: imported 20261006Лиса2");
 
+    // The jumps list on a real track: Лиса 2 has outliers the owner deleted
+    // by hand. Choose the first and cut it out, which splits the track.
+    assert!(
+        click_any_label(server, sid, &["20261006Лиса2"]),
+        "could not select the track row"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(20),
+        "an outlier in the list",
+        |s| contains_any(s, &OUTLIER),
+    );
+    assert!(
+        click_any_label(server, sid, &OUTLIER),
+        "could not choose the outlier"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(10),
+        "the cut-out action",
+        |s| contains_any(s, &CUT_OUT),
+    );
+    assert!(
+        click_any_label(server, sid, &CUT_OUT),
+        "no «Удалить и разделить»"
+    );
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(15),
+        "a second segment",
+        |s| s.contains("Сегмент 2") || s.contains("СЕГМЕНТ 2") || s.contains("Segment 2"),
+    );
+    println!("ok: an outlier cut out, the track split in two");
+
     assert!(click_any_label(server, sid, &RENAME_ALL), "no names button");
     poll_source_until(
         server,
@@ -830,9 +869,13 @@ fn smoke_real_track_processed_by_the_standard() {
         appium_press_key_with_session_id(server, sid, ENTER).ok,
         "confirm"
     );
-    poll_source_until(server, sid, Duration::from_secs(20), "fewer points", |s| {
-        !s.contains("1995 тчк") && !s.contains("1995 pts")
-    });
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(20),
+        "the filter's toast",
+        |s| s.contains("Отфильтровано треков: 1") || s.contains("Tracks filtered: 1"),
+    );
     println!("ok: filtered");
 
     assert!(click_any_label(server, sid, &SAVE_PLTS), "no save button");
