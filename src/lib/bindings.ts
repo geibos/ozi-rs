@@ -487,6 +487,18 @@ async getTracksDir() : Promise<Result<string | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Copy the files an import was made from into `10-Tracks/ГГГГММДД/`,
+ * today's date (standard п. 5).
+ */
+async storeRawSources(paths: string[]) : Promise<Result<RawSourcesDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("store_raw_sources", { paths }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getResultsUploadPlan(searchDir: string | null) : Promise<Result<ResultsUploadPlanDto | null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_results_upload_plan", { searchDir }) };
@@ -1059,6 +1071,10 @@ export type PointDetailDto = { id: number; lat: number; lon: number; elevation: 
  * The size of a picture, so the calibration form knows what it is working on.
  */
 export type RasterSizeDto = { width: number; height: number }
+/**
+ * What keeping the raw files did: the folder and the names written.
+ */
+export type RawSourcesDto = { dir: string; written: string[] }
 export type ReportDto = { 
 /**
  * The folder just written, so the interface can offer to show it.

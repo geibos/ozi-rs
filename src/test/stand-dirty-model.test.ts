@@ -22,6 +22,7 @@ import { standCommandChangesTheProject } from "./stand/tauri-core";
 const LEAVES_THE_PROJECT_ALONE = [
   // The search's files written from the work.
   "get_tracks_dir",
+  "store_raw_sources",
   "export_tracks_plt",
   "get_results_upload_plan",
   "upload_results_ftp",

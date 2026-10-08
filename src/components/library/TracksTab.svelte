@@ -42,6 +42,7 @@
     exportAllTracksGpx,
     exportTracksPlt,
     getTracksDir,
+    storeRawSources,
     exportGpx,
     exportTrackPlt,
     getSimplifiedPreview,
@@ -550,6 +551,20 @@
    * Files import sequentially; per-file failures are collected and the
    * outcome is reported in ONE summary toast.
    */
+  async function keepRawSources(paths: string[]) {
+    try {
+      const kept = await storeRawSources(paths);
+      reportExported(
+        kept.dir,
+        $i18n("tracksTab.keptRaw").replace("{n}", String(kept.written.length)),
+      );
+    } catch (err) {
+      toast.error($i18n("tracksTab.keepRawFailed"), {
+        description: String(err),
+      });
+    }
+  }
+
   async function handleImport() {
     try {
       const selection = await open({
@@ -575,8 +590,18 @@
         .replace("{count}", String(imported))
         .replace("{total}", String(paths.length));
       if (imported > 0) requestAllDataFocus();
+      // The raw files belong in the search's 10-Tracks/ГГГГММДД (п. 5); the
+      // owner found the folder and moved them by hand. Offered, not done:
+      // a file opened to look at is not necessarily this search's.
+      const keepRaw =
+        imported > 0 && (await getTracksDir()) !== null
+          ? {
+              label: $i18n("tracksTab.keepRaw"),
+              onClick: () => void keepRawSources(paths),
+            }
+          : undefined;
       if (failed.length === 0) {
-        toast.success(summary);
+        toast.success(summary, { action: keepRaw });
       } else {
         toast.error(summary, {
           description: describeFailures(failed),

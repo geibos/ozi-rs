@@ -2299,6 +2299,49 @@ impl AppState {
         })
     }
 
+    /// Copy the files an import was made from into
+    /// `<bundle>/10-Tracks/ГГГГММДД/`, today's date: the standard's place for
+    /// raw tracks and marks, kept at least until the search ends (п. 5). The
+    /// owner found a sent GPX's search, made the folder and moved the file
+    /// by hand (recording of 2026-10-08). Names are kept — they carry the
+    /// crew's callsign, which п. 5 asks for; a name already there gets
+    /// ` (2)`, ` (3)`… rather than overwriting a file the same crew sent
+    /// earlier. Returns the folder and the names written.
+    pub fn store_raw_sources(
+        &self,
+        sources: &[PathBuf],
+        date: chrono::NaiveDate,
+    ) -> Result<(PathBuf, Vec<String>), String> {
+        let dir = self
+            .tracks_dir()
+            .ok_or_else(|| "No search folder is open to find 10-Tracks in".to_owned())?
+            .join(date.format("%Y%m%d").to_string());
+        std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        let mut written = Vec::new();
+        for source in sources {
+            let name = source
+                .file_name()
+                .ok_or_else(|| format!("{} is not a file", source.display()))?;
+            let stem = Path::new(name)
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let extension = Path::new(name)
+                .extension()
+                .map(|e| format!(".{}", e.to_string_lossy()))
+                .unwrap_or_default();
+            let mut target = dir.join(name);
+            let mut n = 2;
+            while target.exists() {
+                target = dir.join(format!("{stem} ({n}){extension}"));
+                n += 1;
+            }
+            std::fs::copy(source, &target).map_err(|e| format!("{}: {e}", source.display()))?;
+            written.push(target.file_name().unwrap().to_string_lossy().into_owned());
+        }
+        Ok((dir, written))
+    }
+
     /// `<bundle>/10-Tracks`, where processed tracks go (п. 25).
     pub fn tracks_dir(&self) -> Option<PathBuf> {
         Some(self.active_bundle_dir()?.join("10-Tracks"))
@@ -4695,6 +4738,29 @@ mod tests {
             .and_then(|dir| dir.parent())
             .and_then(|d| d.file_name());
         assert_eq!(bundle.and_then(|s| s.to_str()), Some("demo-project"));
+    }
+
+    /// Raw files go to 10-Tracks/ГГГГММДД under their own names, and a second
+    /// file of the same name is kept beside the first.
+    #[test]
+    fn raw_sources_are_kept_in_todays_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let mut state = AppState::new();
+        state.bundles_root = root.path().to_path_buf();
+        let project = sample_project_with_remote_map();
+        let bundle = lizaalert::bundle_directory(&state.bundles_root, &project.summary.slug);
+        state.lizaalert.selected_project = Some(project);
+        let incoming = tempfile::tempdir().unwrap();
+        let gpx = incoming.path().join("Лиса 19 Мина.gpx");
+        std::fs::write(&gpx, "<gpx/>").unwrap();
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 10, 8).unwrap();
+
+        let (dir, names) = state.store_raw_sources(std::slice::from_ref(&gpx), date).unwrap();
+        assert_eq!(dir, bundle.join("10-Tracks").join("20261008"));
+        assert_eq!(names, vec!["Лиса 19 Мина.gpx".to_owned()]);
+        let (_, again) = state.store_raw_sources(&[gpx], date).unwrap();
+        assert_eq!(again, vec!["Лиса 19 Мина (2).gpx".to_owned()]);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 2);
     }
 
     /// The upload plan takes the processed files from 10-Tracks and leaves

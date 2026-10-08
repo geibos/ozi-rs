@@ -30,6 +30,10 @@
 - [x] 3.3 WPT colour out and back; `Waypoints_ГГГГММДД` in `10-Tracks`; every
       visible mark into one file; a layer's notes cleared in one step
 
+- [x] 3.4 Raw files kept in `10-Tracks/ГГГГММДД/` from the import's toast
+      (п. 5) — the owner found a sent GPX's search and moved it by hand;
+      test, walked on the stand
+
 ## 4. Gates
 
 - [ ] 4.1 `just ci` green

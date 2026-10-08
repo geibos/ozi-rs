@@ -109,6 +109,7 @@ registered without a line on this page, so the gap cannot open again.
 | `export_track_plt`                      | Export single track to PLT                                                                                              |
 | `export_tracks_plt`                     | Every visible track to its own PLT named after it, by default in `10-Tracks`; same-named files stop it unless replacing |
 | `get_tracks_dir`                        | `<bundle>/10-Tracks`, when a search folder is open                                                                      |
+| `store_raw_sources`                     | Copy an import's source files into `10-Tracks/ГГГГММДД/`, today's date (standard п. 5)                                  |
 | `export_wpt_waypoints`                  | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF)                                                            |
 | `export_all_waypoints_wpt`              | Every visible mark of every layer into one WPT file (standard п. 31)                                                    |
 | `get_all_waypoints_export_default_path` | `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, today's date                                                               |

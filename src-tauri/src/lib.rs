@@ -140,6 +140,7 @@ fn specta_builder() -> tauri_specta::Builder {
         commands::clear_waypoint_descriptions,
         commands::export_tracks_plt,
         commands::get_tracks_dir,
+        commands::store_raw_sources,
         commands::ftp::get_results_upload_plan,
         commands::ftp::upload_results_ftp,
         commands::get_all_waypoints_export_default_path,

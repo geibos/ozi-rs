@@ -634,6 +634,7 @@ const LEAVES_THE_PROJECT_ALONE = new Set([
   "preview_project",
   // Writing the search's files from the work is not a change to the work.
   "get_tracks_dir",
+  "store_raw_sources",
   "export_tracks_plt",
   "get_results_upload_plan",
   "upload_results_ftp",
@@ -1096,6 +1097,12 @@ const HANDLERS: StandAnswers = {
   // The search folder of the stand's bundle; the stand writes no files, so
   // it answers with what would have been written.
   get_tracks_dir: () => "/stand/bundles/2026-07-08_Lavrovo/10-Tracks",
+  store_raw_sources: (args) => ({
+    dir: "/stand/bundles/2026-07-08_Lavrovo/10-Tracks/20261008",
+    written: ((args?.paths as string[] | undefined) ?? []).map(
+      (p) => p.split("/").pop() ?? p,
+    ),
+  }),
   export_tracks_plt: (args) => ({
     written: withEditedCounts(tracksListFixture)
       .concat(importedTracks)

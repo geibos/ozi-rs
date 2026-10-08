@@ -1139,6 +1139,30 @@ pub fn export_tracks_plt(
     })
 }
 
+/// What keeping the raw files did: the folder and the names written.
+#[derive(serde::Serialize, specta::Type)]
+pub struct RawSourcesDto {
+    pub dir: String,
+    pub written: Vec<String>,
+}
+
+/// Copy the files an import was made from into `10-Tracks/ГГГГММДД/`,
+/// today's date (standard п. 5).
+#[tauri::command]
+#[specta::specta]
+pub fn store_raw_sources(
+    paths: Vec<String>,
+    state: State<SharedState>,
+) -> Result<RawSourcesDto, String> {
+    let sources: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let (dir, written) = lock_app_state(state.inner())?
+        .store_raw_sources(&sources, chrono::Local::now().date_naive())?;
+    Ok(RawSourcesDto {
+        dir: dir.display().to_string(),
+        written,
+    })
+}
+
 /// The folder processed tracks go to, `<bundle>/10-Tracks`, when a search
 /// folder is open.
 #[tauri::command]

@@ -307,6 +307,9 @@ const dictionaries = {
       "Not by the standard: YYYYMMDD_Callsign, latin letters",
     "tracksTab.nameSuggest": "Not by the standard — click to rename to {name}",
     "tracksTab.renamedTo": "Renamed to {name}",
+    "tracksTab.keepRaw": "Keep the files in 10-Tracks",
+    "tracksTab.keptRaw": "Raw files kept: {n}",
+    "tracksTab.keepRawFailed": "Could not keep the raw files",
     "tracksTab.filterAll": "Filter 4 — visible",
     "tracksTab.filterAllTitle":
       "OziExplorer's track filter at index 4 (Douglas–Peucker, 2 m) on every visible track — after cleaning, as the standard has it",
@@ -964,6 +967,9 @@ const dictionaries = {
     "tracksTab.nameSuggest":
       "Не по стандарту — нажмите, чтобы переименовать в {name}",
     "tracksTab.renamedTo": "Переименован в {name}",
+    "tracksTab.keepRaw": "Сохранить исходники в 10-Tracks",
+    "tracksTab.keptRaw": "Исходников сохранено: {n}",
+    "tracksTab.keepRawFailed": "Не удалось сохранить исходники",
     "tracksTab.filterAll": "Фильтр 4 — видимым",
     "tracksTab.filterAllTitle":
       "Фильтр трека OziExplorer с индексом 4 (Дуглас–Пекер, 2 м) для всех видимых треков — после обработки, как велит стандарт",

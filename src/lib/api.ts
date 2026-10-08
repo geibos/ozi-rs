@@ -9,6 +9,7 @@ import {
   type ResultsUploadPlanDto,
   type ImportReportDto,
   type PltFilesExportDto,
+  type RawSourcesDto,
   type Result,
   type TrackSummaryDto,
 } from "./bindings";
@@ -770,6 +771,11 @@ export async function exportTracksPlt(
   replace: boolean,
 ): Promise<PltFilesExportDto> {
   return unwrap("export_tracks_plt", commands.exportTracksPlt(dir, replace));
+}
+
+/** Copy an import's source files into `10-Tracks/ГГГГММДД/` (п. 5). */
+export async function storeRawSources(paths: string[]): Promise<RawSourcesDto> {
+  return unwrap("store_raw_sources", commands.storeRawSources(paths));
 }
 
 /** `<bundle>/10-Tracks`, or `null` with no search folder open. */
