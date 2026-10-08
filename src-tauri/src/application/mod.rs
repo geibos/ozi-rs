@@ -237,6 +237,29 @@ pub struct DayExport {
     pub waypoints: usize,
 }
 
+/// What a results upload would send, and where.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResultsUploadPlan {
+    pub search_folder: String,
+    pub dir: PathBuf,
+    pub files: Vec<PathBuf>,
+    /// Waypoint files holding a `BVP` mark — the finding of the missing
+    /// person — which go to the server only with the coordinator's word
+    /// (п. 32, 36).
+    pub with_bvp: Vec<String>,
+}
+
+/// Whether a WPT file holds a mark named `BVP`, `BVP1`, `BVP2`…
+fn wpt_has_bvp(path: &Path) -> bool {
+    crate::infrastructure::import::wpt::import_wpt_file(path).is_ok_and(|import| {
+        import.waypoints().iter().any(|w| {
+            let name = w.name().trim().to_ascii_uppercase();
+            name.strip_prefix("BVP")
+                .is_some_and(|rest| rest.chars().all(|c| c.is_ascii_digit()))
+        })
+    })
+}
+
 /// What writing each track to its own PLT did, or would have done.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PltFilesExport {
@@ -2225,6 +2248,48 @@ impl AppState {
             format!("Exported {} tracks to {}", written.len(), dir.display()),
         );
         Ok(PltFilesExport { written, existing })
+    }
+
+    /// What would be sent to a results server: the search's folder name
+    /// there, `ГГГГ-ММ-ДД_Место` — the bundle's own name, which follows the
+    /// same rule (п. 34) — and the processed files, the `.plt` and `.wpt`
+    /// directly in `10-Tracks`. Its subfolders hold raw recordings, which
+    /// are not sent (п. 5). `None` with no search folder open.
+    pub fn results_upload_plan(&self) -> Option<ResultsUploadPlan> {
+        let bundle = self.active_bundle_dir()?;
+        let search_folder = bundle.file_name()?.to_string_lossy().into_owned();
+        let dir = bundle.join("10-Tracks");
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|e| e.path())
+                    .filter(|p| p.is_file())
+                    .filter(|p| {
+                        p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+                            e.eq_ignore_ascii_case("plt") || e.eq_ignore_ascii_case("wpt")
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        files.sort();
+        let with_bvp = files
+            .iter()
+            .filter(|p| {
+                p.extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| e.eq_ignore_ascii_case("wpt"))
+            })
+            .filter(|p| wpt_has_bvp(p))
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect();
+        Some(ResultsUploadPlan {
+            search_folder,
+            dir,
+            files,
+            with_bvp,
+        })
     }
 
     /// `<bundle>/10-Tracks`, where processed tracks go (п. 25).
@@ -4623,6 +4688,47 @@ mod tests {
             .and_then(|dir| dir.parent())
             .and_then(|d| d.file_name());
         assert_eq!(bundle.and_then(|s| s.to_str()), Some("demo-project"));
+    }
+
+    /// The upload plan takes the processed files from 10-Tracks and leaves
+    /// the raw ones in its subfolders; a waypoint file with a BVP is named.
+    #[test]
+    fn the_results_to_send_are_the_processed_files_of_10_tracks() {
+        let root = tempfile::tempdir().unwrap();
+        let mut state = AppState::new();
+        state.bundles_root = root.path().to_path_buf();
+        let project = sample_project_with_remote_map();
+        let bundle = lizaalert::bundle_directory(&state.bundles_root, &project.summary.slug);
+        state.lizaalert.selected_project = Some(project);
+        let tracks = bundle.join("10-Tracks");
+        std::fs::create_dir_all(tracks.join("20261008")).unwrap();
+        std::fs::write(tracks.join("20261008_Lisa15.plt"), "x").unwrap();
+        std::fs::write(tracks.join("notes.txt"), "x").unwrap();
+        std::fs::write(tracks.join("20261008").join("raw.gpx"), "x").unwrap();
+        let mut wpt = Vec::new();
+        crate::infrastructure::export::wpt::write_wpt(
+            [crate::domain::Waypoint::new(
+                crate::domain::WaypointId::new(1),
+                "BVP",
+                59.9,
+                30.3,
+            )],
+            &mut wpt,
+        )
+        .unwrap();
+        std::fs::write(tracks.join("Waypoints_20261008.wpt"), wpt).unwrap();
+
+        let plan = state
+            .results_upload_plan()
+            .expect("a search folder is open");
+        assert_eq!(plan.search_folder, "demo-project");
+        let names: Vec<_> = plan
+            .files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["20261008_Lisa15.plt", "Waypoints_20261008.wpt"]);
+        assert_eq!(plan.with_bvp, vec!["Waypoints_20261008.wpt".to_owned()]);
     }
 
     /// Each visible track to its own PLT, named after it; a same-named file

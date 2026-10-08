@@ -5,6 +5,8 @@ import {
   type FtpAccountDto,
   type FtpAccountInput,
   type FtpCheckDto,
+  type FtpUploadDto,
+  type ResultsUploadPlanDto,
   type ImportReportDto,
   type PltFilesExportDto,
   type Result,
@@ -399,6 +401,22 @@ export async function newProject(): Promise<void> {
  */
 export async function listFtpAccounts(): Promise<FtpAccountDto[]> {
   return unwrap("list_ftp_accounts", commands.listFtpAccounts());
+}
+
+/** What sending the search's results would send, and where. */
+export async function getResultsUploadPlan(): Promise<ResultsUploadPlanDto | null> {
+  return unwrap("get_results_upload_plan", commands.getResultsUploadPlan());
+}
+
+/** Send the search's results to a results account. */
+export async function uploadResultsFtp(
+  id: string,
+  createFolder: boolean,
+): Promise<FtpUploadDto> {
+  return unwrap(
+    "upload_results_ftp",
+    commands.uploadResultsFtp(id, createFolder),
+  );
 }
 
 /** `password: null` keeps the stored password. */

@@ -3,7 +3,7 @@
 //! LizaAlert keeps both on FTP, under different accounts: bundles come from
 //! one place under one login, results go back to several "contours", each
 //! with a login of its own (owner, 2026-10-01). This module holds the
-//! accounts and checks them; transfers stand on it and are not here yet.
+//! accounts, checks them, and sends a search's results.
 //!
 //! A password never touches a file. The accounts file in the application's
 //! data folder holds the host, port, login, folder, name and role; the
@@ -413,9 +413,34 @@ pub enum FtpCheck {
 /// connection, and a check that fails on a firewall's passive-mode rules
 /// would blame the account for the network.
 pub fn check_account(account: &FtpAccount, password: &str, limit: Duration) -> FtpCheck {
+    let (mut ftp, greeting) = match connect_and_login(account, password, limit) {
+        Ok(session) => session,
+        Err(refusal) => return refusal,
+    };
+    if let Err(error) = ftp.cwd(&account.folder) {
+        let _ = ftp.quit();
+        return match error {
+            FtpError::UnexpectedResponse(response) => FtpCheck::NoFolder(reply_text(&response)),
+            other => FtpCheck::Failed(describe(&other)),
+        };
+    }
+    let folder = ftp.pwd().unwrap_or_else(|_| account.folder.clone());
+    // The answer is in. A server that drops the line on QUIT has nothing more
+    // to tell us about the account.
+    let _ = ftp.quit();
+    FtpCheck::Ok { folder, greeting }
+}
+
+/// Connect within `limit` and log in: the first half of a check and of an
+/// upload. The refusal is what a check would report.
+fn connect_and_login(
+    account: &FtpAccount,
+    password: &str,
+    limit: Duration,
+) -> Result<(FtpStream, Option<String>), FtpCheck> {
     let addresses: Vec<_> = match (account.host.as_str(), account.port).to_socket_addrs() {
         Ok(addresses) => addresses.collect(),
-        Err(error) => return FtpCheck::Unreachable(error.to_string()),
+        Err(error) => return Err(FtpCheck::Unreachable(error.to_string())),
     };
     let mut last_error = None;
     let mut connected = None;
@@ -429,7 +454,9 @@ pub fn check_account(account: &FtpAccount, password: &str, limit: Duration) -> F
         }
     }
     let Some(stream) = connected else {
-        return FtpCheck::Unreachable(last_error.unwrap_or_else(|| "no address".to_owned()));
+        return Err(FtpCheck::Unreachable(
+            last_error.unwrap_or_else(|| "no address".to_owned()),
+        ));
     };
     // Without these a server that accepts the connection and never answers
     // holds the check for as long as the operating system lets it.
@@ -437,35 +464,119 @@ pub fn check_account(account: &FtpAccount, password: &str, limit: Duration) -> F
         .set_read_timeout(Some(limit))
         .and_then(|()| stream.set_write_timeout(Some(limit)))
     {
-        return FtpCheck::Unreachable(error.to_string());
+        return Err(FtpCheck::Unreachable(error.to_string()));
     }
 
     let mut ftp = match FtpStream::connect_with_stream(stream) {
         Ok(ftp) => ftp,
-        Err(error) => return FtpCheck::Unreachable(describe(&error)),
+        Err(error) => return Err(FtpCheck::Unreachable(describe(&error))),
     };
     let greeting = ftp.get_welcome_msg().map(|text| text.trim().to_owned());
 
     if let Err(error) = ftp.login(account.login.as_str(), password) {
-        return match error {
+        return Err(match error {
             FtpError::UnexpectedResponse(response) if response.status == Status::NotLoggedIn => {
                 FtpCheck::LoginRefused(reply_text(&response))
             }
             other => FtpCheck::Failed(describe(&other)),
-        };
+        });
     }
+    Ok((ftp, greeting))
+}
+
+/// What sending a search's results did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FtpUpload {
+    /// Every file is on the server, in `remote`.
+    Done {
+        remote: String,
+        uploaded: Vec<String>,
+    },
+    /// The search's folder is not on the server, and creating it was not
+    /// asked for: the standard wants the coordinator's word first (п. 33).
+    NoSearchFolder { remote: String },
+    /// The account did not get as far as its own folder.
+    Refused(FtpCheck),
+    /// A file failed; those before it are on the server.
+    Failed {
+        uploaded: Vec<String>,
+        file: String,
+        reason: String,
+    },
+}
+
+/// Send `files` into `search_folder` under the account's folder — the
+/// search's folder on the results server, `ГГГГ-ММ-ДД_Место` (п. 34) —
+/// creating it only when `create` says so. A file of the same name is
+/// replaced: sending a corrected track again is the ordinary case.
+///
+/// Blocking, like `check_account`: each network step waits at most `limit`.
+pub fn upload_results(
+    account: &FtpAccount,
+    password: &str,
+    search_folder: &str,
+    files: &[PathBuf],
+    create: bool,
+    limit: Duration,
+) -> FtpUpload {
+    let (mut ftp, _) = match connect_and_login(account, password, limit) {
+        Ok(session) => session,
+        Err(refusal) => return FtpUpload::Refused(refusal),
+    };
     if let Err(error) = ftp.cwd(&account.folder) {
         let _ = ftp.quit();
-        return match error {
+        return FtpUpload::Refused(match error {
             FtpError::UnexpectedResponse(response) => FtpCheck::NoFolder(reply_text(&response)),
             other => FtpCheck::Failed(describe(&other)),
+        });
+    }
+    let remote = format!("{}/{}", account.folder.trim_end_matches('/'), search_folder);
+    if ftp.cwd(search_folder).is_err() {
+        if !create {
+            let _ = ftp.quit();
+            return FtpUpload::NoSearchFolder { remote };
+        }
+        if let Err(error) = ftp
+            .mkdir(search_folder)
+            .and_then(|()| ftp.cwd(search_folder))
+        {
+            let _ = ftp.quit();
+            return FtpUpload::Failed {
+                uploaded: Vec::new(),
+                file: search_folder.to_owned(),
+                reason: describe(&error),
+            };
+        }
+    }
+    if let Err(error) = ftp.transfer_type(suppaftp::types::FileType::Binary) {
+        let _ = ftp.quit();
+        return FtpUpload::Failed {
+            uploaded: Vec::new(),
+            file: String::new(),
+            reason: describe(&error),
         };
     }
-    let folder = ftp.pwd().unwrap_or_else(|_| account.folder.clone());
-    // The answer is in. A server that drops the line on QUIT has nothing more
-    // to tell us about the account.
+    let mut uploaded = Vec::new();
+    for path in files {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let result = std::fs::File::open(path)
+            .map_err(|e| e.to_string())
+            .and_then(|mut file| ftp.put_file(&name, &mut file).map_err(|e| describe(&e)));
+        if let Err(reason) = result {
+            let _ = ftp.quit();
+            return FtpUpload::Failed {
+                uploaded,
+                file: name,
+                reason,
+            };
+        }
+        uploaded.push(name);
+    }
     let _ = ftp.quit();
-    FtpCheck::Ok { folder, greeting }
+    FtpUpload::Done { remote, uploaded }
 }
 
 fn reply_text(response: &suppaftp::types::Response) -> String {
@@ -868,6 +979,208 @@ mod tests {
             }
         });
         port
+    }
+
+    /// What a transfer server received: files by name, folders made.
+    #[derive(Default)]
+    struct Received {
+        files: HashMap<String, Vec<u8>>,
+        made: Vec<String>,
+    }
+
+    /// Serve one connection that can also take files: `/results` exists,
+    /// folders under it exist once made, PASV opens a data port and STOR
+    /// stores what arrives on it.
+    fn transfer_server(existing: &[&str]) -> (u16, std::sync::Arc<Mutex<Received>>) {
+        use std::io::Read;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let received = std::sync::Arc::new(Mutex::new(Received::default()));
+        let shared = received.clone();
+        let mut folders: Vec<String> = existing.iter().map(|f| (*f).to_owned()).collect();
+        std::thread::spawn(move || {
+            let Ok((stream, _)) = listener.accept() else {
+                return;
+            };
+            let mut writer = stream.try_clone().unwrap();
+            let mut reader = BufReader::new(stream);
+            writer.write_all(b"220 DB Based FTP ready\r\n").unwrap();
+            let mut cwd = "/".to_owned();
+            let mut data: Option<TcpListener> = None;
+            let mut line = String::new();
+            loop {
+                line.clear();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    return;
+                }
+                let (command, argument) = line
+                    .trim_end()
+                    .split_once(' ')
+                    .map_or((line.trim_end(), ""), |(c, a)| (c, a));
+                let reply = match command {
+                    "USER" => "331 Password required\r\n".to_owned(),
+                    "PASS" if argument == "right" => "230 Logged in\r\n".to_owned(),
+                    "PASS" => "530 Authentication failed\r\n".to_owned(),
+                    "CWD" if argument == "/results" => {
+                        cwd = "/results".to_owned();
+                        "250 Directory changed\r\n".to_owned()
+                    }
+                    "CWD" if folders.iter().any(|f| f == argument) => {
+                        cwd = format!("{cwd}/{argument}");
+                        "250 Directory changed\r\n".to_owned()
+                    }
+                    "CWD" => "550 No such directory\r\n".to_owned(),
+                    "MKD" => {
+                        folders.push(argument.to_owned());
+                        shared.lock().unwrap().made.push(argument.to_owned());
+                        format!("257 \"{argument}\" created\r\n")
+                    }
+                    "PWD" => format!("257 \"{cwd}\" is current directory\r\n"),
+                    "TYPE" => "200 Type set\r\n".to_owned(),
+                    "PASV" => {
+                        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+                        let p = listener.local_addr().unwrap().port();
+                        data = Some(listener);
+                        format!(
+                            "227 Entering Passive Mode (127,0,0,1,{},{})\r\n",
+                            p / 256,
+                            p % 256
+                        )
+                    }
+                    "STOR" => {
+                        let Some(listener) = data.take() else {
+                            let _ = writer.write_all(b"425 No data connection\r\n");
+                            continue;
+                        };
+                        writer.write_all(b"150 Ok to send data\r\n").unwrap();
+                        let (mut conn, _) = listener.accept().unwrap();
+                        let mut bytes = Vec::new();
+                        conn.read_to_end(&mut bytes).unwrap();
+                        shared
+                            .lock()
+                            .unwrap()
+                            .files
+                            .insert(format!("{cwd}/{argument}"), bytes);
+                        "226 Transfer complete\r\n".to_owned()
+                    }
+                    "QUIT" => {
+                        let _ = writer.write_all(b"221 Bye\r\n");
+                        return;
+                    }
+                    _ => "502 Not implemented\r\n".to_owned(),
+                };
+                if writer.write_all(reply.as_bytes()).is_err() {
+                    return;
+                }
+            }
+        });
+        (port, received)
+    }
+
+    fn results_files() -> (tempfile::TempDir, Vec<PathBuf>) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut files = Vec::new();
+        for (name, body) in [
+            (
+                "20261008_Lisa15.plt",
+                "OziExplorer Track Point File Version 2.1",
+            ),
+            (
+                "Waypoints_20261008.wpt",
+                "OziExplorer Waypoint File Version 1.1",
+            ),
+        ] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, body).unwrap();
+            files.push(path);
+        }
+        (dir, files)
+    }
+
+    #[test]
+    fn results_go_into_the_searchs_folder() {
+        let (port, received) = transfer_server(&["2026-10-08_Mesto"]);
+        let (_dir, files) = results_files();
+        let outcome = upload_results(
+            &local(port, "/results"),
+            "right",
+            "2026-10-08_Mesto",
+            &files,
+            false,
+            LIMIT,
+        );
+        assert_eq!(
+            outcome,
+            FtpUpload::Done {
+                remote: "/results/2026-10-08_Mesto".to_owned(),
+                uploaded: vec![
+                    "20261008_Lisa15.plt".to_owned(),
+                    "Waypoints_20261008.wpt".to_owned()
+                ],
+            }
+        );
+        let got = received.lock().unwrap();
+        assert_eq!(
+            got.files["/results/2026-10-08_Mesto/20261008_Lisa15.plt"],
+            b"OziExplorer Track Point File Version 2.1"
+        );
+        assert!(got.made.is_empty());
+    }
+
+    /// The standard wants the coordinator's word before a search's folder is
+    /// made on the server (п. 33): without `create`, a missing folder stops
+    /// the upload before anything is sent.
+    #[test]
+    fn a_missing_search_folder_is_made_only_when_asked() {
+        let (port, received) = transfer_server(&[]);
+        let (_dir, files) = results_files();
+        assert_eq!(
+            upload_results(
+                &local(port, "/results"),
+                "right",
+                "2026-10-08_Mesto",
+                &files,
+                false,
+                LIMIT
+            ),
+            FtpUpload::NoSearchFolder {
+                remote: "/results/2026-10-08_Mesto".to_owned()
+            }
+        );
+        assert!(received.lock().unwrap().files.is_empty());
+
+        let (port, received) = transfer_server(&[]);
+        let outcome = upload_results(
+            &local(port, "/results"),
+            "right",
+            "2026-10-08_Mesto",
+            &files,
+            true,
+            LIMIT,
+        );
+        assert!(matches!(outcome, FtpUpload::Done { .. }), "{outcome:?}");
+        let got = received.lock().unwrap();
+        assert_eq!(got.made, vec!["2026-10-08_Mesto".to_owned()]);
+        assert_eq!(got.files.len(), 2);
+    }
+
+    #[test]
+    fn a_wrong_password_sends_nothing() {
+        let (port, received) = transfer_server(&["2026-10-08_Mesto"]);
+        let (_dir, files) = results_files();
+        let outcome = upload_results(
+            &local(port, "/results"),
+            "wrong",
+            "2026-10-08_Mesto",
+            &files,
+            true,
+            LIMIT,
+        );
+        assert!(matches!(
+            outcome,
+            FtpUpload::Refused(FtpCheck::LoginRefused(_))
+        ));
+        assert!(received.lock().unwrap().files.is_empty());
     }
 
     fn local(port: u16, folder: &str) -> FtpAccount {

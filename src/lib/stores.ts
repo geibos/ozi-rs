@@ -860,6 +860,8 @@ export const commandPaletteOpen = writable(false);
 
 /** The settings screen (`Settings.svelte`), mounted once in the root layout. */
 export const settingsOpen = writable(false);
+/** The «Отправить на сервер» dialog. */
+export const resultsUploadOpen = writable(false);
 
 /**
  * "Map info" affordance state for the Library Maps tab → Map Inspector

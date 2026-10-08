@@ -487,6 +487,27 @@ async getTracksDir() : Promise<Result<string | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getResultsUploadPlan() : Promise<Result<ResultsUploadPlanDto | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_results_upload_plan") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Send the processed files of `10-Tracks` to a results account, into the
+ * search's folder there (standard п. 34). The folder is made only with
+ * `create_folder`: the standard wants the coordinator's word first (п. 33).
+ */
+async uploadResultsFtp(id: string, createFolder: boolean) : Promise<Result<FtpUploadDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("upload_results_ftp", { id, createFolder }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 /**
  * Where every visible mark goes by default:
  * `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, today's date.
@@ -981,6 +1002,16 @@ export type FtpRole =
  * Uploading results. Any number, one per contour.
  */
 "results"
+export type FtpUploadDto = { outcome: FtpUploadOutcome; 
+/**
+ * The folder on the server the files went to, or would have.
+ */
+remote: string | null; uploaded: string[]; 
+/**
+ * The file that failed, or the server's words.
+ */
+detail: string | null }
+export type FtpUploadOutcome = "done" | "no_search_folder" | "no_password" | "nothing_to_send" | "unreachable" | "login_refused" | "no_folder" | "failed"
 /**
  * What a folder import did, for the interface to put into words.
  * 
@@ -1036,6 +1067,11 @@ path: string;
  * True when the screen could not be photographed — see below.
  */
 screenshot_missing: boolean }
+/**
+ * What sending a search's results would do: the folder on the server, the
+ * files from `10-Tracks`, and the waypoint files that hold a `BVP`.
+ */
+export type ResultsUploadPlanDto = { search_folder: string; dir: string; files: string[]; with_bvp: string[] }
 export type SegmentDetailDto = { id: number; points: PointDetailDto[] }
 export type SimplifiedPreviewDto = { original_count: number; simplified_count: number; segments: SimplifiedSegmentDto[] }
 export type SimplifiedSegmentDto = { id: number; original_count: number; simplified_count: number; kept_points: PointDetailDto[] }

@@ -372,7 +372,27 @@ let previewedSlug: string | null = null;
  * backend answers with and nothing more — the stand has no keychain, and a
  * password echoed back would be a lie about the real application.
  */
-let standFtpAccounts: FtpAccountDto[] = [];
+/**
+ * `?ftp=results`: one results account already saved, with its password, so
+ * sending results can be walked without first filling the settings form.
+ */
+let standFtpAccounts: FtpAccountDto[] =
+  PARAMS.get("ftp") === "results"
+    ? [
+        {
+          id: "stand-results",
+          role: "results",
+          name: "Контур 1",
+          host: "ftp.example.org",
+          port: 21,
+          login: "crew",
+          folder: "/results",
+          has_password: true,
+        },
+      ]
+    : [];
+/** Whether the stand's server already has the search's folder. */
+let standSearchFolderMade = false;
 let nextStandFtpId = 0;
 
 /**
@@ -615,6 +635,8 @@ const LEAVES_THE_PROJECT_ALONE = new Set([
   // Writing the search's files from the work is not a change to the work.
   "get_tracks_dir",
   "export_tracks_plt",
+  "get_results_upload_plan",
+  "upload_results_ftp",
   "get_all_waypoints_export_default_path",
   "export_all_waypoints_wpt",
   // Reading a picture's header, and opening the map written for it: the
@@ -901,6 +923,36 @@ const HANDLERS: StandAnswers = {
   },
   // No network on the stand: an account with a password "logs in", one
   // without says so — the two answers the screen has to render differently.
+  get_results_upload_plan: () => ({
+    search_folder: "2026-07-08_Lavrovo",
+    dir: "/stand/bundles/2026-07-08_Lavrovo/10-Tracks",
+    files: ["20260708_Veter2.plt", "Waypoints_20261008.wpt"],
+    with_bvp: [],
+  }),
+  // The first send finds no folder for the search, as a first upload does;
+  // agreeing to make it sends.
+  upload_results_ftp: (args) => {
+    const account = standFtpAccounts.find(
+      (a) => a.id === String(args?.id ?? ""),
+    );
+    if (!account) throw "ftp.error.unknownAccount";
+    const remote = `${account.folder}/2026-07-08_Lavrovo`;
+    if (!standSearchFolderMade && args?.createFolder !== true) {
+      return {
+        outcome: "no_search_folder",
+        remote,
+        uploaded: [],
+        detail: null,
+      };
+    }
+    standSearchFolderMade = true;
+    return {
+      outcome: "done",
+      remote,
+      uploaded: ["20260708_Veter2.plt", "Waypoints_20261008.wpt"],
+      detail: null,
+    };
+  },
   check_ftp_account: (args) => {
     const account = standFtpAccounts.find(
       (a) => a.id === String(args?.id ?? ""),

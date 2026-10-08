@@ -34,6 +34,7 @@
   import { doRedo, doUndo, quickSave } from "$lib/actions/project";
   import CloseGuard from "../components/CloseGuard.svelte";
   import Settings from "../components/Settings.svelte";
+  import ResultsUpload from "../components/ResultsUpload.svelte";
   import ReportNote from "../components/ReportNote.svelte";
   import { captureMoment } from "$lib/actions/report";
   import { isEditableTarget } from "$lib/editable-target";
@@ -347,6 +348,7 @@
   <!-- CJ-7: the question asked before a window with unsaved work closes. -->
   <CloseGuard />
   <Settings />
+  <ResultsUpload />
   <!-- The one line about what happened, after a moment was captured. -->
   <ReportNote />
 </Tooltip.Provider>

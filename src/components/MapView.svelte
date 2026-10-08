@@ -97,6 +97,7 @@
   } from "$lib/geo";
   import { isEditableTarget } from "$lib/editable-target";
   import BoxSelect from "./BoxSelect.svelte";
+  import PointHover from "./PointHover.svelte";
   import { editablePointsInView } from "$lib/editable-points";
   import {
     initMeasureLayer,
@@ -1707,6 +1708,7 @@
 
 <div class="relative h-full min-w-0 flex-1" bind:this={mapEl}>
   <BoxSelect map={loadedMap} />
+  <PointHover map={loadedMap} />
   {#if $editModeActive && tooManyToEdit !== null}
     <div
       class="bg-popover text-popover-foreground border-border absolute top-3 left-1/2 z-40 -translate-x-1/2 rounded-md border px-3 py-1.5 text-xs shadow-lg"

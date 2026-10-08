@@ -23,6 +23,8 @@ const LEAVES_THE_PROJECT_ALONE = [
   // The search's files written from the work.
   "get_tracks_dir",
   "export_tracks_plt",
+  "get_results_upload_plan",
+  "upload_results_ftp",
   "get_all_waypoints_export_default_path",
   "export_all_waypoints_wpt",
   // Reads.

@@ -48,7 +48,7 @@ impl DownloadRegistry {
 
 pub type SharedDownloads = Arc<DownloadRegistry>;
 
-fn lock_app_state<'a>(
+pub(crate) fn lock_app_state<'a>(
     state: &'a SharedState,
 ) -> Result<std::sync::MutexGuard<'a, AppState>, String> {
     state

@@ -195,6 +195,40 @@ const dictionaries = {
     "jumps.cutOut": "Delete and split",
     "jumps.failed": "Could not change the track",
     "boxSelect.toggle": "Box",
+    "resultsUpload.open": "Send to the server…",
+    "resultsUpload.title": "Send the results to the server",
+    "resultsUpload.description":
+      "The processed tracks and marks — every PLT and WPT directly in the search's 10-Tracks — go into the search's folder on a results server",
+    "resultsUpload.loading": "Reading the folder…",
+    "resultsUpload.noSearch":
+      "No search folder is open: results are sent from its 10-Tracks.",
+    "resultsUpload.noAccount":
+      "There is no results account yet. Add one in Settings — host, login and folder of the contour.",
+    "resultsUpload.openSettings": "Open Settings",
+    "resultsUpload.account": "Account",
+    "resultsUpload.to": "Into",
+    "resultsUpload.files": "Files ({n}) from",
+    "resultsUpload.bvp":
+      "{files} holds the finding (BVP). By the standard it goes to the server only with the coordinator's sanction (п. 36).",
+    "resultsUpload.askFolder":
+      "There is no folder {remote} on the server. By the standard (п. 33) a search's folder is made with the coordinator's sanction. Make it and send?",
+    "resultsUpload.send": "Send",
+    "resultsUpload.createAndSend": "Make the folder and send",
+    "resultsUpload.close": "Close",
+    "resultsUpload.done": "Files sent: {n}",
+    "resultsUpload.outcome.done": "Sent",
+    "resultsUpload.outcome.no_search_folder":
+      "The search's folder is not on the server",
+    "resultsUpload.outcome.no_password":
+      "The account has no password — save it in Settings",
+    "resultsUpload.outcome.nothing_to_send":
+      "Nothing to send: there are no PLT or WPT files in 10-Tracks",
+    "resultsUpload.outcome.unreachable": "The server cannot be reached",
+    "resultsUpload.outcome.login_refused": "The server refused the login",
+    "resultsUpload.outcome.no_folder":
+      "The account's folder is not on the server",
+    "resultsUpload.outcome.failed": "Sending failed",
+    "pointHover.point": "Point {i} of {n}",
     "map.editTooMany": "{n} points in view — zoom in to edit them one by one",
     "boxSelect.start": "Select points with a box",
     "boxSelect.stop": "Stop selecting with a box",
@@ -813,6 +847,38 @@ const dictionaries = {
     "jumps.cutOut": "Удалить и разделить",
     "jumps.failed": "Не удалось изменить трек",
     "boxSelect.toggle": "Рамка",
+    "resultsUpload.open": "Отправить на сервер…",
+    "resultsUpload.title": "Отправить результаты на сервер",
+    "resultsUpload.description":
+      "Обработанные треки и точки — все PLT и WPT прямо в 10-Tracks поиска — уходят в папку поиска на сервере выгрузки",
+    "resultsUpload.loading": "Читаю папку…",
+    "resultsUpload.noSearch":
+      "Не открыт комплект поиска: результаты отправляются из его 10-Tracks.",
+    "resultsUpload.noAccount":
+      "Учётки выгрузки ещё нет. Добавьте её в Настройках — сервер, логин и папку контура.",
+    "resultsUpload.openSettings": "Открыть Настройки",
+    "resultsUpload.account": "Учётка",
+    "resultsUpload.to": "Куда",
+    "resultsUpload.files": "Файлы ({n}) из",
+    "resultsUpload.bvp":
+      "В {files} есть точка обнаружения (BVP). По стандарту такой файл выкладывается только с санкции координатора (п. 36).",
+    "resultsUpload.askFolder":
+      "Папки {remote} на сервере нет. По стандарту (п. 33) папку поиска создают с санкции координатора. Создать и отправить?",
+    "resultsUpload.send": "Отправить",
+    "resultsUpload.createAndSend": "Создать папку и отправить",
+    "resultsUpload.close": "Закрыть",
+    "resultsUpload.done": "Отправлено файлов: {n}",
+    "resultsUpload.outcome.done": "Отправлено",
+    "resultsUpload.outcome.no_search_folder": "Папки поиска на сервере нет",
+    "resultsUpload.outcome.no_password":
+      "У учётки нет пароля — сохраните его в Настройках",
+    "resultsUpload.outcome.nothing_to_send":
+      "Нечего отправлять: в 10-Tracks нет файлов PLT и WPT",
+    "resultsUpload.outcome.unreachable": "Сервер недоступен",
+    "resultsUpload.outcome.login_refused": "Сервер не принял логин или пароль",
+    "resultsUpload.outcome.no_folder": "Папки учётки на сервере нет",
+    "resultsUpload.outcome.failed": "Не удалось отправить",
+    "pointHover.point": "Точка {i} из {n}",
     "map.editTooMany":
       "В видимой области точек: {n} — приблизьте карту, чтобы править их по одной",
     "boxSelect.start": "Выделить точки рамкой",

@@ -71,6 +71,7 @@
   } from "$lib/actions/import-paths";
   import { confirm, open } from "@tauri-apps/plugin-dialog";
   import { reportEditFailure } from "$lib/edit-failure";
+  import { resultsUploadOpen } from "$lib/stores";
   import { toast } from "svelte-sonner";
   import { setInteractionMode } from "$lib/actions/modes";
   import UploadIcon from "@lucide/svelte/icons/upload";
@@ -930,6 +931,18 @@
             data-testid="library-save-plts"
           >
             <span class="truncate">{$i18n("tracksTab.savePlts")}</span>
+          </Button>
+        </div>
+        <div class="mt-1.5 flex">
+          <Button
+            variant="outline"
+            size="xs"
+            class="min-w-0 flex-1 justify-center gap-1.5"
+            title={$i18n("resultsUpload.description")}
+            onclick={() => resultsUploadOpen.set(true)}
+            data-testid="library-send-results"
+          >
+            <span class="truncate">{$i18n("resultsUpload.open")}</span>
           </Button>
         </div>
       {/if}

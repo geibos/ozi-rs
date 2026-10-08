@@ -71,29 +71,31 @@ registered without a line on this page, so the gap cannot open again.
 
 ### Project / Bundle Management
 
-| Command                  | Description                                                                                          |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `load_projects`          | Fetch LizaAlert project list (streaming)                                                             |
-| `load_project`           | Open a LizaAlert project by slug                                                                     |
-| `open_selected_map`      | Activate a map package (downloads if needed)                                                         |
-| `open_local_bundle`      | Open map bundle from a local directory                                                               |
-| `set_bundles_root`       | Set root directory for map bundles                                                                   |
-| `save_project`           | Save project to `.ozp` file                                                                          |
-| `load_project_file`      | Load project from `.ozp` file                                                                        |
-| `reveal_bundle`          | Open active bundle directory in file explorer                                                        |
-| `reveal_path`            | Open a file manager on any written file — what an export's «Показать» does                           |
-| `save_report`            | Capture one moment — the screen, the diagnostics and the state — into a dated folder under Documents |
-| `add_report_note`        | Write the operator's line about what happened into a report already captured                         |
-| `reveal_reports`         | Open the folder the reports go into, so a day's worth is handed over at once                         |
-| `preview_project`        | Fetch a bundle's map list without downloading anything                                               |
-| `cancel_project_listing` | Stop the catalogue walk that is running                                                              |
-| `cancel_download`        | Abort a bundle download; files already on disk stay, and the next attempt resumes                    |
-| `new_project`            | Start a new search: an empty project, keeping the bundle and the active raster                       |
-| `calibrate_raster`       | Write a `.map` for a picture that came without one, and open the pair                                |
-| `list_ftp_accounts`      | The FTP accounts — bundles and result endpoints — each with whether a password is stored             |
-| `save_ftp_account`       | Create or update an FTP account; the password goes to the system credential store, `null` keeps it   |
-| `delete_ftp_account`     | Remove an FTP account and its stored password                                                        |
-| `check_ftp_account`      | Connect, log in and change to the account's folder; says which step failed                           |
+| Command                   | Description                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `load_projects`           | Fetch LizaAlert project list (streaming)                                                                    |
+| `load_project`            | Open a LizaAlert project by slug                                                                            |
+| `open_selected_map`       | Activate a map package (downloads if needed)                                                                |
+| `open_local_bundle`       | Open map bundle from a local directory                                                                      |
+| `set_bundles_root`        | Set root directory for map bundles                                                                          |
+| `save_project`            | Save project to `.ozp` file                                                                                 |
+| `load_project_file`       | Load project from `.ozp` file                                                                               |
+| `reveal_bundle`           | Open active bundle directory in file explorer                                                               |
+| `reveal_path`             | Open a file manager on any written file — what an export's «Показать» does                                  |
+| `save_report`             | Capture one moment — the screen, the diagnostics and the state — into a dated folder under Documents        |
+| `add_report_note`         | Write the operator's line about what happened into a report already captured                                |
+| `reveal_reports`          | Open the folder the reports go into, so a day's worth is handed over at once                                |
+| `preview_project`         | Fetch a bundle's map list without downloading anything                                                      |
+| `cancel_project_listing`  | Stop the catalogue walk that is running                                                                     |
+| `cancel_download`         | Abort a bundle download; files already on disk stay, and the next attempt resumes                           |
+| `new_project`             | Start a new search: an empty project, keeping the bundle and the active raster                              |
+| `calibrate_raster`        | Write a `.map` for a picture that came without one, and open the pair                                       |
+| `list_ftp_accounts`       | The FTP accounts — bundles and result endpoints — each with whether a password is stored                    |
+| `save_ftp_account`        | Create or update an FTP account; the password goes to the system credential store, `null` keeps it          |
+| `delete_ftp_account`      | Remove an FTP account and its stored password                                                               |
+| `check_ftp_account`       | Connect, log in and change to the account's folder; says which step failed                                  |
+| `get_results_upload_plan` | The search's folder on the server and the processed files of `10-Tracks` to send; waypoint files with a BVP |
+| `upload_results_ftp`      | Send those files to a results account, into the search's folder; makes the folder only when asked (п. 33)   |
 
 ### Import / Export
 

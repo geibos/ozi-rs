@@ -5,8 +5,10 @@
 //! password crosses the boundary in one direction only — into a save — and
 //! no command answers with one.
 
+use crate::commands::{SharedState, lock_app_state};
 use crate::infrastructure::ftp::{
-    FtpAccount, FtpAccountDraft, FtpAccounts, FtpCheck, FtpRole, check_account,
+    FtpAccount, FtpAccountDraft, FtpAccounts, FtpCheck, FtpRole, FtpUpload, check_account,
+    upload_results,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,6 +18,9 @@ pub type SharedFtpAccounts = Arc<FtpAccounts>;
 
 /// How long each step of a check may wait on the server.
 const CHECK_LIMIT: Duration = Duration::from_secs(10);
+/// A results file is tens of kilobytes; a step that waits longer than this
+/// is a line that has gone, not a slow one.
+const UPLOAD_LIMIT: Duration = Duration::from_secs(30);
 
 #[derive(serde::Serialize, specta::Type)]
 pub struct FtpAccountDto {
@@ -171,5 +176,146 @@ fn failure(outcome: FtpCheckOutcome, detail: String) -> FtpCheckDto {
         outcome,
         detail: Some(detail),
         folder: None,
+    }
+}
+
+/// What sending a search's results would do: the folder on the server, the
+/// files from `10-Tracks`, and the waypoint files that hold a `BVP`.
+#[derive(serde::Serialize, specta::Type)]
+pub struct ResultsUploadPlanDto {
+    pub search_folder: String,
+    pub dir: String,
+    pub files: Vec<String>,
+    pub with_bvp: Vec<String>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_results_upload_plan(
+    state: State<SharedState>,
+) -> Result<Option<ResultsUploadPlanDto>, String> {
+    let plan = lock_app_state(state.inner())?.results_upload_plan();
+    Ok(plan.map(|plan| ResultsUploadPlanDto {
+        search_folder: plan.search_folder,
+        dir: plan.dir.display().to_string(),
+        files: plan
+            .files
+            .iter()
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect(),
+        with_bvp: plan.with_bvp,
+    }))
+}
+
+#[derive(serde::Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum FtpUploadOutcome {
+    Done,
+    NoSearchFolder,
+    NoPassword,
+    NothingToSend,
+    Unreachable,
+    LoginRefused,
+    NoFolder,
+    Failed,
+}
+
+#[derive(serde::Serialize, specta::Type)]
+pub struct FtpUploadDto {
+    pub outcome: FtpUploadOutcome,
+    /// The folder on the server the files went to, or would have.
+    pub remote: Option<String>,
+    pub uploaded: Vec<String>,
+    /// The file that failed, or the server's words.
+    pub detail: Option<String>,
+}
+
+/// Send the processed files of `10-Tracks` to a results account, into the
+/// search's folder there (standard п. 34). The folder is made only with
+/// `create_folder`: the standard wants the coordinator's word first (п. 33).
+#[tauri::command]
+#[specta::specta]
+pub async fn upload_results_ftp(
+    id: String,
+    create_folder: bool,
+    state: State<'_, SharedState>,
+    accounts: State<'_, SharedFtpAccounts>,
+) -> Result<FtpUploadDto, String> {
+    let plan = lock_app_state(state.inner())?.results_upload_plan();
+    let Some(plan) = plan.filter(|p| !p.files.is_empty()) else {
+        return Ok(upload_dto(
+            FtpUploadOutcome::NothingToSend,
+            None,
+            Vec::new(),
+            None,
+        ));
+    };
+    let (account, password) = accounts
+        .credentials(&id)
+        .map_err(|error| error.to_string())?;
+    let Some(password) = password else {
+        return Ok(upload_dto(
+            FtpUploadOutcome::NoPassword,
+            None,
+            Vec::new(),
+            None,
+        ));
+    };
+    let sent = tauri::async_runtime::spawn_blocking(move || {
+        upload_results(
+            &account,
+            &password,
+            &plan.search_folder,
+            &plan.files,
+            create_folder,
+            UPLOAD_LIMIT,
+        )
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(match sent {
+        FtpUpload::Done { remote, uploaded } => {
+            upload_dto(FtpUploadOutcome::Done, Some(remote), uploaded, None)
+        }
+        FtpUpload::NoSearchFolder { remote } => upload_dto(
+            FtpUploadOutcome::NoSearchFolder,
+            Some(remote),
+            Vec::new(),
+            None,
+        ),
+        FtpUpload::Refused(check) => {
+            let (outcome, detail) = match check {
+                FtpCheck::Unreachable(d) => (FtpUploadOutcome::Unreachable, d),
+                FtpCheck::LoginRefused(d) => (FtpUploadOutcome::LoginRefused, d),
+                FtpCheck::NoFolder(d) => (FtpUploadOutcome::NoFolder, d),
+                FtpCheck::Failed(d) => (FtpUploadOutcome::Failed, d),
+                FtpCheck::Ok { .. } => (FtpUploadOutcome::Failed, String::new()),
+            };
+            upload_dto(outcome, None, Vec::new(), Some(detail))
+        }
+        FtpUpload::Failed {
+            uploaded,
+            file,
+            reason,
+        } => upload_dto(
+            FtpUploadOutcome::Failed,
+            None,
+            uploaded,
+            Some(format!("{file}: {reason}")),
+        ),
+    })
+}
+
+fn upload_dto(
+    outcome: FtpUploadOutcome,
+    remote: Option<String>,
+    uploaded: Vec<String>,
+    detail: Option<String>,
+) -> FtpUploadDto {
+    FtpUploadDto {
+        outcome,
+        remote,
+        uploaded,
+        detail,
     }
 }
