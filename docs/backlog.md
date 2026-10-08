@@ -6,6 +6,18 @@ decision.
 
 ## Product
 
+- **A native macOS menu.** Asked for by the owner on 2026-10-08: «нативное
+  меню приложения маковское — понравилось, как было в lipflow-rs». What
+  lipflow-rs has (`~/projects/lipflow-rs/crates/app/src/macos/app.rs`,
+  `build_menu`): an AppKit `NSMenu` built in Rust through `objc2`, every item
+  with an SF Symbol icon (`imageWithSystemSymbolName`, 13 pt, template so it
+  follows light and dark), separators between groups, disabled lines at the
+  top that state what the app is doing, a submenu for a choice (cameras), key
+  equivalents (`⌘,` Settings, `⌘Q` Quit). It is a menu-bar status item there;
+  ozi-rs is a windowed app, so the counterpart is the main menu bar (ozi-rs,
+  Файл, Правка, Вид, Трек, Окно) built the same way — or Tauri's menu API
+  with icons, if it reaches the same look. Which of the two the owner meant —
+  the status item or the main menu — is not asked yet.
 - **FTP as a second source for the catalogue.** Accounts and passwords done
   on 2026-10-02 (`ftp-accounts`); the listing adapter and the source
   preference are what is left. The original note: `maps.lizaalert.ru` runs an FTP
