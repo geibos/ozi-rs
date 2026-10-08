@@ -103,8 +103,14 @@ export const SCREENS: ScreenEntry[] = [
     id: "library-maps",
     title: "The workspace with the Maps tab",
     states: {
+      // The map flies to its opening view after the list is up; one run in
+      // the 2026-10-08 matrix photographed it mid-flight.
       loaded: {
         url: "/project",
+        steps: [
+          { waitFor: '[data-testid="maps-open-project"]' },
+          { settle: true },
+        ],
         ready: '[data-testid="maps-open-project"]',
       },
       empty: {
