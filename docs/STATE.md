@@ -91,9 +91,42 @@ step. Thresholds measured on the owner's own cleaning of the eleven tracks:
 deleted points are on the list, 112 entries over the eleven tracks, 59 of them
 places he edited. The stand serves such a track with `?track=dirty`. Two more recordings came on 2026-10-08 (a forest search, a city one, the
 upload), digested in `docs/field-notes/2026-10-08-forest-search-in-ozi.md`
-with what ozi-rs lacks for each step. Next from
-the recording: name fix-up by the standard's transliteration, colour by group
-type, each track to its own PLT in one go, a 20 000-point track.
+with what ozi-rs lacks for each step.
+
+**A search processed end to end in ozi-rs** (2026-10-08, the owner: «сделай
+доработки… критерий — взять ozi-rs и использовать для реальной обработки
+треков»). What a search's operator does, in the order the library's buttons
+now run, each from the recordings and the standard:
+
+- clean: the jumps list (now also breaks of six hours or more — a previous
+  search's tail, `jumps-and-outliers`), points chosen with a box on the map
+  and deleted or kept alone (`select-points-with-a-box`), edit-mode handles
+  only on the points in view so an 18 000-point phone track pans in 0.2 s
+  instead of 16.5 s (`edit-a-long-recording`);
+- «Фильтр 4 — видимым» (`filter-like-ozi-index-4`);
+- «Имена по стандарту»: the date of the first point and the group's callsign
+  in latin, offered per row and for all; the name check now holds names to
+  п. 14–15 (`process-by-the-standard`);
+- the standard's colours, and one colour for every visible track — a search
+  day at once;
+- «Сохранить в 10-Tracks»: each visible track its own PLT, named after it,
+  without overwriting unasked;
+- marks: colour into WPT and back, `Waypoints_ГГГГММДД.wpt` in `10-Tracks`,
+  every visible mark into one file, a phone's addresses cleared from a
+  layer, the standard's mark colours and the «С»/«C» rule;
+- «Отправить на сервер…»: the PLT and WPT of `10-Tracks` into the search's
+  folder on a results account, the folder made only when asked (п. 33), a
+  BVP file named (п. 36), a search folder picked by hand when no bundle is
+  open (`send-results-by-ftp`);
+- the point under the cursor named with its number, time and leg
+  (`name-the-point-under-the-cursor`).
+
+All walked on the stand and covered by tests (Rust 439, vitest 772 on
+2026-10-08); none yet in the packaged application — that is the batched
+smoke at the end of this run. Not done: copying the source GPX into
+`10-Tracks/ГГГГММДД/` (п. 5), dashed style for doubtful tracks (п. 22), the
+native macOS menu (`docs/backlog.md`), areas (ОК+). The FTP upload has not
+met a real server: it needs the owner's account and the coordinator's word.
 
 **The screenshot matrix exists** (`finish-the-rebuild` group 1, 2026-10-02).
 `just shots` photographs fifteen screen states — the launcher in all five
@@ -515,8 +548,8 @@ afternoon.
   cause, visible for the first time because `appium:showServerLogs` is now on
   (`tools/ozi-rs-mcp/src/appium.rs`):
 
-              Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
-              Code=1000 "Timed out while enabling automation mode."
+                Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+                Code=1000 "Timed out while enabling automation mode."
 
   **What this means.** Enabling automation mode is macOS asking for the
   Accessibility grant that lets a test runner drive the interface. It times out

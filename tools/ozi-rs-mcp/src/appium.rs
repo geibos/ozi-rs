@@ -249,6 +249,22 @@ pub fn appium_launch_session_with_app_path(
     )
 }
 
+/// Launch with environment variables for the application — how a smoke
+/// journey points it at a scratch session (`OZI_RS_SESSION_PATH`,
+/// `OZI_RS_BUNDLES_ROOT`) instead of the operator's own.
+pub fn appium_launch_session_with_app_path_and_env(
+    server_url: &str,
+    app_path: &str,
+    environment: serde_json::Value,
+) -> AppiumToolResult {
+    appium_launch_session_with_capabilities(
+        true,
+        server_url,
+        json!({ "appium:appPath": app_path, "appium:environment": environment }),
+        app_path,
+    )
+}
+
 fn appium_launch_session_with_capabilities(
     appium_available: bool,
     server_url: &str,

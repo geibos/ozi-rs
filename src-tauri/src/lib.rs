@@ -37,6 +37,16 @@ fn build_app_state(app: &tauri::AppHandle) -> application::AppState {
         }
     };
 
+    // A smoke journey that edits and saves must not start from the operator's
+    // own last search: «Сохранить в 10-Tracks» would write into their bundle.
+    // These point the application at a scratch session and bundles folder.
+    let session_path = std::env::var_os("OZI_RS_SESSION_PATH")
+        .map(PathBuf::from)
+        .or(session_path);
+    let bundles_root = std::env::var_os("OZI_RS_BUNDLES_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or(bundles_root);
+
     application::AppState::new_with_paths(session_path, bundles_root)
 }
 

@@ -696,3 +696,164 @@ fn poll_for_new_report(
         thread::sleep(SOURCE_POLL_STEP);
     }
 }
+
+// ── A real track, processed the way a search's operator does it ──────────
+
+const IMPORT: [&str; 2] = ["Импорт…", "Import…"];
+const RENAME_ALL: [&str; 2] = ["Имена по стандарту", "Names by the standard"];
+const FILTER_ALL: [&str; 2] = ["Фильтр 4 — видимым", "Filter 4 — visible"];
+const SAVE_PLTS: [&str; 2] = ["Сохранить в 10-Tracks", "Save to 10-Tracks"];
+const ENTER: char = '\u{E007}';
+
+/// Type into whatever has the focus, one key at a time — the open panel's
+/// "Go to folder" field has no selector worth relying on.
+fn type_keys(server: &str, sid: &str, text: &str) {
+    for c in text.chars() {
+        let pressed = appium_press_key_with_session_id(server, sid, c);
+        assert!(pressed.ok, "typing {c:?} failed: {pressed:?}");
+    }
+}
+
+/// In an open or save panel: ⇧⌘G, the path, Enter, then Enter to confirm.
+fn choose_in_panel(server: &str, sid: &str, path: &str) {
+    thread::sleep(Duration::from_secs(2));
+    let chord = appium_press_chord_with_session_id(server, sid, &[SHIFT, META], 'g');
+    assert!(chord.ok, "⇧⌘G in the panel failed: {chord:?}");
+    thread::sleep(Duration::from_secs(1));
+    type_keys(server, sid, path);
+    thread::sleep(Duration::from_millis(500));
+    assert!(appium_press_key_with_session_id(server, sid, ENTER).ok);
+    thread::sleep(Duration::from_secs(1));
+    assert!(appium_press_key_with_session_id(server, sid, ENTER).ok);
+}
+
+/// The owner's real track of 2026-10-06, `Лиса 2`: imported from GPX, named
+/// by the standard, filtered at index 4 and saved as a PLT — in the packaged
+/// application, with the file read back off the disk. OziExplorer kept 1062
+/// of its 1995 points (the owner's own PLT, three of them deleted by hand).
+///
+/// The application starts on a scratch session and bundles folder: «Сохранить
+/// в 10-Tracks» on the operator's own last search would write into their
+/// bundle. If the track list is not empty once it is up, nothing is touched.
+#[test]
+#[ignore = "requires built app + Appium Mac2 + the owner's tracks in ~/Downloads/gpx; run via `just smoke`"]
+fn smoke_real_track_processed_by_the_standard() {
+    use ozi_rs_mcp::appium::appium_launch_session_with_app_path_and_env;
+
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(2)
+        .expect("workspace root");
+    let app_bundle = workspace.join("target/debug/bundle/macos/ozi-rs.app");
+    assert!(app_bundle.exists(), "run `just build` first");
+    let home = std::path::PathBuf::from(std::env::var("HOME").expect("HOME"));
+    let source = home.join("Downloads/gpx/20261006 Лиса2.gpx");
+    assert!(
+        source.exists(),
+        "the owner's track is missing: {}",
+        source.display()
+    );
+
+    let scratch = std::path::PathBuf::from("/tmp/ozi-smoke-real");
+    let _ = std::fs::remove_dir_all(&scratch);
+    let out = scratch.join("out");
+    std::fs::create_dir_all(&out).unwrap();
+    std::fs::create_dir_all(scratch.join("bundles")).unwrap();
+    let gpx = scratch.join("lisa2.gpx");
+    std::fs::copy(&source, &gpx).unwrap();
+
+    let doctor = appium_doctor();
+    assert!(doctor.ok, "Appium Mac2 is not ready: {doctor:?}");
+    kill_wedged_wda();
+    kill_app_instances();
+    thread::sleep(Duration::from_secs(2));
+
+    let environment = serde_json::json!({
+        "OZI_RS_SESSION_PATH": scratch.join("session.json"),
+        "OZI_RS_BUNDLES_ROOT": scratch.join("bundles"),
+    });
+    let launch = appium_launch_session_with_app_path_and_env(
+        DEFAULT_APPIUM_SERVER_URL,
+        &app_bundle.to_string_lossy(),
+        environment,
+    );
+    assert!(launch.ok, "appium launch failed: {launch:?}");
+    let guard = SessionGuard {
+        server_url: DEFAULT_APPIUM_SERVER_URL.to_owned(),
+        session_id: launch.session_id.clone().expect("session id"),
+    };
+    let server = guard.server_url.as_str();
+    let sid = guard.session_id.as_str();
+
+    poll_source_until(server, sid, Duration::from_secs(30), "workspace", |s| {
+        contains_any(s, &TRACKS_TAB)
+    });
+    assert!(click_any_label(server, sid, &TRACKS_TAB), "no Tracks tab");
+    let source_before =
+        poll_source_until(server, sid, Duration::from_secs(10), "import button", |s| {
+            contains_any(s, &IMPORT)
+        });
+    // The safety: a scratch session has no tracks. Anything here is somebody's.
+    assert!(
+        !source_before.contains(" тчк") && !source_before.contains(" pts"),
+        "the application did not start on the scratch session — stopping before touching anything"
+    );
+    println!("ok: scratch session, empty track list");
+
+    assert!(click_any_label(server, sid, &IMPORT), "no Import button");
+    choose_in_panel(server, sid, &gpx.to_string_lossy());
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(30),
+        "the imported track",
+        |s| s.contains("20261006Лиса2"),
+    );
+    println!("ok: imported 20261006Лиса2");
+
+    assert!(click_any_label(server, sid, &RENAME_ALL), "no names button");
+    poll_source_until(
+        server,
+        sid,
+        Duration::from_secs(15),
+        "the standard name",
+        |s| s.contains("20261006_Lisa2"),
+    );
+    println!("ok: renamed to 20261006_Lisa2");
+
+    assert!(
+        click_any_label(server, sid, &FILTER_ALL),
+        "no filter button"
+    );
+    thread::sleep(Duration::from_secs(2));
+    assert!(
+        appium_press_key_with_session_id(server, sid, ENTER).ok,
+        "confirm"
+    );
+    poll_source_until(server, sid, Duration::from_secs(20), "fewer points", |s| {
+        !s.contains("1995 тчк") && !s.contains("1995 pts")
+    });
+    println!("ok: filtered");
+
+    assert!(click_any_label(server, sid, &SAVE_PLTS), "no save button");
+    choose_in_panel(server, sid, &out.to_string_lossy());
+    let plt = out.join("20261006_Lisa2.plt");
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    while !plt.exists() && std::time::Instant::now() < deadline {
+        thread::sleep(SOURCE_POLL_STEP);
+    }
+    assert!(plt.exists(), "no {} written", plt.display());
+    let bytes = std::fs::read(&plt).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.starts_with("OziExplorer Track Point File Version 2.1"));
+    let points = text.lines().count().saturating_sub(6);
+    println!(
+        "ok: {} written, {points} points (OziExplorer: 1062)",
+        plt.display()
+    );
+    assert!(
+        (1000..=1120).contains(&points),
+        "{points} points; OziExplorer's filter at index 4 kept 1062"
+    );
+    drop(guard);
+}
