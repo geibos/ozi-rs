@@ -9,16 +9,19 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { get } from "svelte/store";
 import { tick } from "svelte";
 
-const { cutOutTrackPoint, deleteTrackPoint, splitSegment } = vi.hoisted(() => ({
-  cutOutTrackPoint: vi.fn(async () => {}),
-  deleteTrackPoint: vi.fn(async () => {}),
-  splitSegment: vi.fn(async () => {}),
-}));
+const { cutOutTrackPoint, deleteTrackPoint, splitSegment, trimTrackAtPoint } =
+  vi.hoisted(() => ({
+    cutOutTrackPoint: vi.fn(async () => {}),
+    deleteTrackPoint: vi.fn(async () => {}),
+    splitSegment: vi.fn(async () => {}),
+    trimTrackAtPoint: vi.fn(async () => 5),
+  }));
 
 vi.mock("$lib/api", () => ({
   cutOutTrackPoint,
   deleteTrackPoint,
   splitSegment,
+  trimTrackAtPoint,
 }));
 
 import TrackJumps from "../components/inspector/TrackJumps.svelte";
@@ -101,5 +104,48 @@ describe("the jumps and outliers list", () => {
     await fireEvent.click(screen.getByTestId("jump-delete-apex"));
     await tick();
     expect(deleteTrackPoint).toHaveBeenCalledWith(5n, 7n, 3n, 11n);
+  });
+});
+
+describe("a break in the list", () => {
+  const brokenTrack = (): TrackDetail => {
+    const start = Date.parse("2026-09-26T09:00:00Z");
+    const later = Date.parse("2026-10-08T06:00:00Z");
+    const points = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1,
+      lat: 59.9 + (i * 10) / 111_195,
+      lon: 30.3,
+      elevation: null,
+      timestamp: new Date((i < 5 ? start : later) + i * 5000).toISOString(),
+    }));
+    return { id: 7, name: "20261008_Lisa15", segments: [{ id: 3, points }] };
+  };
+
+  beforeEach(async () => {
+    setLocale("ru");
+    selectedPointId.set(null);
+    vi.clearAllMocks();
+    render(TrackJumps, {
+      props: { detail: brokenTrack(), layerId: 5n, trackId: 7n },
+    });
+    await tick();
+  });
+
+  afterEach(() => cleanup());
+
+  it("says how long the break was, and cuts either side of it", async () => {
+    const entry = screen.getByTestId("track-jump");
+    expect(entry.dataset.kind).toBe("break");
+    expect(entry.textContent).toContain("Перерыв");
+    await fireEvent.click(entry);
+    await tick();
+    await fireEvent.click(screen.getByTestId("break-trim-before"));
+    await tick();
+    expect(trimTrackAtPoint).toHaveBeenCalledWith(5n, 7n, 6n, true);
+    await fireEvent.click(screen.getByTestId("track-jump"));
+    await tick();
+    await fireEvent.click(screen.getByTestId("break-trim-after"));
+    await tick();
+    expect(trimTrackAtPoint).toHaveBeenLastCalledWith(5n, 7n, 5n, false);
   });
 });

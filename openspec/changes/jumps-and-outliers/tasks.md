@@ -19,6 +19,13 @@
 - [x] 3.2 Distance and speed under each row of the points table
 - [x] 3.3 The list in the inspector, with its actions; component test
 
+## 3a. Breaks (2026-10-08)
+
+- [x] 3a.1 A pause of six hours or more is a break: the owner's 2026-10-08
+      recording cut tails from 26 September and 2 October off two navigators;
+      his eleven tracks of 2026-10-06 never paused for more than twenty
+      minutes inside a search. Tests, the list entry, trimming either side
+
 ## 4. Gates
 
 - [x] 4.1 `just ci` green (2026-10-06: 427 Rust, 741 vitest, matrix 64/64)

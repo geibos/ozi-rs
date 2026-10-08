@@ -27,11 +27,16 @@ is suspect, in track order, within each segment:
 - an **outlier** is a point whose legs in and out are each at least 30 m and
   three median legs, while its two neighbours lie closer to each other than
   0.35 of the two legs together.
+- a **break** is a leg whose two points are six hours or more apart, however
+  far — the tail of a previous search on a navigator nobody cleared; it is
+  listed as a break, not as a jump.
 
 Each entry SHALL show the distance and, when known, the speed of the legs
 around it. Choosing an entry SHALL select its point and take the map to it.
 A jump SHALL offer to split the segment between its two points; an outlier
-SHALL offer to delete the point, and to delete it and split the segment there.
+SHALL offer to delete the point, and to delete it and split the segment there;
+a break SHALL say how long it was and when either side was recorded, and SHALL
+offer to delete everything before it or everything after it.
 The list SHALL NOT change a track by itself.
 
 #### Scenario: A spike is found by its apex
@@ -45,6 +50,13 @@ The list SHALL NOT change a track by itself.
 
 - **WHEN** a track going 10 m a step has one leg of 900 m
 - **THEN** the list holds one jump, at the point after that leg
+
+#### Scenario: The tail of the last search
+
+- **WHEN** a track's first five points were recorded on 26 September and the
+  rest on 8 October
+- **THEN** the list holds a break at the sixth point, and «Удалить всё до»
+  leaves the track starting there
 
 #### Scenario: Choosing an entry
 

@@ -38,12 +38,15 @@ interface SegmentLike {
   points: PointLike[];
 }
 
-export type SuspectKind = "jump" | "outlier";
+export type SuspectKind = "jump" | "outlier" | "break";
 
 export interface Suspect {
   kind: SuspectKind;
   segmentId: number;
-  /** A jump's point is the one after the gap; an outlier's is its apex. */
+  /**
+   * A jump's point is the one after the gap; an outlier's is its apex; a
+   * break's is the first point after the clock jumped.
+   */
   pointId: number;
   /** The point before — where a jump is split. */
   previousPointId: number;
@@ -67,6 +70,12 @@ export interface SuspectThresholds {
    * the track went out and came back.
    */
   outlierReturnRatio: number;
+  /**
+   * A pause at least this long is a break between recordings — the tail of
+   * a previous search on a navigator nobody cleared. Within one search the
+   * owner's eleven tracks paused at most twenty minutes.
+   */
+  breakSeconds: number;
 }
 
 export const DEFAULT_SUSPECT_THRESHOLDS: SuspectThresholds = {
@@ -75,6 +84,7 @@ export const DEFAULT_SUSPECT_THRESHOLDS: SuspectThresholds = {
   outlierMinM: 30,
   outlierMedians: 3,
   outlierReturnRatio: 0.35,
+  breakSeconds: 6 * 3600,
 };
 
 function metres(a: PointLike, b: PointLike): number {
@@ -153,7 +163,12 @@ export function findSuspects(
         before,
         after,
       };
-      if (isOutlier(i)) {
+      if (
+        before.seconds !== null &&
+        before.seconds >= thresholds.breakSeconds
+      ) {
+        suspects.push({ kind: "break", ...base });
+      } else if (isOutlier(i)) {
         suspects.push({ kind: "outlier", ...base });
       } else if (
         before.distanceM >= jumpM &&

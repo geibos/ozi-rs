@@ -134,6 +134,47 @@ describe("jumps and outliers", () => {
   });
 });
 
+describe("a break between days", () => {
+  it("is found where the clock jumps by hours, whatever the distance", () => {
+    // A navigator that came from the last search: its old points first, then
+    // five days later this search's, a few metres away.
+    const points = walk(30);
+    const later = Date.parse(points[10].timestamp!) + 5 * 86_400_000;
+    points.slice(10).forEach((p, i) => {
+      p.timestamp = new Date(later + i * 5000).toISOString();
+    });
+    const suspects = findSuspects([{ id: 1, points }]);
+    expect(suspects).toHaveLength(1);
+    expect(suspects[0]).toMatchObject({
+      kind: "break",
+      pointId: 11,
+      previousPointId: 10,
+    });
+    expect(suspects[0].before.seconds).toBeCloseTo(5 * 86_400 + 5, -1);
+  });
+
+  it("is a break, not a jump, when the gap is far as well", () => {
+    const points = walk(30);
+    shiftNorth(points, 20, 5_000);
+    const later = Date.parse(points[20].timestamp!) + 86_400_000;
+    points.slice(20).forEach((p, i) => {
+      p.timestamp = new Date(later + i * 5000).toISOString();
+    });
+    expect(findSuspects([{ id: 1, points }]).map((s) => s.kind)).toEqual([
+      "break",
+    ]);
+  });
+
+  it("leaves a pause of an hour alone", () => {
+    const points = walk(30);
+    const later = Date.parse(points[15].timestamp!) + 3_600_000;
+    points.slice(15).forEach((p, i) => {
+      p.timestamp = new Date(later + i * 5000).toISOString();
+    });
+    expect(findSuspects([{ id: 1, points }])).toEqual([]);
+  });
+});
+
 describe("a leg, as the points table writes it", () => {
   const leg = (distanceM: number, speedKmh: number | null) => ({
     distanceM,

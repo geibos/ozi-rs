@@ -34,6 +34,9 @@ short runs he cut out of a dense cluster of points.
   «Удалить и разделить».
 - «Удалить и разделить» removes a point and splits its segment between the
   points on either side, as one undoable step (`CutOutTrackPoint`).
+- A pause of six hours or more is listed as a break, with the dates on
+  either side, offering to delete everything before or after it — the tail
+  of a previous search (owner's recording, 2026-10-08).
 - The list is a review aid: it never edits a track by itself, and the
   thresholds are not settings yet.
 

@@ -9,7 +9,13 @@
    * are already picked out, and choosing one takes the map to it.
    */
   import { Button } from "$lib/components/ui/button";
-  import { cutOutTrackPoint, deleteTrackPoint, splitSegment } from "$lib/api";
+  import {
+    cutOutTrackPoint,
+    deleteTrackPoint,
+    splitSegment,
+    trimTrackAtPoint,
+  } from "$lib/api";
+  import { formatDurationSeconds, formatTimestamp } from "$lib/track-stats";
   import { reportEditFailure } from "$lib/edit-failure";
   import { locale, t } from "$lib/i18n";
   import {
@@ -38,6 +44,45 @@
         .map((id, i) => [id, i + 1] as const),
     ),
   );
+
+  /** Each point's time, for saying when a break began and ended. */
+  const timeOf = $derived(
+    new Map(
+      detail.segments.flatMap((s) =>
+        s.points.map((p) => [p.id, p.timestamp] as const),
+      ),
+    ),
+  );
+
+  function label(s: Suspect): string {
+    if (s.kind === "outlier") return $t("jumps.outlier");
+    if (s.kind === "jump") return $t("jumps.jump");
+    return $t("jumps.break").replace(
+      "{duration}",
+      formatDurationSeconds(s.before.seconds ?? 0, $locale),
+    );
+  }
+
+  /**
+   * Cut off one side of a break: the old search before it, or whatever was
+   * recorded after it. The point on the kept side stays.
+   */
+  function trimAtBreak(s: Suspect, keepAfter: boolean) {
+    void edit(
+      () =>
+        keepAfter
+          ? trimTrackAtPoint(layerId, trackId, BigInt(s.pointId), true).then(
+              () => undefined,
+            )
+          : trimTrackAtPoint(
+              layerId,
+              trackId,
+              BigInt(s.previousPointId),
+              false,
+            ).then(() => undefined),
+      true,
+    );
+  }
 
   function choose(suspect: Suspect) {
     selectedPointId.set(BigInt(suspect.pointId));
@@ -133,10 +178,9 @@
             <span
               class="font-medium {s.kind === 'outlier'
                 ? 'text-destructive'
-                : 'text-foreground'}"
-              >{s.kind === "outlier"
-                ? $t("jumps.outlier")
-                : $t("jumps.jump")}</span
+                : s.kind === 'break'
+                  ? 'text-yellow-600 dark:text-yellow-500'
+                  : 'text-foreground'}">{label(s)}</span
             >
             <span class="text-muted-foreground tabular-nums"
               >{$t("jumps.point").replace(
@@ -146,12 +190,39 @@
             >
           </div>
           <div class="text-muted-foreground font-mono text-[10px]">
-            {formatLeg(s.before, $locale)}{#if s.kind === "outlier" && s.after}
-              {" → "}{formatLeg(s.after, $locale)}{/if}
+            {#if s.kind === "break"}
+              {formatTimestamp(timeOf.get(s.previousPointId), $locale)}
+              {" → "}{formatTimestamp(timeOf.get(s.pointId), $locale)}
+            {:else}
+              {formatLeg(
+                s.before,
+                $locale,
+              )}{#if s.kind === "outlier" && s.after}
+                {" → "}{formatLeg(s.after, $locale)}{/if}
+            {/if}
           </div>
           {#if chosen}
             <div class="flex flex-wrap gap-1 pt-1">
-              {#if s.kind === "jump"}
+              {#if s.kind === "break"}
+                <Button
+                  variant="outline"
+                  size="xs"
+                  data-testid="break-trim-before"
+                  onclick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    trimAtBreak(s, true);
+                  }}>{$t("jumps.trimBefore")}</Button
+                >
+                <Button
+                  variant="outline"
+                  size="xs"
+                  data-testid="break-trim-after"
+                  onclick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    trimAtBreak(s, false);
+                  }}>{$t("jumps.trimAfter")}</Button
+                >
+              {:else if s.kind === "jump"}
                 <Button
                   variant="outline"
                   size="xs"
