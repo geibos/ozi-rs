@@ -89,7 +89,9 @@ table on it. A jump offers «Разделить здесь», an outlier «Уд�
 step. Thresholds measured on the owner's own cleaning of the eleven tracks:
 26 of his 32 breaks (one more was already a GPX break) and 15 of his 20
 deleted points are on the list, 112 entries over the eleven tracks, 59 of them
-places he edited. The stand serves such a track with `?track=dirty`. Next from
+places he edited. The stand serves such a track with `?track=dirty`. Two more recordings came on 2026-10-08 (a forest search, a city one, the
+upload), digested in `docs/field-notes/2026-10-08-forest-search-in-ozi.md`
+with what ozi-rs lacks for each step. Next from
 the recording: name fix-up by the standard's transliteration, colour by group
 type, each track to its own PLT in one go, a 20 000-point track.
 
@@ -513,8 +515,8 @@ afternoon.
   cause, visible for the first time because `appium:showServerLogs` is now on
   (`tools/ozi-rs-mcp/src/appium.rs`):
 
-            Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
-            Code=1000 "Timed out while enabling automation mode."
+              Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+              Code=1000 "Timed out while enabling automation mode."
 
   **What this means.** Enabling automation mode is macOS asking for the
   Accessibility grant that lets a test runner drive the interface. It times out
