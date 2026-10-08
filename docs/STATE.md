@@ -121,12 +121,27 @@ now run, each from the recordings and the standard:
 - the point under the cursor named with its number, time and leg
   (`name-the-point-under-the-cursor`).
 
-All walked on the stand and covered by tests (Rust 439, vitest 772 on
-2026-10-08); none yet in the packaged application — that is the batched
-smoke at the end of this run. Not done: copying the source GPX into
-`10-Tracks/ГГГГММДД/` (п. 5), dashed style for doubtful tracks (п. 22), the
-native macOS menu (`docs/backlog.md`), areas (ОК+). The FTP upload has not
-met a real server: it needs the owner's account and the coordinator's word.
+All walked on the stand and covered by tests (Rust 443, vitest 777 on
+2026-10-08). The packaged application, 2026-10-08 18:00–18:07, with nobody at
+the keyboard:
+
+- `just smoke`: `smoke_cj3_layer_management`, `smoke_cj5_draw_track`,
+  `smoke_report_capture_moment` green — the cj3 run owed since 2026-10-02 is
+  paid.
+- `smoke_real_track_processed_by_the_standard` (new; the owner's
+  `20261006 Лиса2.gpx` on a scratch session via `OZI_RS_SESSION_PATH` /
+  `OZI_RS_BUNDLES_ROOT`) failed twice and was not run a third time. The first
+  run found a real gap — a fresh start had no way into the workspace without
+  a bundle — fixed as «Работать без карты». The second got through «Работать
+  без карты», the empty scratch list, importing the real GPX through the
+  native open panel and selecting the track, and failed clicking an outlier
+  entry by its text. The entries now carry an accessible name («Выброс,
+  точка N») and the journey clicks by it; not yet run. Owed: `just smoke`
+  once more with nobody at the keyboard. Renaming, filtering, saving PLT and
+  sending by FTP are therefore not yet seen in the packaged application. Not done: copying the source GPX into
+  `10-Tracks/ГГГГММДД/` (п. 5), dashed style for doubtful tracks (п. 22), the
+  native macOS menu (`docs/backlog.md`), areas (ОК+). The FTP upload has not
+  met a real server: it needs the owner's account and the coordinator's word.
 
 **The screenshot matrix exists** (`finish-the-rebuild` group 1, 2026-10-02).
 `just shots` photographs fifteen screen states — the launcher in all five
@@ -554,8 +569,8 @@ afternoon.
   cause, visible for the first time because `appium:showServerLogs` is now on
   (`tools/ozi-rs-mcp/src/appium.rs`):
 
-                  Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
-                  Code=1000 "Timed out while enabling automation mode."
+                    Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+                    Code=1000 "Timed out while enabling automation mode."
 
   **What this means.** Enabling automation mode is macOS asking for the
   Accessibility grant that lets a test runner drive the interface. It times out

@@ -704,7 +704,6 @@ const RENAME_ALL: [&str; 2] = ["Имена по стандарту", "Names by t
 const FILTER_ALL: [&str; 2] = ["Фильтр 4 — видимым", "Filter 4 — visible"];
 const SAVE_PLTS: [&str; 2] = ["Сохранить в 10-Tracks", "Save to 10-Tracks"];
 const ENTER: char = '\u{E007}';
-const OUTLIER: [&str; 2] = ["Выброс", "Outlier"];
 const WITHOUT_MAP: [&str; 2] = [
     "Работать без карты (OpenStreetMap)",
     "Work without a map (OpenStreetMap)",
@@ -856,10 +855,18 @@ fn smoke_real_track_processed_by_the_standard() {
         sid,
         Duration::from_secs(20),
         "an outlier in the list",
-        |s| contains_any(s, &OUTLIER),
+        |s| s.contains("Выброс, точка") || s.contains("Outlier, point"),
     );
+    // An entry's accessible name is «Выброс, точка N»; the list's heading
+    // hint also holds the word, so the bare word proves nothing.
+    let outlier_entry = [
+        "//*[starts-with(@label, \"Выброс, точка\")]",
+        "//*[starts-with(@label, \"Outlier, point\")]",
+    ];
     assert!(
-        click_text(server, sid, &OUTLIER),
+        outlier_entry
+            .iter()
+            .any(|sel| appium_click_with_session_id(server, sid, Some(sel)).ok),
         "could not choose the outlier"
     );
     poll_source_until(

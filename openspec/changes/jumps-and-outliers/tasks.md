@@ -44,5 +44,8 @@
       had taken up its opening view (which then overrode the flight to the
       point). Clicks now wait for their target to hold still, and a `settle`
       step waits for the whole screen
-- [ ] 4.4 In the packaged application with one of the owner's real tracks:
+- [ ] 4.4 (2026-10-08: the smoke journey on the owner's Лиса 2 reached the
+      track in the packaged application and failed choosing an outlier by
+      its text; entries now have an accessible name, journey not re-run)
+      In the packaged application with one of the owner's real tracks:
       the list, «Удалить и разделить», one ⌘Z — with the batched smoke
