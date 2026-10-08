@@ -484,6 +484,15 @@ fn connect_and_login(
     Ok((ftp, greeting))
 }
 
+/// Whether a name can go into an FTP command as one argument: no control
+/// characters (a CR or LF would end the command) and no slash (it is one
+/// path segment, not a path).
+fn safe_ftp_name(name: &str) -> bool {
+    !name
+        .chars()
+        .any(|c| c.is_control() || c == '/' || c == '\\')
+}
+
 /// What sending a search's results did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FtpUpload {
@@ -519,6 +528,35 @@ pub fn upload_results(
     create: bool,
     limit: Duration,
 ) -> FtpUpload {
+    // A name goes into a command line on the control connection: a CR or LF
+    // in it would end that command and start another one of the name's
+    // choosing. Folder and file names come from the disk, which allows them;
+    // the server must never see them.
+    let names: Vec<String> = files
+        .iter()
+        .map(|path| {
+            path.file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        })
+        .collect();
+    if let Some(bad) = std::iter::once(search_folder)
+        .chain(names.iter().map(String::as_str))
+        .find(|name| name.is_empty() || !safe_ftp_name(name))
+    {
+        return FtpUpload::Failed {
+            uploaded: Vec::new(),
+            file: bad.escape_debug().to_string(),
+            reason: "a name with a control character or a slash is not sent".to_owned(),
+        };
+    }
+    if account.folder.chars().any(char::is_control) {
+        return FtpUpload::Failed {
+            uploaded: Vec::new(),
+            file: account.folder.escape_debug().to_string(),
+            reason: "a name with a control character or a slash is not sent".to_owned(),
+        };
+    }
     let (mut ftp, _) = match connect_and_login(account, password, limit) {
         Ok(session) => session,
         Err(refusal) => return FtpUpload::Refused(refusal),
@@ -557,11 +595,7 @@ pub fn upload_results(
         };
     }
     let mut uploaded = Vec::new();
-    for path in files {
-        let name = path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+    for (path, name) in files.iter().zip(names) {
         let result = std::fs::File::open(path)
             .map_err(|e| e.to_string())
             .and_then(|mut file| ftp.put_file(&name, &mut file).map_err(|e| describe(&e)));
@@ -1162,6 +1196,39 @@ mod tests {
         let got = received.lock().unwrap();
         assert_eq!(got.made, vec!["2026-10-08_Mesto".to_owned()]);
         assert_eq!(got.files.len(), 2);
+    }
+
+    /// A file or folder name with a line break would end the STOR or MKD it
+    /// travels in and start a command of its own; it is refused before the
+    /// server is even reached.
+    #[test]
+    fn a_name_that_would_end_a_command_is_not_sent() {
+        let (port, received) = transfer_server(&["2026-10-08_Mesto"]);
+        let dir = tempfile::tempdir().unwrap();
+        let sly = dir.path().join("a.plt\r\nDELE important.plt");
+        std::fs::write(&sly, "x").unwrap();
+        let outcome = upload_results(
+            &local(port, "/results"),
+            "right",
+            "2026-10-08_Mesto",
+            &[sly],
+            true,
+            LIMIT,
+        );
+        assert!(matches!(outcome, FtpUpload::Failed { ref uploaded, .. } if uploaded.is_empty()));
+        assert!(received.lock().unwrap().files.is_empty());
+
+        let (_dir, files) = results_files();
+        let outcome = upload_results(
+            &local(port, "/results"),
+            "right",
+            "x\r\nRMD /results",
+            &files,
+            true,
+            LIMIT,
+        );
+        assert!(matches!(outcome, FtpUpload::Failed { .. }));
+        assert!(received.lock().unwrap().made.is_empty());
     }
 
     #[test]

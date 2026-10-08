@@ -14,6 +14,15 @@
 - [x] 2.2 «Отправить на сервер»: the account, the folder, the files, the BVP
       warning, the folder question, the result
 
+## 2a. After the first cut (2026-10-08)
+
+- [x] 2a.1 A search folder picked by hand when no bundle is open — the forest
+      search of 2026-10-08 had no map ordered; component test
+- [x] 2a.2 A security review of the commit found file and folder names
+      going into STOR, MKD and CWD unchecked: a CR LF in a name would inject
+      a command. Names with control characters (and slashes, outside the
+      account's own folder) are refused before connecting; test
+
 ## 3. Gates
 
 - [ ] 3.1 `just ci` green

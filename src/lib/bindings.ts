@@ -487,9 +487,9 @@ async getTracksDir() : Promise<Result<string | null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
-async getResultsUploadPlan() : Promise<Result<ResultsUploadPlanDto | null, string>> {
+async getResultsUploadPlan(searchDir: string | null) : Promise<Result<ResultsUploadPlanDto | null, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_results_upload_plan") };
+    return { status: "ok", data: await TAURI_INVOKE("get_results_upload_plan", { searchDir }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -497,12 +497,13 @@ async getResultsUploadPlan() : Promise<Result<ResultsUploadPlanDto | null, strin
 },
 /**
  * Send the processed files of `10-Tracks` to a results account, into the
- * search's folder there (standard п. 34). The folder is made only with
+ * search's folder there (standard п. 34). `search_dir` is a search folder
+ * the operator picked when no bundle is open. The folder is made only with
  * `create_folder`: the standard wants the coordinator's word first (п. 33).
  */
-async uploadResultsFtp(id: string, createFolder: boolean) : Promise<Result<FtpUploadDto, string>> {
+async uploadResultsFtp(id: string, createFolder: boolean, searchDir: string | null) : Promise<Result<FtpUploadDto, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("upload_results_ftp", { id, createFolder }) };
+    return { status: "ok", data: await TAURI_INVOKE("upload_results_ftp", { id, createFolder, searchDir }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

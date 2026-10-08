@@ -12,6 +12,7 @@
   import * as Dialog from "$lib/components/ui/dialog";
   import { Button } from "$lib/components/ui/button";
   import { toast } from "svelte-sonner";
+  import { open } from "@tauri-apps/plugin-dialog";
   import {
     getResultsUploadPlan,
     listFtpAccounts,
@@ -33,6 +34,11 @@
   /** The server's folder for the search is missing; asking whether to make it. */
   let askFolder = $state<string | null>(null);
   let problem = $state<string | null>(null);
+  /**
+   * A search folder picked by hand, when no bundle is open — a search with
+   * no map ordered still has its folder and its `10-Tracks`.
+   */
+  let searchDir = $state<string | null>(null);
 
   const account = $derived(accounts.find((a) => a.id === chosen) ?? null);
   const remote = $derived(
@@ -46,7 +52,7 @@
     loaded = false;
     askFolder = null;
     problem = null;
-    void Promise.all([getResultsUploadPlan(), listFtpAccounts()])
+    void Promise.all([getResultsUploadPlan(searchDir), listFtpAccounts()])
       .then(([p, list]) => {
         plan = p;
         accounts = list.filter((a) => a.role === "results");
@@ -67,12 +73,26 @@
     return result.detail ? `${$t(key)}: ${result.detail}` : $t(key);
   }
 
+  async function pickSearchFolder() {
+    const picked = await open({
+      directory: true,
+      title: $t("resultsUpload.pickSearch"),
+    });
+    if (!picked) return;
+    searchDir = picked as string;
+    try {
+      plan = await getResultsUploadPlan(searchDir);
+    } catch (error) {
+      problem = String(error);
+    }
+  }
+
   async function send(createFolder: boolean) {
     if (!chosen) return;
     busy = true;
     problem = null;
     try {
-      const result = await uploadResultsFtp(chosen, createFolder);
+      const result = await uploadResultsFtp(chosen, createFolder, searchDir);
       if (result.outcome === "done") {
         toast.success(
           $t("resultsUpload.done").replace(
@@ -111,6 +131,15 @@
       <p class="text-sm" data-testid="results-upload-no-search">
         {$t("resultsUpload.noSearch")}
       </p>
+      <div>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="results-upload-pick"
+          onclick={() => void pickSearchFolder()}
+          >{$t("resultsUpload.pickSearch")}</Button
+        >
+      </div>
     {:else if accounts.length === 0}
       <p class="text-sm" data-testid="results-upload-no-account">
         {$t("resultsUpload.noAccount")}

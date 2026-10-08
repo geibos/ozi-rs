@@ -404,18 +404,24 @@ export async function listFtpAccounts(): Promise<FtpAccountDto[]> {
 }
 
 /** What sending the search's results would send, and where. */
-export async function getResultsUploadPlan(): Promise<ResultsUploadPlanDto | null> {
-  return unwrap("get_results_upload_plan", commands.getResultsUploadPlan());
+export async function getResultsUploadPlan(
+  searchDir: string | null = null,
+): Promise<ResultsUploadPlanDto | null> {
+  return unwrap(
+    "get_results_upload_plan",
+    commands.getResultsUploadPlan(searchDir),
+  );
 }
 
 /** Send the search's results to a results account. */
 export async function uploadResultsFtp(
   id: string,
   createFolder: boolean,
+  searchDir: string | null = null,
 ): Promise<FtpUploadDto> {
   return unwrap(
     "upload_results_ftp",
-    commands.uploadResultsFtp(id, createFolder),
+    commands.uploadResultsFtp(id, createFolder, searchDir),
   );
 }
 

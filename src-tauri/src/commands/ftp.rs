@@ -192,9 +192,15 @@ pub struct ResultsUploadPlanDto {
 #[tauri::command]
 #[specta::specta]
 pub fn get_results_upload_plan(
+    search_dir: Option<String>,
     state: State<SharedState>,
 ) -> Result<Option<ResultsUploadPlanDto>, String> {
-    let plan = lock_app_state(state.inner())?.results_upload_plan();
+    let plan = match search_dir {
+        Some(dir) => {
+            crate::application::AppState::results_upload_plan_in(std::path::Path::new(&dir))
+        }
+        None => lock_app_state(state.inner())?.results_upload_plan(),
+    };
     Ok(plan.map(|plan| ResultsUploadPlanDto {
         search_folder: plan.search_folder,
         dir: plan.dir.display().to_string(),
@@ -231,17 +237,24 @@ pub struct FtpUploadDto {
 }
 
 /// Send the processed files of `10-Tracks` to a results account, into the
-/// search's folder there (standard п. 34). The folder is made only with
+/// search's folder there (standard п. 34). `search_dir` is a search folder
+/// the operator picked when no bundle is open. The folder is made only with
 /// `create_folder`: the standard wants the coordinator's word first (п. 33).
 #[tauri::command]
 #[specta::specta]
 pub async fn upload_results_ftp(
     id: String,
     create_folder: bool,
+    search_dir: Option<String>,
     state: State<'_, SharedState>,
     accounts: State<'_, SharedFtpAccounts>,
 ) -> Result<FtpUploadDto, String> {
-    let plan = lock_app_state(state.inner())?.results_upload_plan();
+    let plan = match search_dir {
+        Some(dir) => {
+            crate::application::AppState::results_upload_plan_in(std::path::Path::new(&dir))
+        }
+        None => lock_app_state(state.inner())?.results_upload_plan(),
+    };
     let Some(plan) = plan.filter(|p| !p.files.is_empty()) else {
         return Ok(upload_dto(
             FtpUploadOutcome::NothingToSend,

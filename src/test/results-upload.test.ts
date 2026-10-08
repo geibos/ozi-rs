@@ -17,6 +17,9 @@ const { getResultsUploadPlan, listFtpAccounts, uploadResultsFtp } = vi.hoisted(
   }),
 );
 
+const { openDialog } = vi.hoisted(() => ({ openDialog: vi.fn() }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: openDialog }));
+
 vi.mock("$lib/api", () => ({
   getResultsUploadPlan,
   listFtpAccounts,
@@ -101,11 +104,11 @@ describe("sending a search's results", () => {
 
     await fireEvent.click(screen.getByTestId("results-upload-send"));
     await vi.waitFor(() => screen.getByTestId("results-upload-ask-folder"));
-    expect(uploadResultsFtp).toHaveBeenCalledWith("c1", false);
+    expect(uploadResultsFtp).toHaveBeenCalledWith("c1", false, null);
 
     await fireEvent.click(screen.getByTestId("results-upload-create"));
     await vi.waitFor(() =>
-      expect(uploadResultsFtp).toHaveBeenLastCalledWith("c1", true),
+      expect(uploadResultsFtp).toHaveBeenLastCalledWith("c1", true, null),
     );
     await tick();
     expect(get(resultsUploadOpen)).toBe(false);
@@ -124,6 +127,38 @@ describe("sending a search's results", () => {
       expect(
         screen.getByTestId("results-upload-problem").textContent,
       ).toContain("530 Authentication failed"),
+    );
+  });
+
+  it("with no bundle open, sends from a search folder the operator picks", async () => {
+    getResultsUploadPlan.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      search_folder: "2026-10-08_Mesto",
+      dir: "/searches/2026-10-08_Mesto/10-Tracks",
+      files: ["20261008_Lisa15.plt"],
+      with_bvp: [],
+    });
+    openDialog.mockResolvedValueOnce("/searches/2026-10-08_Mesto");
+    uploadResultsFtp.mockResolvedValueOnce({
+      outcome: "done",
+      remote: "/results/2026-10-08_Mesto",
+      uploaded: ["20261008_Lisa15.plt"],
+      detail: null,
+    });
+    render(ResultsUpload);
+    resultsUploadOpen.set(true);
+    await vi.waitFor(() => screen.getByTestId("results-upload-pick"));
+    await fireEvent.click(screen.getByTestId("results-upload-pick"));
+    await vi.waitFor(() => screen.getByTestId("results-upload-files"));
+    expect(getResultsUploadPlan).toHaveBeenLastCalledWith(
+      "/searches/2026-10-08_Mesto",
+    );
+    await fireEvent.click(screen.getByTestId("results-upload-send"));
+    await vi.waitFor(() =>
+      expect(uploadResultsFtp).toHaveBeenCalledWith(
+        "c1",
+        false,
+        "/searches/2026-10-08_Mesto",
+      ),
     );
   });
 });

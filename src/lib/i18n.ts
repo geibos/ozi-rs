@@ -201,10 +201,11 @@ const dictionaries = {
       "The processed tracks and marks — every PLT and WPT directly in the search's 10-Tracks — go into the search's folder on a results server",
     "resultsUpload.loading": "Reading the folder…",
     "resultsUpload.noSearch":
-      "No search folder is open: results are sent from its 10-Tracks.",
+      "No search bundle is open. Pick the search's folder — named YYYY-MM-DD_Place, with the processed files in its 10-Tracks.",
     "resultsUpload.noAccount":
       "There is no results account yet. Add one in Settings — host, login and folder of the contour.",
     "resultsUpload.openSettings": "Open Settings",
+    "resultsUpload.pickSearch": "Pick the search folder…",
     "resultsUpload.account": "Account",
     "resultsUpload.to": "Into",
     "resultsUpload.files": "Files ({n}) from",
@@ -853,10 +854,11 @@ const dictionaries = {
       "Обработанные треки и точки — все PLT и WPT прямо в 10-Tracks поиска — уходят в папку поиска на сервере выгрузки",
     "resultsUpload.loading": "Читаю папку…",
     "resultsUpload.noSearch":
-      "Не открыт комплект поиска: результаты отправляются из его 10-Tracks.",
+      "Комплект поиска не открыт. Выберите папку поиска — с именем ГГГГ-ММ-ДД_Место и обработанными файлами в её 10-Tracks.",
     "resultsUpload.noAccount":
       "Учётки выгрузки ещё нет. Добавьте её в Настройках — сервер, логин и папку контура.",
     "resultsUpload.openSettings": "Открыть Настройки",
+    "resultsUpload.pickSearch": "Выбрать папку поиска…",
     "resultsUpload.account": "Учётка",
     "resultsUpload.to": "Куда",
     "resultsUpload.files": "Файлы ({n}) из",

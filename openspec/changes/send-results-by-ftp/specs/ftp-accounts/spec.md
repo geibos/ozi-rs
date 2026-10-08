@@ -12,6 +12,14 @@ be replaced. The result SHALL list the files sent and the folder; a failure
 SHALL name the file and what the server said, and SHALL list the files sent
 before it.
 
+When no search bundle is open — a search with no map ordered — the operator
+SHALL be able to pick the search's folder instead; its name is then the
+folder on the server, and its `10-Tracks` holds the files.
+
+A file or folder name holding a control character, or a file or search
+folder name holding a slash, SHALL NOT be sent: a line break inside an FTP
+command would end it and start another of the name's making.
+
 #### Scenario: A search's results sent
 
 - **WHEN** `10-Tracks` holds two PLT files, a WPT file and a subfolder of raw
@@ -47,3 +55,9 @@ the server only with the coordinator's sanction (п. 36).
 
 - **WHEN** `Waypoints_20261008.wpt` holds a mark named `BVP`
 - **THEN** the operator is told so, by file name, before anything is sent
+
+#### Scenario: A name that would end a command
+
+- **WHEN** a file in `10-Tracks` is named with a line break followed by
+  `DELE important.plt`
+- **THEN** nothing is sent and the server receives no command at all

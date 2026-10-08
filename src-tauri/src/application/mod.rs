@@ -2256,7 +2256,14 @@ impl AppState {
     /// directly in `10-Tracks`. Its subfolders hold raw recordings, which
     /// are not sent (п. 5). `None` with no search folder open.
     pub fn results_upload_plan(&self) -> Option<ResultsUploadPlan> {
-        let bundle = self.active_bundle_dir()?;
+        Self::results_upload_plan_in(&self.active_bundle_dir()?)
+    }
+
+    /// The same for a search folder the operator picked: a search without a
+    /// map bundle — the forest search of 2026-10-08 had none ordered — still
+    /// has a folder of its own with a `10-Tracks` in it.
+    pub fn results_upload_plan_in(bundle: &Path) -> Option<ResultsUploadPlan> {
+        let bundle = bundle.to_path_buf();
         let search_folder = bundle.file_name()?.to_string_lossy().into_owned();
         let dir = bundle.join("10-Tracks");
         let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
