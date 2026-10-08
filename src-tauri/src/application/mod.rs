@@ -4755,7 +4755,9 @@ mod tests {
         std::fs::write(&gpx, "<gpx/>").unwrap();
         let date = chrono::NaiveDate::from_ymd_opt(2026, 10, 8).unwrap();
 
-        let (dir, names) = state.store_raw_sources(std::slice::from_ref(&gpx), date).unwrap();
+        let (dir, names) = state
+            .store_raw_sources(std::slice::from_ref(&gpx), date)
+            .unwrap();
         assert_eq!(dir, bundle.join("10-Tracks").join("20261008"));
         assert_eq!(names, vec!["Лиса 19 Мина.gpx".to_owned()]);
         let (_, again) = state.store_raw_sources(&[gpx], date).unwrap();
