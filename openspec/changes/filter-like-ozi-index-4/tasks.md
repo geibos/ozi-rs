@@ -17,6 +17,12 @@
 - [x] 3.2 The hint and the button, in both dictionaries
 - [x] 3.3 Component test: the panel opens at 2 m, the button returns to it
 
+## 3a. Every visible track (2026-10-08)
+
+- [x] 3a.1 «Фильтр 4 — видимым»: asks with the count of tracks and points,
+      simplifies each at 2 m. Walked on the stand: two visible tracks
+      filtered, the toast says two
+
 ## 4. Gates
 
 - [x] 4.1 `just ci` green (2026-10-06: 424 Rust, 726 vitest, 60 shots; the panel is not in the baseline)

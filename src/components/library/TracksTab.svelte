@@ -286,6 +286,36 @@
     }
   }
 
+  /**
+   * OziExplorer's filter at index 4 — Douglas–Peucker at 2 m, measured
+   * against it — on every visible track: the standard filters every foot
+   * track that way (п. 10), and the owner did it one track at a time. After
+   * the cleaning, not before (п. 9); each track is its own undo step.
+   */
+  async function handleFilterAll() {
+    const visible = tracks.filter((row) => row.visible);
+    if (visible.length === 0) return;
+    const before = visible.reduce((sum, row) => sum + row.pointCount, 0);
+    const ok = await confirm(
+      $i18n("tracksTab.filterAllConfirm")
+        .replace("{n}", String(visible.length))
+        .replace("{points}", String(before)),
+      { kind: "info" },
+    );
+    if (!ok) return;
+    try {
+      for (const row of visible) {
+        await simplifyTrack(row.layerId, row.trackId, OZI_INDEX_4_TOLERANCE_M);
+      }
+      tracksGeometryVersion.update((v) => v + 1);
+      toast.success(
+        $i18n("tracksTab.filterAllDone").replace("{n}", String(visible.length)),
+      );
+    } catch (err) {
+      reportEditFailure("tracksTab.filterAllFailed", err);
+    }
+  }
+
   /** Every track the standard's name can be offered for, renamed. */
   async function handleRenameAll() {
     const offered = tracks
@@ -915,12 +945,25 @@
             size="xs"
             class="min-w-0 flex-1 justify-center gap-1.5"
             disabled={$drawingModeActive}
+            title={$i18n("tracksTab.filterAllTitle")}
+            onclick={handleFilterAll}
+            data-testid="library-filter-all"
+          >
+            <span class="truncate">{$i18n("tracksTab.filterAll")}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            class="min-w-0 flex-1 justify-center gap-1.5"
+            disabled={$drawingModeActive}
             title={$i18n("tracksTab.renameAllTitle")}
             onclick={handleRenameAll}
             data-testid="library-rename-all"
           >
             <span class="truncate">{$i18n("tracksTab.renameAll")}</span>
           </Button>
+        </div>
+        <div class="mt-1.5 flex gap-1.5">
           <Button
             variant="outline"
             size="xs"
@@ -932,8 +975,6 @@
           >
             <span class="truncate">{$i18n("tracksTab.savePlts")}</span>
           </Button>
-        </div>
-        <div class="mt-1.5 flex">
           <Button
             variant="outline"
             size="xs"

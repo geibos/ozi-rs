@@ -53,3 +53,18 @@ SHALL offer to put the slider back at 2 m after it has been moved.
 
 - **WHEN** the operator has moved the slider and presses the index-4 button
 - **THEN** the tolerance is 2 m again and the preview follows it
+
+## ADDED Requirements
+
+### Requirement: Every visible track can be filtered at index 4 at once
+
+The system SHALL offer to simplify every visible track at 2 m — OziExplorer's
+filter at index 4, which the standard prescribes for every foot track
+(п. 10) — after saying how many tracks and points that is and asking. Each
+track SHALL be its own undoable step. The owner filtered track after track by
+hand (recordings of 2026-10-06 and 2026-10-08).
+
+#### Scenario: A search day filtered
+
+- **WHEN** two tracks are visible and the operator agrees to filter them
+- **THEN** both are simplified at 2 m, and each can be undone on its own

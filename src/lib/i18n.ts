@@ -307,6 +307,13 @@ const dictionaries = {
       "Not by the standard: YYYYMMDD_Callsign, latin letters",
     "tracksTab.nameSuggest": "Not by the standard — click to rename to {name}",
     "tracksTab.renamedTo": "Renamed to {name}",
+    "tracksTab.filterAll": "Filter 4 — visible",
+    "tracksTab.filterAllTitle":
+      "OziExplorer's track filter at index 4 (Douglas–Peucker, 2 m) on every visible track — after cleaning, as the standard has it",
+    "tracksTab.filterAllConfirm":
+      "Filter {n} visible tracks ({points} points) as OziExplorer does at index 4? Each track is its own undo step.",
+    "tracksTab.filterAllDone": "Tracks filtered: {n}",
+    "tracksTab.filterAllFailed": "Could not filter the tracks",
     "trackColour.red": "Red — foot groups (standard п. 21)",
     "trackColour.blue": "Blue — foot groups (п. 21)",
     "trackColour.green":
@@ -957,6 +964,13 @@ const dictionaries = {
     "tracksTab.nameSuggest":
       "Не по стандарту — нажмите, чтобы переименовать в {name}",
     "tracksTab.renamedTo": "Переименован в {name}",
+    "tracksTab.filterAll": "Фильтр 4 — видимым",
+    "tracksTab.filterAllTitle":
+      "Фильтр трека OziExplorer с индексом 4 (Дуглас–Пекер, 2 м) для всех видимых треков — после обработки, как велит стандарт",
+    "tracksTab.filterAllConfirm":
+      "Отфильтровать видимые треки ({n}, точек {points}) как Ozi с индексом 4? Каждый трек — отдельный шаг отмены.",
+    "tracksTab.filterAllDone": "Отфильтровано треков: {n}",
+    "tracksTab.filterAllFailed": "Не удалось отфильтровать треки",
     "trackColour.red": "Красный — пешие группы (стандарт, п. 21)",
     "trackColour.blue": "Синий — пешие группы (п. 21)",
     "trackColour.green": "Зелёный — пешие, редко: сливается с фоном (п. 21)",
