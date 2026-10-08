@@ -140,7 +140,13 @@ matched 64/64 and the other failed `library-tracks__error__en__light` (5736
 pixels; its diff was overwritten before it was looked at), and an earlier run
 that day timed out on `settings__loaded__ru__dark` («did not hold still») —
 neither screen had changed, so the matrix has an intermittent miss somewhere
-that is not yet understood. Accepting a
+that is not yet understood. On 2026-10-08 the misses had causes: the matrix
+clicked into the inspector while it re-rendered and before the map had taken
+its opening view (`stillThere` before a click, a `settle` step), and a run
+against the live tree photographs whatever Vite reloads mid-shot. Run it from
+a snapshot while editing: `git worktree add -f ../ozi-rs-shots HEAD --detach`,
+`scripts/shots.sh` there (it mounts its own checkout), then copy
+`src/test/stand/baseline/` back. Accepting a
 deliberate change is `just shots --update` in a commit of its own. It found a
 defect on its first day: a project restored without a map opened in the
 catalogue (`a-project-is-a-workspace`).
@@ -548,8 +554,8 @@ afternoon.
   cause, visible for the first time because `appium:showServerLogs` is now on
   (`tools/ozi-rs-mcp/src/appium.rs`):
 
-                Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
-                Code=1000 "Timed out while enabling automation mode."
+                  Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture
+                  Code=1000 "Timed out while enabling automation mode."
 
   **What this means.** Enabling automation mode is macOS asking for the
   Accessibility grant that lets a test runner drive the interface. It times out
