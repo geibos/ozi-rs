@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  distinctNames,
   isStandardTrackName,
   suggestTrackName,
   transliterate,
@@ -85,5 +86,25 @@ describe("a suggested name", () => {
     expect(suggestTrackName("File", "2026-10-08T06:00:00Z", MSK)).toBeNull();
     expect(suggestTrackName("track.gpx", null, MSK)).toBeNull();
     expect(suggestTrackName("Лиса 19", null, MSK)).toBeNull();
+  });
+});
+
+describe("two tracks of one group", () => {
+  it("are numbered as п. 18 has it", () => {
+    expect(
+      distinctNames(["20261008_Lisa19", "20261008_Lisa15", "20261008_Lisa19"]),
+    ).toEqual(["20261008_Lisa19_1", "20261008_Lisa15", "20261008_Lisa19_2"]);
+  });
+
+  it("are numbered past a name another track already has", () => {
+    expect(
+      distinctNames(["20261008_Lisa19"], new Set(["20261008_Lisa19"])),
+    ).toEqual(["20261008_Lisa19_1"]);
+    expect(
+      distinctNames(
+        ["20261008_Lisa19", "20261008_Lisa19"],
+        new Set(["20261008_Lisa19_1"]),
+      ),
+    ).toEqual(["20261008_Lisa19_2", "20261008_Lisa19_3"]);
   });
 });

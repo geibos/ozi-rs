@@ -49,11 +49,21 @@ other words transliterated as the standard's example spells them (`Мохнат�
 callsign, nothing SHALL be offered. An action SHALL rename every track for
 which a name is offered and say how many are left to name by hand.
 
+When several tracks would take the same name — a group's navigator and its
+phone — the names SHALL be numbered `_1`, `_2`… as п. 18 has it, and a name
+another track already carries SHALL be numbered past.
+
 #### Scenario: A crew's file name
 
 - **WHEN** a track named `Лиса 19 Мина` has its first point at 00:45 on
   8 October, local time
 - **THEN** the offered name is `20261008_Lisa19_Mina`
+
+#### Scenario: One group, two files
+
+- **WHEN** «Имена по стандарту» renames two tracks that both work out to
+  `20261008_Lisa19`
+- **THEN** they are named `20261008_Lisa19_1` and `20261008_Lisa19_2`
 
 #### Scenario: Nothing to build from
 

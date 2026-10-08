@@ -179,3 +179,33 @@ export function suggestTrackName(
   if (!date || !sign) return null;
   return `${date}_${sign}`;
 }
+
+/**
+ * Names made distinct the way п. 18 has it: a group with several navigators
+ * numbers its tracks `_1`, `_2`… Two files of one group — the navigator's and
+ * the phone's — suggest the same name, and «Сохранить в 10-Tracks» refuses
+ * two tracks with one file. Every name of a clashing group is numbered, in
+ * the order given; a name already taken by a track not being renamed is
+ * numbered past it.
+ */
+export function distinctNames(
+  names: readonly string[],
+  taken: ReadonlySet<string> = new Set(),
+): string[] {
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  const used = new Set(taken);
+  const next = new Map<string, number>();
+  return names.map((name) => {
+    if ((counts.get(name) ?? 0) < 2 && !used.has(name)) {
+      used.add(name);
+      return name;
+    }
+    let n = next.get(name) ?? 1;
+    while (used.has(`${name}_${n}`)) n += 1;
+    next.set(name, n + 1);
+    const numbered = `${name}_${n}`;
+    used.add(numbered);
+    return numbered;
+  });
+}

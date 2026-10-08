@@ -5,6 +5,10 @@
       and the group's word; tests on names from the recordings
 - [x] 1.2 `start_time` in the track summary; fixtures regenerated
 - [x] 1.3 The warning offers and applies the name; «Имена по стандарту»
+- [x] 1.4 Two tracks of one group numbered `_1`, `_2` (п. 18) — found
+      walking the forest search's files: a navigator's and a phone's track
+      of Лиса 19 would both be `20261008_Lisa19`, and saving refuses two
+      tracks with one file
 
 ## 2. Colours
 

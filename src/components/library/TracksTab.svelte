@@ -82,7 +82,11 @@
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import CheckIcon from "@lucide/svelte/icons/check";
-  import { isStandardTrackName, suggestTrackName } from "$lib/standard-name";
+  import {
+    distinctNames,
+    isStandardTrackName,
+    suggestTrackName,
+  } from "$lib/standard-name";
   import {
     hex,
     isReservedTrackColour,
@@ -274,8 +278,13 @@
    * (owner's recording, 2026-10-08); undo takes it back.
    */
   async function applySuggestion(t: TrackFeature) {
-    const next = suggestion(t);
-    if (!next) return;
+    const offered = suggestion(t);
+    if (!offered) return;
+    // Numbered past another track of the same group already named (п. 18).
+    const taken = new Set(
+      tracks.filter((row) => row !== t).map((row) => row.name),
+    );
+    const [next] = distinctNames([offered], taken);
     try {
       await renameTrack(t.layerId, t.trackId, next);
       toast.success($i18n("tracksTab.renamedTo").replace("{name}", next), {
@@ -327,9 +336,19 @@
       toast.message($i18n("tracksTab.renameAllNothing"));
       return;
     }
+    // Two files of one group suggest one name; number them (п. 18).
+    const renaming = new Set(offered.map(([t]) => t));
+    const taken = new Set(
+      tracks.filter((row) => !renaming.has(row)).map((row) => row.name),
+    );
+    const names = distinctNames(
+      offered.map(([, name]) => name),
+      taken,
+    );
     let renamed = 0;
     try {
-      for (const [t, next] of offered) {
+      for (const [index, [t]] of offered.entries()) {
+        const next = names[index];
         await renameTrack(t.layerId, t.trackId, next);
         renamed += 1;
       }
