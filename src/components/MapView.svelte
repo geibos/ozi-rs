@@ -97,6 +97,7 @@
   } from "$lib/geo";
   import { isEditableTarget } from "$lib/editable-target";
   import BoxSelect from "./BoxSelect.svelte";
+  import { editablePointsInView } from "$lib/editable-points";
   import {
     initMeasureLayer,
     updateMeasureLayer,
@@ -495,16 +496,48 @@
     pointMarkers.push(marker);
   }
 
+  /** The track edit mode is on, kept so a pan can put handles on what comes into view. */
+  let editableTrack: {
+    layerId: bigint;
+    trackId: bigint;
+    detail: TrackDetail;
+  } | null = null;
+  /** How many points are in view when they are too many for handles. */
+  let tooManyToEdit = $state<number | null>(null);
+
   function renderEditableTrackPoints(
     layerId: bigint,
     trackId: bigint,
     detail: TrackDetail,
   ) {
+    editableTrack = { layerId, trackId, detail };
+    renderEditableInView();
+  }
+
+  /**
+   * Handles on the points in view only, and none past a thousand — see
+   * `$lib/editable-points`. Called again whenever the map stops moving.
+   */
+  function renderEditableInView() {
     clearPointMarkers();
-    for (const segment of detail.segments) {
-      segment.points.forEach((point, index) => {
-        createPointMarker(layerId, trackId, segment, point, index);
-      });
+    const editable = editableTrack;
+    if (!editable || !map) return;
+    const b = map.getBounds();
+    const { points, tooMany } = editablePointsInView(editable.detail.segments, {
+      west: b.getWest(),
+      south: b.getSouth(),
+      east: b.getEast(),
+      north: b.getNorth(),
+    });
+    tooManyToEdit = tooMany;
+    for (const { segment, point, index } of points) {
+      createPointMarker(
+        editable.layerId,
+        editable.trackId,
+        segment,
+        point,
+        index,
+      );
     }
     updateSelectedPointMarkerState();
   }
@@ -1057,6 +1090,10 @@
       // forever when it ran after startup (tracks-never-render bug).
       mapLoaded = true;
       loadedMap = map;
+      // Edit-mode handles follow the view: a pan brings new points into it.
+      map.on("moveend", () => {
+        if (get(editModeActive) && editableTrack) renderEditableInView();
+      });
       // CJ-2 promises a field launch makes no network requests, and this
       // source made one per visible tile — for a basemap that is covered by
       // the local raster the moment a map is opened, and that offline only
@@ -1404,6 +1441,8 @@
 
     if (!$editModeActive || !$selectedTrack) {
       clearPointMarkers();
+      editableTrack = null;
+      tooManyToEdit = null;
       contextMenu = null;
       return;
     }
@@ -1668,6 +1707,14 @@
 
 <div class="relative h-full min-w-0 flex-1" bind:this={mapEl}>
   <BoxSelect map={loadedMap} />
+  {#if $editModeActive && tooManyToEdit !== null}
+    <div
+      class="bg-popover text-popover-foreground border-border absolute top-3 left-1/2 z-40 -translate-x-1/2 rounded-md border px-3 py-1.5 text-xs shadow-lg"
+      data-testid="edit-too-many"
+    >
+      {$i18n("map.editTooMany").replace("{n}", String(tooManyToEdit))}
+    </div>
+  {/if}
   {#if contextMenu}
     <div
       class="bg-popover text-popover-foreground border-border absolute z-40 flex min-w-40 flex-col gap-0.5 rounded-md border p-1 shadow-lg"

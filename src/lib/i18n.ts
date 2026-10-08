@@ -195,6 +195,7 @@ const dictionaries = {
     "jumps.cutOut": "Delete and split",
     "jumps.failed": "Could not change the track",
     "boxSelect.toggle": "Box",
+    "map.editTooMany": "{n} points in view — zoom in to edit them one by one",
     "boxSelect.start": "Select points with a box",
     "boxSelect.stop": "Stop selecting with a box",
     "boxSelect.hint": "Drag a box over the track's points; Shift adds to it",
@@ -812,6 +813,8 @@ const dictionaries = {
     "jumps.cutOut": "Удалить и разделить",
     "jumps.failed": "Не удалось изменить трек",
     "boxSelect.toggle": "Рамка",
+    "map.editTooMany":
+      "В видимой области точек: {n} — приблизьте карту, чтобы править их по одной",
     "boxSelect.start": "Выделить точки рамкой",
     "boxSelect.stop": "Закончить выделение рамкой",
     "boxSelect.hint":

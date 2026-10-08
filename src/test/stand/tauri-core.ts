@@ -484,7 +484,45 @@ function dirtyTrackDetail(): TrackDetailLike {
   };
 }
 
+/**
+ * `?track=big`: the fixture track as a phone records it — 18 000 points a
+ * second apart, the size the owner's recording of 2026-10-08 said "opens
+ * slowly". A deterministic wander, so two walks see the same track.
+ */
+function bigTrackDetail(): TrackDetailLike {
+  const mPerDegLat = 111_195;
+  const mPerDegLon = mPerDegLat * Math.cos((59.95 * Math.PI) / 180);
+  const start = Date.parse("2026-10-08T06:00:00+00:00");
+  let seed = 42;
+  const random = () => {
+    seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+    return seed / 2_147_483_648;
+  };
+  let heading = 0.6;
+  let north = 0;
+  let east = 0;
+  const points = Array.from({ length: 18_000 }, (_, i) => {
+    heading += (random() - 0.5) * 0.3;
+    const step = 0.7 + random() * 0.8;
+    north += Math.cos(heading) * step;
+    east += Math.sin(heading) * step;
+    return {
+      id: i + 1,
+      lat: 59.95243 + north / mPerDegLat,
+      lon: 31.59681 + east / mPerDegLon,
+      elevation: 30 + Math.sin(i / 500) * 5,
+      timestamp: new Date(start + i * 1000).toISOString(),
+    };
+  });
+  return {
+    id: trackDetailFixture.id,
+    name: trackDetailFixture.name,
+    segments: [{ id: 1, points }],
+  };
+}
+
 if (PARAMS.get("track") === "dirty") editedDetail = dirtyTrackDetail();
+if (PARAMS.get("track") === "big") editedDetail = bigTrackDetail();
 
 /**
  * The fixture track's row, with its point count taken from the edited detail.
