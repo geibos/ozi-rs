@@ -54,7 +54,11 @@
     createWaypointLayer,
     renameWaypointLayer,
     deleteWaypointLayer,
+    clearWaypointDescriptions,
+    exportAllWaypointsWpt,
+    getAllWaypointsExportDefaultPath,
   } from "$lib/api";
+  import DownloadIcon from "@lucide/svelte/icons/download";
   import { open } from "@tauri-apps/plugin-dialog";
   import { toast } from "svelte-sonner";
   import type { WaypointData } from "$lib/types";
@@ -139,6 +143,54 @@
         ),
         { description: String(error) },
       );
+    }
+  }
+
+  /**
+   * Every visible mark into one WPT, `Waypoints_ГГГГММДД.wpt` in `10-Tracks`
+   * by default. Marks come a file per navigator per day and each import is a
+   * layer; the standard wants as few waypoint files as possible, ideally one
+   * (п. 29, 31). Hidden marks stay out — hiding is how a mark with no meaning
+   * for the search is set aside (п. 30).
+   */
+  async function handleExportAll() {
+    try {
+      const defaultPath = await getAllWaypointsExportDefaultPath();
+      const path = await open({
+        save: true,
+        defaultPath,
+        filters: [{ name: "WPT", extensions: ["wpt"] }],
+      } as Parameters<typeof open>[0]);
+      if (!path) return;
+      const written = await exportAllWaypointsWpt(path as string);
+      reportExported(
+        path as string,
+        get(t)("waypointsTab.exportAllDone").replace("{n}", String(written)),
+      );
+    } catch (error) {
+      toast.error(get(t)("waypointsTab.exportAllFailed"), {
+        description: String(error),
+      });
+    }
+  }
+
+  /**
+   * Clear every note in the active layer: a phone writes the street address
+   * into each mark it saves, and the owner deletes them all (2026-10-08). One
+   * undo step.
+   */
+  async function handleClearDescriptions() {
+    const id = $activeWaypointLayerId;
+    if (id === null) return;
+    try {
+      const cleared = await clearWaypointDescriptions(id);
+      toast.success(
+        get(t)("waypointsTab.notesCleared").replace("{n}", String(cleared)),
+      );
+    } catch (error) {
+      toast.error(get(t)("waypointsTab.notesClearFailed"), {
+        description: String(error),
+      });
     }
   }
 
@@ -366,6 +418,13 @@
             >
               {$t("layers.rename")}
             </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={handleClearDescriptions}
+              disabled={$activeWaypointLayerId === null}
+              data-testid="waypoint-layer-clear-notes"
+            >
+              {$t("waypointsTab.clearNotes")}
+            </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item
               onSelect={handleDeleteLayer}
@@ -501,6 +560,17 @@
             <EyeOffIcon class="size-3.5" strokeWidth={1.5} />
           </Tooltip.Trigger>
           <Tooltip.Content>{$t("waypointsTab.hideAll")}</Tooltip.Content>
+        </Tooltip.Root>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class="text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-sm border-0 bg-transparent p-0"
+            aria-label={$t("waypointsTab.exportAll")}
+            onclick={handleExportAll}
+            data-testid="waypoints-export-all"
+          >
+            <DownloadIcon class="size-3.5" strokeWidth={1.5} />
+          </Tooltip.Trigger>
+          <Tooltip.Content>{$t("waypointsTab.exportAll")}</Tooltip.Content>
         </Tooltip.Root>
         {#if waypointQuery !== ""}
           <span

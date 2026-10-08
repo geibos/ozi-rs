@@ -57,7 +57,9 @@ where
             symbol = symbol_code,
             status = STATUS,
             fg = FOREGROUND_COLOR,
-            bg = BACKGROUND_COLOR,
+            // The mark's colour is its label's background: what the
+            // standard's colours (п. 28) look like in the original.
+            bg = waypoint.color().map_or(BACKGROUND_COLOR, ozi_color),
             // Field 11 is the note beside the mark. It went out empty until
             // 2026-09-23, so a mark handed to the штаб next door arrived as a
             // place with no reason attached. Forty characters is the format's
@@ -72,6 +74,21 @@ where
     }
 
     Ok(())
+}
+
+/// An RGBA colour as OziExplorer writes one: red + green·256 + blue·65536.
+pub fn ozi_color([r, g, b, _]: [u8; 4]) -> u32 {
+    u32::from(r) | (u32::from(g) << 8) | (u32::from(b) << 16)
+}
+
+/// The colour a WPT row's field holds, or `None` for the original's default
+/// background — a mark nobody coloured.
+pub fn color_from_ozi(value: u32) -> Option<[u8; 4]> {
+    if value == BACKGROUND_COLOR || value > 0x00FF_FFFF {
+        return None;
+    }
+    let [r, g, b, _] = value.to_le_bytes();
+    Some([r, g, b, 255])
 }
 
 /// Map an internal OziExplorer-style symbol identifier to the integer code

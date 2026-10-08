@@ -198,6 +198,15 @@ fn parse_row(line: &str, index: usize) -> Option<Waypoint> {
         let _ = waypoint.set_symbol(Some(symbol.to_owned()));
     }
 
+    // Field 10 is the label's background, which is the mark's colour.
+    if let Some(color) = fields
+        .get(9)
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .and_then(crate::infrastructure::export::wpt::color_from_ozi)
+    {
+        let _ = waypoint.set_color(Some(color));
+    }
+
     // Field 11 is the description. Dropping it made the exchange between
     // headquarters carry the place and not the reason for it.
     if let Some(description) = fields.get(10).map(|s| s.trim()).filter(|s| !s.is_empty()) {
@@ -290,6 +299,36 @@ mod tests {
         let import = import_wpt_text("/tmp/x.wpt".to_owned(), &text).expect("import");
         assert_eq!(import.waypoints().len(), 1);
         assert_eq!(import.waypoints()[0].name(), "ШТАБ");
+    }
+
+    /// A mark's colour is the standard's language (п. 28): red for what
+    /// matters, sea-green for an unconfirmed find, green for a group or a
+    /// feature of the ground. It went out as OziExplorer's default yellow
+    /// whatever the mark was, and came back without one. It is the label's
+    /// background in the file (field 10), BGR-packed, text black on it.
+    #[test]
+    fn a_marks_colour_survives_the_trip_out_and_back() {
+        use crate::infrastructure::export::wpt::write_wpt;
+
+        let mut find = Waypoint::new(WaypointId::new(1), "Находка", 59.9, 30.3);
+        let _ = find.set_color(Some([220, 38, 38, 255]));
+        let plain = Waypoint::new(WaypointId::new(2), "Заброс 1", 59.91, 30.31);
+
+        let mut written = Vec::new();
+        write_wpt([find, plain], &mut written).expect("write");
+        let decoded = decode_plt_bytes(&written).expect("decode");
+        let rows: Vec<&str> = decoded.lines().skip(4).collect();
+        let fields: Vec<&str> = rows[0].split(',').collect();
+        assert_eq!(fields[8], "0", "the text stays black");
+        assert_eq!(fields[9], (220 + 38 * 256 + 38 * 65_536).to_string());
+
+        let back = import_wpt_text("/tmp/round.wpt".to_owned(), &decoded).expect("read it back");
+        assert_eq!(back.waypoints()[0].color(), Some([220, 38, 38, 255]));
+        assert_eq!(
+            back.waypoints()[1].color(),
+            None,
+            "the default yellow is no colour of ours"
+        );
     }
 
     /// The trip out and back, which is what CJ-6 actually promises: the

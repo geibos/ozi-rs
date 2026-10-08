@@ -96,6 +96,7 @@
     formatMeasuredArea,
   } from "$lib/geo";
   import { isEditableTarget } from "$lib/editable-target";
+  import BoxSelect from "./BoxSelect.svelte";
   import {
     initMeasureLayer,
     updateMeasureLayer,
@@ -117,6 +118,8 @@
 
   let mapEl: HTMLDivElement;
   let map: maplibregl.Map;
+  /** The map once it has loaded, for the tools mounted beside it. */
+  let loadedMap = $state<maplibregl.Map | null>(null);
   let currentMapSourceId: string | null = null;
   let appliedMapPath: string | null = null;
   let pointMarkers: maplibregl.Marker[] = [];
@@ -1053,6 +1056,7 @@
       // isStyleLoaded()/once("load"), which silently dropped refreshes
       // forever when it ran after startup (tracks-never-render bug).
       mapLoaded = true;
+      loadedMap = map;
       // CJ-2 promises a field launch makes no network requests, and this
       // source made one per visible tile — for a basemap that is covered by
       // the local raster the moment a map is opened, and that offline only
@@ -1663,6 +1667,7 @@
 </script>
 
 <div class="relative h-full min-w-0 flex-1" bind:this={mapEl}>
+  <BoxSelect map={loadedMap} />
   {#if contextMenu}
     <div
       class="bg-popover text-popover-foreground border-border absolute z-40 flex min-w-40 flex-col gap-0.5 rounded-md border p-1 shadow-lg"

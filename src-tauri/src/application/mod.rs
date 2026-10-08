@@ -237,6 +237,16 @@ pub struct DayExport {
     pub waypoints: usize,
 }
 
+/// What writing each track to its own PLT did, or would have done.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PltFilesExport {
+    /// File names written.
+    pub written: Vec<String>,
+    /// File names already in the folder. Nothing is written while any are
+    /// listed here and replacing was not asked for.
+    pub existing: Vec<String>,
+}
+
 /// A file that has been fully downloaded and fsync'd inside an in-progress
 /// bundle download.
 #[derive(Debug, Clone)]
@@ -994,6 +1004,35 @@ impl AppState {
     /// Paths, not bytes — see `Waypoint::attachments`. The list is replaced
     /// whole because the undo delta needs the previous one either way, and a
     /// pair of add/remove commands can get out of step with itself.
+    /// Clear the note of every mark in a layer, as one undo step. A phone
+    /// writes the street address into each mark it saves — "бестолково
+    /// абсолютно", the owner on 2026-10-08 — and the standard wants a note to
+    /// say what the mark is (п. 26). Returns how many notes were cleared.
+    pub fn apply_clear_waypoint_descriptions(
+        &mut self,
+        layer_id: LayerId,
+    ) -> Result<usize, ProjectLayerError> {
+        let changes: Vec<(WaypointId, Option<String>, Option<String>)> = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .find(|layer| layer.id() == layer_id)
+            .ok_or(ProjectLayerError::WaypointLayerUnavailable(layer_id))?
+            .waypoints()
+            .iter()
+            .filter_map(|w| w.description().map(|d| (w.id(), Some(d.to_owned()), None)))
+            .collect();
+        let count = changes.len();
+        if count == 0 {
+            return Ok(0);
+        }
+        let cmd = commands::ProjectCommand::SetWaypointDescriptions { layer_id, changes };
+        self.history
+            .apply(&mut self.project, &cmd)
+            .map_err(|commands::CommandError::ProjectLayer(e)| e)?;
+        Ok(count)
+    }
+
     pub fn apply_set_waypoint_attachments(
         &mut self,
         layer_id: LayerId,
@@ -1753,6 +1792,21 @@ impl AppState {
         })
     }
 
+    /// Remove the chosen points, or with `keep_only` everything but them —
+    /// the two things done with a box drawn on the map. One undo step.
+    pub fn apply_remove_track_points(
+        &mut self,
+        layer_id: LayerId,
+        track_id: TrackId,
+        chosen: &[TrackPointId],
+        keep_only: bool,
+    ) -> Result<usize, ProjectLayerError> {
+        let chosen: std::collections::HashSet<TrackPointId> = chosen.iter().copied().collect();
+        self.apply_crop_with(layer_id, track_id, |p| {
+            chosen.contains(&p.id()) != keep_only
+        })
+    }
+
     /// Shared crop plumbing: collect points matching `remove`, apply one
     /// undoable CropTrackPoints. Returns how many points were removed.
     fn apply_crop_with(
@@ -2024,20 +2078,163 @@ impl AppState {
         }
     }
 
-    /// Default path suggestion for a WPT waypoint export.
-    /// Returns `<bundle>/<layer_name>.wpt` when a bundle is active; otherwise
-    /// `<layer_name>.wpt` (filename only, the dialog will pick a directory).
+    /// Default path suggestion for a WPT waypoint export, dated today.
     pub fn export_wpt_default_path(&self, layer_id: LayerId) -> Option<PathBuf> {
-        let layer = self
-            .project
+        self.export_wpt_default_path_on(layer_id, chrono::Local::now().date_naive())
+    }
+
+    /// `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, as the standard has it:
+    /// a waypoint file's name begins `Waypoints_` and carries the date (п. 29),
+    /// and processed marks go straight into `10-Tracks` (п. 25). It used to be
+    /// `<bundle>/<layer name>.wpt` — a name the standard does not allow when
+    /// the layer is called after a Cyrillic file, in a folder it does not use.
+    /// Without a bundle, the file name alone; the dialog picks the folder.
+    pub fn export_wpt_default_path_on(
+        &self,
+        layer_id: LayerId,
+        date: chrono::NaiveDate,
+    ) -> Option<PathBuf> {
+        self.project
             .waypoint_layers()
             .iter()
             .find(|l| l.id() == layer_id)?;
-        let file_name = format!("{}.wpt", layer.name());
+        Some(self.standard_waypoints_path(date))
+    }
+
+    fn standard_waypoints_path(&self, date: chrono::NaiveDate) -> PathBuf {
+        let file_name = format!("Waypoints_{}.wpt", date.format("%Y%m%d"));
         match self.active_bundle_dir() {
-            Some(dir) => Some(dir.join(file_name)),
-            None => Some(PathBuf::from(file_name)),
+            Some(dir) => dir.join("10-Tracks").join(file_name),
+            None => PathBuf::from(file_name),
         }
+    }
+
+    /// Every visible mark of every layer, in one WPT file.
+    ///
+    /// Marks arrive a file per navigator per day, and each import is a layer
+    /// of its own; the standard wants as few waypoint files as possible,
+    /// ideally one (п. 31). Hidden marks stay out: hiding is how the operator
+    /// says a mark carries no meaning for the search (п. 30). Returns how
+    /// many marks were written.
+    pub fn export_all_waypoints_wpt(&mut self, path: PathBuf) -> Result<usize, String> {
+        let waypoints: Vec<Waypoint> = self
+            .project
+            .waypoint_layers()
+            .iter()
+            .flat_map(|layer| layer.waypoints().iter())
+            .filter(|w| w.visible())
+            .cloned()
+            .collect();
+        let count = waypoints.len();
+        if count == 0 {
+            let message = "No visible waypoints to export".to_owned();
+            self.update_status(DiagnosticLevel::Error, message.clone());
+            return Err(message);
+        }
+        let result = std::fs::File::create(&path)
+            .map_err(|e| format!("Export failed: {e}"))
+            .and_then(|mut file| {
+                crate::infrastructure::export::wpt::write_wpt(waypoints, &mut file)
+                    .map_err(|e| format!("Export failed: {e}"))
+            });
+        match result {
+            Ok(()) => {
+                self.update_status(
+                    DiagnosticLevel::Info,
+                    format!("Exported {count} waypoints to {}", path.display()),
+                );
+                Ok(count)
+            }
+            Err(message) => {
+                self.update_status(DiagnosticLevel::Error, message.clone());
+                Err(message)
+            }
+        }
+    }
+
+    /// Every visible track to its own PLT in `dir`, the file named after the
+    /// track (standard п. 24). The processed tracks of a search are a folder
+    /// of such files, `10-Tracks`, and Ozi wrote them one Save at a time.
+    ///
+    /// Files already there are listed and nothing is written unless
+    /// `replace` says so: the folder is shared, and a same-named file may be
+    /// a colleague's. Two tracks with one name would write one file twice,
+    /// and are refused before anything is written.
+    pub fn export_visible_tracks_plt(
+        &mut self,
+        dir: &Path,
+        replace: bool,
+    ) -> Result<PltFilesExport, String> {
+        let tracks: Vec<&crate::domain::Track> = self
+            .project
+            .track_layers()
+            .iter()
+            .flat_map(|layer| layer.tracks().iter())
+            .filter(|t| t.style().visible)
+            .collect();
+        if tracks.is_empty() {
+            return Err("No visible tracks to export".to_owned());
+        }
+        let names: Vec<String> = tracks
+            .iter()
+            .map(|t| format!("{}.plt", plt_file_stem(t.name())))
+            .collect();
+        let mut seen = std::collections::HashSet::new();
+        let twice: Vec<&String> = names
+            .iter()
+            .filter(|n| !seen.insert(n.to_lowercase()))
+            .collect();
+        if !twice.is_empty() {
+            let list = twice
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(format!("Two tracks would write the same file: {list}"));
+        }
+        let existing: Vec<String> = names
+            .iter()
+            .filter(|n| dir.join(n).exists())
+            .cloned()
+            .collect();
+        if !existing.is_empty() && !replace {
+            return Ok(PltFilesExport {
+                written: Vec::new(),
+                existing,
+            });
+        }
+        std::fs::create_dir_all(dir).map_err(|e| format!("Export failed: {e}"))?;
+        let mut written = Vec::new();
+        for (track, name) in tracks.iter().zip(&names) {
+            let style = track.style();
+            let [r, g, b, _] = style.color;
+            let color = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+            let mut file = std::fs::File::create(dir.join(name))
+                .map_err(|e| format!("Export failed for {name}: {e}"))?;
+            crate::infrastructure::export::plt::export_plt(
+                track,
+                color,
+                f64::from(style.line_width),
+                &mut file,
+            )
+            .map_err(|e| format!("Export failed for {name}: {e}"))?;
+            written.push(name.clone());
+        }
+        self.update_status(
+            DiagnosticLevel::Info,
+            format!("Exported {} tracks to {}", written.len(), dir.display()),
+        );
+        Ok(PltFilesExport { written, existing })
+    }
+
+    /// `<bundle>/10-Tracks`, where processed tracks go (п. 25).
+    pub fn tracks_dir(&self) -> Option<PathBuf> {
+        Some(self.active_bundle_dir()?.join("10-Tracks"))
+    }
+
+    /// Where every visible mark goes by default: today's standard file.
+    pub fn export_all_waypoints_default_path(&self) -> PathBuf {
+        self.standard_waypoints_path(chrono::Local::now().date_naive())
     }
 
     pub fn undo(&mut self) {
@@ -2425,6 +2622,27 @@ pub(crate) fn reveal_in_file_manager(path: &std::path::Path) {
     #[cfg(target_os = "windows")]
     {
         let _ = std::process::Command::new("explorer").arg(path).spawn();
+    }
+}
+
+/// A track name as a file name: the standard's names (п. 14) are safe
+/// already; anything a file system would refuse becomes `_`.
+fn plt_file_stem(name: &str) -> String {
+    let stem: String = name
+        .trim()
+        .chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    if stem.is_empty() {
+        "track".to_owned()
+    } else {
+        stem
     }
 }
 
@@ -2883,6 +3101,86 @@ mod tests {
             state.history.mutation_count(),
             before,
             "nothing removed, nothing to undo"
+        );
+    }
+
+    /// Points chosen with a box on the map — OziExplorer's Selection Control,
+    /// which the owner used on every track (2026-10-08): delete the chosen
+    /// ones, or keep only them. Either is one undo step.
+    #[test]
+    fn chosen_points_are_removed_or_kept_in_one_step() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let track_id = TrackId::new(1);
+        let mut track = Track::new(track_id, "20261008_Lisa15");
+        for (segment_id, range) in [(1u64, 1..=4u64), (2, 5..=7)] {
+            let mut segment = TrackSegment::new(TrackSegmentId::new(segment_id));
+            for i in range {
+                segment.add_point(TrackPoint::new(TrackPointId::new(i), 59.9, 30.3));
+            }
+            track.add_segment(segment);
+        }
+        state.project.add_track_to_layer(layer_id, track).unwrap();
+        let ids = |s: &AppState| {
+            s.project.track_layers()[0].tracks()[0]
+                .segments()
+                .iter()
+                .map(|seg| {
+                    seg.points()
+                        .iter()
+                        .map(|p| p.id().value())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+        let chosen = [2u64, 3, 6].map(TrackPointId::new);
+
+        let removed = state
+            .apply_remove_track_points(layer_id, track_id, &chosen, false)
+            .expect("delete the chosen");
+        assert_eq!(removed, 3);
+        assert_eq!(ids(&state), vec![vec![1, 4], vec![5, 7]]);
+        state.undo();
+        assert_eq!(ids(&state), vec![vec![1, 2, 3, 4], vec![5, 6, 7]]);
+
+        let removed = state
+            .apply_remove_track_points(layer_id, track_id, &chosen, true)
+            .expect("keep only the chosen");
+        assert_eq!(removed, 4);
+        assert_eq!(ids(&state), vec![vec![2, 3], vec![6]]);
+    }
+
+    /// Choosing every point and deleting them would leave a track with no
+    /// points; the crop underneath refuses that, and so does this.
+    #[test]
+    fn removing_every_point_is_refused() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        let track_id = TrackId::new(1);
+        let mut track = Track::new(track_id, "Short");
+        let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+        for i in 1..=2u64 {
+            segment.add_point(TrackPoint::new(TrackPointId::new(i), 59.9, 30.3));
+        }
+        track.add_segment(segment);
+        state.project.add_track_to_layer(layer_id, track).unwrap();
+
+        let all = [1u64, 2].map(TrackPointId::new);
+        assert!(
+            state
+                .apply_remove_track_points(layer_id, track_id, &all, false)
+                .is_err()
+        );
+        assert_eq!(
+            state
+                .apply_remove_track_points(layer_id, track_id, &[], true)
+                .map_err(|_| ()),
+            Err(()),
+            "keeping none is removing all"
         );
     }
 
@@ -4310,15 +4608,180 @@ mod tests {
 
         let layer_id = LayerId::new(1);
         // Default waypoint layer "Waypoints" is created in AppState::new()
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 10, 8).unwrap();
         let path = state
-            .export_wpt_default_path(layer_id)
+            .export_wpt_default_path_on(layer_id, date)
             .expect("default path returned");
 
+        // The standard's name (п. 29), in the standard's folder (п. 25).
         let file_name = path.file_name().and_then(|name| name.to_str());
-        assert_eq!(file_name, Some("Waypoints.wpt"));
-        // Parent directory should be the bundle (named after slug "demo-project").
+        assert_eq!(file_name, Some("Waypoints_20261008.wpt"));
         let parent = path.parent().and_then(|dir| dir.file_name());
-        assert_eq!(parent.and_then(|s| s.to_str()), Some("demo-project"));
+        assert_eq!(parent.and_then(|s| s.to_str()), Some("10-Tracks"));
+        let bundle = path
+            .parent()
+            .and_then(|dir| dir.parent())
+            .and_then(|d| d.file_name());
+        assert_eq!(bundle.and_then(|s| s.to_str()), Some("demo-project"));
+    }
+
+    /// Each visible track to its own PLT, named after it; a same-named file
+    /// already there stops the export until replacing is asked for.
+    #[test]
+    fn each_visible_track_goes_to_its_own_plt() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+        let mut state = AppState::new();
+        let layer_id = LayerId::new(1);
+        for (id, name, visible) in [
+            (1, "20261008_Lisa15", true),
+            (2, "20261008_Lisa16", true),
+            (3, "черновик", false),
+        ] {
+            let mut track = Track::new(TrackId::new(id), name);
+            let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+            segment.add_point(TrackPoint::new(TrackPointId::new(1), 59.9, 30.3));
+            track.add_segment(segment);
+            track.style_mut().visible = visible;
+            state.project.add_track_to_layer(layer_id, track).unwrap();
+        }
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("20261008_Lisa16.plt"), "a colleague's").unwrap();
+
+        let first = state.export_visible_tracks_plt(dir.path(), false).unwrap();
+        assert!(
+            first.written.is_empty(),
+            "nothing written while a file is in the way"
+        );
+        assert_eq!(first.existing, vec!["20261008_Lisa16.plt".to_owned()]);
+        assert!(!dir.path().join("20261008_Lisa15.plt").exists());
+
+        let second = state.export_visible_tracks_plt(dir.path(), true).unwrap();
+        assert_eq!(
+            second.written,
+            vec![
+                "20261008_Lisa15.plt".to_owned(),
+                "20261008_Lisa16.plt".to_owned()
+            ]
+        );
+        let text = std::fs::read(dir.path().join("20261008_Lisa16.plt")).unwrap();
+        assert!(text.starts_with(b"OziExplorer Track Point File"));
+        assert!(
+            !dir.path().join("черновик.plt").exists(),
+            "hidden tracks stay"
+        );
+    }
+
+    #[test]
+    fn two_tracks_with_one_name_are_refused() {
+        use crate::domain::{Track, TrackPoint, TrackPointId, TrackSegment, TrackSegmentId};
+
+        let mut state = AppState::new();
+        for id in 1..=2 {
+            let mut track = Track::new(TrackId::new(id), "20261008_Lisa15");
+            let mut segment = TrackSegment::new(TrackSegmentId::new(1));
+            segment.add_point(TrackPoint::new(TrackPointId::new(1), 59.9, 30.3));
+            track.add_segment(segment);
+            state
+                .project
+                .add_track_to_layer(LayerId::new(1), track)
+                .unwrap();
+        }
+        let dir = tempfile::tempdir().unwrap();
+        assert!(state.export_visible_tracks_plt(dir.path(), true).is_err());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    /// The addresses a phone writes into marks go from a whole layer at once,
+    /// and come back with one undo.
+    #[test]
+    fn a_layers_notes_are_cleared_in_one_step() {
+        use crate::domain::{Waypoint, WaypointId};
+
+        let mut state = AppState::new();
+        let layer = state.project.waypoint_layers()[0].id();
+        for (id, note) in [
+            (1, Some("ул. Лесная, 5")),
+            (2, None),
+            (3, Some("Ромашково")),
+        ] {
+            let mut waypoint = Waypoint::new(WaypointId::new(id), "Заброс", 59.9, 30.3);
+            let _ = waypoint.set_description(note.map(str::to_owned));
+            state
+                .history
+                .apply(
+                    &mut state.project,
+                    &commands::ProjectCommand::add_waypoint(layer, waypoint),
+                )
+                .unwrap();
+        }
+        let notes = |s: &AppState| {
+            s.project.waypoint_layers()[0]
+                .waypoints()
+                .iter()
+                .map(|w| w.description().map(str::to_owned))
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(state.apply_clear_waypoint_descriptions(layer).unwrap(), 2);
+        assert_eq!(notes(&state), vec![None, None, None]);
+        state.undo();
+        assert_eq!(
+            notes(&state),
+            vec![
+                Some("ул. Лесная, 5".to_owned()),
+                None,
+                Some("Ромашково".to_owned())
+            ]
+        );
+        state.redo();
+        assert_eq!(state.apply_clear_waypoint_descriptions(layer).unwrap(), 0);
+    }
+
+    /// Marks from several imports leave as one file (п. 31), hidden ones
+    /// staying behind.
+    #[test]
+    fn every_visible_mark_leaves_in_one_wpt_file() {
+        use crate::domain::{Waypoint, WaypointId};
+
+        let mut state = AppState::new();
+        let first = state.project.waypoint_layers()[0].id();
+        let second = LayerId::new(40);
+        state
+            .history
+            .apply(
+                &mut state.project,
+                &commands::ProjectCommand::add_waypoint_layer(second, "Лиса 16, 8 окт"),
+            )
+            .unwrap();
+        for (layer, id, name, visible) in [
+            (first, 1, "Заброс 1", true),
+            (second, 2, "Заброс 2", true),
+            (second, 3, "123", false),
+        ] {
+            let mut waypoint = Waypoint::new(WaypointId::new(id), name, 59.9, 30.3);
+            waypoint.set_visible(visible);
+            state
+                .history
+                .apply(
+                    &mut state.project,
+                    &commands::ProjectCommand::add_waypoint(layer, waypoint),
+                )
+                .unwrap();
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Waypoints_20261008.wpt");
+        let written = state
+            .export_all_waypoints_wpt(path.clone())
+            .expect("export");
+        assert_eq!(written, 2);
+        let text = std::fs::read(&path).unwrap();
+        let rows = text
+            .split(|b| *b == b'\n')
+            .filter(|l| !l.is_empty())
+            .count();
+        assert_eq!(rows, 4 + 2, "the header and the two visible marks");
     }
 
     #[test]
@@ -4326,11 +4789,12 @@ mod tests {
         let state = AppState::new();
         let layer_id = LayerId::new(1);
 
+        let date = chrono::NaiveDate::from_ymd_opt(2026, 10, 8).unwrap();
         let path = state
-            .export_wpt_default_path(layer_id)
+            .export_wpt_default_path_on(layer_id, date)
             .expect("default path returned");
 
-        assert_eq!(path, PathBuf::from("Waypoints.wpt"));
+        assert_eq!(path, PathBuf::from("Waypoints_20261008.wpt"));
         assert!(
             path.parent()
                 .map(|p| p.as_os_str().is_empty())

@@ -191,6 +191,19 @@ const dictionaries = {
     "jumps.deleteApex": "Delete the apex",
     "jumps.cutOut": "Delete and split",
     "jumps.failed": "Could not change the track",
+    "boxSelect.toggle": "Box",
+    "boxSelect.start": "Select points with a box",
+    "boxSelect.stop": "Stop selecting with a box",
+    "boxSelect.hint": "Drag a box over the track's points; Shift adds to it",
+    "boxSelect.chooseTrack":
+      "Select a track first, then draw a box over its points",
+    "boxSelect.chosen": "{n} points chosen",
+    "boxSelect.delete": "Delete chosen",
+    "boxSelect.keepOnly": "Keep only these",
+    "boxSelect.clear": "Clear",
+    "boxSelect.done": "Done",
+    "boxSelect.removed": "{n} points removed",
+    "boxSelect.failed": "Could not remove the points",
     "mapsTab.switchFailed": "Failed to switch map",
     "mapsTab.revealFailed": "Failed to reveal the bundle",
     "mapsTab.downloading": "Downloading",
@@ -251,7 +264,56 @@ const dictionaries = {
     "tracksTab.importFolderDone":
       "Imported: {tracks} tracks, {waypoints} waypoints, from {files} files",
     "tracksTab.importFolderSkipped": "Could not read {count}: {files}",
-    "tracksTab.nameHint": "Format: YYYYMMDD_Callsign",
+    "tracksTab.nameHint":
+      "Not by the standard: YYYYMMDD_Callsign, latin letters",
+    "tracksTab.nameSuggest": "Not by the standard — click to rename to {name}",
+    "tracksTab.renamedTo": "Renamed to {name}",
+    "trackColour.red": "Red — foot groups (standard п. 21)",
+    "trackColour.blue": "Blue — foot groups (п. 21)",
+    "trackColour.green":
+      "Green — foot groups, rarely: it merges with the ground (п. 21)",
+    "trackColour.pink": "Pink — Ветра (п. 21)",
+    "trackColour.yellow": "Yellow — Борты and БПЛА, width 1 (п. 20)",
+    "trackColour.aqua": "Light blue — Борты and БПЛА, width 1 (п. 20)",
+    "trackColour.white": "White — Борты and БПЛА, width 1 (п. 20)",
+    "tracksTab.blackIsForTasks": "Black is reserved for tasks (standard п. 23)",
+    "tracksTab.paintVisible": "This colour for every visible track",
+    "tracksTab.paintedVisible": "Tracks coloured: {n}",
+    "waypointColour.important":
+      "Red — important for the search, confirmed finds (standard п. 28)",
+    "waypointColour.unconfirmed": "Sea green — unconfirmed finds (п. 28)",
+    "waypointColour.ground":
+      "Green — groups' positions, features of the ground (п. 28)",
+    "waypointColour.dropOff": "Lime — a drop-off point",
+    "inspector.waypointNameEs":
+      "The Russian С should be the latin C (standard п. 26) — replace",
+    "inspector.waypointNameBad":
+      "Not allowed in a name (п. 26): {chars} — put it in the note",
+    "waypointsTab.exportAll":
+      "Save every visible mark into one WPT (Waypoints_YYYYMMDD in 10-Tracks)",
+    "waypointsTab.exportAllDone": "Marks saved: {n}",
+    "waypointsTab.exportAllFailed": "Could not save the marks",
+    "waypointsTab.clearNotes": "Clear the notes in this layer",
+    "waypointsTab.notesCleared": "Notes cleared: {n}",
+    "waypointsTab.notesClearFailed": "Could not clear the notes",
+    "tracksTab.renameFailed": "Could not rename the track",
+    "tracksTab.renameAll": "Names by the standard",
+    "tracksTab.renameAllTitle":
+      "Rename every track whose standard name can be worked out: the date of its first point and the group's callsign in latin letters",
+    "tracksTab.renameAllNothing":
+      "No track to rename: the names are by the standard, or there is no date or callsign to build one from",
+    "tracksTab.renameAllDone": "Renamed: {n}",
+    "tracksTab.renameAllLeft": "{n} still to name by hand",
+    "tracksTab.savePlts": "Save to 10-Tracks",
+    "tracksTab.savePltsTitle":
+      "Each visible track to its own PLT named after it, in the search's 10-Tracks folder",
+    "tracksTab.savePltsPick": "Folder for the tracks",
+    "tracksTab.savePltsUnnamed":
+      "{n} tracks are not named by the standard, and their files will carry those names: {names}. Save anyway?",
+    "tracksTab.savePltsReplace":
+      "{n} files are already in the folder: {names}. Replace them?",
+    "tracksTab.savePltsDone": "Tracks saved: {n}",
+    "tracksTab.savePltsFailed": "Could not save the tracks",
     "waypointsTab.empty": "No waypoints yet",
     "waypointsTab.layer": "Waypoint layer",
     "waypointsTab.pickLayer": "Pick a layer",
@@ -743,6 +805,19 @@ const dictionaries = {
     "jumps.deleteApex": "Удалить вершину",
     "jumps.cutOut": "Удалить и разделить",
     "jumps.failed": "Не удалось изменить трек",
+    "boxSelect.toggle": "Рамка",
+    "boxSelect.start": "Выделить точки рамкой",
+    "boxSelect.stop": "Закончить выделение рамкой",
+    "boxSelect.hint":
+      "Обведите рамкой точки трека; с Shift — добавить к выбранным",
+    "boxSelect.chooseTrack": "Выберите трек, затем обведите его точки рамкой",
+    "boxSelect.chosen": "Выбрано точек: {n}",
+    "boxSelect.delete": "Удалить выбранные",
+    "boxSelect.keepOnly": "Оставить только их",
+    "boxSelect.clear": "Снять",
+    "boxSelect.done": "Готово",
+    "boxSelect.removed": "Удалено точек: {n}",
+    "boxSelect.failed": "Не удалось удалить точки",
     "mapsTab.switchFailed": "Не удалось переключить карту",
     "mapsTab.revealFailed": "Не удалось показать бандл",
     "mapsTab.downloading": "Скачивается",
@@ -801,7 +876,57 @@ const dictionaries = {
     "tracksTab.importFolderDone":
       "Импортировано: треков {tracks}, точек {waypoints}, из файлов {files}",
     "tracksTab.importFolderSkipped": "Не прочитано {count}: {files}",
-    "tracksTab.nameHint": "Формат: ГГГГММДД_Позывной",
+    "tracksTab.nameHint": "Не по стандарту: ГГГГММДД_Позывной, латиницей",
+    "tracksTab.nameSuggest":
+      "Не по стандарту — нажмите, чтобы переименовать в {name}",
+    "tracksTab.renamedTo": "Переименован в {name}",
+    "trackColour.red": "Красный — пешие группы (стандарт, п. 21)",
+    "trackColour.blue": "Синий — пешие группы (п. 21)",
+    "trackColour.green": "Зелёный — пешие, редко: сливается с фоном (п. 21)",
+    "trackColour.pink": "Розовый — Ветра (п. 21)",
+    "trackColour.yellow": "Жёлтый — Борты и БПЛА, толщина 1 (п. 20)",
+    "trackColour.aqua": "Голубой — Борты и БПЛА, толщина 1 (п. 20)",
+    "trackColour.white": "Белый — Борты и БПЛА, толщина 1 (п. 20)",
+    "tracksTab.blackIsForTasks":
+      "Чёрный зарезервирован для задач (стандарт, п. 23)",
+    "tracksTab.paintVisible": "Этот цвет — всем видимым трекам",
+    "tracksTab.paintedVisible": "Перекрашено треков: {n}",
+    "waypointColour.important":
+      "Красный — важное для поиска, подтверждённые артефакты (стандарт, п. 28)",
+    "waypointColour.unconfirmed":
+      "Морская волна — неподтверждённые артефакты (п. 28)",
+    "waypointColour.ground":
+      "Зелёный — положения групп, особенности местности (п. 28)",
+    "waypointColour.dropOff": "Лаймовый — точка заброса",
+    "inspector.waypointNameEs":
+      "Русская «С» должна быть латинской «C» (стандарт, п. 26) — заменить",
+    "inspector.waypointNameBad":
+      "Недопустимо в имени (п. 26): {chars} — перенесите в описание",
+    "waypointsTab.exportAll":
+      "Сохранить все видимые точки в один WPT (Waypoints_ГГГГММДД в 10-Tracks)",
+    "waypointsTab.exportAllDone": "Сохранено точек: {n}",
+    "waypointsTab.exportAllFailed": "Не удалось сохранить точки",
+    "waypointsTab.clearNotes": "Стереть описания в слое",
+    "waypointsTab.notesCleared": "Стёрто описаний: {n}",
+    "waypointsTab.notesClearFailed": "Не удалось стереть описания",
+    "tracksTab.renameFailed": "Не удалось переименовать трек",
+    "tracksTab.renameAll": "Имена по стандарту",
+    "tracksTab.renameAllTitle":
+      "Переименовать все треки, для которых получается имя по стандарту: дата первой точки и позывной группы латиницей",
+    "tracksTab.renameAllNothing":
+      "Нечего переименовывать: имена уже по стандарту или не из чего собрать дату и позывной",
+    "tracksTab.renameAllDone": "Переименовано: {n}",
+    "tracksTab.renameAllLeft": "Ещё {n} — назвать вручную",
+    "tracksTab.savePlts": "Сохранить в 10-Tracks",
+    "tracksTab.savePltsTitle":
+      "Каждый видимый трек — в свой PLT с именем трека, в папку 10-Tracks поиска",
+    "tracksTab.savePltsPick": "Папка для треков",
+    "tracksTab.savePltsUnnamed":
+      "Треков не по стандарту: {n}, и файлы получат эти имена: {names}. Сохранить всё равно?",
+    "tracksTab.savePltsReplace":
+      "В папке уже есть файлов: {n} — {names}. Заменить?",
+    "tracksTab.savePltsDone": "Сохранено треков: {n}",
+    "tracksTab.savePltsFailed": "Не удалось сохранить треки",
     "waypointsTab.empty": "Точек пока нет",
     "waypointsTab.layer": "Слой точек",
     "waypointsTab.pickLayer": "Выберите слой",

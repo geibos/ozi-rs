@@ -66,6 +66,7 @@ const TRANSPARENT_PNG = Uint8Array.from([
  */
 const EMITS_STATE_CHANGED = new Set([
   "calibrate_raster",
+  "clear_waypoint_descriptions",
   "set_waypoint_attachments",
   "add_waypoint",
   "cancel_drawing",
@@ -104,6 +105,7 @@ const EMITS_STATE_CHANGED = new Set([
   "rename_track_layer",
   "rename_waypoint",
   "rename_waypoint_layer",
+  "remove_track_points",
   "save_project",
   "set_all_tracks_visible",
   "set_all_waypoints_visible",
@@ -354,6 +356,7 @@ function importOneLayer(label: string, trackCount: number): string {
       line_width: 3.0,
       visible: true,
       point_count: 42,
+      start_time: null,
       distance_km: 3.7,
       duration_seconds: 5400,
     });
@@ -571,6 +574,11 @@ const MAKES_THE_PROJECT_CLEAN = new Set([
  */
 const LEAVES_THE_PROJECT_ALONE = new Set([
   "preview_project",
+  // Writing the search's files from the work is not a change to the work.
+  "get_tracks_dir",
+  "export_tracks_plt",
+  "get_all_waypoints_export_default_path",
+  "export_all_waypoints_wpt",
   // Reading a picture's header, and opening the map written for it: the
   // active raster is the ground, not the work on it.
   "read_raster_size",
@@ -995,6 +1003,24 @@ const HANDLERS: StandAnswers = {
   },
   // Answers with counts, not "accepted": the Tracks tab reads them into the
   // toast, and a stub that returned nothing crashed on `.tracks`.
+  // The search folder of the stand's bundle; the stand writes no files, so
+  // it answers with what would have been written.
+  get_tracks_dir: () => "/stand/bundles/2026-07-08_Lavrovo/10-Tracks",
+  export_tracks_plt: (args) => ({
+    written: withEditedCounts(tracksListFixture)
+      .concat(importedTracks)
+      .filter((t) => t.visible)
+      .map((t) => `${t.name}.plt`),
+    existing: [],
+    dir: String(args?.dir ?? "/stand/bundles/2026-07-08_Lavrovo/10-Tracks"),
+  }),
+  get_all_waypoints_export_default_path: () =>
+    "/stand/bundles/2026-07-08_Lavrovo/10-Tracks/Waypoints_20261008.wpt",
+  export_all_waypoints_wpt: () => waypointsFixture.length,
+  clear_waypoint_descriptions: () => {
+    standEmit("state-changed", undefined);
+    return 0;
+  },
   export_all_tracks_gpx: () => ({
     tracks: tracksListFixture.length,
     waypoints: waypointsFixture.length,
@@ -1138,6 +1164,21 @@ const HANDLERS: StandAnswers = {
     }
     standEmit("state-changed", undefined);
     return null;
+  },
+  remove_track_points: (args) => {
+    const detail = detailForEditing();
+    const chosen = new Set((args?.pointIds as number[] | undefined) ?? []);
+    const keepOnly = args?.keepOnly === true;
+    let removed = 0;
+    for (const segment of detail.segments) {
+      const before = segment.points.length;
+      segment.points = segment.points.filter(
+        (p) => chosen.has(p.id) === keepOnly,
+      );
+      removed += before - segment.points.length;
+    }
+    if (removed > 0) standEmit("state-changed", undefined);
+    return removed;
   },
   cut_out_track_point: (args) => {
     const detail = detailForEditing();

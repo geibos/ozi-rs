@@ -40,6 +40,8 @@
   import {
     deleteTrack,
     exportAllTracksGpx,
+    exportTracksPlt,
+    getTracksDir,
     exportGpx,
     exportTrackPlt,
     getSimplifiedPreview,
@@ -67,7 +69,8 @@
     describeFailures,
     importPaths,
   } from "$lib/actions/import-paths";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { confirm, open } from "@tauri-apps/plugin-dialog";
+  import { reportEditFailure } from "$lib/edit-failure";
   import { toast } from "svelte-sonner";
   import { setInteractionMode } from "$lib/actions/modes";
   import UploadIcon from "@lucide/svelte/icons/upload";
@@ -78,8 +81,14 @@
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import PencilIcon from "@lucide/svelte/icons/pencil";
   import CheckIcon from "@lucide/svelte/icons/check";
-  import { isOkStandardTrackName } from "$lib/track-names";
-  import { locale, t as i18n } from "$lib/i18n";
+  import { isStandardTrackName, suggestTrackName } from "$lib/standard-name";
+  import {
+    hex,
+    isReservedTrackColour,
+    TRACK_COLOURS,
+    type Rgba,
+  } from "$lib/standard-colours";
+  import { locale, t as i18n, type MessageKey } from "$lib/i18n";
   import { layerDisplayName } from "$lib/layer-names";
   import { formatTrackStats } from "$lib/track-stats";
   import LibraryRow from "./LibraryRow.svelte";
@@ -220,6 +229,26 @@
     await setTrackColor(t.layerId, t.trackId, hexToRgba(input.value));
   }
 
+  async function applyTrackColour(t: TrackFeature, rgba: Rgba) {
+    await setTrackColor(t.layerId, t.trackId, [...rgba]);
+  }
+
+  /**
+   * One colour for every visible track. The owner colours a whole search day
+   * at once — the night's foot groups blue, the previous night's red — and
+   * Ozi made that a dialog per track. Hide the others, then paint.
+   */
+  async function paintVisible(t: TrackFeature) {
+    const rgba = hexToRgba(colorToHex(t.color));
+    const visible = tracks.filter((row) => row.visible);
+    for (const row of visible) {
+      await setTrackColor(row.layerId, row.trackId, rgba);
+    }
+    toast.success(
+      $i18n("tracksTab.paintedVisible").replace("{n}", String(visible.length)),
+    );
+  }
+
   async function handleSetLineWidth(t: TrackFeature, width: number) {
     await setTrackLineWidth(t.layerId, t.trackId, width);
   }
@@ -230,6 +259,122 @@
 
   async function handleRename(t: TrackFeature, newName: string) {
     await renameTrack(t.layerId, t.trackId, newName);
+  }
+
+  /** The standard's name for a row, or `null` when there is nothing to offer. */
+  function suggestion(t: TrackFeature): string | null {
+    if (isStandardTrackName(t.name)) return null;
+    return suggestTrackName(t.name, t.startTime);
+  }
+
+  /**
+   * Rename to the standard's name in one click. The operator renamed every
+   * track by hand in OziExplorer, working the date out from the first point
+   * (owner's recording, 2026-10-08); undo takes it back.
+   */
+  async function applySuggestion(t: TrackFeature) {
+    const next = suggestion(t);
+    if (!next) return;
+    try {
+      await renameTrack(t.layerId, t.trackId, next);
+      toast.success($i18n("tracksTab.renamedTo").replace("{name}", next), {
+        description: t.name,
+      });
+    } catch (err) {
+      reportEditFailure("tracksTab.renameFailed", err);
+    }
+  }
+
+  /** Every track the standard's name can be offered for, renamed. */
+  async function handleRenameAll() {
+    const offered = tracks
+      .map((t) => [t, suggestion(t)] as const)
+      .filter(
+        (pair): pair is readonly [TrackFeature, string] => pair[1] !== null,
+      );
+    if (offered.length === 0) {
+      toast.message($i18n("tracksTab.renameAllNothing"));
+      return;
+    }
+    let renamed = 0;
+    try {
+      for (const [t, next] of offered) {
+        await renameTrack(t.layerId, t.trackId, next);
+        renamed += 1;
+      }
+      const left =
+        tracks.filter((t) => !isStandardTrackName(t.name)).length - renamed;
+      toast.success(
+        $i18n("tracksTab.renameAllDone").replace("{n}", String(renamed)),
+        left > 0
+          ? {
+              description: $i18n("tracksTab.renameAllLeft").replace(
+                "{n}",
+                String(left),
+              ),
+            }
+          : undefined,
+      );
+    } catch (err) {
+      reportEditFailure("tracksTab.renameFailed", err);
+    }
+  }
+
+  /**
+   * Each visible track to its own PLT in `10-Tracks`, named after the track
+   * (standard п. 24–25) — the result of a search, which OziExplorer saved one
+   * dialog per track. Same-named files are asked about, not overwritten; a
+   * track not named by the standard is asked about too, since its file name
+   * will be its name.
+   */
+  async function handleSavePlts() {
+    try {
+      let dir = await getTracksDir();
+      if (!dir) {
+        const picked = await open({
+          directory: true,
+          title: $i18n("tracksTab.savePltsPick"),
+        });
+        if (!picked) return;
+        dir = picked as string;
+      }
+      const unnamed = tracks.filter(
+        (t) => t.visible && !isStandardTrackName(t.name),
+      );
+      if (
+        unnamed.length > 0 &&
+        !(await confirm(
+          $i18n("tracksTab.savePltsUnnamed")
+            .replace("{n}", String(unnamed.length))
+            .replace("{names}", unnamed.map((t) => t.name).join(", ")),
+          { kind: "warning" },
+        ))
+      ) {
+        return;
+      }
+      let result = await exportTracksPlt(dir, false);
+      if (result.written.length === 0 && result.existing.length > 0) {
+        const replace = await confirm(
+          $i18n("tracksTab.savePltsReplace")
+            .replace("{n}", String(result.existing.length))
+            .replace("{names}", result.existing.join(", ")),
+          { kind: "warning" },
+        );
+        if (!replace) return;
+        result = await exportTracksPlt(dir, true);
+      }
+      reportExported(
+        result.dir,
+        $i18n("tracksTab.savePltsDone").replace(
+          "{n}",
+          String(result.written.length),
+        ),
+      );
+    } catch (err) {
+      toast.error($i18n("tracksTab.savePltsFailed"), {
+        description: String(err),
+      });
+    }
   }
 
   /**
@@ -763,6 +908,30 @@
             <span class="truncate">{$i18n("tracksTab.exportAll")}</span>
           </Button>
         </div>
+        <div class="mt-1.5 flex gap-1.5">
+          <Button
+            variant="outline"
+            size="xs"
+            class="min-w-0 flex-1 justify-center gap-1.5"
+            disabled={$drawingModeActive}
+            title={$i18n("tracksTab.renameAllTitle")}
+            onclick={handleRenameAll}
+            data-testid="library-rename-all"
+          >
+            <span class="truncate">{$i18n("tracksTab.renameAll")}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            class="min-w-0 flex-1 justify-center gap-1.5"
+            disabled={$drawingModeActive}
+            title={$i18n("tracksTab.savePltsTitle")}
+            onclick={handleSavePlts}
+            data-testid="library-save-plts"
+          >
+            <span class="truncate">{$i18n("tracksTab.savePlts")}</span>
+          </Button>
+        </div>
       {/if}
     {/if}
 
@@ -858,30 +1027,75 @@
                 aria-label={$i18n("row.trackColor")}
               ></Popover.Trigger>
               <Popover.Content class="w-auto p-2">
-                <input
-                  class="border-border h-8 w-12 rounded-sm border bg-transparent p-0"
-                  type="color"
-                  value={colorToHex(t.color)}
-                  aria-label={$i18n("row.trackColor")}
-                  onchange={(e) => handleColorChange(t, e)}
-                />
+                <div class="flex items-center gap-2">
+                  <input
+                    class="border-border h-8 w-12 rounded-sm border bg-transparent p-0"
+                    type="color"
+                    value={colorToHex(t.color)}
+                    aria-label={$i18n("row.trackColor")}
+                    onchange={(e) => handleColorChange(t, e)}
+                  />
+                  <!-- The standard's colours (п. 20–23), black left out: it
+                       is for tasks. -->
+                  <div class="flex gap-1" data-testid="track-standard-colours">
+                    {#each TRACK_COLOURS as colour (colour.key)}
+                      <button
+                        class="border-border size-5 rounded-sm border p-0"
+                        style={`background:${hex(colour.rgba)}`}
+                        title={$i18n(`trackColour.${colour.key}` as MessageKey)}
+                        aria-label={$i18n(
+                          `trackColour.${colour.key}` as MessageKey,
+                        )}
+                        onclick={() => void applyTrackColour(t, colour.rgba)}
+                      ></button>
+                    {/each}
+                  </div>
+                </div>
+                {#if isReservedTrackColour(hexToRgba(colorToHex(t.color)))}
+                  <div
+                    class="mt-1.5 max-w-56 text-[11px] text-yellow-600 dark:text-yellow-500"
+                    data-testid="track-colour-black"
+                  >
+                    {$i18n("tracksTab.blackIsForTasks")}
+                  </div>
+                {/if}
+                <Button
+                  variant="outline"
+                  size="xs"
+                  class="mt-2 w-full"
+                  data-testid="track-paint-visible"
+                  onclick={() => void paintVisible(t)}
+                  >{$i18n("tracksTab.paintVisible")}</Button
+                >
               </Popover.Content>
             </Popover.Root>
           {/snippet}
           {#snippet nameSuffix()}
-            {#if !isOkStandardTrackName(t.name)}
+            {#if !isStandardTrackName(t.name)}
+              {@const next = suggestion(t)}
               <!-- A non-standard name is worth flagging, but spelling the rule
                    out under every row buried the names themselves. The glyph
-                   carries the same text as its tooltip and label. -->
+                   carries the same text as its tooltip and label, and when the
+                   standard's name can be worked out, clicking it renames. -->
               <Tooltip.Root>
                 <Tooltip.Trigger
                   class="shrink-0 border-0 bg-transparent p-0 text-yellow-500 hover:text-yellow-400"
-                  aria-label={$i18n("tracksTab.nameHint")}
+                  aria-label={next
+                    ? $i18n("tracksTab.nameSuggest").replace("{name}", next)
+                    : $i18n("tracksTab.nameHint")}
                   data-testid="track-name-warning"
+                  onclick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    void applySuggestion(t);
+                  }}
                 >
                   <CircleAlertIcon class="size-3" strokeWidth={2} />
                 </Tooltip.Trigger>
-                <Tooltip.Content>{$i18n("tracksTab.nameHint")}</Tooltip.Content>
+                <Tooltip.Content
+                  >{next
+                    ? $i18n("tracksTab.nameSuggest").replace("{name}", next)
+                    : $i18n("tracksTab.nameHint")}</Tooltip.Content
+                >
               </Tooltip.Root>
             {/if}
           {/snippet}

@@ -40,11 +40,17 @@
     toggleWaypointVisible,
   } from "$lib/api";
   import { open } from "@tauri-apps/plugin-dialog";
-  import { t } from "$lib/i18n";
+  import { t, type MessageKey } from "$lib/i18n";
   import { toast } from "svelte-sonner";
   import type { WaypointData } from "$lib/types";
   import SymbolPicker from "../SymbolPicker.svelte";
   import { waypointColorHex } from "$lib/waypoint-symbols";
+  import {
+    hex,
+    latinEs,
+    WAYPOINT_COLOURS,
+    waypointNameProblems,
+  } from "$lib/standard-colours";
 
   // `$state<T>(...)` rather than an annotated `let`: with the annotation,
   // TypeScript's flow analysis narrows the variable to `null` at any point
@@ -178,6 +184,27 @@
     }
   }
 
+  /** The name's trouble by п. 26, for the hint under it. */
+  const nameProblems = $derived(
+    waypoint ? waypointNameProblems(waypoint.name) : null,
+  );
+
+  async function fixRussianEs() {
+    const wp = waypoint;
+    const layerId = $activeWaypointLayerId;
+    if (!wp || layerId === null) return;
+    try {
+      const fixed = latinEs(wp.name);
+      await renameWaypoint(layerId, BigInt(wp.id), fixed);
+      nameDraft = fixed;
+      nameDirty = false;
+    } catch (error) {
+      toast.error($t("inspector.waypointRenameFailed"), {
+        description: String(error),
+      });
+    }
+  }
+
   function handleNameInput(event: Event) {
     nameDraft = (event.currentTarget as HTMLInputElement).value;
     nameDirty = true;
@@ -293,6 +320,19 @@
         data-testid="waypoint-color"
         onchange={handleColorChange}
       />
+      <!-- The standard's colours (п. 28) one click away; the picker above
+           is for anything else. -->
+      <div class="flex gap-0.5" data-testid="waypoint-standard-colours">
+        {#each WAYPOINT_COLOURS as colour (colour.key)}
+          <button
+            class="border-border size-3.5 rounded-sm border p-0"
+            style={`background:${hex(colour.rgba)}`}
+            title={$t(`waypointColour.${colour.key}` as MessageKey)}
+            aria-label={$t(`waypointColour.${colour.key}` as MessageKey)}
+            onclick={() => void applyColor([...colour.rgba])}
+          ></button>
+        {/each}
+      </div>
       {#if waypoint?.color}
         <button
           class="text-muted-foreground hover:text-foreground border-0 bg-transparent p-0 text-[10px]"
@@ -321,6 +361,28 @@
         class="h-8 text-sm font-medium"
         aria-label={$t("inspector.waypointName")}
       />
+      <!-- п. 26: the Russian capital С must be the latin C, and only letters,
+           digits, space, `_` and `-` belong in a name; the note takes the
+           rest. Said once, under the name, with the fix where there is one. -->
+      {#if nameProblems?.russianEs}
+        <button
+          class="mt-1 border-0 bg-transparent p-0 text-left text-[11px] text-yellow-600 hover:underline dark:text-yellow-500"
+          onclick={() => void fixRussianEs()}
+          data-testid="waypoint-name-fix-es"
+          >{$t("inspector.waypointNameEs")}</button
+        >
+      {/if}
+      {#if nameProblems && nameProblems.badCharacters.length > 0}
+        <div
+          class="mt-1 text-[11px] text-yellow-600 dark:text-yellow-500"
+          data-testid="waypoint-name-bad-characters"
+        >
+          {$t("inspector.waypointNameBad").replace(
+            "{chars}",
+            nameProblems.badCharacters.join(" "),
+          )}
+        </div>
+      {/if}
     </div>
     <Button
       variant="ghost"

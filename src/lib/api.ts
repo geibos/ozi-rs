@@ -6,6 +6,7 @@ import {
   type FtpAccountInput,
   type FtpCheckDto,
   type ImportReportDto,
+  type PltFilesExportDto,
   type Result,
   type TrackSummaryDto,
 } from "./bindings";
@@ -698,6 +699,27 @@ export async function splitSegment(
 }
 
 /**
+ * Delete the points chosen with a box on the map, or with `keepOnly` every
+ * point but them — one undo step. Returns how many points went.
+ */
+export async function removeTrackPoints(
+  layerId: bigint,
+  trackId: bigint,
+  pointIds: bigint[],
+  keepOnly: boolean,
+): Promise<number> {
+  return unwrap(
+    "remove_track_points",
+    commands.removeTrackPoints(
+      toIdNumber(layerId),
+      toIdNumber(trackId),
+      pointIds.map(toIdNumber),
+      keepOnly,
+    ),
+  );
+}
+
+/**
  * Delete a point and split its segment between the points on either side —
  * «Удалить и разделить», one undo step.
  */
@@ -715,6 +737,45 @@ export async function cutOutTrackPoint(
       toIdNumber(segmentId),
       toIdNumber(pointId),
     ),
+  );
+}
+
+/** Every visible track to its own PLT named after it — see the command. */
+export async function exportTracksPlt(
+  dir: string | null,
+  replace: boolean,
+): Promise<PltFilesExportDto> {
+  return unwrap("export_tracks_plt", commands.exportTracksPlt(dir, replace));
+}
+
+/** `<bundle>/10-Tracks`, or `null` with no search folder open. */
+export async function getTracksDir(): Promise<string | null> {
+  return unwrap("get_tracks_dir", commands.getTracksDir());
+}
+
+/** Every visible mark into one WPT; how many were written. */
+export async function exportAllWaypointsWpt(path: string): Promise<number> {
+  return unwrap(
+    "export_all_waypoints_wpt",
+    commands.exportAllWaypointsWpt(path),
+  );
+}
+
+/** `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, today's date. */
+export async function getAllWaypointsExportDefaultPath(): Promise<string> {
+  return unwrap(
+    "get_all_waypoints_export_default_path",
+    commands.getAllWaypointsExportDefaultPath(),
+  );
+}
+
+/** Clear the note of every mark in a layer, one undo step. */
+export async function clearWaypointDescriptions(
+  layerId: bigint,
+): Promise<number> {
+  return unwrap(
+    "clear_waypoint_descriptions",
+    commands.clearWaypointDescriptions(toIdNumber(layerId)),
   );
 }
 

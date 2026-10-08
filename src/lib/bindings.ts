@@ -426,6 +426,79 @@ async cutOutTrackPoint(layerId: number, trackId: number, segmentId: number, poin
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Delete the points chosen with a box on the map, or with `keep_only` every
+ * point but them, as one undo step. Returns how many points were removed.
+ */
+async removeTrackPoints(layerId: number, trackId: number, pointIds: number[], keepOnly: boolean) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("remove_track_points", { layerId, trackId, pointIds, keepOnly }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every visible mark of every layer into one WPT file (standard п. 31).
+ * Returns how many marks were written.
+ */
+async exportAllWaypointsWpt(path: string) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_all_waypoints_wpt", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Clear the note of every mark in a waypoint layer, one undo step. Returns
+ * how many notes were cleared.
+ */
+async clearWaypointDescriptions(layerId: number) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_waypoint_descriptions", { layerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every visible track to its own PLT, named after the track (standard
+ * п. 24), in `dir` or by default `<bundle>/10-Tracks` (п. 25). Same-named
+ * files stop it unless `replace`.
+ */
+async exportTracksPlt(dir: string | null, replace: boolean) : Promise<Result<PltFilesExportDto, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_tracks_plt", { dir, replace }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The folder processed tracks go to, `<bundle>/10-Tracks`, when a search
+ * folder is open.
+ */
+async getTracksDir() : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_tracks_dir") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Where every visible mark goes by default:
+ * `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, today's date.
+ */
+async getAllWaypointsExportDefaultPath() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_all_waypoints_export_default_path") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async joinSegments(layerId: number, trackId: number, segmentIdA: number, segmentIdB: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("join_segments", { layerId, trackId, segmentIdA, segmentIdB }) };
@@ -944,6 +1017,11 @@ slug: string; name: string; center_lat: number; center_lon: number; maps: LizaMa
  * what not to download.
  */
 contents: BundleEntryDto[] }
+/**
+ * What writing each track to its own PLT did: the files written, or, when
+ * nothing was written, the files that were in the way.
+ */
+export type PltFilesExportDto = { written: string[]; existing: string[]; dir: string }
 export type PointDetailDto = { id: number; lat: number; lon: number; elevation: number | null; timestamp: string | null }
 /**
  * The size of a picture, so the calibration form knows what it is working on.
@@ -969,7 +1047,12 @@ export type TrackDetailDto = { id: number; name: string; segments: SegmentDetail
  * from the domain `Track` so the frontend can render them without re-walking
  * the segment data.
  */
-export type TrackSummaryDto = { layer_id: number; track_id: number; name: string; color: string; line_width: number; visible: boolean; distance_km: number; duration_seconds: number | null; point_count: number }
+export type TrackSummaryDto = { layer_id: number; track_id: number; name: string; color: string; line_width: number; visible: boolean; distance_km: number; duration_seconds: number | null; point_count: number; 
+/**
+ * The first point's time, RFC 3339 — the day the group went out, which
+ * is the date a track is named by (standard п. 15–16).
+ */
+start_time: string | null }
 export type WaypointDto = { id: number; name: string; lat: number; lon: number; symbol: string | null; visible: boolean; 
 /**
  * RGBA, or absent for "whatever the map draws waypoints with". Absent is

@@ -161,6 +161,13 @@ pub enum ProjectCommand {
         new_attachments: Vec<String>,
     },
     /// The note beside a mark: what a crew is actually sent to.
+    /// Several marks' notes at once, each with its old and new text: the
+    /// addresses a phone writes into every mark, cleared from a whole layer
+    /// in one undo step. Reverse swaps old and new.
+    SetWaypointDescriptions {
+        layer_id: LayerId,
+        changes: Vec<(WaypointId, Option<String>, Option<String>)>,
+    },
     SetWaypointDescription {
         layer_id: LayerId,
         waypoint_id: WaypointId,
@@ -846,6 +853,16 @@ impl ProjectCommand {
                 )?;
                 Ok(())
             }
+            Self::SetWaypointDescriptions { layer_id, changes } => {
+                for (waypoint_id, _, new_description) in changes {
+                    project.set_waypoint_description_in_layer(
+                        *layer_id,
+                        *waypoint_id,
+                        new_description.clone(),
+                    )?;
+                }
+                Ok(())
+            }
             Self::SetWaypointAttachments {
                 layer_id,
                 waypoint_id,
@@ -1342,6 +1359,13 @@ impl ProjectCommand {
                 waypoint_id: *waypoint_id,
                 old_description: new_description.clone(),
                 new_description: old_description.clone(),
+            },
+            Self::SetWaypointDescriptions { layer_id, changes } => Self::SetWaypointDescriptions {
+                layer_id: *layer_id,
+                changes: changes
+                    .iter()
+                    .map(|(id, old, new)| (*id, new.clone(), old.clone()))
+                    .collect(),
             },
             Self::SetWaypointAttachments {
                 layer_id,

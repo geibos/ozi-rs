@@ -120,6 +120,9 @@ pub struct TrackSummaryDto {
     pub distance_km: f64,
     pub duration_seconds: Option<u64>,
     pub point_count: u32,
+    /// The first point's time, RFC 3339 — the day the group went out, which
+    /// is the date a track is named by (standard п. 15–16).
+    pub start_time: Option<String>,
 }
 
 #[derive(serde::Serialize, specta::Type, Clone)]
@@ -202,6 +205,12 @@ fn to_track_summary_dto(layer_id: u64, track: &crate::domain::Track) -> TrackSum
         distance_km: track.total_distance_km(),
         duration_seconds,
         point_count: track.point_count() as u32,
+        start_time: track
+            .segments()
+            .iter()
+            .flat_map(|s| s.points())
+            .find_map(|p| p.timestamp())
+            .map(|t| t.to_rfc3339()),
     }
 }
 
@@ -1096,6 +1105,89 @@ pub fn export_wpt_waypoints(
     Ok(())
 }
 
+/// What writing each track to its own PLT did: the files written, or, when
+/// nothing was written, the files that were in the way.
+#[derive(serde::Serialize, specta::Type)]
+pub struct PltFilesExportDto {
+    pub written: Vec<String>,
+    pub existing: Vec<String>,
+    pub dir: String,
+}
+
+/// Every visible track to its own PLT, named after the track (standard
+/// п. 24), in `dir` or by default `<bundle>/10-Tracks` (п. 25). Same-named
+/// files stop it unless `replace`.
+#[tauri::command]
+#[specta::specta]
+pub fn export_tracks_plt(
+    dir: Option<String>,
+    replace: bool,
+    state: State<SharedState>,
+) -> Result<PltFilesExportDto, String> {
+    let mut app_state = lock_app_state(state.inner())?;
+    let dir = match dir {
+        Some(dir) => PathBuf::from(dir),
+        None => app_state
+            .tracks_dir()
+            .ok_or_else(|| "No search folder is open to find 10-Tracks in".to_owned())?,
+    };
+    let result = app_state.export_visible_tracks_plt(&dir, replace)?;
+    Ok(PltFilesExportDto {
+        written: result.written,
+        existing: result.existing,
+        dir: dir.display().to_string(),
+    })
+}
+
+/// The folder processed tracks go to, `<bundle>/10-Tracks`, when a search
+/// folder is open.
+#[tauri::command]
+#[specta::specta]
+pub fn get_tracks_dir(state: State<SharedState>) -> Result<Option<String>, String> {
+    Ok(lock_app_state(state.inner())?
+        .tracks_dir()
+        .map(|p| p.display().to_string()))
+}
+
+/// Clear the note of every mark in a waypoint layer, one undo step. Returns
+/// how many notes were cleared.
+#[tauri::command]
+#[specta::specta]
+pub fn clear_waypoint_descriptions(
+    layer_id: u64,
+    state: State<SharedState>,
+    app: AppHandle,
+) -> Result<u32, String> {
+    use crate::domain::LayerId;
+    let cleared = lock_app_state(state.inner())?
+        .apply_clear_waypoint_descriptions(LayerId::new(layer_id))
+        .map_err(|e| format!("{e}"))?;
+    if cleared > 0 {
+        let _ = app.emit("state-changed", ());
+    }
+    Ok(cleared as u32)
+}
+
+/// Every visible mark of every layer into one WPT file (standard п. 31).
+/// Returns how many marks were written.
+#[tauri::command]
+#[specta::specta]
+pub fn export_all_waypoints_wpt(path: String, state: State<SharedState>) -> Result<u32, String> {
+    let count = lock_app_state(state.inner())?.export_all_waypoints_wpt(PathBuf::from(path))?;
+    Ok(count as u32)
+}
+
+/// Where every visible mark goes by default:
+/// `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, today's date.
+#[tauri::command]
+#[specta::specta]
+pub fn get_all_waypoints_export_default_path(state: State<SharedState>) -> Result<String, String> {
+    Ok(lock_app_state(state.inner())?
+        .export_all_waypoints_default_path()
+        .display()
+        .to_string())
+}
+
 /// Export a waypoint layer to GPX — the format phones, navigators and the
 /// other groups' software read.
 #[tauri::command]
@@ -1838,6 +1930,35 @@ pub fn crop_track_to_extent(
         )
         .map_err(|e| format!("{e}"))?;
     let _ = app.emit("state-changed", ());
+    Ok(removed as u32)
+}
+
+/// Delete the points chosen with a box on the map, or with `keep_only` every
+/// point but them, as one undo step. Returns how many points were removed.
+#[tauri::command]
+#[specta::specta]
+pub fn remove_track_points(
+    state: State<SharedState>,
+    app: AppHandle,
+    layer_id: u64,
+    track_id: u64,
+    point_ids: Vec<u64>,
+    keep_only: bool,
+) -> Result<u32, String> {
+    use crate::domain::{LayerId, TrackId, TrackPointId};
+    let chosen: Vec<TrackPointId> = point_ids.into_iter().map(TrackPointId::new).collect();
+    let mut app_state = lock_app_state(state.inner())?;
+    let removed = app_state
+        .apply_remove_track_points(
+            LayerId::new(layer_id),
+            TrackId::new(track_id),
+            &chosen,
+            keep_only,
+        )
+        .map_err(|e| format!("{e}"))?;
+    if removed > 0 {
+        let _ = app.emit("state-changed", ());
+    }
     Ok(removed as u32)
 }
 

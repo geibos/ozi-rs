@@ -40,6 +40,7 @@ non-destructive and immediately visible.
 | `MoveWaypoint`            | Move waypoint to new coordinates                            | yes      |
 | `RenameWaypoint`          | Rename a waypoint (stores old and new names)                | yes      |
 | `SetWaypointSymbol`       | Set or clear a waypoint symbol (stores old and new symbols) | yes      |
+| `SetWaypointDescriptions` | Several marks' notes at once, old and new for each          | yes      |
 
 ## Tauri IPC Commands
 
@@ -96,39 +97,44 @@ registered without a line on this page, so the gap cannot open again.
 
 ### Import / Export
 
-| Command                             | Description                                                                  |
-| ----------------------------------- | ---------------------------------------------------------------------------- |
-| `import_gpx`                        | Import GPX file or ZIP archive                                               |
-| `import_plt`                        | Import PLT file                                                              |
-| `import_wpt`                        | Import an OziExplorer waypoint file into a layer of its own                  |
-| `import_tracks_directory`           | Walk a folder and its subfolders, importing every `.gpx` and `.plt`          |
-| `export_gpx`                        | Export track layer to GPX                                                    |
-| `export_track_plt`                  | Export single track to PLT                                                   |
-| `export_wpt_waypoints`              | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF)                 |
-| `get_wpt_export_default_path`       | Suggest WPT export path (`<bundle>/<layer>.wpt`)                             |
-| `export_all_tracks_gpx`             | Every track in the project into one GPX, returning how many were written     |
-| `export_gpx_waypoints`              | Export a waypoint layer to GPX — what phones and other groups' software read |
-| `get_waypoints_export_default_path` | Suggest a waypoint export path for a given format                            |
+| Command                                 | Description                                                                                                             |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `import_gpx`                            | Import GPX file or ZIP archive                                                                                          |
+| `import_plt`                            | Import PLT file                                                                                                         |
+| `import_wpt`                            | Import an OziExplorer waypoint file into a layer of its own                                                             |
+| `import_tracks_directory`               | Walk a folder and its subfolders, importing every `.gpx` and `.plt`                                                     |
+| `export_gpx`                            | Export track layer to GPX                                                                                               |
+| `export_track_plt`                      | Export single track to PLT                                                                                              |
+| `export_tracks_plt`                     | Every visible track to its own PLT named after it, by default in `10-Tracks`; same-named files stop it unless replacing |
+| `get_tracks_dir`                        | `<bundle>/10-Tracks`, when a search folder is open                                                                      |
+| `export_wpt_waypoints`                  | Export waypoint layer to OziExplorer WPT v1.1 (cp1251, CRLF)                                                            |
+| `export_all_waypoints_wpt`              | Every visible mark of every layer into one WPT file (standard п. 31)                                                    |
+| `get_all_waypoints_export_default_path` | `<bundle>/10-Tracks/Waypoints_ГГГГММДД.wpt`, today's date                                                               |
+| `get_wpt_export_default_path`           | Suggest WPT export path (`<bundle>/<layer>.wpt`)                                                                        |
+| `export_all_tracks_gpx`                 | Every track in the project into one GPX, returning how many were written                                                |
+| `export_gpx_waypoints`                  | Export a waypoint layer to GPX — what phones and other groups' software read                                            |
+| `get_waypoints_export_default_path`     | Suggest a waypoint export path for a given format                                                                       |
 
 ### Track Mutations (via CommandStack, undoable)
 
-| Command                | Description                                                       |
-| ---------------------- | ----------------------------------------------------------------- |
-| `rename_track`         | Rename a track                                                    |
-| `move_track_point`     | Move a point by drag                                              |
-| `delete_track_point`   | Delete a point                                                    |
-| `insert_track_point`   | Insert a point at index                                           |
-| `split_segment`        | Split segment at a point                                          |
-| `cut_out_track_point`  | Delete a middle point and split the segment there, one undo step  |
-| `join_segments`        | Join two adjacent segments                                        |
-| `delete_track`         | Delete a track                                                    |
-| `create_empty_track`   | Create empty track (for drawing mode)                             |
-| `simplify_track`       | Apply Douglas-Peucker simplification                              |
-| `sort_track_points`    | Sort a track's points by timestamp, as one undoable step          |
-| `crop_track_to_extent` | Keep only the points inside the given map extent                  |
-| `crop_track_to_time`   | Keep only the points inside the given time range                  |
-| `cancel_drawing`       | Discard the draw in progress without leaving it on the redo stack |
-| `trim_track_at_point`  | Cut everything before or after a chosen point, keeping that point |
+| Command                | Description                                                           |
+| ---------------------- | --------------------------------------------------------------------- |
+| `rename_track`         | Rename a track                                                        |
+| `move_track_point`     | Move a point by drag                                                  |
+| `delete_track_point`   | Delete a point                                                        |
+| `insert_track_point`   | Insert a point at index                                               |
+| `split_segment`        | Split segment at a point                                              |
+| `cut_out_track_point`  | Delete a middle point and split the segment there, one undo step      |
+| `remove_track_points`  | Delete the points chosen with a box, or keep only them, one undo step |
+| `join_segments`        | Join two adjacent segments                                            |
+| `delete_track`         | Delete a track                                                        |
+| `create_empty_track`   | Create empty track (for drawing mode)                                 |
+| `simplify_track`       | Apply Douglas-Peucker simplification                                  |
+| `sort_track_points`    | Sort a track's points by timestamp, as one undoable step              |
+| `crop_track_to_extent` | Keep only the points inside the given map extent                      |
+| `crop_track_to_time`   | Keep only the points inside the given time range                      |
+| `cancel_drawing`       | Discard the draw in progress without leaving it on the redo stack     |
+| `trim_track_at_point`  | Cut everything before or after a chosen point, keeping that point     |
 
 ### Track Style (non-undoable, bypass CommandStack)
 
@@ -142,19 +148,20 @@ registered without a line on this page, so the gap cannot open again.
 
 ### Waypoint Mutations (via CommandStack, undoable)
 
-| Command                     | Description                                                                             |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| `add_waypoint`              | Add waypoint at coordinates                                                             |
-| `move_waypoint`             | Move waypoint to new coordinates                                                        |
-| `delete_waypoint`           | Delete a waypoint                                                                       |
-| `rename_waypoint`           | Rename a waypoint                                                                       |
-| `set_waypoint_symbol`       | Set or clear waypoint symbol                                                            |
-| `set_waypoint_color`        | Set or clear a mark's colour                                                            |
-| `set_waypoint_description`  | Write the note beside a mark — what a crew is actually sent to                          |
-| `set_waypoint_attachments`  | Replace the files that belong to a mark — paths beside the project, not bytes inside it |
-| `toggle_waypoint_visible`   | Flip one waypoint's visibility (style, not an undoable edit)                            |
-| `set_all_waypoints_visible` | Show or hide every waypoint in one step                                                 |
-| `show_only_waypoint`        | Show one waypoint and hide the rest                                                     |
+| Command                       | Description                                                                             |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| `add_waypoint`                | Add waypoint at coordinates                                                             |
+| `move_waypoint`               | Move waypoint to new coordinates                                                        |
+| `delete_waypoint`             | Delete a waypoint                                                                       |
+| `rename_waypoint`             | Rename a waypoint                                                                       |
+| `set_waypoint_symbol`         | Set or clear waypoint symbol                                                            |
+| `set_waypoint_color`          | Set or clear a mark's colour                                                            |
+| `set_waypoint_description`    | Write the note beside a mark — what a crew is actually sent to                          |
+| `clear_waypoint_descriptions` | Clear the note of every mark in a layer, one undo step                                  |
+| `set_waypoint_attachments`    | Replace the files that belong to a mark — paths beside the project, not bytes inside it |
+| `toggle_waypoint_visible`     | Flip one waypoint's visibility (style, not an undoable edit)                            |
+| `set_all_waypoints_visible`   | Show or hide every waypoint in one step                                                 |
+| `show_only_waypoint`          | Show one waypoint and hide the rest                                                     |
 
 ### Layers (via CommandStack, undoable)
 

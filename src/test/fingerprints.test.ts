@@ -31,6 +31,7 @@ function track(
     distance_km: 0,
     duration_seconds: null,
     point_count: 10,
+    start_time: null,
     ...partial,
   };
 }

@@ -20,6 +20,8 @@ export interface TrackFeature {
   distanceKm: number;
   durationSeconds: number | null;
   pointCount: number;
+  /** The first point's time, RFC 3339 — the day the group went out. */
+  startTime: string | null;
 }
 
 /** Sort by (layer, track) so rows belonging to one layer stay together. */
@@ -46,6 +48,7 @@ export function trackFeaturesFromSummaries(
         durationSeconds:
           s.duration_seconds === null ? null : Number(s.duration_seconds),
         pointCount: s.point_count,
+        startTime: s.start_time ?? null,
       }) satisfies TrackFeature,
   );
   rows.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));

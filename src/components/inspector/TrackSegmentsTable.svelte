@@ -33,6 +33,7 @@
   import { joinSegments, splitSegment, trimTrackAtPoint } from "$lib/api";
   import { formatLeg, legsOf, type Leg } from "$lib/track-jumps";
   import TrackJumps from "./TrackJumps.svelte";
+  import { boxSelectActive, setBoxSelect } from "$lib/box-select";
   import { reportEditFailure } from "$lib/edit-failure";
   import { locale, t } from "$lib/i18n";
   import { toast } from "svelte-sonner";
@@ -309,6 +310,16 @@
         onclick={() => stepPoint(1)}>↓</button
       >
     </span>
+    <Button
+      variant={$boxSelectActive ? "default" : "outline"}
+      size="xs"
+      disabled={!$selectedTrack}
+      title={$t("boxSelect.start")}
+      data-testid="box-select-toggle"
+      onclick={() => setBoxSelect(!$boxSelectActive)}
+    >
+      {$t("boxSelect.toggle")}
+    </Button>
     <Button
       variant={$editModeActive ? "default" : "outline"}
       size="xs"

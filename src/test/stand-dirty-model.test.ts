@@ -20,6 +20,11 @@ import { standCommandChangesTheProject } from "./stand/tauri-core";
  * the safe way to be wrong at review.
  */
 const LEAVES_THE_PROJECT_ALONE = [
+  // The search's files written from the work.
+  "get_tracks_dir",
+  "export_tracks_plt",
+  "get_all_waypoints_export_default_path",
+  "export_all_waypoints_wpt",
   // Reads.
   "get_app_state",
   "get_ozi_metadata",

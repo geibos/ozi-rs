@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { boxSelectActive, setBoxSelect } from "$lib/box-select";
   /**
    * Global Cmd-K command palette.
    *
@@ -603,6 +604,19 @@
               >{$ringActive
                 ? $i18n("palette.ringStop")
                 : $i18n("palette.ring")}</span
+            >
+          </Command.Item>
+          <Command.Item
+            value="tool:box-select"
+            onSelect={() => {
+              setBoxSelect(!$boxSelectActive);
+              close();
+            }}
+          >
+            <span class="flex-1"
+              >{$boxSelectActive
+                ? $i18n("boxSelect.stop")
+                : $i18n("boxSelect.start")}</span
             >
           </Command.Item>
           <Command.Item
