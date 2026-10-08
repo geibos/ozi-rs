@@ -85,7 +85,7 @@
   import {
     distinctNames,
     isStandardTrackName,
-    suggestTrackName,
+    suggestFromNames,
   } from "$lib/standard-name";
   import {
     hex,
@@ -269,7 +269,14 @@
   /** The standard's name for a row, or `null` when there is nothing to offer. */
   function suggestion(t: TrackFeature): string | null {
     if (isStandardTrackName(t.name)) return null;
-    return suggestTrackName(t.name, t.startTime);
+    // The layer is named after the file the track came from, which is
+    // often where the crew wrote the group: a phone calls its track
+    // `заброс`, the file is `20261006 Лиса4`.
+    const layer = trackLayers.find((l) => BigInt(l.id) === t.layerId);
+    return suggestFromNames(
+      layer ? [t.name, layer.name] : [t.name],
+      t.startTime,
+    );
   }
 
   /**

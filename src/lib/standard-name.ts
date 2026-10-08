@@ -98,6 +98,48 @@ const GROUPS: Record<string, string> = {
   avtonom: "Avtonom",
 };
 
+/** Car models a crew writes after a Ветер's number; not callsigns. */
+const CARS = new Set([
+  "гранта",
+  "granta",
+  "нива",
+  "niva",
+  "веста",
+  "vesta",
+  "лада",
+  "lada",
+  "уаз",
+  "uaz",
+  "патриот",
+  "patriot",
+  "дастер",
+  "duster",
+  "логан",
+  "logan",
+  "солярис",
+  "solaris",
+  "рио",
+  "rio",
+  "поло",
+  "polo",
+  "приора",
+  "priora",
+  "калина",
+  "kalina",
+  "ларгус",
+  "largus",
+  "шнива",
+  "буханка",
+  "газель",
+  "gazel",
+  "тойота",
+  "toyota",
+  "хендай",
+  "hyundai",
+  "киа",
+  "kia",
+]);
+
 /** Words a file name carries that are not part of anybody's callsign. */
 const NOISE = new Set(["track", "трек", "gpx", "plt", "file", "файл"]);
 
@@ -145,6 +187,10 @@ function callsign(rest: string): string | null {
       parts.push(group + number);
     } else if (/^\d+$/.test(token)) {
       parts.push(token);
+    } else if (CARS.has(token.toLowerCase())) {
+      // A Ветер's car is not a callsign: the owner renamed `Ветер 2 Гранта`
+      // to `Veter2` (2026-10-06), and kept `Veter1_Maura`, a driver's.
+      continue;
     } else {
       const latin = transliterate(token).replace(/[^A-Za-z0-9]/g, "");
       if (latin) parts.push(capitalise(latin));
@@ -208,4 +254,34 @@ export function distinctNames(
     used.add(numbered);
     return numbered;
   });
+}
+
+/** Whether a name holds a group's word — `Лиса`, `ветер5`, `Bort`… */
+export function namesAGroup(name: string): boolean {
+  return name
+    .split(/[\s_\-.,\d]+/u)
+    .some((word) => GROUPS[word.toLowerCase()] !== undefined);
+}
+
+/**
+ * The standard's name from the first of `candidates` that names a group —
+ * the track's own name, then its layer's, which is the file it came from — or
+ * failing that from the first that gives anything. A phone calls its track
+ * `заброс` and the crew calls the file `Лиса4` (owner's tracks, 2026-10-06).
+ */
+export function suggestFromNames(
+  candidates: readonly string[],
+  startTime: string | null,
+  timeZone?: string,
+): string | null {
+  const grouped = candidates.find(namesAGroup);
+  if (grouped !== undefined) {
+    const named = suggestTrackName(grouped, startTime, timeZone);
+    if (named) return named;
+  }
+  for (const candidate of candidates) {
+    const named = suggestTrackName(candidate, startTime, timeZone);
+    if (named) return named;
+  }
+  return null;
 }

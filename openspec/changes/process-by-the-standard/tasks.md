@@ -9,6 +9,11 @@
       walking the forest search's files: a navigator's and a phone's track
       of Лиса 19 would both be `20261008_Lisa19`, and saving refuses two
       tracks with one file
+- [x] 1.5 Held against the owner's own names for his eleven tracks of
+      2026-10-06 (GPX in, his PLT names out): 8 of 11 at first; the three
+      misses were a Ветер's car (`Ветер 2 Гранта` → `Veter2`) and a phone
+      track called `заброс` in a file named `Лиса4`. With the car list and
+      the layer's name as a second source, 11 of 11
 
 ## 2. Colours
 

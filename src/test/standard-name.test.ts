@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   distinctNames,
   isStandardTrackName,
+  suggestFromNames,
   suggestTrackName,
   transliterate,
 } from "../lib/standard-name";
@@ -106,5 +107,32 @@ describe("two tracks of one group", () => {
         new Set(["20261008_Lisa19_1"]),
       ),
     ).toEqual(["20261008_Lisa19_2", "20261008_Lisa19_3"]);
+  });
+});
+
+describe("names as the owner gave them to his eleven tracks", () => {
+  it("drops a Ветер's car, keeps a Лиса's callsign", () => {
+    expect(suggestTrackName("Ветер 2 Гранта", null, MSK, "20261006")).toBe(
+      "20261006_Veter2",
+    );
+    expect(suggestTrackName("20261006-Veter4-2", null, MSK)).toBe(
+      "20261006_Veter4_2",
+    );
+    expect(suggestTrackName("Лиса3 Klyaksa", null, MSK, "20261006")).toBe(
+      "20261006_Lisa3_Klyaksa",
+    );
+  });
+
+  it("takes the file's name when the track's names no group", () => {
+    expect(
+      suggestFromNames(
+        ["заброс", "20261006 Лиса4"],
+        "2026-10-05T21:46:00Z",
+        MSK,
+      ),
+    ).toBe("20261006_Lisa4");
+    expect(
+      suggestFromNames(["Ветер 1", "File"], "2026-10-05T21:40:00Z", MSK),
+    ).toBe("20261006_Veter1");
   });
 });

@@ -49,6 +49,11 @@ other words transliterated as the standard's example spells them (`Мохнат�
 callsign, nothing SHALL be offered. An action SHALL rename every track for
 which a name is offered and say how many are left to name by hand.
 
+A car model written after a Ветер's number (`Гранта`, `Нива`…) SHALL NOT
+become part of the callsign; a personal callsign SHALL (`Veter1_Maura`,
+`Lisa3_Black`). When the track's own name names no group, the name of its
+layer — the file it came from — SHALL be used.
+
 When several tracks would take the same name — a group's navigator and its
 phone — the names SHALL be numbered `_1`, `_2`… as п. 18 has it, and a name
 another track already carries SHALL be numbered past.
